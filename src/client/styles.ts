@@ -1,0 +1,36 @@
+/** Inline styles shared by the prompt-customizer panel components. */
+export const s = (() => {
+  const flex = { display: 'flex', alignItems: 'center' }
+  return {
+    root: { fontFamily: 'inherit', fontSize: 13, lineHeight: 1.5 },
+    bar: { ...flex, gap: 6, marginBottom: 8, flexWrap: 'wrap' },
+    tab: { padding: '4px 10px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit', opacity: 0.75 },
+    tabActive: { padding: '4px 10px', border: '1px solid rgba(128,128,128,.7)', borderRadius: 6, background: 'rgba(128,128,128,.18)', cursor: 'pointer', color: 'inherit' },
+    refresh: { marginLeft: 'auto', padding: '4px 10px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit' },
+    list: { display: 'flex', flexDirection: 'column', gap: 6 },
+    row: { ...flex, gap: 8, padding: '6px 8px', border: '1px solid rgba(128,128,128,.2)', borderRadius: 8, background: 'rgba(128,128,128,.06)' },
+    switchWrap: { ...flex, gap: 6, minWidth: 90 },
+    rowBody: { flex: 1, minWidth: 0 },
+    rowTitle: { ...flex, gap: 6, alignItems: 'baseline', flexWrap: 'wrap' },
+    code: { fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' },
+    orderTag: { color: 'rgba(128,128,128,.8)', fontSize: 11 },
+    preview: { color: 'rgba(128,128,128,.85)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    badgeOk: { color: '#3fb950', fontSize: 11, border: '1px solid rgba(63,185,80,.5)', borderRadius: 999, padding: '0 6px' },
+    badgeBlocked: { color: '#f85149', fontSize: 11, border: '1px solid rgba(248,81,73,.5)', borderRadius: 999, padding: '0 6px' },
+    badgeReplaced: { color: '#d29922', fontSize: 11, border: '1px solid rgba(210,153,34,.5)', borderRadius: 999, padding: '0 6px' },
+    mini: { padding: '3px 8px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit', whiteSpace: 'nowrap' },
+    arrowCol: { display: 'flex', flexDirection: 'column', gap: 2 },
+    arrow: { padding: '0 6px', border: '1px solid rgba(128,128,128,.3)', borderRadius: 4, background: 'transparent', cursor: 'pointer', color: 'inherit', fontSize: 11, lineHeight: 1.4, opacity: 0.8 },
+    rowDragging: { opacity: 0.4 },
+    rowDropAbove: { boxShadow: '0 -2px 0 0 #58a6ff' },
+    rowDropBelow: { boxShadow: '0 2px 0 0 #58a6ff' },
+    dragHandle: { cursor: 'grab', color: 'rgba(128,128,128,.7)', fontSize: 13, padding: '0 2px', userSelect: 'none' },
+    injectBox: { marginTop: 10, padding: '8px', border: '1px dashed rgba(128,128,128,.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 },
+    injectRow: { ...flex, gap: 6 },
+    editBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
+    editInput: { padding: '6px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', color: 'inherit', fontFamily: 'inherit', fontSize: 12, resize: 'vertical', width: '100%', boxSizing: 'border-box' },
+    input: { padding: '4px 6px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', color: 'inherit' },
+    muted: { color: 'rgba(128,128,128,.75)', fontSize: 12 },
+    error: { color: '#f85149', fontSize: 12, marginBottom: 6 },
+  }
+})()

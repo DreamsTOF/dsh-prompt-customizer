@@ -1,0 +1,9 @@
+# dsh-prompt-customizer bundle patch: inserts the dual-face plugin row into
+# the web profile roster. Applied as a profile bundle layer (the
+# `dsh.bundle.patch` manifest field). The node half (exports ".") runs in the
+# host process (settings namespace, prompt/tool filtering, inventory route);
+# the `dsh.client` declaration in package.json loads the browser half
+# (exports "./client", served at /plugins/prompt-customizer/client.js).
+- insert:
+    - id: prompt-customizer
+      name: 'dsh-prompt-customizer'
