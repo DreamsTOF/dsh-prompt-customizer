@@ -22,3 +22,6 @@ Thumbs.db
 # Env / secrets
 .env
 .env.*
+
+# npm auth token (local publish credential)
+.npmrc

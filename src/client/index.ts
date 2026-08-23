@@ -49,10 +49,11 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, DICT), 'prompt-customizer: locale')
   const t = ctx.locale.bind(NS)
 
-  // Register a standalone settings section (sidebar menu entry) AND a plugin
-  // settings card. Both go through a NESTED inject of settingsScope so the
-  // panel can read/write the namespace config; on hosts without the settings
-  // transport neither appears instead of unmounting the whole plugin.
+  // Register a standalone settings section (sidebar menu entry) so the panel
+  // only appears under "提示词定制", not as a card inside the "插件" settings
+  // list. Goes through a NESTED inject of settingsScope so the panel can
+  // read/write the namespace config; on hosts without the settings transport
+  // it stays hidden instead of unmounting the whole plugin.
   ctx.inject(['settingsScope'], (scoped) => {
     const scope = scoped.settingsScope.bind({ namespace: NS })
 
@@ -61,13 +62,6 @@ export function apply(ctx: ClientContext): void {
       id: 'prompt-customizer',
       order: 50,
       label: () => t('nav'),
-      locale: NS,
-      inject: () => ({ t }),
-    }, () => h(Panel, { scope, t })))
-
-    scoped.slots.inject('settings.plugin.item', () => scoped.slots.register({
-      name: 'settings.plugin.item',
-      key: NS,
       locale: NS,
       inject: () => ({ t }),
     }, () => h(Panel, { scope, t })))
