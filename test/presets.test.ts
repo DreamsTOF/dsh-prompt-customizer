@@ -287,3 +287,64 @@ test('serializePreset returns { name, data }', () => {
   const preset = { id: 'p1', name: 'A', data: { sections: ['x'] } }
   assert.deepEqual(serializePreset(preset), { name: 'A', data: { sections: ['x'] } })
 })
+
+// ── Complex preset-switching cross coverage (regression: 5+ presets) ─────────
+
+// A 5-preset switch chain. The key invariant: after applying ANY preset, that
+// preset's OWN blocked sections must survive — even after applying other
+// presets in between (the previously reported bug deleted them).
+test('complex switch chain over 5+ presets keeps each preset own blocks', () => {
+  function make(id: string, blocked: string[], orderNames: string[] = NAMES) {
+    return { id, name: id, data: { sections: blocked, replace: {}, order: fullOrder(orderNames), tools: {} } }
+  }
+  const presets: Record<string, ReturnType<typeof make>> = {
+    p1: make('p1', ['a', 'b']),
+    p2: make('p2', ['c', 'd']),
+    p3: make('p3', ['e', 'f', 'g']),
+    p4: make('p4', []),
+    p5: make('p5', ['b', 'c'], ['a', 'b', 'c']), // partial order
+  }
+
+  const all = new Set(NAMES)
+  let cfg: { sections: string[] } = { sections: [] }
+
+  const seq = ['p4', 'p1', 'p2', 'p5', 'p3', 'p1', 'p4', 'p2', 'p5', 'p3', 'p1', 'p5', 'p2', 'p4', 'p3', 'p1']
+
+  for (const id of seq) {
+    const preset = presets[id]!
+    const patch = applyPresetData(preset.data, cfg, all)
+
+    // Exact expected blocked set for this preset.
+    const orderNames = new Set(preset.data.order.map((o) => o.name))
+    const expected = new Set(preset.data.sections)
+    if (orderNames.size > 0) {
+      const active = new Set([...orderNames].filter((n) => !expected.has(n)))
+      for (const n of all) if (!orderNames.has(n)) expected.add(n)
+      for (const n of active) expected.delete(n)
+    }
+    assert.deepEqual([...patch.sections].sort(), [...expected].sort(), `step ${id}: blocked set`)
+
+    // The reported bug regression: the preset's own blocked sections survive.
+    for (const n of preset.data.sections) {
+      assert.ok(patch.sections.includes(n), `preset ${id} must keep its own block ${n}`)
+    }
+
+    cfg = { sections: patch.sections }
+  }
+})
+
+// Applies a large preset, then a small (partial-order) preset: the small one
+// default-disables the sections outside its own list, cross-cutting the prior
+// preset's blocks.
+test('small preset after a full preset default-disables outside its list', () => {
+  const full = { id: 'f', name: 'f', data: { sections: ['a', 'b'], replace: {}, order: fullOrder(NAMES), tools: {} } }
+  const small = { id: 's', name: 's', data: { sections: [], replace: {}, order: fullOrder(NAMES.slice(0, 5)), tools: {} } }
+
+  // Apply full preset first (blocks a,b).
+  const step1 = applyPresetData(full.data, { sections: [] }, new Set(NAMES))
+  assert.deepEqual([...step1.sections].sort(), ['a', 'b'])
+
+  // Switch to the small preset: sections not in its list (f,g,h) are disabled.
+  const step2 = applyPresetData(small.data, { sections: step1.sections }, new Set(NAMES))
+  assert.deepEqual([...step2.sections].sort(), ['f', 'g', 'h'])
+})
