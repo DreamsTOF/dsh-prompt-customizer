@@ -26,16 +26,16 @@
 
 ## 安装
 
-从 npm 安装：
+从 npm 安装（将 `web` 换成你的 profile 名）：
 
 ```bash
-dsh plugin add dsh-prompt-customizer
+dsh plugin --profile web add dsh-prompt-customizer
 ```
 
 或从本地目录安装：
 
 ```bash
-dsh plugin add /path/to/dsh-prompt-customizer
+dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
 安装后，打开 dsh Web UI → **设置** → 侧边栏中的 **提示词定制**。

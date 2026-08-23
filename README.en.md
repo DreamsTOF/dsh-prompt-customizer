@@ -26,16 +26,16 @@ Plugin-injected prompt sections (from other plugins) can pollute your system pro
 
 ## Installation
 
-Install from npm:
+Install from npm (replace `web` with your profile name):
 
 ```bash
-dsh plugin add dsh-prompt-customizer
+dsh plugin --profile web add dsh-prompt-customizer
 ```
 
 Or install from a local checkout:
 
 ```bash
-dsh plugin add /path/to/dsh-prompt-customizer
+dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
 After installation, open the dsh web UI → **Settings** → **提示词定制** (Prompt Customizer) in the sidebar.
