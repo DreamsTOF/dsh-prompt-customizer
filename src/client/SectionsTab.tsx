@@ -2,15 +2,8 @@
 import { createElement as h, useState, type ReactElement, type DragEvent, type ChangeEvent } from 'react'
 import type { Config, Inventory, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
+import { mergeSections, type Section } from './presets.ts'
 import { s } from './styles.ts'
-
-interface Section {
-  name: string
-  order: number
-  text?: string
-  active: boolean
-  replaced: boolean
-}
 
 export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
   const replace = cfg.replace ?? {}
@@ -23,22 +16,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   // Merge inventory sections with user-injected sections, sorted by order.
   // Injected sections that don't exist in the original prompt appear here too,
   // positioned by their order value.
-  const merged: Section[] = (() => {
-    const map = new Map<string, Section>()
-    for (const sec of inv?.sections ?? []) map.set(sec.name, sec)
-    for (const item of cfg.inject ?? []) {
-      const existing = map.get(item.name)
-      if (existing) map.set(item.name, { ...existing, order: item.order })
-      else map.set(item.name, {
-        name: item.name,
-        order: item.order,
-        text: item.text || '<动态生成>',
-        active: !blockedNames.has(item.name),
-        replaced: false,
-      })
-    }
-    return [...map.values()].sort((a, b) => a.order - b.order)
-  })()
+  const merged: Section[] = mergeSections(inv, cfg, blockedNames)
 
   const toggleBlock = (name: string, currentlyBlocked: boolean): void => {
     const list = (cfg.sections ?? []).slice()

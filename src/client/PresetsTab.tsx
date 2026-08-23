@@ -2,6 +2,7 @@
 import { createElement as h, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
 import type { Config, Inventory, Preset, PresetData, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
+import { applyPresetData, buildPresetData, mergeSections } from './presets.ts'
 import { s } from './styles.ts'
 
 export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
@@ -9,54 +10,32 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   const [name, setName] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
-  // Current section names (inventory + injected), used to decide what to block.
-  const currentNames = (() => {
-    const set = new Set<string>()
-    for (const sec of inv?.sections ?? []) set.add(sec.name)
-    for (const item of cfg.inject ?? []) set.add(item.name)
-    return set
-  })()
+  const blockedNames = new Set(cfg.sections ?? [])
+  const merged = mergeSections(inv, cfg, blockedNames)
+  const currentNames = new Set(merged.map((sec) => sec.name))
 
   // Capture the current customization as a new preset (full snapshot). The
   // absolute order is converted to a relative form (each section records the
   // section it should follow) so the preset stays portable across prompts.
   const saveCurrent = (): void => {
     const presetName = name.trim() || `${t('preset')} ${presets.length + 1}`
-    const inject = cfg.inject ?? []
-    const order = inject.map((sec, i) => ({
-      name: sec.name,
-      after: i > 0 ? inject[i - 1].name : undefined,
-      text: sec.text,
-    }))
-    const data: PresetData = {
-      sections: cfg.sections,
-      replace: cfg.replace,
-      order,
-      tools: cfg.tools,
-    }
+    const data = buildPresetData(cfg, merged)
     scope.set('presets', [...presets, { id: genId(), name: presetName, data }])
     setName('')
   }
 
-  // Apply a preset. The preset's section list defines the active set:
+  // Apply a preset. The patch is computed by the pure helper:
   //  - same-name sections are overridden (content + order)
   //  - preset sections missing from the current prompt are added
   //  - current sections NOT in the preset list are disabled (blocked)
-  //  - the active sections are arranged by the preset's relative order
+  //  - only the preset's ACTIVE sections are unblocked (its own blocked list
+  //    is preserved)
   const applyPreset = (preset: Preset): void => {
-    const presetOrder = preset.data.order ?? []
-    const presetNames = new Set(presetOrder.map((x) => x.name))
-
-    // Blocked list: preset's own blocked names, plus any current section that
-    // is not part of the preset's active set; preset's active names unblocked.
-    const blocked = new Set(preset.data.sections ?? [])
-    for (const name of currentNames) if (!presetNames.has(name)) blocked.add(name)
-    for (const name of presetNames) blocked.delete(name)
-
-    scope.set('inject', resolveOrder(presetOrder))
-    scope.set('replace', { ...(cfg.replace ?? {}), ...(preset.data.replace ?? {}) })
-    scope.set('sections', [...blocked])
-    scope.set('tools', preset.data.tools ?? { exclude: [], include: [] })
+    const patch = applyPresetData(preset.data, cfg, currentNames)
+    scope.set('inject', patch.inject)
+    scope.set('replace', patch.replace)
+    scope.set('sections', patch.sections)
+    scope.set('tools', patch.tools)
     scope.set('activePreset', preset.id)
   }
 
@@ -132,53 +111,4 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
 
 function genId(): string {
   return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-}
-
-/**
- * Resolve a preset's relative order into an absolute ordered list (0..n-1).
- * Sections with no anchor (or whose anchor is absent) come first in preset
- * order; each anchored section is inserted right after its anchor; any
- * remaining sections (cycles) are appended.
- */
-function resolveOrder(presetOrder: Array<{ name: string; after?: string; text: string }>): Array<{ name: string; order: number; text: string }> {
-  const afterMap = new Map<string, string | undefined>()
-  const textMap = new Map<string, string>()
-  for (const sec of presetOrder) {
-    afterMap.set(sec.name, sec.after)
-    textMap.set(sec.name, sec.text)
-  }
-
-  const result: string[] = []
-  const placed = new Set<string>()
-
-  // Roots: no anchor, or anchor not part of the preset's own set.
-  for (const sec of presetOrder) {
-    const anchor = afterMap.get(sec.name)
-    if (!anchor || !afterMap.has(anchor)) {
-      result.push(sec.name)
-      placed.add(sec.name)
-    }
-  }
-
-  // Chain resolution: place each section right after its (already placed) anchor.
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const sec of presetOrder) {
-      if (placed.has(sec.name)) continue
-      const anchor = afterMap.get(sec.name)
-      if (anchor && placed.has(anchor)) {
-        result.splice(result.indexOf(anchor) + 1, 0, sec.name)
-        placed.add(sec.name)
-        changed = true
-      }
-    }
-  }
-
-  // Any remaining (cycle / unresolved) → append in preset order.
-  for (const sec of presetOrder) {
-    if (!placed.has(sec.name)) { result.push(sec.name); placed.add(sec.name) }
-  }
-
-  return result.map((name, i) => ({ name, order: i, text: textMap.get(name) ?? '' }))
 }
