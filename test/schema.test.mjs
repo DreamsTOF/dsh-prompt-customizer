@@ -48,3 +48,17 @@ test('rejects a preset missing required id/name', () => {
     presets: [{ data: {} }],
   }))
 })
+
+test('rejects a preset order entry missing a name', () => {
+  assert.throws(() => Config({
+    presets: [{ id: 'p', name: 'n', data: { order: [{ after: 'a', text: '' }] } }],
+  }))
+})
+
+test('rejects non-array sections', () => {
+  assert.throws(() => Config({ sections: 'tool:read' }))
+})
+
+test('rejects non-string replace values', () => {
+  assert.throws(() => Config({ replace: { a: 42 } }))
+})

@@ -83,3 +83,56 @@ test('filters tools by include (whitelist wins over exclude)', async () => {
   )
   assert.deepEqual(res.tools.map((t) => t.name), ['tool:read'])
 })
+
+// ── cross coverage ──────────────────────────────────────────────────────────
+
+test('blocks multiple sections at once', async () => {
+  const res = await assemble({ sections: ['harness:source', 'tool:read'] }, baseSections, baseTools)
+  assert.deepEqual(res.sections.map((s) => s.name), ['harness:identity'])
+})
+
+test('combines block + inject (order sorted across both)', async () => {
+  const res = await assemble(
+    { sections: ['tool:read'], inject: [{ name: 'app:x', order: -50, text: 'X' }] },
+    baseSections,
+    baseTools,
+  )
+  assert.deepEqual(res.sections.map((s) => s.name), ['app:x', 'harness:source', 'harness:identity'])
+  assert.equal(res.sections[0].text, 'X')
+})
+
+test('replaces multiple sections', async () => {
+  const res = await assemble(
+    { replace: { 'harness:source': 'S', 'harness:identity': 'I' } },
+    baseSections,
+    baseTools,
+  )
+  assert.equal(res.sections.find((s) => s.name === 'harness:source').text, 'S')
+  assert.equal(res.sections.find((s) => s.name === 'harness:identity').text, 'I')
+})
+
+test('blocked section that is also replaced stays removed', async () => {
+  const res = await assemble(
+    { sections: ['tool:read'], replace: { 'tool:read': 'CUSTOM' } },
+    baseSections,
+    baseTools,
+  )
+  assert.ok(!res.sections.some((s) => s.name === 'tool:read'))
+})
+
+test('no-op config returns sections and tools unchanged and in order', async () => {
+  const res = await assemble({}, baseSections, baseTools)
+  assert.deepEqual(res.sections.map((s) => s.name), ['harness:source', 'harness:identity', 'tool:read'])
+  assert.deepEqual(res.tools.map((t) => t.name), ['tool:read', 'tool:write'])
+})
+
+test('empty include list disables the whitelist filter', async () => {
+  const res = await assemble({ tools: { exclude: [], include: [] } }, baseSections, baseTools)
+  assert.equal(res.tools.length, 2)
+})
+
+test('empty sections list is handled', async () => {
+  const res = await assemble({}, [], baseTools)
+  assert.deepEqual(res.sections, [])
+  assert.equal(res.tools.length, 2)
+})

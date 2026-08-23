@@ -2,7 +2,7 @@
 import { createElement as h, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
 import type { Config, Inventory, Preset, PresetData, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
-import { applyPresetData, buildPresetData, mergeSections } from './presets.ts'
+import { addImportedPresets, applyPresetData, buildPresetData, mergeSections, removePreset, serializePreset } from './presets.ts'
 import { s } from './styles.ts'
 
 export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
@@ -40,13 +40,14 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   }
 
   const deletePreset = (id: string): void => {
-    scope.set('presets', presets.filter((p) => p.id !== id))
-    if (cfg.activePreset === id) scope.unset('activePreset')
+    const next = removePreset(presets, id, cfg.activePreset)
+    scope.set('presets', next.presets)
+    if (next.activeId === undefined && cfg.activePreset === id) scope.unset('activePreset')
   }
 
   // Serialize a preset to a downloadable JSON file.
   const exportPreset = (preset: Preset): void => {
-    const blob = new Blob([JSON.stringify({ name: preset.name, data: preset.data }, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(serializePreset(preset), null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -64,12 +65,7 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result))
-        const incoming = Array.isArray(parsed) ? parsed : [parsed]
-        const existing = new Set(presets.map((p) => p.name))
-        const added = incoming
-          .filter((p) => p && typeof p.name === 'string' && !existing.has(p.name))
-          .map((p) => ({ id: genId(), name: p.name, data: (p.data ?? {}) as PresetData }))
-        if (added.length > 0) scope.set('presets', [...presets, ...added])
+        scope.set('presets', addImportedPresets(presets, parsed, genId))
       } catch { /* ignore invalid json */ }
     }
     reader.readAsText(file)

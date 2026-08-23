@@ -1,5 +1,5 @@
 /** Pure preset / section helpers shared by the client UI and the node tests. */
-import type { Config, Inventory, PresetData } from './types.ts'
+import type { Config, Inventory, Preset, PresetData } from './types.ts'
 
 export interface Section {
   name: string
@@ -111,15 +111,88 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
   const presetOrder = data.order ?? []
   const presetNames = new Set(presetOrder.map((x) => x.name))
   const blocked = new Set(data.sections ?? [])
-  const activeNames = new Set([...presetNames].filter((n) => !blocked.has(n)))
 
-  for (const name of currentNames) if (!presetNames.has(name)) blocked.add(name)
-  for (const name of activeNames) blocked.delete(name)
+  // Only enforce the "active set" when the preset actually defines an order.
+  // An empty order (e.g. a hand-authored / imported preset that only blocks a
+  // few sections) must not default-disable every current section.
+  if (presetOrder.length > 0) {
+    const activeNames = new Set([...presetNames].filter((n) => !blocked.has(n)))
+    for (const name of currentNames) if (!presetNames.has(name)) blocked.add(name)
+    for (const name of activeNames) blocked.delete(name)
+  }
 
   return {
     sections: [...blocked],
     replace: { ...(cfg.replace ?? {}), ...(data.replace ?? {}) },
     inject: resolveOrder(presetOrder),
     tools: { exclude: data.tools?.exclude ?? [], include: data.tools?.include ?? [] },
+  }
+}
+
+// ── Tool filtering ──────────────────────────────────────────────────────────
+
+export type ToolsCfg = { exclude?: string[]; include?: string[] }
+
+/** Whether a tool is hidden under the current include/exclude config. */
+export function isToolHidden(name: string, toolsCfg: ToolsCfg | undefined): boolean {
+  const include = toolsCfg?.include ?? []
+  const exclude = toolsCfg?.exclude ?? []
+  return include.length > 0 ? !include.includes(name) : exclude.includes(name)
+}
+
+/** Toggle a tool's hidden state, returning a new tools config. */
+export function toggleTool(name: string, currentlyHidden: boolean, toolsCfg: ToolsCfg | undefined): ToolsCfg {
+  const include = toolsCfg?.include ?? []
+  const exclude = toolsCfg?.exclude ?? []
+  if (include.length > 0) {
+    const next = include.slice()
+    if (currentlyHidden) next.push(name)
+    else { const i = next.indexOf(name); if (i >= 0) next.splice(i, 1) }
+    return { exclude, include: next }
+  }
+  const next = exclude.slice()
+  if (currentlyHidden) { const i = next.indexOf(name); if (i >= 0) next.splice(i, 1) }
+  else next.push(name)
+  return { exclude: next, include }
+}
+
+/**
+ * Switch between include (whitelist) and exclude (blacklist) modes. Turning
+ * include mode on discards names unknown to the current tool set and seeds the
+ * include list from the currently non-excluded tools; turning it off clears the
+ * include list (keep only known exclude names).
+ */
+export function setToolMode(on: boolean, toolsCfg: ToolsCfg | undefined, toolNames: string[]): ToolsCfg {
+  const known = new Set(toolNames)
+  const exclude = (toolsCfg?.exclude ?? []).filter((n) => known.has(n))
+  if (on) return { exclude, include: toolNames.filter((n) => !exclude.includes(n)) }
+  return { exclude, include: [] }
+}
+
+// ── Preset list operations ──────────────────────────────────────────────────
+
+/** Serialize a preset for export (JSON-safe full snapshot). */
+export function serializePreset(preset: Preset): { name: string; data: PresetData } {
+  return { name: preset.name, data: preset.data }
+}
+
+/**
+ * Import preset(s): same-name presets are skipped, only distinct names are
+ * added. Returns a new presets list (or the original if nothing changed).
+ */
+export function addImportedPresets(existing: Preset[], parsed: unknown, makeId: () => string): Preset[] {
+  const incoming = Array.isArray(parsed) ? parsed : [parsed]
+  const existingNames = new Set(existing.map((p) => p.name))
+  const added = incoming
+    .filter((p) => p && typeof (p as { name?: unknown }).name === 'string' && !existingNames.has((p as Preset).name))
+    .map((p) => ({ id: makeId(), name: (p as Preset).name, data: ((p as Preset).data ?? {}) as PresetData }))
+  return added.length > 0 ? [...existing, ...added] : existing
+}
+
+/** Delete a preset, clearing the active id if it pointed at the removed one. */
+export function removePreset(presets: Preset[], id: string, activeId?: string): { presets: Preset[]; activeId?: string } {
+  return {
+    presets: presets.filter((p) => p.id !== id),
+    activeId: activeId === id ? undefined : activeId,
   }
 }
