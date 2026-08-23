@@ -1,14 +1,15 @@
 {
   "name": "dsh-prompt-customizer",
   "description": "System-prompt & tool customizer for DeepSeek Harness with a settings-panel UI: block / replace / inject prompt sections by name, and hide tools from the model catalog by exclude/include. Config lives in the dsh settings document (namespace prompt-customizer).",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": false,
   "main": "lib/index.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.client.json --noEmit",
     "build": "tsdown",
-    "check": "npm run typecheck && npm run build",
+    "test": "node --test",
+    "check": "npm run typecheck && npm run build && npm run test",
     "prepack": "npm run build"
   },
   "exports": {

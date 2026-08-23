@@ -104,6 +104,11 @@ npm run check   # typecheck + build
 
 浏览器端使用 [tsdown](https://github.com/rolldown/tsdown) 打包为 `client/client.js`（`__ModuleLoader__` factory bundle）。宿主端代码位于 `lib/`。
 
+## 已知限制
+
+- **替换动态生成的段会固定其生成内容**：像 `app:web-surface` 这类段在装配时实时生成（如嵌入当前 Web 服务器 URL）。替换后，文本会固定为您编辑时的值，不再随端口等运行时状态自动更新；如需跟随运行时变化，请勿替换该段，改用屏蔽。
+- **动态文本解析是尽力而为**：面板读取动态段时会尝试调用其生成函数并传入最小上下文，以便回显真实内容。个别依赖更复杂上下文、调用时会抛错的动态段会回退显示 `<动态生成>`，不影响其余功能。
+
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF

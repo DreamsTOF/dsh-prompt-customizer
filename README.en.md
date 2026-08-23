@@ -104,6 +104,11 @@ npm run check   # typecheck + build
 
 The browser half is built with [tsdown](https://github.com/rolldown/tsdown) into `client/client.js` (a `__ModuleLoader__` factory bundle). The host half lives in `lib/`.
 
+## Known limitations
+
+- **Replacing a dynamically generated section freezes its content**: sections like `app:web-surface` are generated live at assembly time (e.g. they embed the current Web server URL). After replacing, the text becomes fixed at the value you edited and no longer tracks runtime state such as the port. To keep following runtime changes, block the section instead of replacing it.
+- **Dynamic text resolution is best-effort**: the panel tries to call a dynamic section's generator function (with a minimal context) to echo its real content. A few dynamic sections that depend on richer context and throw when called fall back to showing `<动态生成>`; the rest of the features are unaffected.
+
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF
