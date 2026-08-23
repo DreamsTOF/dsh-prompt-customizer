@@ -7,6 +7,8 @@ export interface Section {
   text?: string
   active: boolean
   replaced: boolean
+  /** `system` = read from the host prompt inventory (not deletable); `custom` = added by this plugin (deletable). */
+  source?: 'system' | 'custom'
 }
 
 /** The config fields a preset apply must write back to the settings scope. */
@@ -17,20 +19,35 @@ export interface ConfigPatch {
   tools: { exclude: string[]; include: string[] }
 }
 
-/** Merge the inventory sections with the user's inject list, sorted by order. */
+/**
+ * Merge the inventory sections with the user's inject list, sorted by order.
+ * Sections read from the inventory (other plugins) are `system`; sections this
+ * plugin generated carry a hidden `custom` marker and are `custom`. The source
+ * is decided by the hidden marker — never by name collisions — so a custom
+ * section keeps its identity (and its deletability) even when its name happens
+ * to match an inventory section, and across preset switches. Custom sections
+ * always render their own text; they can never be "<动态生成>".
+ */
 export function mergeSections(inv: Inventory | null, cfg: Config, blockedNames: ReadonlySet<string>): Section[] {
   const map = new Map<string, Section>()
-  for (const sec of inv?.sections ?? []) map.set(sec.name, sec)
+  for (const sec of inv?.sections ?? []) map.set(sec.name, { ...sec, source: 'system' })
   for (const item of cfg.inject ?? []) {
+    const isCustom = item.custom === true
     const existing = map.get(item.name)
-    if (existing) map.set(item.name, { ...existing, order: item.order })
-    else map.set(item.name, {
-      name: item.name,
-      order: item.order,
-      text: item.text || '<动态生成>',
-      active: !blockedNames.has(item.name),
-      replaced: false,
-    })
+    if (existing) {
+      map.set(item.name, isCustom
+        ? { ...existing, order: item.order, text: item.text ?? '', source: 'custom' }
+        : { ...existing, order: item.order, source: 'system' })
+    } else {
+      map.set(item.name, {
+        name: item.name,
+        order: item.order,
+        text: item.text ?? '',
+        active: !blockedNames.has(item.name),
+        replaced: false,
+        source: isCustom ? 'custom' : 'system',
+      })
+    }
   }
   return [...map.values()].sort((a, b) => a.order - b.order)
 }
@@ -41,13 +58,15 @@ export function mergeSections(inv: Inventory | null, cfg: Config, blockedNames: 
  * order; each anchored section is inserted right after its anchor; any
  * remaining sections (cycles) are appended.
  */
-export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: string; order: number; text: string }> {
+export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: string; order: number; text: string; custom?: boolean }> {
   const list = presetOrder ?? []
   const afterMap = new Map<string, string | undefined>()
   const textMap = new Map<string, string>()
+  const customMap = new Map<string, boolean>()
   for (const sec of list) {
     afterMap.set(sec.name, sec.after)
     textMap.set(sec.name, sec.text)
+    customMap.set(sec.name, sec.custom === true)
   }
 
   const result: string[] = []
@@ -76,7 +95,7 @@ export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: st
     if (!placed.has(sec.name)) { result.push(sec.name); placed.add(sec.name) }
   }
 
-  return result.map((name, i) => ({ name, order: i, text: textMap.get(name) ?? '' }))
+  return result.map((name, i) => ({ name, order: i, text: textMap.get(name) ?? '', custom: customMap.get(name) }))
 }
 
 /**
@@ -86,10 +105,14 @@ export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: st
  * ordered set, and thus a meaningful "active list" when applied.
  */
 export function buildPresetData(cfg: Config, merged: Section[]): PresetData {
+  // Only custom (plugin-added) sections carry their own text into the preset's
+  // order list. System sections keep an empty text so applying the preset only
+  // reorders them and never freezes their dynamically generated content.
   const order = merged.map((sec, i) => ({
     name: sec.name,
     after: i > 0 ? merged[i - 1].name : undefined,
-    text: sec.text ?? '',
+    text: sec.source === 'custom' ? (sec.text ?? '') : '',
+    custom: sec.source === 'custom',
   }))
   return {
     sections: cfg.sections,
@@ -106,11 +129,28 @@ export function buildPresetData(cfg: Config, merged: Section[]): PresetData {
  *  - current sections NOT in the preset's ordered list are disabled by default
  *  - only the preset's ACTIVE sections (in the order list but not in its block
  *    list) are unblocked; the preset's own blocked sections stay blocked.
+ *
+ * Custom injected sections that exist in the current config but are NOT in the
+ * preset's ordered list are preserved in the resulting inject list (so they
+ * stay visible) and disabled (added to the blocked set), rather than silently
+ * dropped — a preset must not make the user's own injected sections vanish.
  */
 export function applyPresetData(data: PresetData, cfg: Config, currentNames: ReadonlySet<string>): ConfigPatch {
   const presetOrder = data.order ?? []
   const presetNames = new Set(presetOrder.map((x) => x.name))
   const blocked = new Set(data.sections ?? [])
+
+  // Inject list = the preset's resolved order, then any custom injected
+  // sections present in the current config but absent from the preset list.
+  // Keeping them in `inject` makes them visible; they are disabled below.
+  const inject = resolveOrder(presetOrder)
+  const kept = new Set(inject.map((x) => x.name))
+  let order = inject.length
+  for (const item of cfg.inject ?? []) {
+    if (!item || !item.name || presetNames.has(item.name) || kept.has(item.name)) continue
+    kept.add(item.name)
+    inject.push({ name: item.name, order: order++, text: item.text ?? '', custom: item.custom === true })
+  }
 
   // Only enforce the "active set" when the preset actually defines an order.
   // An empty order (e.g. a hand-authored / imported preset that only blocks a
@@ -124,9 +164,23 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
   return {
     sections: [...blocked],
     replace: { ...(cfg.replace ?? {}), ...(data.replace ?? {}) },
-    inject: resolveOrder(presetOrder),
+    inject,
     tools: { exclude: data.tools?.exclude ?? [], include: data.tools?.include ?? [] },
   }
+}
+
+/**
+ * Remove a custom (plugin-added) section from the config: it disappears from
+ * the inject list, is no longer forced into the blocked set, and any replace
+ * text for it is cleared. System sections read from the host inventory cannot
+ * be removed this way (they would just come back on the next inventory read).
+ */
+export function removeSection(name: string, cfg: Config): Pick<Config, 'sections' | 'inject' | 'replace'> {
+  const sections = (cfg.sections ?? []).filter((n) => n !== name)
+  const inject = (cfg.inject ?? []).filter((item) => item.name !== name)
+  const replace = { ...(cfg.replace ?? {}) }
+  delete replace[name]
+  return { sections, inject, replace }
 }
 
 // ── Tool filtering ──────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 import { createElement as h, useState, type ReactElement, type DragEvent, type ChangeEvent } from 'react'
 import type { Config, Inventory, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
-import { mergeSections, type Section } from './presets.ts'
+import { mergeSections, removeSection, type Section } from './presets.ts'
 import { s } from './styles.ts'
 
 export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
@@ -44,14 +44,26 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
 
   // Persist the full ordered list. We treat the sorted list as an array and
   // re-index every section with a sequential integer order (0, 1, 2, …), so
-  // there are never duplicate or fractional orders. text is left empty for
-  // original sections (keeps their text); injected sections keep their own.
+  // there are never duplicate or fractional orders. System sections keep empty
+  // text (so we never freeze their dynamically generated content); custom
+  // (plugin-generated) sections keep their own text and the hidden `custom`
+  // marker, so they render real content and stay identifiable/deletable.
   const persistOrder = (ordered: Section[]): void => {
     const list = ordered.map((sec, i) => {
       const existing = (cfg.inject ?? []).find((x) => x.name === sec.name)
-      return { name: sec.name, order: i, text: existing ? existing.text : '' }
+      const isCustom = sec.source === 'custom'
+      return { name: sec.name, order: i, text: isCustom ? (sec.text ?? '') : (existing?.text ?? ''), custom: isCustom }
     })
     scope.set('inject', list)
+  }
+
+  // Delete a custom (plugin-added) section: remove it from inject / sections /
+  // replace so it no longer appears in the panel at all.
+  const removeCustom = (name: string): void => {
+    const patch = removeSection(name, cfg)
+    scope.set('sections', patch.sections)
+    scope.set('inject', patch.inject)
+    scope.set('replace', patch.replace)
   }
 
   // Move a section up/down one slot (array-index swap), then re-index.
@@ -92,10 +104,12 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   }
   const onDragEnd = (): void => { setDragName(null); setDropTarget(null) }
 
-  // Add a new injected section, placed by its order hint, then re-index.
+  // Add a new injected section, placed by its order hint, then re-index. The
+  // section is marked `custom` (the hidden marker) so it is identified as
+  // plugin-generated and thus deletable, and its own text is preserved.
   const addSection = (name: string, order: number, text: string): void => {
     const next = merged.slice()
-    const entry: Section = { name, order, text: text || '<动态生成>', active: true, replaced: false }
+    const entry: Section = { name, order, text, active: true, replaced: false, source: 'custom' }
     const existing = next.findIndex((x) => x.name === name)
     if (existing >= 0) next[existing] = entry
     else {
@@ -137,6 +151,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
           h('div', { style: s.rowTitle }, [
             h('span', { style: s.code }, sec.name),
             h('span', { style: s.orderTag }, '#' + index),
+            h('span', { style: sec.source === 'custom' ? s.badgeCustom : s.badgeSystem }, sec.source === 'custom' ? t('manual') : t('system')),
             sec.replaced ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           ]),
           isEditing
@@ -147,13 +162,14 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
                   h('button', { style: s.mini, onClick: () => setEditing(null) }, t('clearReplace')),
                 ]),
               ])
-            : h('div', { style: s.preview }, String(sec.text ?? '').slice(0, 140) || t('dynamic')),
+            : h('div', { style: s.preview }, String(sec.text ?? '').slice(0, 140) || (sec.source === 'custom' ? t('empty') : t('dynamic'))),
         ]),
         h('div', { style: s.arrowCol }, [
           h('button', { style: s.arrow, disabled: index === 0, onClick: () => moveOrder(index, -1), title: t('moveUp') }, '↑'),
           h('button', { style: s.arrow, disabled: index === merged.length - 1, onClick: () => moveOrder(index, 1), title: t('moveDown') }, '↓'),
         ]),
         h('button', { style: s.mini, onClick: () => replace[sec.name] ? clearReplace(sec.name) : startReplace(sec.name, String(sec.text ?? '')) }, replace[sec.name] ? t('clearReplace') : t('replace')),
+        sec.source === 'custom' ? h('button', { style: s.mini, onClick: () => removeCustom(sec.name), title: t('delete') }, t('delete')) : null,
       ])
     }),
     h('div', { style: s.injectBox }, [

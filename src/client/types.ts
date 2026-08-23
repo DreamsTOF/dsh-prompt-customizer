@@ -18,7 +18,7 @@ export interface Inventory {
 export interface Config {
   sections?: string[]
   replace?: Record<string, string>
-  inject?: Array<{ name: string; order: number; text: string }>
+  inject?: Array<{ name: string; order: number; text: string; custom?: boolean }>
   tools?: { exclude?: string[]; include?: string[] }
   presets?: Preset[]
   activePreset?: string
@@ -36,6 +36,6 @@ export interface PresetData {
   sections?: string[]
   replace?: Record<string, string>
   /** Relative order: each section records the section it should follow. */
-  order?: Array<{ name: string; after?: string; text: string }>
+  order?: Array<{ name: string; after?: string; text: string; custom?: boolean }>
   tools?: { exclude?: string[]; include?: string[] }
 }

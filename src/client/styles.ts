@@ -18,6 +18,8 @@ export const s = (() => {
     badgeOk: { color: '#3fb950', fontSize: 11, border: '1px solid rgba(63,185,80,.5)', borderRadius: 999, padding: '0 6px' },
     badgeBlocked: { color: '#f85149', fontSize: 11, border: '1px solid rgba(248,81,73,.5)', borderRadius: 999, padding: '0 6px' },
     badgeReplaced: { color: '#d29922', fontSize: 11, border: '1px solid rgba(210,153,34,.5)', borderRadius: 999, padding: '0 6px' },
+    badgeCustom: { color: '#58a6ff', fontSize: 11, border: '1px solid rgba(88,166,255,.5)', borderRadius: 999, padding: '0 6px' },
+    badgeSystem: { color: 'rgba(128,128,128,.85)', fontSize: 11, border: '1px solid rgba(128,128,128,.4)', borderRadius: 999, padding: '0 6px' },
     mini: { padding: '3px 8px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit', whiteSpace: 'nowrap' },
     arrowCol: { display: 'flex', flexDirection: 'column', gap: 2 },
     arrow: { padding: '0 6px', border: '1px solid rgba(128,128,128,.3)', borderRadius: 4, background: 'transparent', cursor: 'pointer', color: 'inherit', fontSize: 11, lineHeight: 1.4, opacity: 0.8 },
