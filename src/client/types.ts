@@ -14,6 +14,15 @@ export interface Inventory {
   tools: Array<{ name: string; description?: string; hidden: boolean }>
 }
 
+/** Final-assembly preview payload from the host route. */
+export interface Preview {
+  ok: boolean
+  scope?: unknown
+  sections: Array<{ name: string; text: string }>
+  text: string
+  tools: Array<{ name: string; description: string } | string>
+}
+
 /** The resolved config object (namespace value). */
 export interface Config {
   sections?: string[]

@@ -17,6 +17,7 @@ import type { Config, Inventory, SettingsScope } from './types.ts'
 import { SectionsTab } from './SectionsTab.tsx'
 import { ToolsTab } from './ToolsTab.tsx'
 import { PresetsTab } from './PresetsTab.tsx'
+import { PreviewTab } from './PreviewTab.tsx'
 
 const NS = 'prompt-customizer'
 const INVENTORY_URL = '/api/prompt-customizer/inventory'
@@ -73,7 +74,7 @@ export function apply(ctx: ClientContext): void {
 function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactElement {
   const [snap, setSnap] = useState(() => scope.getSnapshot())
   const [inv, setInv] = useState<Inventory | null>(null)
-  const [tab, setTab] = useState<'sections' | 'tools' | 'presets'>('sections')
+  const [tab, setTab] = useState<'sections' | 'tools' | 'presets' | 'preview'>('sections')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => scope.subscribe(() => setSnap(scope.getSnapshot())), [scope])
@@ -99,6 +100,7 @@ function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactEleme
       h('button', { style: tab === 'sections' ? s.tabActive : s.tab, onClick: () => setTab('sections') }, t('tabsSections')),
       h('button', { style: tab === 'tools' ? s.tabActive : s.tab, onClick: () => setTab('tools') }, t('tabsTools')),
       h('button', { style: tab === 'presets' ? s.tabActive : s.tab, onClick: () => setTab('presets') }, t('tabsPresets')),
+      h('button', { style: tab === 'preview' ? s.tabActive : s.tab, onClick: () => setTab('preview') }, t('tabsPreview')),
       h('button', { style: s.refresh, onClick: refresh }, t('refresh')),
     ]),
     error ? h('div', { style: s.error }, String(error)) : null,
@@ -106,6 +108,8 @@ function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactEleme
       ? h(SectionsTab, { cfg, inv, scope, t })
       : tab === 'tools'
         ? h(ToolsTab, { cfg, inv, scope, t })
-        : h(PresetsTab, { cfg, inv, scope, t }),
+        : tab === 'presets'
+          ? h(PresetsTab, { cfg, inv, scope, t })
+          : h(PreviewTab, { scope, t }),
   ])
 }
