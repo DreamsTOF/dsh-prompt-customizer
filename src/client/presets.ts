@@ -143,6 +143,10 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
   // Inject list = the preset's resolved order, then any custom injected
   // sections present in the current config but absent from the preset list.
   // Keeping them in `inject` makes them visible; they are disabled below.
+  // Kept customs continue after the preset's own indexes; if the preset covers
+  // only a small subset they may tie with the inventory's native orders — the
+  // merge view sorts stably (inventory first), so ordering stays deterministic,
+  // and the next reorder/persist re-indexes everything contiguously anyway.
   const inject = resolveOrder(presetOrder)
   const kept = new Set(inject.map((x) => x.name))
   let order = inject.length
@@ -172,12 +176,16 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
 /**
  * Remove a custom (plugin-added) section from the config: it disappears from
  * the inject list, is no longer forced into the blocked set, and any replace
- * text for it is cleared. System sections read from the host inventory cannot
- * be removed this way (they would just come back on the next inventory read).
+ * text for it is cleared. The remaining inject entries are re-indexed to a
+ * contiguous 0..n-1 order (the virtual index model), so removal never leaves
+ * holes. System sections read from the host inventory cannot be removed this
+ * way (they would just come back on the next inventory read).
  */
 export function removeSection(name: string, cfg: Config): Pick<Config, 'sections' | 'inject' | 'replace'> {
   const sections = (cfg.sections ?? []).filter((n) => n !== name)
-  const inject = (cfg.inject ?? []).filter((item) => item.name !== name)
+  const inject = (cfg.inject ?? [])
+    .filter((item) => item.name !== name)
+    .map((item, i) => ({ ...item, order: i }))
   const replace = { ...(cfg.replace ?? {}) }
   delete replace[name]
   return { sections, inject, replace }
@@ -200,8 +208,16 @@ export function toggleTool(name: string, currentlyHidden: boolean, toolsCfg: Too
   const exclude = toolsCfg?.exclude ?? []
   if (include.length > 0) {
     const next = include.slice()
-    if (currentlyHidden) next.push(name)
-    else { const i = next.indexOf(name); if (i >= 0) next.splice(i, 1) }
+    if (currentlyHidden) {
+      next.push(name)
+      // Re-showing a tool in whitelist mode must also clear any stale blacklist
+      // entry, otherwise the name lingers in both lists and reappears as hidden
+      // if the user later switches back to blacklist mode.
+      const nextExclude = exclude.filter((n) => n !== name)
+      return { exclude: nextExclude, include: next }
+    }
+    const i = next.indexOf(name)
+    if (i >= 0) next.splice(i, 1)
     return { exclude, include: next }
   }
   const next = exclude.slice()
