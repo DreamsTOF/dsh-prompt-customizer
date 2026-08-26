@@ -249,6 +249,16 @@ function checkInvariants(w: World, cfg: Config, tag: string): void {
     assert.ok(!patch.inject.some((x) => x.name === victim.name), `${tag}: S6 ${victim.name} 可从 inject 移除`)
     assert.ok(!patch.sections.includes(victim.name!), `${tag}: S6 ${victim.name} 可从 sections 移除`)
   }
+
+  // replace 值必须是有效非空字符串
+  for (const [k, v] of Object.entries(cfg.replace ?? {})) {
+    assert.equal(typeof v, 'string', `${tag}: replace[${k}] 为字符串`)
+    assert.ok(v!.trim() !== '', `${tag}: replace[${k}] 非空白`)
+  }
+
+  // inject order 连续性：0..len-1
+  const injOrders = inject.map((x) => x.order).sort((a, b) => a - b)
+  assert.deepEqual(injOrders, Array.from({ length: injOrders.length }, (_, i) => i), `${tag}: inject order 连续 [0..len)`)
 }
 
 /** 应用预设后的专项校验（I8/S3/S4）。 */
@@ -303,10 +313,55 @@ function runSuperChaos(seed: number, steps: number): void {
     )
   }
 
+  /** 导入导出完整往返：serialize → import → apply → 再 serialize，字段守恒。 */
+  const checkImportExport = (preset: Preset, tag: string): void => {
+    const exported = JSON.parse(JSON.stringify(serializePreset(preset))) as ReturnType<typeof serializePreset>
+    const imported = addImportedPresets([], exported, () => nid())[0]!
+    // JSON.stringify strips `after: undefined` so compare via serialized form
+    assert.equal(JSON.stringify(imported.data), JSON.stringify(preset.data), `${tag}: 导入副本 data 与原件一致`)
+    const reExported = JSON.parse(JSON.stringify(serializePreset(imported)))
+    assert.deepEqual(reExported, exported, `${tag}: 再次序列化结果一致`)
+  }
+
+  /** 预设 data 完整性：sections ⊆ order 名、tools 子集合法。 */
+  const checkPresetData = (preset: Preset, tag: string): void => {
+    const orderNames = new Set((preset.data.order ?? []).map((o) => o.name))
+    for (const n of preset.data.sections ?? []) {
+      assert.ok(orderNames.has(n), `${tag}: 预设 sections ${n} 存在于 order`)
+    }
+    for (const t of preset.data.tools?.exclude ?? [])
+      assert.ok(w.tools.includes(t), `${tag}: 预设 exclude ${t} ∈ 工具全集`)
+    for (const t of preset.data.tools?.include ?? [])
+      assert.ok(w.tools.includes(t), `${tag}: 预设 include ${t} ∈ 工具全集`)
+  }
+
+  /** 工具模式一致性：include 非空 → 白名单模式，exclude 命中 → 隐藏。 */
+  const checkToolModeConsistency = (c: Config, tag: string): void => {
+    const inc = c.tools?.include ?? []
+    const exc = c.tools?.exclude ?? []
+    for (const t of w.tools) {
+      const hidden = isToolHidden(t, c.tools)
+      if (inc.length > 0) assert.equal(hidden, !inc.includes(t), `${tag}: 白名单模式 ${t} 可见性`)
+      else assert.equal(hidden, exc.includes(t), `${tag}: 黑名单模式 ${t} 可见性`)
+    }
+  }
+
+  /** 排序连续性：merged 视图 order ∈ [0, len) 且 inject order 连续 0..n-1。 */
+  const checkSectionOrdering = (c: Config, tag: string): void => {
+    const merged = mergedOf(w, c)
+    const orders = merged.map((s) => s.order)
+    const sorted = [...orders].sort((a, b) => a - b)
+    assert.deepEqual(orders, sorted, `${tag}: 视图 order 升序`)
+    assert.deepEqual(sorted, Array.from({ length: sorted.length }, (_, i) => i), `${tag}: 视图 order 连续 [0..len)`)
+    const injOrders = (c.inject ?? []).map((x) => x.order)
+    const injSorted = [...injOrders].sort((a, b) => a - b)
+    assert.deepEqual(injSorted, Array.from({ length: injSorted.length }, (_, i) => i), `${tag}: inject order 连续 [0..len)`)
+  }
+
   for (let step = 0; step < steps; step++) {
     const tag = `super seed=${seed} step=${step}`
     try {
-      const roll = rnd.int(26)
+      const roll = rnd.int(30)
       if (roll < 3) {
         cfg = uiToggleBlock(cfg, rnd.pick(names()))
       } else if (roll < 5) {
@@ -345,11 +400,37 @@ function runSuperChaos(seed: number, steps: number): void {
         for (const t of w.tools) tools = toggleTool(t, isToolHidden(t, tools), tools)
         cfg = { ...cfg, tools: setToolMode(false, tools, w.tools) }
       } else if (roll < 19) {
-        // S-18 同名注入覆盖
-        const customs = (cfg.inject ?? []).filter((x) => x.custom)
-        if (customs.length > 0 || rnd.bool()) {
-          const name = customs.length > 0 ? rnd.pick(customs).name! : rnd.pick(w.pool)
-          cfg = uiAddSection(w, cfg, name!, rnd.int(names().length), `O-${seed}-${step}`)
+        // S-18 同名注入覆盖 + S-20 稀疏/残缺预设（合并提高覆盖率）
+        if (rnd.bool(0.4)) {
+          // 同名注入：覆盖已有手动段
+          const customs = (cfg.inject ?? []).filter((x) => x.custom)
+          if (customs.length > 0 || rnd.bool()) {
+            const name = customs.length > 0 ? rnd.pick(customs).name! : rnd.pick(w.pool)
+            cfg = uiAddSection(w, cfg, name!, rnd.int(names().length), `O-${seed}-${step}`)
+          }
+        } else {
+          // S-20 稀疏/残缺但形状合法的预设攻击
+          const useGhost = rnd.bool(0.5)
+          const mainName = useGhost ? 'ghost-y' : w.sys[0]!
+          const sparse: Preset = {
+            id: nid(),
+            name: `SPARSE-${step}`,
+            data: {
+              sections: [mainName],
+              replace: {},
+              order: [
+                { name: mainName, text: '', custom: rnd.bool() },
+                ...(useGhost ? [] : [{ name: w.sys[0]!, after: mainName, text: '', custom: rnd.bool() }]),
+              ],
+            },
+          }
+          assert.ok(sparse.data.sections!.length > 0, `${tag}: 稀疏 sections 非空`)
+          assert.ok(sparse.data.order!.length >= 1, `${tag}: 稀疏 order 非空`)
+          cfg = { ...cfg, presets: [...(cfg.presets ?? []), sparse] }
+          checkPresetData(sparse, `${tag} 稀疏data`)
+          const before = cfg
+          cfg = uiApplyW(w, cfg, sparse)
+          checkAfterApply(w, before, sparse, cfg, `${tag} 稀疏`)
         }
       } else if (roll < 21) {
         // 9. 保存预设 + 内联不动点校验。
@@ -366,6 +447,7 @@ function runSuperChaos(seed: number, steps: number): void {
         assert.deepEqual(applied.sections, snapshotted.sections, `${tag}: 不动点 sections`)
         assert.deepEqual(applied.replace, snapshotted.replace, `${tag}: 不动点 replace`)
         assert.deepEqual(applied.tools, snapshotted.tools, `${tag}: 不动点 tools`)
+        checkToolModeConsistency(snapshotted, `${tag} 保存`)
         cfg = snapshotted
       } else if (roll < 22) {
         // S-13 快照链：应用后立刻另存
@@ -388,30 +470,116 @@ function runSuperChaos(seed: number, steps: number): void {
           roundTripCheck(rnd.pick(cfg.presets!), tag)
         }
       } else if (roll < 25) {
-        // S-20 稀疏/残缺但形状合法的预设：缺 tools、幽灵锚、sections 引用 order 内的幽灵名。
-        // 约束 sections ⊆ order 名（与真实快照一致的形状），否则会制造不可见幽灵屏蔽。
-        // 先入库再应用（与真实 UI 的导入→应用路径一致，保证 activePreset 有效）。
-        const sparse: Preset = {
+        // 工具模式切换一致性：交替白/黑名单，验证模式语义不泄漏
+        if ((cfg.presets ?? []).length > 0) {
+          let tools = setToolMode(true, cfg.tools, w.tools)
+          cfg = { ...cfg, tools }
+          checkToolModeConsistency(cfg, `${tag} 切白`)
+          // 随机切换几个工具再回黑名单
+          for (let k = 0; k < 3 && k < w.tools.length; k++) {
+            const t = rnd.pick(w.tools)
+            tools = toggleTool(t, isToolHidden(t, cfg.tools), cfg.tools)
+            cfg = { ...cfg, tools }
+          }
+          tools = setToolMode(false, cfg.tools, w.tools)
+          cfg = { ...cfg, tools }
+          checkToolModeConsistency(cfg, `${tag} 切黑`)
+          checkPresetData(rnd.pick(cfg.presets!), `${tag} 工具切后预设`)
+        }
+      } else if (roll < 26) {
+        // 完整导入导出往返 + 重复导入去重 + 序列化字段守恒
+        const presetArr = cfg.presets ?? []
+        if (presetArr.length > 0) {
+          const preset = rnd.pick(presetArr)
+          assert.ok(preset, `${tag}: rnd.pick 返回有效预设`)
+          checkImportExport(preset, `${tag} IE`)
+          // 重复导入：同名应被跳过
+          const serialized = JSON.parse(JSON.stringify(serializePreset(preset))) as ReturnType<typeof serializePreset>
+          const before = (cfg.presets ?? []).length
+          cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], serialized, () => nid()) }
+          assert.equal((cfg.presets ?? []).length, before, `${tag}: 重复导入去重`)
+          // 导入数组：多条一次性导入，只新增不重复
+          const newEntry = { name: `NEW-${step}`, data: { sections: w.sys.slice(0, 2), replace: {}, order: w.sys.slice(0, 2).map((n, i) => ({ name: n, text: '', custom: false })), tools: w.tools.length > 0 ? { exclude: [w.tools[0]!], include: [] } : { exclude: [], include: [] } } }
+          const arr = [JSON.parse(JSON.stringify(serializePreset(preset))), newEntry]
+          const before2 = (cfg.presets ?? []).length
+          cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], arr, () => nid()) }
+          assert.equal((cfg.presets ?? []).length, before2 + 1, `${tag}: 数组导入仅新增`)
+        }
+      } else if (roll < 27) {
+        // 复杂预设应用：预设含 replace + tools + custom section，验证 patch 正确合并
+        const customName = `EXTRA-${step}`
+        cfg = uiAddSection(w, cfg, customName, rnd.int(names().length), `CTX-${step}`)
+        const complexReplace: Record<string, string> = {}
+        for (const n of w.sys.slice(0, 3)) complexReplace[n!] = `CR-${seed}`
+        const complexPreset: Preset = {
           id: nid(),
-          name: `SPARSE-${step}`,
+          name: `COMPLEX-${step}`,
           data: {
-            sections: rnd.bool(0.5) ? ['ghost-y'] : [w.sys[0]!],
+            sections: w.sys.slice(0, 3),
+            replace: complexReplace,
+            order: w.sys.slice(0, 3).map((n, i) => ({ name: n, text: '', custom: false })),
+            tools: { exclude: w.tools.slice(0, 2), include: [] },
+          },
+        }
+        cfg = { ...cfg, presets: [...(cfg.presets ?? []), complexPreset] }
+        const before = cfg
+        cfg = uiApplyW(w, cfg, complexPreset)
+        checkAfterApply(w, before, complexPreset, cfg, `${tag} 复杂应用`)
+        checkToolModeConsistency(cfg, `${tag} 复杂后工具`)
+        // 替换文本在 merge 视图中可见
+        const mergedAfter = mergedOf(w, cfg)
+        for (const n of w.sys.slice(0, 3)) {
+          const row = mergedAfter.find((s) => s.name === n)
+          assert.ok(row, `${tag}: 复杂应用后 ${n} 存在`)
+        }
+      } else if (roll < 28) {
+        // resolveOrder 边界：循环锚 / 不存在锚
+        const anchorMissing: Preset = {
+          id: nid(),
+          name: `MISS-${step}`,
+          data: { sections: [w.sys[0]!], replace: {}, order: [{ name: w.sys[0]!, after: 'nonexistent-anchor', text: '' }] },
+        }
+        cfg = { ...cfg, presets: [...(cfg.presets ?? []), anchorMissing] }
+        const before = cfg
+        cfg = uiApplyW(w, cfg, anchorMissing)
+        checkAfterApply(w, before, anchorMissing, cfg, `${tag} 缺锚`)
+        const cyclic: Preset = {
+          id: nid(),
+          name: `CYCLE-${step}`,
+          data: {
+            sections: [w.sys[0]!, w.sys[1]!],
             replace: {},
             order: [
-              { name: 'ghost-y', text: '' },
-              { name: w.sys[0]!, after: 'ghost-y', text: '', custom: rnd.bool() },
+              { name: w.sys[0]!, after: w.sys[1]!, text: '' },
+              { name: w.sys[1]!, after: w.sys[0]!, text: '' },
             ],
           },
         }
-        cfg = { ...cfg, presets: [...(cfg.presets ?? []), sparse] }
-        const before = cfg
-        cfg = uiApplyW(w, cfg, sparse)
-        checkAfterApply(w, before, sparse, cfg, `${tag} 稀疏`)
-      } else if (roll < 26) {
+        cfg = { ...cfg, presets: [...(cfg.presets ?? []), cyclic] }
+        const before2 = cfg
+        cfg = uiApplyW(w, cfg, cyclic)
+        checkAfterApply(w, before2, cyclic, cfg, `${tag} 循环锚`)
+      } else if (roll < 29) {
+        // section 重排后顺序连续性 + 工具状态
+        const ns = names()
+        if (ns.length > 2) {
+          // 连续多次 move
+          for (let k = 0; k < 5 && k < ns.length; k++) {
+            cfg = uiMove(w, cfg, rnd.int(ns.length), rnd.bool() ? -1 : 1)
+          }
+          checkSectionOrdering(cfg, `${tag} move后`)
+        }
+        // 拖到首/末位再检查
+        if (ns.length > 1) {
+          cfg = uiDragTo(w, cfg, rnd.pick(ns), rnd.bool() ? 0 : ns.length - 1)
+          checkSectionOrdering(cfg, `${tag} 拖拽后`)
+        }
+        checkToolModeConsistency(cfg, `${tag} 重排后工具`)
+      } else {
         // S-21 手动段全部删除后立即重建一个
         for (const x of (cfg.inject ?? []).filter((x) => x.custom)) cfg = uiRemoveCustom(cfg, x.name!)
         cfg = uiAddSection(w, cfg, rnd.pick(w.pool), rnd.int(names().length), `RE-${seed}-${step}`)
-      } else {
+        checkSectionOrdering(cfg, `${tag} S-21重建`)
         // S-15 / 应用：高概率先删激活预设，再随机应用或删除
         if (cfg.activePreset !== undefined && rnd.bool(0.5)) cfg = uiDeletePreset(cfg, cfg.activePreset)
         if ((cfg.presets ?? []).length > 0) {
