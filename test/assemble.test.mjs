@@ -14,11 +14,11 @@ function makeCtx(config) {
   return { ctx, handler: () => handler }
 }
 
-async function assemble(config, sections, tools, context = {}) {
+async function assemble(config, sections, tools) {
   const { ctx, handler } = makeCtx(config)
   apply(ctx)
   const assembly = { sections, tools, contexts: [], variables: {} }
-  return handler()(assembly, context, async () => assembly)
+  return handler()(assembly, {}, async () => assembly)
 }
 
 const baseSections = [
@@ -135,65 +135,4 @@ test('empty sections list is handled', async () => {
   const res = await assemble({}, [], baseTools)
   assert.deepEqual(res.sections, [])
   assert.equal(res.tools.length, 2)
-})
-
-// ── P1: per-agent scoped customization ───────────────────────────────────────
-
-test('scope without byAgent uses the shared default config', async () => {
-  const res = await assemble(
-    { sections: ['tool:read'], byAgent: {} },
-    baseSections,
-    baseTools,
-    { scope: { agentPreset: 'standard' } },
-  )
-  assert.deepEqual(res.sections.map((s) => s.name), ['harness:source', 'harness:identity'])
-})
-
-test('agent scope picks the byAgent overlay (block only for that agent)', async () => {
-  const config = {
-    sections: [], // default: nothing blocked
-    byAgent: {
-      minimal: { sections: ['harness:identity'] },
-    },
-  }
-  // default agent: nothing blocked.
-  const def = await assemble(config, baseSections, baseTools, { scope: { agentPreset: 'standard' } })
-  assert.equal(def.sections.length, 3)
-  // minimal agent: its own block applies.
-  const minimal = await assemble(config, baseSections, baseTools, { scope: { agentPreset: 'minimal' } })
-  assert.deepEqual(minimal.sections.map((s) => s.name), ['harness:source', 'tool:read'])
-})
-
-test('agent overlay replace merges over the default replace', async () => {
-  const config = {
-    replace: { 'harness:identity': 'DEFAULT' },
-    byAgent: {
-      standard: { replace: { 'harness:identity': 'AGENT' } },
-    },
-  }
-  const res = await assemble(config, baseSections, baseTools, { scope: { agentPreset: 'standard' } })
-  assert.equal(res.sections.find((s) => s.name === 'harness:identity').text, 'AGENT')
-})
-
-test('agent overlay inject is merged with the default inject (same-name wins)', async () => {
-  const config = {
-    inject: [{ name: 'app:x', order: -1, text: 'default' }],
-    byAgent: {
-      standard: { inject: [{ name: 'app:x', order: -1, text: 'agent' }] },
-    },
-  }
-  const res = await assemble(config, baseSections, baseTools, { scope: { agentPreset: 'standard' } })
-  assert.equal(res.sections.find((s) => s.name === 'app:x').text, 'agent')
-  assert.deepEqual(res.sections.map((s) => s.name), ['app:x', 'harness:source', 'harness:identity', 'tool:read'])
-})
-
-test('agent overlay tools exclude wins over the default for that agent only', async () => {
-  const config = {
-    tools: { exclude: [], include: [] },
-    byAgent: {
-      standard: { tools: { exclude: ['tool:write'], include: [] } },
-    },
-  }
-  const res = await assemble(config, baseSections, baseTools, { scope: { agentPreset: 'standard' } })
-  assert.deepEqual(res.tools.map((t) => t.name), ['tool:read'])
 })

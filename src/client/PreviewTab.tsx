@@ -16,17 +16,13 @@ export function PreviewTab({ scope, t }: { scope: SettingsScope; t: Translate })
 
   // Reload whenever the namespace config changes (block/replace/inject), so the
   // section count and final text always reflect the current customization —
-  // not just on mount. A config change that lands while a fetch is in flight is
-  // never dropped: it schedules one trailing reload, so the preview converges
-  // to the latest config even when the in-flight response was served before the
-  // write committed on the host.
+  // not just on mount.
   const inFlight = useRef(false)
-  const pending = useRef(false)
   const load = (): void => {
-    if (inFlight.current) { pending.current = true; return }
+    if (inFlight.current) return
     inFlight.current = true
     setData(null)
-    fetch(PREVIEW_URL, { cache: 'no-store' })
+    fetch(PREVIEW_URL)
       .then((r) => r.json())
       .then((body: Preview) => {
         if (body && body.ok === false) throw new Error((body as { error?: string }).error ?? 'preview failed')
@@ -34,10 +30,7 @@ export function PreviewTab({ scope, t }: { scope: SettingsScope; t: Translate })
         setError(null)
       })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
-      .finally(() => {
-        inFlight.current = false
-        if (pending.current) { pending.current = false; load() }
-      })
+      .finally(() => { inFlight.current = false })
   }
   useEffect(load, [])
   useEffect(() => scope.subscribe(load), [scope])

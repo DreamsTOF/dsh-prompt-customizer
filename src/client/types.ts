@@ -29,33 +29,8 @@ export interface Config {
   replace?: Record<string, string>
   inject?: Array<{ name: string; order: number; text: string; custom?: boolean }>
   tools?: { exclude?: string[]; include?: string[] }
-  /** Per-agent overlays: byAgent.<agentId> overrides the default fields for that agent. */
-  byAgent?: Record<string, AgentOverlay>
   presets?: Preset[]
   activePreset?: string
-}
-
-/** The per-agent overlay subset of Config (everything except byAgent/presets). */
-export interface AgentOverlay {
-  sections?: string[]
-  replace?: Record<string, string>
-  inject?: Array<{ name: string; order: number; text: string; custom?: boolean }>
-  tools?: { exclude?: string[]; include?: string[] }
-}
-
-/** Agent-preset info returned by /api/prompt-customizer/agents. */
-export interface AgentInfo {
-  id: string
-  name: string
-  description: string
-  order: number
-}
-
-export interface AgentsPayload {
-  ok: boolean
-  agents: AgentInfo[]
-  defaultAgent?: string
-  error?: string
 }
 
 /** A complete customization snapshot that can be saved / applied / exported. */
