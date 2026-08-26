@@ -63,7 +63,9 @@ test('mergeSections: reordering an inventory section without the marker stays sy
   const merged = mergeSections(invOf(['b']), { inject: [{ name: 'b', order: 5, text: '', custom: false }] }, new Set())
   const b = merged.find((sec) => sec.name === 'b')!
   assert.equal(b.source, 'system')
-  assert.equal(b.order, 5)
+  // mergeSections 把视图顺序连续重排为 0..n-1（与 chaos-super 的
+  // checkSectionOrdering 不变量一致），注入侧 order=5 只参与排序、不保留为显示顺序。
+  assert.equal(b.order, 0)
 })
 
 // ── 回归：预设快照不得固化系统段的动态文本 ───────────────────────────────────

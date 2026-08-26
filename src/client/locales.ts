@@ -47,6 +47,8 @@ export const DICT = {
     restore: '还原',
     active: '使用中',
     preset: '预设',
+    ioFailed: '导入/导出失败',
+    importInvalid: '无效的预设文件',
   },
   en: {
     nav: 'Prompt Customizer',
@@ -95,6 +97,8 @@ export const DICT = {
     restore: 'Restore',
     active: 'Active',
     preset: 'Preset',
+    ioFailed: 'Import/export failed',
+    importInvalid: 'Invalid preset file',
   },
 } as const
 
