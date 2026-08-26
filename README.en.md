@@ -4,7 +4,9 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin that lets you control the **system prompt** and the **tool catalog** from a settings-panel UI.
 
-Plugin-injected prompt sections (from other plugins) can pollute your system prompt. This plugin lets you **block**, **replace**, **inject**, and **reorder** prompt sections by name, and **hide tools** from the model catalog — all live, without touching the other plugins.
+Plugin-injected prompt sections can pollute your system prompt. This plugin lets you **block**, **replace**, **inject**, and **reorder** prompt sections by name, and **hide tools** from the model catalog — all live, without touching the other plugins.
+
+![Overview](docs/images/4.png)
 
 ## Features
 
@@ -13,16 +15,26 @@ Plugin-injected prompt sections (from other plugins) can pollute your system pro
   - **Replace** a section's text (the original text is echoed for editing, including dynamically generated sections).
   - **Inject** brand-new sections.
   - **Reorder** sections with ↑/↓ arrows or **drag & drop** (HTML5). Order is stored as a virtual 0-based index, so there are never duplicate or fractional orders.
+
+![Prompt sections](2.png)
+
 - **Tools**
   - **Blacklist** (`exclude`): hide the listed tools.
   - **Whitelist** (`include`): keep only the listed tools (wins over exclude).
   - Only the model-facing catalog is affected — tools and routes keep working.
+
+![Tools](docs/images/2-1.png)
+![Tools](docs/images/2-2.png)
+![Tools](docs/images/2-3.png)
+
 - **Presets**
   - **Save** the current customization as a preset (full snapshot).
   - **Apply** a preset: same-name sections are overridden, preset-only sections are added, and current sections outside the preset list are disabled by default.
   - **Export / Import** presets as JSON (full snapshot).
   - Presets store **relative order** (each section records the section it follows), so they stay portable across prompts with different section sets.
   - Multiple presets can be stored locally; only one is active at a time.
+
+![Presets](docs/images/3.png)
 
 ## Installation
 
@@ -63,37 +75,6 @@ Toggle tools to hide them (blacklist), or switch to whitelist mode to keep only 
 - **Apply** — activate a preset (overrides same-name sections, adds preset-only sections, disables current sections outside the preset).
 - **Export** — download the preset as JSON.
 - **Import** — load a preset JSON file (same-name presets are skipped).
-
-## Configuration
-
-The plugin stores its config in the dsh settings document under the `prompt-customizer` namespace (`~/.dsh/settings.yaml`). You can edit it directly:
-
-```yaml
-prompt-customizer:
-  # Block these prompt sections by name.
-  sections:
-    - plugin:some-plugin
-  # Replace a section's text by name (original order kept).
-  replace:
-    system: 'You are a helpful coding assistant.'
-  # Inject / override sections (name + order + text).
-  inject:
-    - name: tool:read
-      order: 0
-      text: ''
-  # Tool catalog filtering.
-  tools:
-    exclude: []
-    include: []
-```
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `sections` | `string[]` | Prompt section names to block. |
-| `replace` | `Record<string, string>` | Replacement text per section name. |
-| `inject` | `{name, order, text}[]` | Sections to inject or override (order controls splice position). |
-| `tools.exclude` | `string[]` | Tool names to hide. |
-| `tools.include` | `string[]` | When non-empty, keep only these tools (wins over `exclude`). |
 
 ## Development
 
