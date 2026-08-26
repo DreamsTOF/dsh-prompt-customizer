@@ -9,7 +9,7 @@ import { PreviewTools } from './PreviewTools.tsx'
 
 const PREVIEW_URL = '/api/prompt-customizer/preview'
 
-export function PreviewTab({ scope, t }: { scope: SettingsScope; t: Translate }): ReactElement {
+export function PreviewTab({ scope, t, active, refreshId }: { scope: SettingsScope; t: Translate; active: boolean; refreshId: number }): ReactElement {
   const [sub, setSub] = useState<'prompt' | 'tools'>('prompt')
   const [data, setData] = useState<Preview | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +22,7 @@ export function PreviewTab({ scope, t }: { scope: SettingsScope; t: Translate })
     if (inFlight.current) return
     inFlight.current = true
     setData(null)
-    fetch(PREVIEW_URL)
+    fetch(`${PREVIEW_URL}?t=${Date.now()}`)
       .then((r) => r.json())
       .then((body: Preview) => {
         if (body && body.ok === false) throw new Error((body as { error?: string }).error ?? 'preview failed')
@@ -34,6 +34,8 @@ export function PreviewTab({ scope, t }: { scope: SettingsScope; t: Translate })
   }
   useEffect(load, [])
   useEffect(() => scope.subscribe(load), [scope])
+  // Refresh when this tab becomes active or when refresh button is clicked
+  useEffect(() => { if (active) load() }, [active, refreshId])
 
   return h('div', { style: s.list }, [
     h('div', { style: s.bar }, [

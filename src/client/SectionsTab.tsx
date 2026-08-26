@@ -36,18 +36,17 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     scope.set('replace', next)
     setEditing(null)
   }
-  const clearReplace = (name: string): void => {
+  const restoreReplace = (name: string): void => {
     const next = { ...replace }
     delete next[name]
     scope.set('replace', next)
   }
 
-  // Persist the full ordered list. We treat the sorted list as an array and
-  // re-index every section with a sequential integer order (0, 1, 2, …), so
-  // there are never duplicate or fractional orders. System sections keep empty
-  // text (so we never freeze their dynamically generated content); custom
-  // (plugin-generated) sections keep their own text and the hidden `custom`
-  // marker, so they render real content and stay identifiable/deletable.
+  // Persist the full ordered list (system + custom). We re-index every section
+  // with a sequential integer order (0, 1, 2, …) so the plugin panel order is
+  // the authoritative sort order. System sections keep empty text (so the
+  // server never freezes their dynamically generated content); custom sections
+  // keep their own text.
   const persistOrder = (ordered: Section[]): void => {
     const list = ordered.map((sec, i) => {
       const existing = (cfg.inject ?? []).find((x) => x.name === sec.name)
@@ -152,23 +151,25 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
             h('span', { style: s.code }, sec.name),
             h('span', { style: s.orderTag }, '#' + index),
             h('span', { style: sec.source === 'custom' ? s.badgeCustom : s.badgeSystem }, sec.source === 'custom' ? t('manual') : t('system')),
-            sec.replaced ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
+            replace[sec.name] ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           ]),
           isEditing
             ? h('div', { style: s.editBox }, [
                 h('textarea', { style: s.editInput, value: draft, onChange: (e: ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value), rows: 3 }),
                 h('div', { style: s.injectRow }, [
-                  h('button', { style: s.mini, onClick: () => commitReplace(sec.name) }, t('add')),
-                  h('button', { style: s.mini, onClick: () => setEditing(null) }, t('clearReplace')),
+                  h('button', { style: s.mini, onClick: () => commitReplace(sec.name) }, t('save')),
+                  h('button', { style: s.mini, onClick: () => setEditing(null) }, t('clearInput')),
+                  sec.source !== 'custom' && replace[sec.name] ? h('button', { style: s.mini, onClick: () => restoreReplace(sec.name) }, t('restore')) : null,
                 ]),
               ])
-            : h('div', { style: s.preview }, String(sec.text ?? '').slice(0, 140) || (sec.source === 'custom' ? t('empty') : t('dynamic'))),
+            : h('div', { style: s.preview }, String(replace[sec.name] ?? sec.text ?? '').slice(0, 140) || (sec.source === 'custom' ? t('empty') : t('dynamic'))),
         ]),
         h('div', { style: s.arrowCol }, [
           h('button', { style: s.arrow, disabled: index === 0, onClick: () => moveOrder(index, -1), title: t('moveUp') }, '↑'),
           h('button', { style: s.arrow, disabled: index === merged.length - 1, onClick: () => moveOrder(index, 1), title: t('moveDown') }, '↓'),
         ]),
-        h('button', { style: s.mini, onClick: () => replace[sec.name] ? clearReplace(sec.name) : startReplace(sec.name, String(sec.text ?? '')) }, replace[sec.name] ? t('clearReplace') : t('replace')),
+        isEditing ? null : h('button', { style: s.mini, onClick: () => startReplace(sec.name, String(sec.text ?? '')) }, t('replace')),
+        !isEditing && sec.source !== 'custom' && replace[sec.name] ? h('button', { style: s.mini, onClick: () => restoreReplace(sec.name) }, t('restore')) : null,
         sec.source === 'custom' ? h('button', { style: s.mini, onClick: () => removeCustom(sec.name), title: t('delete') }, t('delete')) : null,
       ])
     }),

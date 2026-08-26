@@ -76,13 +76,14 @@ function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactEleme
   const [inv, setInv] = useState<Inventory | null>(null)
   const [tab, setTab] = useState<'sections' | 'tools' | 'presets' | 'preview'>('sections')
   const [error, setError] = useState<string | null>(null)
+  const [refreshId, setRefreshId] = useState(0)
 
   useEffect(() => scope.subscribe(() => setSnap(scope.getSnapshot())), [scope])
 
   const refresh = (): void => {
     fetch(INVENTORY_URL)
       .then((r) => r.json())
-      .then((data: Inventory) => { setInv(data); setError(null) })
+      .then((data: Inventory) => { setInv(data); setError(null); setRefreshId((n) => n + 1) })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
   useEffect(refresh, [])
@@ -110,6 +111,6 @@ function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactEleme
         ? h(ToolsTab, { cfg, inv, scope, t })
         : tab === 'presets'
           ? h(PresetsTab, { cfg, inv, scope, t })
-          : h(PreviewTab, { scope, t }),
+          : h(PreviewTab, { scope, t, active: tab === 'preview', refreshId }),
   ])
 }

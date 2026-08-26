@@ -49,7 +49,7 @@ export function mergeSections(inv: Inventory | null, cfg: Config, blockedNames: 
       })
     }
   }
-  return [...map.values()].sort((a, b) => a.order - b.order)
+  return [...map.values()].sort((a, b) => a.order - b.order).map((sec, i) => ({ ...sec, order: i }))
 }
 
 /**

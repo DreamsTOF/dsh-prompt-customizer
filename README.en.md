@@ -6,8 +6,6 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plug
 
 Plugin-injected prompt sections can pollute your system prompt. This plugin lets you **block**, **replace**, **inject**, and **reorder** prompt sections by name, and **hide tools** from the model catalog — all live, without touching the other plugins.
 
-![Overview](docs/images/4.png)
-
 ## Features
 
 - **Prompt sections**
@@ -16,16 +14,16 @@ Plugin-injected prompt sections can pollute your system prompt. This plugin lets
   - **Inject** brand-new sections.
   - **Reorder** sections with ↑/↓ arrows or **drag & drop** (HTML5). Order is stored as a virtual 0-based index, so there are never duplicate or fractional orders.
 
-![Prompt sections](2.png)
+![Prompt sections](docs/images/prompt-sections.png)
 
 - **Tools**
   - **Blacklist** (`exclude`): hide the listed tools.
   - **Whitelist** (`include`): keep only the listed tools (wins over exclude).
   - Only the model-facing catalog is affected — tools and routes keep working.
 
-![Tools](docs/images/2-1.png)
-![Tools](docs/images/2-2.png)
-![Tools](docs/images/2-3.png)
+![Tools blacklist](docs/images/tools-blacklist.png)
+![Tools all visible](docs/images/tools-all-visible.png)
+![Model filtered tools](docs/images/model-tools-filtered.png)
 
 - **Presets**
   - **Save** the current customization as a preset (full snapshot).
@@ -34,7 +32,7 @@ Plugin-injected prompt sections can pollute your system prompt. This plugin lets
   - Presets store **relative order** (each section records the section it follows), so they stay portable across prompts with different section sets.
   - Multiple presets can be stored locally; only one is active at a time.
 
-![Presets](docs/images/3.png)
+![Model system prompt](docs/images/model-system-prompt.png)
 
 ## Installation
 
