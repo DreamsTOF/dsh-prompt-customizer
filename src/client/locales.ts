@@ -1,4 +1,4 @@
-/** Locale dictionaries for the prompt-customizer panel. */
+/** 提示词定制面板的中英文词典（由宿主 locale 服务按命名空间注册）。 */
 export const DICT = {
   zh: {
     nav: '提示词定制',

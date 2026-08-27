@@ -60,10 +60,23 @@ test('mergeSections: custom marker wins over a name collision with the inventory
 })
 
 test('mergeSections: reordering an inventory section without the marker stays system', () => {
-  const merged = mergeSections(invOf(['b']), { inject: [{ name: 'b', order: 5, text: '', custom: false }] }, new Set())
-  const b = merged.find((sec) => sec.name === 'b')!
-  assert.equal(b.source, 'system')
-  assert.equal(b.order, 5)
+  // 真实用法里客户端会持久化全部段的连续虚拟下标；此处按同样方式只重排
+  // （a/b 对调），不携带 custom 标记 —— 来源必须保持 system（由隐藏标记决定，
+  // 与名字碰撞无关）。合并视图输出的是连续 0..n-1 虚拟下标，而非注入时的
+  // 原始 order 值（那是面板 #N 徽标的既有契约）。
+  const merged = mergeSections(
+    invOf(['a', 'b']),
+    {
+      inject: [
+        { name: 'b', order: 0, text: '', custom: false },
+        { name: 'a', order: 1, text: '', custom: false },
+      ],
+    },
+    new Set(),
+  )
+  assert.deepEqual(merged.map((x) => x.name), ['b', 'a'])
+  assert.deepEqual(merged.map((x) => x.order), [0, 1])
+  assert.ok(merged.every((x) => x.source === 'system'))
 })
 
 // ── 回归：预设快照不得固化系统段的动态文本 ───────────────────────────────────

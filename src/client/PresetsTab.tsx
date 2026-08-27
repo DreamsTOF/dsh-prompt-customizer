@@ -1,4 +1,4 @@
-/** Presets tab: save / apply / export / import complete customization snapshots. */
+/** 预设 Tab：保存 / 应用 / 导出 / 导入完整的定制快照。 */
 import { createElement as h, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
 import type { Config, Inventory, Preset, PresetData, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -14,9 +14,8 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   const merged = mergeSections(inv, cfg, blockedNames)
   const currentNames = new Set(merged.map((sec) => sec.name))
 
-  // Capture the current customization as a new preset (full snapshot). The
-  // absolute order is converted to a relative form (each section records the
-  // section it should follow) so the preset stays portable across prompts.
+  // 把当前定制捕获为新预设（完整快照）。绝对顺序会被转成相对形式
+  // （每段记录它应跟随的前一段），因此预设可以跨不同提示词移植。
   const saveCurrent = (): void => {
     const presetName = name.trim() || `${t('preset')} ${presets.length + 1}`
     const data = buildPresetData(cfg, merged)
@@ -24,12 +23,11 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
     setName('')
   }
 
-  // Apply a preset. The patch is computed by the pure helper:
-  //  - same-name sections are overridden (content + order)
-  //  - preset sections missing from the current prompt are added
-  //  - current sections NOT in the preset list are disabled (blocked)
-  //  - only the preset's ACTIVE sections are unblocked (its own blocked list
-  //    is preserved)
+  // 应用预设。补丁由纯函数助手计算：
+  //  - 同名段被覆盖（内容 + 顺序）
+  //  - 预设中有、当前提示词中没有的段被添加
+  //  - 当前有、但不在预设列表中的段被屏蔽
+  //  - 只有预设的「激活段」被解除屏蔽（预设自己的屏蔽名单被保留）
   const applyPreset = (preset: Preset): void => {
     const patch = applyPresetData(preset.data, cfg, currentNames)
     scope.set('inject', patch.inject)
@@ -45,7 +43,7 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
     if (next.activeId === undefined && cfg.activePreset === id) scope.unset('activePreset')
   }
 
-  // Serialize a preset to a downloadable JSON file.
+  // 把预设序列化成可下载的 JSON 文件。
   const exportPreset = (preset: Preset): void => {
     const blob = new Blob([JSON.stringify(serializePreset(preset), null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -56,8 +54,8 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
     URL.revokeObjectURL(url)
   }
 
-  // Import preset(s) from a JSON file. Same-name presets are skipped; only
-  // presets with new names are added to the local list.
+  // 从 JSON 文件导入预设。同名预设会被跳过；只有名字是新的预设才会
+  // 追加到本地列表。
   const onImportFile = (e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -105,6 +103,7 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   ])
 }
 
+/** 生成预设 id：时间戳 + 随机段（base36），够用且无需额外依赖。 */
 function genId(): string {
   return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }

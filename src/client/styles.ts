@@ -1,4 +1,4 @@
-/** Inline styles shared by the prompt-customizer panel components. */
+/** 提示词定制面板各组件共享的内联样式（颜色走半透明灰，随宿主主题自然适配）。 */
 export const s = (() => {
   const flex = { display: 'flex', alignItems: 'center' }
   return {

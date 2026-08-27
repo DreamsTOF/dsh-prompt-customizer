@@ -1,6 +1,6 @@
-/** Preview tab: two read-only sub-tabs — the FINAL assembled system prompt
- *  after every plugin's filter, and the tools the current preset will inject
- *  (whitelist-style, after include/exclude). Neither view edits config. */
+/** 预览 Tab：两个只读子视图 —— 所有插件过滤后的最终装配系统提示词，
+ *  以及当前定制（include/exclude 之后）将注入的工具白名单视图。
+ *  两个视图都不修改配置。 */
 import { createElement as h, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Preview, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -14,9 +14,8 @@ export function PreviewTab({ scope, t, active, refreshId }: { scope: SettingsSco
   const [data, setData] = useState<Preview | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Reload whenever the namespace config changes (block/replace/inject), so the
-  // section count and final text always reflect the current customization —
-  // not just on mount.
+  // 命名空间配置一变（屏蔽/替换/注入）就重新加载，段数与最终文本始终反映
+  // 当前定制——而不只在挂载时加载一次。inFlight 防止并发请求竞态。
   const inFlight = useRef(false)
   const load = (): void => {
     if (inFlight.current) return
@@ -34,7 +33,7 @@ export function PreviewTab({ scope, t, active, refreshId }: { scope: SettingsSco
   }
   useEffect(load, [])
   useEffect(() => scope.subscribe(load), [scope])
-  // Refresh when this tab becomes active or when refresh button is clicked
+  // 切到本 Tab 或点击刷新按钮时重新加载
   useEffect(() => { if (active) load() }, [active, refreshId])
 
   return h('div', { style: s.list }, [

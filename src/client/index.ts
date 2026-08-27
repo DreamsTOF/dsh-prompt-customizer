@@ -1,14 +1,13 @@
 /**
- * dsh-prompt-customizer — browser half (TypeScript source).
+ * dsh-prompt-customizer — 浏览器端（TypeScript 源码）。
  *
- * Registers a "提示词定制" settings section (sidebar entry) and a plugin
- * settings card. The panel fetches the effective section / tool inventory
- * from the host `/api/prompt-customizer/inventory` and lets the user block,
- * replace, inject prompt sections and hide tools. All writes go through the
- * bound settings scope (`prompt-customizer` namespace) and apply live.
+ * 注册一个「提示词定制」设置分区（侧边栏入口）及插件设置卡片。面板从宿主
+ * 的 `/api/prompt-customizer/inventory` 拉取当前生效的段 / 工具清单，让用户
+ * 屏蔽、替换、注入提示词段并隐藏工具。所有写入都走绑定的设置作用域
+ * （`prompt-customizer` 命名空间），实时生效。
  *
- * Built by tsdown into the __ModuleLoader__ factory bundle at client/client.js;
- * the only external is the loader module table's react entry.
+ * 由 tsdown 打包为 client/client.js（__ModuleLoader__ factory bundle）；
+ * 唯一的外部依赖是 loader 模块表中的 react 入口。
  */
 import { createElement as h, useEffect, useState, type ReactElement } from 'react'
 import { DICT, type Translate } from './locales.ts'
@@ -25,7 +24,7 @@ const INVENTORY_URL = '/api/prompt-customizer/inventory'
 export const name = 'prompt-customizer'
 export const inject = ['slots', 'locale']
 
-/** The subset of the client cordis context this plugin touches. */
+/** 本插件用到的客户端 cordis 上下文的最小子集。 */
 interface ClientContext {
   effect(callback: () => unknown, label?: string): void
   locale: {
@@ -35,7 +34,7 @@ interface ClientContext {
   inject(services: string[], callback: (scoped: SettingsScopeHost) => void): void
 }
 
-/** The host surface the settings card needs (settingsScope transport). */
+/** 设置卡片需要的宿主能力面（settingsScope 传输层 + 插槽注册）。 */
 interface SettingsScopeHost {
   settingsScope: {
     bind(options: { namespace: string }): SettingsScope
@@ -50,11 +49,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, DICT), 'prompt-customizer: locale')
   const t = ctx.locale.bind(NS)
 
-  // Register a standalone settings section (sidebar menu entry) so the panel
-  // only appears under "提示词定制", not as a card inside the "插件" settings
-  // list. Goes through a NESTED inject of settingsScope so the panel can
-  // read/write the namespace config; on hosts without the settings transport
-  // it stays hidden instead of unmounting the whole plugin.
+  // 注册为独立的设置分区（侧边栏菜单项），面板只出现在「提示词定制」下，
+  // 而不是作为卡片塞进「插件」设置列表。通过 NESTED inject 拿到 settingsScope
+  // 后才能读写命名空间配置；在缺少 settings 传输层的宿主上保持隐藏，
+  // 而不是把整个插件卸载掉。
   ctx.inject(['settingsScope'], (scoped) => {
     const scope = scoped.settingsScope.bind({ namespace: NS })
 
@@ -69,7 +67,13 @@ export function apply(ctx: ClientContext): void {
   })
 }
 
-// ── Root panel ──────────────────────────────────────────────────────────────
+// ── 根面板 ────────────────────────────────────────────────────────────────
+
+/**
+ * 面板根组件：拉取清单、维护 Tab 状态，把各 Tab 子视图与共享配置装配起来。
+ * 配置快照来自 settingsScope（subscribe 实时同步）；清单来自宿主路由，
+ * 可通过「刷新」按钮手动重取。
+ */
 
 function Panel({ scope, t }: { scope: SettingsScope; t: Translate }): ReactElement {
   const [snap, setSnap] = useState(() => scope.getSnapshot())

@@ -1,4 +1,4 @@
-/** Tools tab: hide tools from the model catalog (blacklist only — check = hide). */
+/** 工具 Tab：从模型目录中隐藏工具（纯黑名单 —— 勾选即隐藏）。 */
 import { createElement as h, type ReactElement } from 'react'
 import type { Config, Inventory, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -8,8 +8,8 @@ export function ToolsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory |
   const tools = inv?.tools ?? []
   const exclude = cfg.tools?.exclude ?? []
 
-  // Blacklist-only: a tool is hidden iff it is in the exclude list. Any stale
-  // whitelist (include) is discarded on write so mode switching is gone.
+  // 纯黑名单模式：工具是否隐藏只取决于它是否在 exclude 列表里。
+  // 写入时丢弃任何残留的白名单（include），彻底去掉模式切换的概念。
   const hidden = (name: string): boolean => exclude.includes(name)
 
   const toggle = (name: string, currentlyHidden: boolean): void => {

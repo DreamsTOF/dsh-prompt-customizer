@@ -1,10 +1,11 @@
-/** Prompt-sections tab: block / replace / inject / reorder prompt sections. */
+/** 提示词段 Tab：屏蔽 / 替换 / 注入 / 重排提示词段。 */
 import { createElement as h, useState, type ReactElement, type DragEvent, type ChangeEvent } from 'react'
 import type { Config, Inventory, SettingsScope } from './types.ts'
 import type { Translate } from './locales.ts'
 import { mergeSections, removeSection, type Section } from './presets.ts'
 import { s } from './styles.ts'
 
+/** 提示词段 Tab：每行一个段，支持屏蔽、编辑替换文本、拖拽/箭头排序与删除。 */
 export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
   const replace = cfg.replace ?? {}
   const blockedNames = new Set(cfg.sections ?? [])
@@ -13,9 +14,8 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   const [dragName, setDragName] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<{ name: string; pos: 'above' | 'below' } | null>(null)
 
-  // Merge inventory sections with user-injected sections, sorted by order.
-  // Injected sections that don't exist in the original prompt appear here too,
-  // positioned by their order value.
+  // 合并清单段与用户注入段，按 order 排序。
+  // 原提示词中不存在的注入段也会出现在这里，按其 order 值定位。
   const merged: Section[] = mergeSections(inv, cfg, blockedNames)
 
   const toggleBlock = (name: string, currentlyBlocked: boolean): void => {
@@ -25,7 +25,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     scope.set('sections', list)
   }
   const startReplace = (name: string, original: string): void => {
-    // Echo the ORIGINAL prompt text so the user edits from the current value.
+    // 回显「原始」提示词文本，让用户从当前值开始编辑。
     setEditing(name)
     setDraft(replace[name] ?? original)
   }
@@ -42,11 +42,9 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     scope.set('replace', next)
   }
 
-  // Persist the full ordered list (system + custom). We re-index every section
-  // with a sequential integer order (0, 1, 2, …) so the plugin panel order is
-  // the authoritative sort order. System sections keep empty text (so the
-  // server never freezes their dynamically generated content); custom sections
-  // keep their own text.
+  // 持久化完整有序列表（system + custom）。每个段都重新编号为连续整数
+  // （0, 1, 2, …），面板上的顺序即最终排序依据。system 段保留空文本
+  // （服务端因此不会冻结其动态生成的内容）；custom 段保留自己的文本。
   const persistOrder = (ordered: Section[]): void => {
     const list = ordered.map((sec, i) => {
       const existing = (cfg.inject ?? []).find((x) => x.name === sec.name)
@@ -56,8 +54,8 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     scope.set('inject', list)
   }
 
-  // Delete a custom (plugin-added) section: remove it from inject / sections /
-  // replace so it no longer appears in the panel at all.
+  // 删除一个 custom（本插件注入）段：从 inject / sections / replace 中全部
+  // 移除，之后它不会再出现在面板上。
   const removeCustom = (name: string): void => {
     const patch = removeSection(name, cfg)
     scope.set('sections', patch.sections)
@@ -65,7 +63,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     scope.set('replace', patch.replace)
   }
 
-  // Move a section up/down one slot (array-index swap), then re-index.
+  // 上移/下移一格（数组下标交换），然后重新编号。
   const moveOrder = (index: number, dir: -1 | 1): void => {
     const target = index + dir
     if (target < 0 || target >= merged.length) return
@@ -103,9 +101,8 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   }
   const onDragEnd = (): void => { setDragName(null); setDropTarget(null) }
 
-  // Add a new injected section, placed by its order hint, then re-index. The
-  // section is marked `custom` (the hidden marker) so it is identified as
-  // plugin-generated and thus deletable, and its own text is preserved.
+  // 新增一个注入段，按顺序提示值放置，然后重新编号。该段会带上 `custom`
+  // 隐藏标记，从而被识别为本插件生成（可删除），并且自身文本得以保留。
   const addSection = (name: string, order: number, text: string): void => {
     const next = merged.slice()
     const entry: Section = { name, order, text, active: true, replaced: false, source: 'custom' }
@@ -180,6 +177,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   ])
 }
 
+/** 注入新段表单：名称 + 顺序提示 + 文本，一行式提交。 */
 function InjectForm({ onAdd, t }: { onAdd: (name: string, order: number, text: string) => void; t: Translate }): ReactElement {
   const [name, setName] = useState('')
   const [order, setOrder] = useState('120')

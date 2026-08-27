@@ -1,12 +1,14 @@
-/** Tools preview: read-only whitelist-style list of the tools the current
- *  preset will inject (the FINAL model-visible catalog after include/exclude).
- *  A tool being listed means it is visible — there is no "blocked" state here.
- *  This view never edits the blacklist/whitelist config. */
+/** 工具预览：当前定制（include/exclude 之后）最终对模型可见的工具目录，
+ *  只读、白名单风格。列出即代表可见——这里没有「已屏蔽」状态。
+ *  本视图绝不修改黑名单/白名单配置。 */
 import { createElement as h, type ReactElement } from 'react'
 import type { Translate } from './locales.ts'
 import { s } from './styles.ts'
 
+/** 预览工具条目：对象形态或纯字符串工具名（统一归一化为对象）。 */
 export type PreviewTool = { name: string; description: string } | string
+
+/** 把字符串形态的条目补全为 { name, description: '' }。 */
 
 function norm(tool: PreviewTool): { name: string; description: string } {
   return typeof tool === 'string' ? { name: tool, description: '' } : tool
