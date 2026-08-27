@@ -1,11 +1,18 @@
 /** 预设 Tab：保存 / 应用 / 导出 / 导入完整的定制快照。 */
 import { createElement as h, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
-import type { Config, Inventory, Preset, PresetData, SettingsScope } from './types.ts'
+import type { Config, Inventory, Preset, PresetData } from './types.ts'
 import type { Translate } from './locales.ts'
 import { addImportedPresets, applyPresetData, buildPresetData, mergeSections, removePreset, serializePreset } from './presets.ts'
 import { s } from './styles.ts'
 
-export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
+export function PresetsTab({ cfg, inv, t, write, writeGlobal }: {
+  cfg: Config
+  inv: Inventory | null
+  t: Translate
+  write: (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown) => void
+  /** 预设库专用：永远写在全局字段（presets / activePreset 不分作用域）。 */
+  writeGlobal: (field: string, value: unknown) => void
+}): ReactElement {
   const presets = cfg.presets ?? []
   const [name, setName] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -19,7 +26,7 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   const saveCurrent = (): void => {
     const presetName = name.trim() || `${t('preset')} ${presets.length + 1}`
     const data = buildPresetData(cfg, merged)
-    scope.set('presets', [...presets, { id: genId(), name: presetName, data }])
+    writeGlobal('presets', [...presets, { id: genId(), name: presetName, data }])
     setName('')
   }
 
@@ -28,19 +35,21 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
   //  - 预设中有、当前提示词中没有的段被添加
   //  - 当前有、但不在预设列表中的段被屏蔽
   //  - 只有预设的「激活段」被解除屏蔽（预设自己的屏蔽名单被保留）
+  // 四个定制字段写入当前编辑目标（全局顶层或 overrides[id]）；快照库
+  // （presets / activePreset）永远保持在全局。
   const applyPreset = (preset: Preset): void => {
     const patch = applyPresetData(preset.data, cfg, currentNames)
-    scope.set('inject', patch.inject)
-    scope.set('replace', patch.replace)
-    scope.set('sections', patch.sections)
-    scope.set('tools', patch.tools)
-    scope.set('activePreset', preset.id)
+    write('inject', patch.inject)
+    write('replace', patch.replace)
+    write('sections', patch.sections)
+    write('tools', patch.tools)
+    writeGlobal('activePreset', preset.id)
   }
 
   const deletePreset = (id: string): void => {
     const next = removePreset(presets, id, cfg.activePreset)
-    scope.set('presets', next.presets)
-    if (next.activeId === undefined && cfg.activePreset === id) scope.unset('activePreset')
+    writeGlobal('presets', next.presets)
+    if (next.activeId === undefined && cfg.activePreset === id) writeGlobal('activePreset', undefined)
   }
 
   // 把预设序列化成可下载的 JSON 文件。
@@ -63,7 +72,7 @@ export function PresetsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result))
-        scope.set('presets', addImportedPresets(presets, parsed, genId))
+        writeGlobal('presets', addImportedPresets(presets, parsed, genId))
       } catch { /* ignore invalid json */ }
     }
     reader.readAsText(file)

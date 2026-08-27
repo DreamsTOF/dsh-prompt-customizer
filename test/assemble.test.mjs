@@ -1,24 +1,31 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { stringify as yamlStringify } from 'yaml'
 import { apply } from '../lib/index.js'
 
-/** Minimal Cordis ctx: capture the assemble handler; settings.get returns cfg. */
+/** Minimal Cordis ctx + 临时 dataDir：配置写入 tmp 的 config.yaml。 */
 function makeCtx(config) {
   let handler
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-assemble-'))
+  if (config !== undefined) {
+    fs.writeFileSync(path.join(dataDir, 'config.yaml'), yamlStringify(config))
+  }
   const ctx = {
-    settings: { register: () => ({ get: () => config }) },
     on: (name, h) => { if (name === 'system-prompt/assemble') handler = h },
     get: () => undefined,
     effect: () => {},
   }
-  return { ctx, handler: () => handler }
+  return { ctx, handler: () => handler, dataDir }
 }
 
-async function assemble(config, sections, tools) {
-  const { ctx, handler } = makeCtx(config)
-  apply(ctx)
+async function assemble(config, sections, tools, context = {}) {
+  const { ctx, handler, dataDir } = makeCtx(config)
+  apply(ctx, { dataDir })
   const assembly = { sections, tools, contexts: [], variables: {} }
-  return handler()(assembly, {}, async () => assembly)
+  return handler()(assembly, context, async () => assembly)
 }
 
 const baseSections = [
@@ -134,5 +141,11 @@ test('empty include list disables the whitelist filter', async () => {
 test('empty sections list is handled', async () => {
   const res = await assemble({}, [], baseTools)
   assert.deepEqual(res.sections, [])
+  assert.equal(res.tools.length, 2)
+})
+
+test('missing config file behaves like empty config', async () => {
+  const res = await assemble(undefined, baseSections, baseTools)
+  assert.deepEqual(res.sections.map((s) => s.name), ['harness:source', 'harness:identity', 'tool:read'])
   assert.equal(res.tools.length, 2)
 })

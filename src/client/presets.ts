@@ -1,5 +1,5 @@
 /** 纯函数的预设 / 段操作助手，同时被客户端 UI 与 Node 测试复用（不触碰 IO 与 React）。 */
-import type { Config, Inventory, Preset, PresetData } from './types.ts'
+import type { Config, Inventory, OverrideData, Preset, PresetData } from './types.ts'
 
 export interface Section {
   name: string
@@ -227,6 +227,47 @@ export function setToolMode(on: boolean, toolsCfg: ToolsCfg | undefined, toolNam
   const exclude = (toolsCfg?.exclude ?? []).filter((n) => known.has(n))
   if (on) return { exclude, include: toolNames.filter((n) => !exclude.includes(n)) }
   return { exclude, include: [] }
+}
+
+// ── 按 agent 预设的覆盖编辑 ─────────────────────────────────────────────
+
+/**
+ * 编辑目标的「显示视图」：全局目标返回原配置；agent 预设目标把该预设
+ * override 的字段叠在全局值之上展示（空缺字段显示全局继承值）。`presets`
+ * 与 `activePreset` 永远来自全局 —— 预设快照库本身不分作用域。
+ */
+export function editView(cfg: Config, target: string | undefined): Config {
+  if (!target) return cfg
+  const ovr = cfg.overrides?.[target] ?? {}
+  return {
+    sections: ovr.sections ?? cfg.sections,
+    replace: ovr.replace ?? cfg.replace,
+    inject: ovr.inject ?? cfg.inject,
+    tools: {
+      exclude: ovr.tools?.exclude ?? cfg.tools?.exclude,
+      include: ovr.tools?.include ?? cfg.tools?.include,
+      bootstrap: ovr.tools?.bootstrap ?? cfg.tools?.bootstrap,
+    },
+    presets: cfg.presets,
+    activePreset: cfg.activePreset,
+  }
+}
+
+/**
+ * 往某个 agent 预设的 override 里写入一个字段，返回新的 overrides 记录
+ * （不改原对象）。与 editView 配对：编辑视图里看到的继承值一旦被修改，
+ * 就整体落成该预设自己的字段（字段级接管语义）。
+ */
+export function setOverrideField(
+  cfg: Config,
+  target: string,
+  field: 'sections' | 'replace' | 'inject' | 'tools',
+  value: unknown,
+): Record<string, OverrideData> {
+  return {
+    ...(cfg.overrides ?? {}),
+    [target]: { ...(cfg.overrides?.[target] ?? {}), [field]: value },
+  }
 }
 
 // ── 预设列表操作 ──────────────────────────────────────────────────────────

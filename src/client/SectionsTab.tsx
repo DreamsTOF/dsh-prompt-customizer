@@ -1,12 +1,18 @@
 /** 提示词段 Tab：屏蔽 / 替换 / 注入 / 重排提示词段。 */
 import { createElement as h, useState, type ReactElement, type DragEvent, type ChangeEvent } from 'react'
-import type { Config, Inventory, SettingsScope } from './types.ts'
+import type { Config, Inventory } from './types.ts'
 import type { Translate } from './locales.ts'
 import { mergeSections, removeSection, type Section } from './presets.ts'
 import { s } from './styles.ts'
 
-/** 提示词段 Tab：每行一个段，支持屏蔽、编辑替换文本、拖拽/箭头排序与删除。 */
-export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventory | null; scope: SettingsScope; t: Translate }): ReactElement {
+/** 提示词段 Tab：每行一个段，支持屏蔽、编辑替换文本、拖拽/箭头排序与删除。
+ *  写入经由 `write`（全局 = 顶层字段；agent 预设目标 = overrides[id]）。 */
+export function SectionsTab({ cfg, inv, t, write }: {
+  cfg: Config
+  inv: Inventory | null
+  t: Translate
+  write: (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown) => void
+}): ReactElement {
   const replace = cfg.replace ?? {}
   const blockedNames = new Set(cfg.sections ?? [])
   const [editing, setEditing] = useState<string | null>(null)
@@ -22,7 +28,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     const list = (cfg.sections ?? []).slice()
     if (currentlyBlocked) { const i = list.indexOf(name); if (i >= 0) list.splice(i, 1) }
     else list.push(name)
-    scope.set('sections', list)
+    write('sections', list)
   }
   const startReplace = (name: string, original: string): void => {
     // 回显「原始」提示词文本，让用户从当前值开始编辑。
@@ -33,34 +39,42 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
     const next = { ...replace }
     if (draft.trim() === '') delete next[name]
     else next[name] = draft
-    scope.set('replace', next)
+    write('replace', next)
     setEditing(null)
   }
   const restoreReplace = (name: string): void => {
     const next = { ...replace }
     delete next[name]
-    scope.set('replace', next)
+    write('replace', next)
   }
 
   // 持久化完整有序列表（system + custom）。每个段都重新编号为连续整数
   // （0, 1, 2, …），面板上的顺序即最终排序依据。system 段保留空文本
   // （服务端因此不会冻结其动态生成的内容）；custom 段保留自己的文本。
-  const persistOrder = (ordered: Section[]): void => {
+  // phase 跟随既有条目（排序不改变生效阶段）；setPhase 用于同一次写入里
+  // 覆盖某个段（通常是新注入的段）的阶段，避免二次写入基于陈旧快照。
+  const persistOrder = (ordered: Section[], setPhase?: { name: string; phase: string }): void => {
     const list = ordered.map((sec, i) => {
       const existing = (cfg.inject ?? []).find((x) => x.name === sec.name)
       const isCustom = sec.source === 'custom'
-      return { name: sec.name, order: i, text: isCustom ? (sec.text ?? '') : (existing?.text ?? ''), custom: isCustom }
+      return {
+        name: sec.name,
+        order: i,
+        text: isCustom ? (sec.text ?? '') : (existing?.text ?? ''),
+        phase: setPhase?.name === sec.name ? setPhase.phase : (existing?.phase ?? 'always'),
+        custom: isCustom,
+      }
     })
-    scope.set('inject', list)
+    write('inject', list)
   }
 
   // 删除一个 custom（本插件注入）段：从 inject / sections / replace 中全部
   // 移除，之后它不会再出现在面板上。
   const removeCustom = (name: string): void => {
     const patch = removeSection(name, cfg)
-    scope.set('sections', patch.sections)
-    scope.set('inject', patch.inject)
-    scope.set('replace', patch.replace)
+    write('sections', patch.sections)
+    write('inject', patch.inject)
+    write('replace', patch.replace)
   }
 
   // 上移/下移一格（数组下标交换），然后重新编号。
@@ -101,9 +115,18 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   }
   const onDragEnd = (): void => { setDragName(null); setDropTarget(null) }
 
+  // 阶段徽标：只有非 always 的注入段才显示，避免常驻段的噪音。
+  const phaseBadge = (name: string): ReactElement | null => {
+    const phase = (cfg.inject ?? []).find((x) => x.name === name)?.phase
+    if (phase !== 'bootstrap' && phase !== 'active') return null
+    return h('span', { style: s.badgeCustom }, phase === 'bootstrap' ? t('phaseBootstrap') : t('phaseActive'))
+  }
+
   // 新增一个注入段，按顺序提示值放置，然后重新编号。该段会带上 `custom`
   // 隐藏标记，从而被识别为本插件生成（可删除），并且自身文本得以保留。
-  const addSection = (name: string, order: number, text: string): void => {
+  // phase 决定生效阶段（always 恒定 / bootstrap 仅未晋级 / active 仅晋级后），
+  // 与列表写入同批持久化。
+  const addSection = (name: string, order: number, text: string, phase: 'always' | 'bootstrap' | 'active'): void => {
     const next = merged.slice()
     const entry: Section = { name, order, text, active: true, replaced: false, source: 'custom' }
     const existing = next.findIndex((x) => x.name === name)
@@ -113,7 +136,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
       if (idx < 0) next.push(entry)
       else next.splice(idx, 0, entry)
     }
-    persistOrder(next)
+    persistOrder(next, { name, phase })
   }
 
   return h('div', { style: s.list }, [
@@ -148,6 +171,7 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
             h('span', { style: s.code }, sec.name),
             h('span', { style: s.orderTag }, '#' + index),
             h('span', { style: sec.source === 'custom' ? s.badgeCustom : s.badgeSystem }, sec.source === 'custom' ? t('manual') : t('system')),
+            phaseBadge(sec.name),
             replace[sec.name] ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           ]),
           isEditing
@@ -177,22 +201,31 @@ export function SectionsTab({ cfg, inv, scope, t }: { cfg: Config; inv: Inventor
   ])
 }
 
-/** 注入新段表单：名称 + 顺序提示 + 文本，一行式提交。 */
-function InjectForm({ onAdd, t }: { onAdd: (name: string, order: number, text: string) => void; t: Translate }): ReactElement {
+/** 注入新段表单：名称 + 顺序提示 + 文本 + 生效阶段，一行式提交。 */
+function InjectForm({ onAdd, t }: { onAdd: (name: string, order: number, text: string, phase: 'always' | 'bootstrap' | 'active') => void; t: Translate }): ReactElement {
   const [name, setName] = useState('')
   const [order, setOrder] = useState('120')
   const [text, setText] = useState('')
+  const [phase, setPhase] = useState<'always' | 'bootstrap' | 'active'>('always')
 
   const submit = (): void => {
     if (!name.trim()) return
-    onAdd(name.trim(), Number(order) || 120, text)
-    setName(''); setText(''); setOrder('120')
+    onAdd(name.trim(), Number(order) || 120, text, phase)
+    setName(''); setText(''); setOrder('120'); setPhase('always')
   }
 
   return h('div', {}, [
     h('div', { style: s.injectRow }, [
       h('input', { style: { ...s.input, width: '22%' }, placeholder: t('name'), value: name, onChange: (e) => setName(e.target.value) }),
       h('input', { style: { ...s.input, width: '12%' }, type: 'number', placeholder: t('order'), value: order, onChange: (e) => setOrder(e.target.value) }),
+      h('select', { style: s.input, value: phase, onChange: (e: { target: { value: string } }) => {
+        if (e.target.value === 'bootstrap' || e.target.value === 'active') setPhase(e.target.value)
+        else setPhase('always')
+      } }, [
+        h('option', { value: 'always' }, t('phaseAlways')),
+        h('option', { value: 'bootstrap' }, t('phaseBootstrap')),
+        h('option', { value: 'active' }, t('phaseActive')),
+      ]),
       h('input', { style: { ...s.input, flex: 1 }, placeholder: t('text'), value: text, onChange: (e) => setText(e.target.value) }),
       h('button', { style: s.mini, onClick: submit }, t('add')),
     ]),
