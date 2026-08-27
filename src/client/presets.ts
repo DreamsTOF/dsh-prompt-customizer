@@ -278,6 +278,22 @@ export function serializePreset(preset: Preset): { name: string; data: PresetDat
 }
 
 /**
+ * Derive a safe default filename for a preset export. User-entered preset
+ * names may contain characters that are illegal in filenames (`/\:*?"<>|`,
+ * control chars) — those are replaced; a trailing dot/space is trimmed
+ * (invalid on Windows); an empty or all-illegal result falls back to
+ * `preset`.
+ */
+export function presetExportFilename(name: string): string {
+  const sanitized = String(name)
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .trim()
+    .replace(/[. ]+$/, '')
+  const base = sanitized === '' ? 'preset' : sanitized
+  return `${base}.json`
+}
+
+/**
  * 导入预设：同名的会被跳过，只追加名字不同的预设。返回新的预设列表
  * （若没有任何变更则返回原列表）。
  */

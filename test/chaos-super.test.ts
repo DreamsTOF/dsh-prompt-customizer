@@ -12,6 +12,8 @@
  *                         S-19 连续切换 3~5 个预设的链
  *                         S-20 稀疏/残缺预设攻击（缺 tools、幽灵锚、sections 含幽灵名）
  *                         S-21 手动段全部删除后立即重建
+ *                         S-22 导入/导出桌面适配（tauri 原生 dialog/fs 命令契约、
+ *                              web 回退下载/选择器、文件名净化、环境检测）
  *  不变量增强             I1~I9 全部继承（含「保存→立即应用 = 完美不动点」，
  *                         已内联到每个保存操作），另加：
  *    S1  activePreset 恒为 undefined 或指向现存预设 id
@@ -33,13 +35,29 @@ import {
   buildPresetData,
   isToolHidden,
   mergeSections,
+  presetExportFilename,
   removePreset,
   removeSection,
-  serializePreset,
   setToolMode,
   toggleTool,
   type Section,
 } from '../src/client/presets.ts'
+import {
+  decodePresetExport,
+  encodePresetExport,
+  exportPresetFile,
+  importPresetFile,
+  isTauriEnv,
+  makeIoEnv,
+  readPickedFile,
+  tauriOpenText,
+  tauriSaveText,
+  webDownload,
+  type BrowserDownloadTarget,
+  type FileReaderLike,
+  type PresetIoEnv,
+  type TauriInvoke,
+} from '../src/client/preset-io.ts'
 import type { Config, Inventory, Preset } from '../src/client/types.ts'
 
 // ── 可复现伪随机 ─────────────────────────────────────────────────────────────
@@ -290,6 +308,220 @@ function checkAfterApply(w: World, before: Config, preset: Preset, after: Config
   assert.deepEqual(thrice, twice, `${tag}: 三次应用幂等`)
 }
 
+// ── 导入/导出适配（web ↔ tauri 桌面宿主）──────────────────────────────────────
+// 原实现只在浏览器可用（Blob+<a download> / <input type=file>+FileReader）。
+// 宿主被封装成 tauri WebView 后，导出优先走原生保存对话框+dialog/fs 插件，
+// 导入优先走原生打开对话框；宿主未注册插件或被 ACL 拦截时优雅回退 web 路径。
+
+test('io: 导出文件名净化非法字符并修剪尾部点/空格', () => {
+  assert.equal(presetExportFilename('a/b\\c:d*e?"f<g>h|i'), 'a_b_c_d_e__f_g_h_i.json')
+  assert.equal(presetExportFilename('preset.'), 'preset.json')
+  assert.equal(presetExportFilename('   '), 'preset.json')
+  assert.equal(presetExportFilename('Weird\tName'), 'Weird_Name.json')
+  assert.equal(presetExportFilename('αβγ'), 'αβγ.json')
+})
+
+test('io: tauri 环境检测（v2 __TAURI_INTERNALS__ / v1 __TAURI__）', () => {
+  assert.equal(isTauriEnv({ __TAURI_INTERNALS__: { invoke() {} } }), true)
+  assert.equal(isTauriEnv({ __TAURI_INTERNALS__: {} }), true)
+  assert.equal(isTauriEnv({ __TAURI__: {} }), true)
+  assert.equal(isTauriEnv({}), false)
+  assert.equal(isTauriEnv(null), false)
+  assert.equal(isTauriEnv(undefined), false)
+})
+
+test('io: encode→decode→import 走真实文件格式无损往返', () => {
+  const preset: Preset = {
+    id: 'p1',
+    name: 'My/Weird:Preset',
+    data: {
+      sections: ['s0'],
+      replace: { s0: 'R' },
+      order: [{ name: 's0', after: undefined, text: '', custom: true }],
+      tools: { exclude: ['t1'], include: [] },
+    },
+  }
+  const text = encodePresetExport(preset)
+  assert.equal(JSON.parse(text).name, preset.name)
+  const imported = addImportedPresets([], decodePresetExport(text), () => 'new')[0]!
+  assert.equal(imported.name, preset.name)
+  // JSON 语义无损：encode→decode 与纯 JSON 序列化等价（undefined 键被 JSON 合法剥离）。
+  assert.deepEqual(imported.data, JSON.parse(JSON.stringify(preset.data)))
+})
+
+test('io: decode 拒绝非法 JSON/空文本，垃圾形状导入不出错', () => {
+  assert.throws(() => decodePresetExport('{oops'))
+  assert.throws(() => decodePresetExport('undefined'))
+  assert.throws(() => decodePresetExport(''))
+  assert.throws(() => decodePresetExport('   '))
+  // null 是合法 JSON：解析出 null，导入时被滤掉，不抛错。
+  assert.doesNotThrow(() => decodePresetExport(null as unknown as string))
+  assert.equal(addImportedPresets([], decodePresetExport('null'), () => 'x').length, 0)
+  const two = addImportedPresets([], decodePresetExport(JSON.stringify([{ name: 'A', data: {} }])), () => 'y')
+  assert.deepEqual(two.map((p) => p.name), ['A'])
+})
+
+test('io: 导出在宿主提供原生 dialog/fs 时走 tauri 保存对话框', async () => {
+  const calls: Array<{ file: string; text: string }> = []
+  const io: PresetIoEnv = {
+    tauri: true,
+    saveText: async (file, text) => { calls.push({ file, text }); return { kind: 'saved' } },
+    openText: async () => ({ kind: 'cancelled' }),
+    download: () => { throw new Error('web fallback must not run') },
+  }
+  const preset: Preset = { id: 'p', name: 'My Preset', data: { sections: ['a'] } }
+  const res = await exportPresetFile(preset, io)
+  assert.equal(res.ok, true)
+  assert.equal(res.via, 'tauri')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0]!.file, 'My Preset.json')
+  assert.deepEqual(JSON.parse(calls[0]!.text), { name: 'My Preset', data: { sections: ['a'] } })
+})
+
+test('io: 原生对话框不可用（未注册插件/ACL 拦截）时导出回退 web 下载', async () => {
+  const downloads: string[] = []
+  const io: PresetIoEnv = {
+    tauri: true,
+    saveText: async () => ({ kind: 'unavailable' }),
+    openText: async () => ({ kind: 'unavailable' }),
+    download: (_n, text) => { downloads.push(text) },
+  }
+  const res = await exportPresetFile({ id: 'p', name: 'P', data: {} }, io)
+  assert.equal(res.ok, true)
+  assert.equal(res.via, 'browser')
+  assert.equal(downloads.length, 1)
+  assert.equal(JSON.parse(downloads[0]!).name, 'P')
+})
+
+test('io: 用户取消原生保存对话框后不得再触发 web 下载', async () => {
+  const io: PresetIoEnv = {
+    tauri: true,
+    saveText: async () => ({ kind: 'cancelled' }),
+    openText: async () => ({ kind: 'cancelled' }),
+    download: () => { throw new Error('must not download after cancel') },
+  }
+  const res = await exportPresetFile({ id: 'p', name: 'P', data: {} }, io)
+  assert.equal(res.ok, false)
+  assert.equal(res.cancelled, true)
+})
+
+test('io: 纯 web 环境导出直接走浏览器下载', async () => {
+  const downloads: string[] = []
+  const io: PresetIoEnv = {
+    tauri: false,
+    saveText: async () => ({ kind: 'unavailable' }),
+    openText: async () => ({ kind: 'unavailable' }),
+    download: (_n, text) => { downloads.push(text) },
+  }
+  const res = await exportPresetFile({ id: 'p', name: 'web', data: {} }, io)
+  assert.equal(res.ok, true)
+  assert.equal(res.via, 'browser')
+  assert.equal(downloads.length, 1)
+})
+
+test('io: 导入在 tauri 下读原生打开对话框选中的文件', async () => {
+  const text = encodePresetExport({ id: 'p', name: 'N', data: { sections: ['a'] } })
+  const io: PresetIoEnv = {
+    tauri: true,
+    saveText: async () => ({ kind: 'unavailable' }),
+    openText: async () => ({ kind: 'text', text }),
+    download: () => {},
+  }
+  const res = await importPresetFile(io)
+  assert.equal(res.kind, 'text')
+  assert.equal(res.via, 'tauri')
+  if (res.kind === 'text') assert.equal(res.text, text)
+})
+
+test('io: 导入取消 / 不可用 → 组件回退文件选择器', async () => {
+  const base: PresetIoEnv = {
+    tauri: true,
+    saveText: async () => ({ kind: 'unavailable' }),
+    openText: async () => ({ kind: 'unavailable' }),
+    download: () => {},
+  }
+  assert.equal((await importPresetFile(base)).kind, 'unavailable')
+  assert.equal((await importPresetFile({ ...base, openText: async () => ({ kind: 'cancelled' }) })).kind, 'cancelled')
+  assert.equal((await importPresetFile({ ...base, tauri: false })).kind, 'unavailable')
+})
+
+test('io: 原生命令契约 = plugin:dialog|* + plugin:fs|*', async () => {
+  const cmds: string[] = []
+  const writes: Array<Record<string, unknown>> = []
+  const invoke: TauriInvoke = async (cmd, args) => {
+    cmds.push(cmd)
+    if (cmd === 'plugin:dialog|save') return '/tmp/out.json'
+    if (cmd === 'plugin:fs|write_text_file') { writes.push(args ?? {}); return null }
+    if (cmd === 'plugin:dialog|open') return '/tmp/in.json'
+    if (cmd === 'plugin:fs|read_text_file') return '{"name":"N","data":{}}'
+    throw new Error('unexpected ' + cmd)
+  }
+  assert.deepEqual(await tauriSaveText(invoke, 'p.json', '{}'), { kind: 'saved' })
+  assert.deepEqual(cmds, ['plugin:dialog|save', 'plugin:fs|write_text_file'])
+  assert.deepEqual(writes, [{ path: '/tmp/out.json', contents: '{}' }])
+  cmds.length = 0
+  assert.deepEqual(await tauriOpenText(invoke), { kind: 'text', text: '{"name":"N","data":{}}' })
+  assert.deepEqual(cmds, ['plugin:dialog|open', 'plugin:fs|read_text_file'])
+})
+
+test('io: 原生命令被拒（缺插件/ACL）降级 unavailable，对话框返回 null 视为取消', async () => {
+  const reject: TauriInvoke = async () => { throw new Error('not allowed') }
+  assert.deepEqual(await tauriSaveText(reject, 'p.json', 'x'), { kind: 'unavailable' })
+  assert.deepEqual(await tauriOpenText(reject), { kind: 'unavailable' })
+  const cancel: TauriInvoke = async (cmd) => (cmd === 'plugin:dialog|save' || cmd === 'plugin:dialog|open' ? null : 'x')
+  assert.deepEqual(await tauriSaveText(cancel, 'p.json', 'x'), { kind: 'cancelled' })
+  assert.deepEqual(await tauriOpenText(cancel), { kind: 'cancelled' })
+})
+
+test('io: web 下载触发 anchor.click 并撤销 objectURL', () => {
+  let clicked = ''
+  let revoked = ''
+  let blobText = ''
+  const target: BrowserDownloadTarget = {
+    makeAnchor: () => ({ href: '', download: '', click() { clicked = this.download } }),
+    makeBlob: (text) => { blobText = text; return {} },
+    objectUrl: () => 'blob:fake',
+    revoke: (u) => { revoked = u },
+  }
+  webDownload(target, 'p.json', '{"a":1}')
+  assert.equal(clicked, 'p.json')
+  assert.equal(blobText, '{"a":1}')
+  assert.equal(revoked, 'blob:fake')
+})
+
+test('io: readPickedFile 通过 FileReader-like 解析选中文件文本', async () => {
+  const fake: FileReaderLike = {
+    onload: null,
+    onerror: null,
+    result: '{"name":"R","data":{}}',
+    readAsText() { this.onload?.() },
+  }
+  assert.equal(await readPickedFile(fake, {}), '{"name":"R","data":{}}')
+  const bad: FileReaderLike = { onload: null, onerror: null, result: null, readAsText() { this.onerror?.() } }
+  await assert.rejects(() => readPickedFile(bad, {}))
+})
+
+test('io: makeIoEnv 在有 __TAURI_INTERNALS__ 的宿主上接上原生桥', async () => {
+  const logged: string[] = []
+  const win = {
+    __TAURI_INTERNALS__: {
+      invoke: async (cmd: string): Promise<unknown> => {
+        logged.push(cmd)
+        if (cmd === 'plugin:dialog|save') return '/x.json'
+        if (cmd === 'plugin:fs|write_text_file') return null
+        throw new Error('nope')
+      },
+    },
+  }
+  const env = makeIoEnv(win)
+  assert.equal(env.tauri, true)
+  assert.deepEqual(await env.saveText('p.json', '{}'), { kind: 'saved' })
+  assert.deepEqual(logged, ['plugin:dialog|save', 'plugin:fs|write_text_file'])
+  const web = makeIoEnv({})
+  assert.equal(web.tauri, false)
+  assert.deepEqual(await web.saveText('p.json', '{}'), { kind: 'unavailable' })
+})
+
 // ── 超级混沌主循环 ───────────────────────────────────────────────────────────
 function runSuperChaos(seed: number, steps: number): void {
   const rnd = new Rnd(seed)
@@ -300,9 +532,11 @@ function runSuperChaos(seed: number, steps: number): void {
 
   const names = (): string[] => mergedOf(w, cfg).map((s) => s.name)
 
-  /** S3：导出→JSON→导入副本，应用结果必须与原件逐字段一致。 */
+  /** S3：导出（encode）→JSON 文本→导入（decode+add）→应用，结果必须与原件逐字段一致。
+   *  走 preset-io 的真实文件格式（encodePresetExport/decodePresetExport），
+   *  不再用 JSON.clone(serializePreset) 绕开序列化。 */
   const roundTripCheck = (origin: Preset, tag: string): void => {
-    const exported = JSON.parse(JSON.stringify(serializePreset(origin))) as ReturnType<typeof serializePreset>
+    const exported = decodePresetExport(encodePresetExport(origin))
     const imported = addImportedPresets([], exported, () => nid())[0]!
     const viaOrigin = uiApplyW(w, cfg, origin)
     const viaCopy = uiApplyW(w, cfg, imported)
@@ -313,13 +547,13 @@ function runSuperChaos(seed: number, steps: number): void {
     )
   }
 
-  /** 导入导出完整往返：serialize → import → apply → 再 serialize，字段守恒。 */
+  /** 导入导出完整往返：encode → decode → import → apply → 再 encode，字段守恒。 */
   const checkImportExport = (preset: Preset, tag: string): void => {
-    const exported = JSON.parse(JSON.stringify(serializePreset(preset))) as ReturnType<typeof serializePreset>
+    const exported = decodePresetExport(encodePresetExport(preset))
     const imported = addImportedPresets([], exported, () => nid())[0]!
     // JSON.stringify strips `after: undefined` so compare via serialized form
     assert.equal(JSON.stringify(imported.data), JSON.stringify(preset.data), `${tag}: 导入副本 data 与原件一致`)
-    const reExported = JSON.parse(JSON.stringify(serializePreset(imported)))
+    const reExported = decodePresetExport(encodePresetExport(imported))
     assert.deepEqual(reExported, exported, `${tag}: 再次序列化结果一致`)
   }
 
@@ -494,13 +728,13 @@ function runSuperChaos(seed: number, steps: number): void {
           assert.ok(preset, `${tag}: rnd.pick 返回有效预设`)
           checkImportExport(preset, `${tag} IE`)
           // 重复导入：同名应被跳过
-          const serialized = JSON.parse(JSON.stringify(serializePreset(preset))) as ReturnType<typeof serializePreset>
+          const serialized = decodePresetExport(encodePresetExport(preset))
           const before = (cfg.presets ?? []).length
           cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], serialized, () => nid()) }
           assert.equal((cfg.presets ?? []).length, before, `${tag}: 重复导入去重`)
           // 导入数组：多条一次性导入，只新增不重复
           const newEntry = { name: `NEW-${step}`, data: { sections: w.sys.slice(0, 2), replace: {}, order: w.sys.slice(0, 2).map((n, i) => ({ name: n, text: '', custom: false })), tools: w.tools.length > 0 ? { exclude: [w.tools[0]!], include: [] } : { exclude: [], include: [] } } }
-          const arr = [JSON.parse(JSON.stringify(serializePreset(preset))), newEntry]
+          const arr = [decodePresetExport(encodePresetExport(preset)), newEntry]
           const before2 = (cfg.presets ?? []).length
           cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], arr, () => nid()) }
           assert.equal((cfg.presets ?? []).length, before2 + 1, `${tag}: 数组导入仅新增`)

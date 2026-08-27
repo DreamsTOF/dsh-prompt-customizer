@@ -1,4 +1,4 @@
-/** 提示词定制面板的中英文词典（由宿主 locale 服务按命名空间注册）。 */
+/** Locale dictionaries for the prompt-customizer panel. */
 export const DICT = {
   zh: {
     nav: '提示词定制',
@@ -47,6 +47,8 @@ export const DICT = {
     restore: '还原',
     active: '使用中',
     preset: '预设',
+    ioFailed: '导入/导出失败',
+    importInvalid: '无效的预设文件',
     targetGlobal: '目标：全局默认',
     targetHint: '选择编辑目标 —— 选中某个 agent 预设后，改动只对该预设生效（字段级覆盖）。',
     broken: '损坏',
@@ -104,6 +106,8 @@ export const DICT = {
     restore: 'Restore',
     active: 'Active',
     preset: 'Preset',
+    ioFailed: 'Import/export failed',
+    importInvalid: 'Invalid preset file',
     targetGlobal: 'Target: global default',
     targetHint: 'Pick an edit target — changes apply only to the chosen agent preset (field-level override).',
     broken: 'broken',
