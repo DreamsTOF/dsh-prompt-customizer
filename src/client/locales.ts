@@ -58,6 +58,13 @@ export const DICT = {
     phaseActive: '晋级后',
     bootstrapTitle: '引导目录（未晋级时生效）',
     bootstrapHint: '会话首个工具调用 / 回复之前用这个白名单替代上面的静态过滤；晋级后恢复常规配置。留空表示关闭阶段化。',
+    exportOk: '导出成功',
+    exportCancel: '已取消导出',
+    exportFail: '导出失败',
+    importOk: '导入完成',
+    importNone: '没有新增预设（同名已存在或文件为空）',
+    importCancel: '已取消导入',
+    importFail: '导入失败',
   },
   en: {
     nav: 'Prompt Customizer',
@@ -117,6 +124,13 @@ export const DICT = {
     phaseActive: 'After promotion',
     bootstrapTitle: 'Bootstrap catalog (pre-promotion)',
     bootstrapHint: 'Replaces the static filter above with this keep-set until the first durable tool call or reply; afterwards the regular config applies. Empty disables phasing.',
+    exportOk: 'Exported',
+    exportCancel: 'Export cancelled',
+    exportFail: 'Export failed',
+    importOk: 'Import complete',
+    importNone: 'Nothing imported (duplicate names or empty file)',
+    importCancel: 'Import cancelled',
+    importFail: 'Import failed',
   },
 } as const
 

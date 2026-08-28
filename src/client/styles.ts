@@ -37,5 +37,6 @@ export const s = (() => {
     input: { padding: '4px 6px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', color: 'inherit' },
     muted: { color: 'rgba(128,128,128,.75)', fontSize: 12 },
     error: { color: '#f85149', fontSize: 12, marginBottom: 6 },
+    noticeOk: { color: '#3fb950', fontSize: 12, marginBottom: 6 },
   }
 })()

@@ -1,56 +1,53 @@
 /**
- * preset-io.ts — environment-adaptive preset import/export.
+ * preset-io.ts —— 跨环境（Tauri 2 桌面 / Web）的预设导入导出适配层。
  *
- * The browser half originally ran in a plain web page: exporting used
- * Blob + <a download>, importing used a hidden <input type="file"> +
- * FileReader. The host is now wrapped in a Tauri desktop WebView, where the
- * expected desktop UX is a NATIVE save/open dialog plus a real file write.
+ * 浏览器端最初跑在普通网页里：导出用 Blob + <a download>，导入用隐藏的
+ * <input type="file"> + FileReader。宿主现在可能包在 Tauri 桌面 WebView
+ * 里，桌面端的预期交互是「原生保存 / 打开对话框 + 真实文件读写」。
  *
- * This module keeps the file format pure (encode/decode) and routes the
- * actual I/O through a small injectable `PresetIoEnv`:
+ * 本模块保持文件格式纯净（encode/decode 为纯函数），把真正的 I/O 路由到
+ * 一个小型的可注入 `PresetIoEnv`：
  *
- *  - Tauri v2: window.__TAURI_INTERNALS__.invoke drives the native
- *    `plugin:dialog|save` / `plugin:dialog|open` + `plugin:fs|write_text_file`
- *    / `plugin:fs|read_text_file` commands — but only when the host app has
- *    registered the dialog/fs plugins AND its capability ACL allows the
- *    commands. Any rejection (plugin not registered, ACL "not allowed") is
- *    reported as `unavailable` and the caller falls back to the web path, so
- *    the plugin keeps working even on a tauri host that ships no dialog/fs
- *    plugins yet.
- *  - Web (and tauri fallback): Blob + anchor download / hidden file input,
- *    identical to the previous behaviour. In a WebView2 the anchor download
- *    degrades to the WebView's default download handling, and the file input
- *    still opens the OS picker.
+ *  - Tauri v2：通过 window.__TAURI_INTERNALS__.invoke 调用原生的
+ *    `plugin:dialog|save` / `plugin:dialog|open` 与
+ *    `plugin:fs|write_text_file` / `plugin:fs|read_text_file` 命令 —— 但
+ *    仅当宿主应用注册了 dialog / fs 插件、且其 capability ACL 放行这些
+ *    命令时才可用。任何拒绝（插件未注册、ACL "not allowed"）都归为
+ *    `unavailable`，由调用方回退到 Web 路径 —— 所以即使 Tauri 宿主尚未
+ *    带 dialog/fs 插件，本插件也照常工作。
+ *  - Web（以及 tauri 回退）：Blob + 锚点下载 / 隐藏文件输入，与旧行为
+ *    完全一致。在 WebView2 里锚点下载会退化为 WebView 默认的下载处理，
+ *    文件输入仍会打开系统选择器。
  *
- * Nothing here touches the DOM at module scope — every branch takes injected
- * fakes — so the module loads under Node and the whole matrix (web / tauri
- * saved / tauri cancelled / tauri unavailable) is unit-tested.
+ * 本模块在模块作用域不触碰 DOM —— 每个分支都接受注入的假实现 —— 因此
+ * 可以在 Node 下加载，web / tauri 已保存 / tauri 已取消 / tauri 不可用
+ * 的整个矩阵都能单测覆盖。
  */
 import type { Preset } from './types.ts'
 import { presetExportFilename } from './presets.ts'
 
-// ── Environment detection ───────────────────────────────────────────────────
+// ── 环境检测 ────────────────────────────────────────────────────────────────
 
-/** Tauri v2 raw IPC bridge (window.__TAURI_INTERNALS__). */
+/** Tauri v2 原始 IPC 桥（window.__TAURI_INTERNALS__）。 */
 export interface TauriInvoke {
   (cmd: string, args?: Record<string, unknown>, options?: unknown): Promise<unknown>
 }
 
-/** True when the page runs inside a Tauri (v1 marker or v2 bridge) webview. */
+/** 页面是否运行在 Tauri（v1 标记或 v2 桥）webview 内。 */
 export function isTauriEnv(win: unknown): boolean {
   if (win === null || win === undefined) return false
   const w = win as { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
   return w.__TAURI_INTERNALS__ !== undefined || w.__TAURI__ !== undefined
 }
 
-/** The usable Tauri v2 invoke bridge, or null when unavailable. */
+/** 取可用的 Tauri v2 invoke 桥；不可用时返回 null。 */
 function invokeOf(win: unknown): TauriInvoke | null {
   if (!isTauriEnv(win)) return null
   const internals = (win as { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__
   return internals && typeof internals.invoke === 'function' ? (internals.invoke as TauriInvoke) : null
 }
 
-// ── Native (tauri) primitives ───────────────────────────────────────────────
+// ── 原生（tauri）原语 ───────────────────────────────────────────────────────
 
 export type SaveOutcome = { kind: 'saved' } | { kind: 'cancelled' } | { kind: 'unavailable' }
 export type OpenOutcome = { kind: 'text'; text: string } | { kind: 'cancelled' } | { kind: 'unavailable' }
@@ -58,10 +55,9 @@ export type OpenOutcome = { kind: 'text'; text: string } | { kind: 'cancelled' }
 const JSON_FILTERS = [{ name: 'JSON', extensions: ['json'] }]
 
 /**
- * Native save dialog + write. `cancelled` = the user closed the dialog
- * (caller must NOT fall back to a download then); `unavailable` = the host
- * cannot serve the dialog/fs plugins (missing plugin or ACL block) and the
- * caller SHOULD fall back.
+ * 原生保存对话框 + 写文件。`cancelled` = 用户关闭了对话框（调用方绝不
+ * 得再回退到下载）；`unavailable` = 宿主无法提供 dialog/fs 插件（插件
+ * 缺失或被 ACL 拦截），调用方应当回退。
  */
 export async function tauriSaveText(invoke: TauriInvoke, defaultName: string, text: string): Promise<SaveOutcome> {
   try {
@@ -74,7 +70,7 @@ export async function tauriSaveText(invoke: TauriInvoke, defaultName: string, te
   }
 }
 
-/** Native open dialog + read. `cancelled` = user closed the dialog. */
+/** 原生打开对话框 + 读文件。`cancelled` = 用户关闭了对话框。 */
 export async function tauriOpenText(invoke: TauriInvoke): Promise<OpenOutcome> {
   try {
     const picked = await invoke('plugin:dialog|open', { multiple: false, directory: false, filters: JSON_FILTERS })
@@ -88,9 +84,9 @@ export async function tauriOpenText(invoke: TauriInvoke): Promise<OpenOutcome> {
   }
 }
 
-// ── Web fallback primitives ─────────────────────────────────────────────────
+// ── Web 回退原语 ────────────────────────────────────────────────────────────
 
-/** Anchor-download target; deps are injected so Node can fake them. */
+/** 锚点下载的目标接口；依赖全部注入以便 Node 里伪造。 */
 export interface BrowserDownloadTarget {
   makeAnchor(): { href: string; download: string; click(): void }
   makeBlob(text: string): unknown
@@ -98,7 +94,7 @@ export interface BrowserDownloadTarget {
   revoke(url: string): void
 }
 
-/** Web fallback export: Blob + object URL + <a download> + revoke. */
+/** Web 回退导出：Blob + object URL + <a download> + revoke。 */
 export function webDownload(target: BrowserDownloadTarget, filename: string, text: string): void {
   const blob = target.makeBlob(text)
   const url = target.objectUrl(blob)
@@ -109,9 +105,9 @@ export function webDownload(target: BrowserDownloadTarget, filename: string, tex
   target.revoke(url)
 }
 
-/** FileReader-shaped reader (injected: real FileReader in the browser, fakes in tests).
- *  The callback types accept an optional event argument so the DOM FileReader's
- *  `(this: FileReader, ev: ProgressEvent) => any` handlers assign cleanly. */
+/** FileReader 形状的读取器（浏览器注入真 FileReader，测试注入假实现）。
+ *  回调类型带可选的事件参数，让 DOM FileReader 的
+ *  `(this: FileReader, ev: ProgressEvent) => any` 处理器能干净赋值。 */
 export interface FileReaderLike {
   readAsText(file: unknown): void
   onload: ((ev?: unknown) => void) | null
@@ -119,7 +115,7 @@ export interface FileReaderLike {
   result: string | ArrayBuffer | null
 }
 
-/** Web fallback import: resolve a picked file's text via a FileReader-like. */
+/** Web 回退导入：经 FileReader 形状的读取器解析所选文件的文本。 */
 export function readPickedFile(reader: FileReaderLike, file: unknown): Promise<string> {
   return new Promise((resolve, reject) => {
     reader.onload = () => {
@@ -131,17 +127,17 @@ export function readPickedFile(reader: FileReaderLike, file: unknown): Promise<s
   })
 }
 
-// ── Pure file format ────────────────────────────────────────────────────────
+// ── 纯文件格式 ──────────────────────────────────────────────────────────────
 
-/** Encode one preset into the JSON export file format (single-object format). */
+/** 把单个预设编码为导出文件的 JSON 格式（单对象格式）。 */
 export function encodePresetExport(preset: Preset): string {
   return JSON.stringify({ name: preset.name, data: preset.data }, null, 2)
 }
 
 /**
- * Parse an exported preset file: a single { name, data } object or an array
- * of them. Throws a plain Error on empty / invalid JSON so callers can show a
- * friendly message; entry-level filtering happens later in addImportedPresets.
+ * 解析导出的预设文件：单个 { name, data } 对象或对象数组。空内容 /
+ * 非法 JSON 抛普通 Error，由调用方给出友好提示；条目级的过滤在
+ * addImportedPresets 里进行。
  */
 export function decodePresetExport(text: string): unknown {
   const trimmed = String(text).trim()
@@ -149,9 +145,9 @@ export function decodePresetExport(text: string): unknown {
   return JSON.parse(trimmed)
 }
 
-// ── Environment facade ──────────────────────────────────────────────────────
+// ── 环境门面 ────────────────────────────────────────────────────────────────
 
-/** The I/O surface a caller (UI or test) drives. */
+/** 调用方（UI 或测试）驱动的 I/O 面。 */
 export interface PresetIoEnv {
   readonly tauri: boolean
   saveText(defaultName: string, text: string): Promise<SaveOutcome>
@@ -171,7 +167,7 @@ function browserDownloadTarget(): BrowserDownloadTarget {
   }
 }
 
-/** Build the real environment for the current window (safe to call in Node). */
+/** 为当前 window 构建真实环境（在 Node 里调用也安全）。 */
 export function makeIoEnv(win?: unknown): PresetIoEnv {
   const w = win !== undefined ? win : typeof window !== 'undefined' ? window : undefined
   const invoke = invokeOf(w)
@@ -187,8 +183,8 @@ export function makeIoEnv(win?: unknown): PresetIoEnv {
 export type ExportResult = { ok: boolean; via: 'tauri' | 'browser'; cancelled?: boolean; message?: string }
 
 /**
- * Export one preset: native tauri save dialog when the host serves it
- * (cancelled = user said no, never fall back), otherwise the web download.
+ * 导出一个预设：宿主能提供原生对话框时走 tauri 保存（cancelled = 用户
+ * 拒绝，绝不回退下载）；否则走 Web 下载。
  */
 export async function exportPresetFile(preset: Preset, io?: PresetIoEnv): Promise<ExportResult> {
   const env = io ?? makeIoEnv()
@@ -199,7 +195,7 @@ export async function exportPresetFile(preset: Preset, io?: PresetIoEnv): Promis
       const out = await env.saveText(filename, text)
       if (out.kind === 'saved') return { ok: true, via: 'tauri' }
       if (out.kind === 'cancelled') return { ok: false, via: 'tauri', cancelled: true }
-      // unavailable -> fall through to the web download
+      // unavailable -> 继续走 Web 下载
     }
     env.download(filename, text)
     return { ok: true, via: 'browser' }
@@ -211,8 +207,8 @@ export async function exportPresetFile(preset: Preset, io?: PresetIoEnv): Promis
 export type ImportResult = { kind: 'text'; text: string; via: 'tauri' } | { kind: 'cancelled' } | { kind: 'unavailable' }
 
 /**
- * Import one preset via the native tauri open dialog when available; the
- * caller clicks its hidden file input when `unavailable` is returned.
+ * 经原生 tauri 打开对话框导入一个预设；返回 `unavailable` 时由调用方
+ * 点击自己的隐藏文件输入（Web 回退）。
  */
 export async function importPresetFile(io?: PresetIoEnv): Promise<ImportResult> {
   const env = io ?? makeIoEnv()
@@ -223,7 +219,7 @@ export async function importPresetFile(io?: PresetIoEnv): Promise<ImportResult> 
       if (out.kind === 'cancelled') return { kind: 'cancelled' }
     }
   } catch {
-    /* fall through to the picker fallback */
+    /* 落到下面的选择器回退 */
   }
   return { kind: 'unavailable' }
 }
