@@ -4,7 +4,7 @@
 import { createElement as h, useEffect, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
 import type { Config, Inventory, Preset } from './types.ts'
 import type { Translate } from './locales.ts'
-import { addImportedPresets, applyPresetData, buildPresetData, mergeSections, removePreset } from './presets.ts'
+import { addImportedPresets, applyPresetData, buildPresetData, genId, mergeSections, removePreset } from './presets.ts'
 import { decodePresetExport, exportPresetFile, importPresetFile } from './preset-io.ts'
 import { s } from './styles.ts'
 
@@ -14,11 +14,12 @@ interface Notice {
   text: string
 }
 
-export function PresetsTab({ cfg, inv, t, write, writeGlobal }: {
+export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
   cfg: Config
   inv: Inventory | null
   t: Translate
-  write: (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown) => void
+  /** 应用预设：四字段补丁一次落盘（显式意图，不经草稿）。 */
+  writePatch: (patch: { sections?: unknown; replace?: unknown; inject?: unknown; tools?: unknown }) => void
   /** 预设库专用：永远写在全局字段（presets / activePreset 不分作用域）。 */
   writeGlobal: (field: string, value: unknown) => void
 }): ReactElement {
@@ -59,14 +60,11 @@ export function PresetsTab({ cfg, inv, t, write, writeGlobal }: {
   //  - 预设中有、当前提示词中没有的段被添加
   //  - 当前有、但不在预设列表中的段被屏蔽
   //  - 只有预设的「激活段」被解除屏蔽（预设自己的屏蔽名单被保留）
-  // 四个定制字段写入当前编辑目标（全局顶层或 overrides[id]）；快照库
-  // （presets / activePreset）永远保持在全局。
+  // 四个定制字段以一个补丁写入当前编辑目标（全局顶层或 overrides[id]）；
+  // 快照库（presets / activePreset）永远保持在全局。
   const applyPreset = (preset: Preset): void => {
     const patch = applyPresetData(preset.data, cfg, currentNames)
-    write('inject', patch.inject)
-    write('replace', patch.replace)
-    write('sections', patch.sections)
-    write('tools', patch.tools)
+    writePatch({ sections: patch.sections, replace: patch.replace, inject: patch.inject, tools: patch.tools })
     writeGlobal('activePreset', preset.id)
   }
 
@@ -161,9 +159,4 @@ export function PresetsTab({ cfg, inv, t, write, writeGlobal }: {
       ])
     }),
   ])
-}
-
-/** 生成预设 id：时间戳 + 随机段（base36），够用且无需额外依赖。 */
-function genId(): string {
-  return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }

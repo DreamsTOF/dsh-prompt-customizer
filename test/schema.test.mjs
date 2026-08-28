@@ -12,13 +12,13 @@ test('accepts a valid config and preserves known fields', () => {
   assert.deepEqual(value.sections, ['tool:read'])
   assert.equal(value.replace['tool:read'], 'custom text')
   assert.equal(value.inject[0].name, 'harness:identity')
-  assert.deepEqual(value.tools, { exclude: ['tool:x'], include: [], bootstrap: { exclude: [], include: [] } })
+  assert.deepEqual(value.tools, { exclude: ['tool:x'], include: [], bootstrap: { exclude: [], include: [] }, compaction: { exclude: [], include: [] } })
 })
 
 test('defaults missing fields', () => {
   const value = Config({})
   assert.deepEqual(value.sections, [])
-  assert.deepEqual(value.tools, { exclude: [], include: [], bootstrap: { exclude: [], include: [] } })
+  assert.deepEqual(value.tools, { exclude: [], include: [], bootstrap: { exclude: [], include: [] }, compaction: { exclude: [], include: [] } })
   assert.deepEqual(value.overrides, {})
   assert.deepEqual(value.presets, [])
   assert.equal(value.activePreset, undefined)

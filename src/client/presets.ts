@@ -1,5 +1,5 @@
 /** 纯函数的预设 / 段操作助手，同时被客户端 UI 与 Node 测试复用（不触碰 IO 与 React）。 */
-import type { Config, Inventory, OverrideData, Preset, PresetData } from './types.ts'
+import type { Config, CycleEntry, Inventory, OverrideData, PhaseViewKey, Preset, PresetData, Preview, ToolsConfig } from './types.ts'
 
 export interface Section {
   name: string
@@ -16,7 +16,7 @@ export interface ConfigPatch {
   sections: string[]
   replace: Record<string, string>
   inject: Array<{ name: string; order: number; text: string }>
-  tools: { exclude: string[]; include: string[] }
+  tools: ToolsConfig
 }
 
 /**
@@ -158,11 +158,21 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
     for (const name of activeNames) blocked.delete(name)
   }
 
+  // 阶段性目录（bootstrap / compaction）不属于预设快照：应用预设只换
+  // 静态过滤，目录配置保留当前值不被抹掉（缺席时不留下显式 undefined 键，
+  // 「保存→应用 = 不动点」的不变量依赖键形状完全一致）。
+  const keptCatalogs: ToolsConfig = {}
+  if (cfg.tools?.bootstrap !== undefined) keptCatalogs.bootstrap = cfg.tools.bootstrap
+  if (cfg.tools?.compaction !== undefined) keptCatalogs.compaction = cfg.tools.compaction
   return {
     sections: [...blocked],
     replace: { ...(cfg.replace ?? {}), ...(data.replace ?? {}) },
     inject,
-    tools: { exclude: data.tools?.exclude ?? [], include: data.tools?.include ?? [] },
+    tools: {
+      exclude: data.tools?.exclude ?? [],
+      include: data.tools?.include ?? [],
+      ...keptCatalogs,
+    },
   }
 }
 
@@ -185,6 +195,72 @@ export function removeSection(name: string, cfg: Config): Pick<Config, 'sections
 // ── 工具过滤 ─────────────────────────────────────────────────────────────
 
 export type ToolsCfg = { exclude?: string[]; include?: string[] }
+
+/**
+ * 一套阶段装配的 (提示词, 工具) 指纹 —— 段名 / 工具名（稳定排序）/ 渲染
+ * 文本任一不同即视为不同阶段（与「提示词/工具和上一轮不同即为一阶段」
+ * 的定义一致）。装配为 null（拉取失败）时返回该阶段专属的哨兵签名 ——
+ * 绝不与其它阶段折叠，宁可单独成组也不冒充相同。
+ */
+export function phaseSignature(key: PhaseViewKey, preview: Preview | null): string {
+  if (preview === null) return `__null:${key}`
+  const sections = (preview.sections ?? []).map((x) => x.name).join(',')
+  const tools = (preview.tools ?? []).map((t) => (typeof t === 'string' ? t : t.name)).sort().join(',')
+  return sections + '\u0000' + tools + '\u0000' + (preview.text ?? '')
+}
+
+/**
+ * 从三套名义装配推导预设真实拥有的阶段（agent 周期）：按 (提示词, 工具)
+ * 签名去重，只保留真正不同的提示词 / 工具组合。返回顺序固定为
+ * bootstrap → compaction → active（分组去重的锚定阅读顺序），每组取
+ * 首个名义视图为代表。
+ */
+export function deriveCycle(views: Record<PhaseViewKey, Preview | null>): CycleEntry[] {
+  const order: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
+  const cycle: CycleEntry[] = []
+  const bySignature = new Map<string, CycleEntry>()
+  for (const key of order) {
+    const sig = phaseSignature(key, views[key])
+    const existing = bySignature.get(sig)
+    if (existing !== undefined) {
+      existing.merged.push(key)
+      continue
+    }
+    const entry: CycleEntry = { key, merged: [key] }
+    bySignature.set(sig, entry)
+    cycle.push(entry)
+  }
+  return cycle
+}
+
+/** 周期三阶段的展示顺序：引导期 → 常驻期 → 压缩受控期。 */
+export const CYCLE_DISPLAY_ORDER: PhaseViewKey[] = ['bootstrap', 'active', 'compaction']
+
+/**
+ * 把推导出的周期按展示顺序重排（去重分组后的条目，键映射到展示顺序；
+ * 未知键的组（如拉取失败的哨兵组）追加在末尾，绝不丢弃）。
+ */
+export function cycleInDisplayOrder(cycle: CycleEntry[]): CycleEntry[] {
+  const byKey = new Map(cycle.map((entry) => [entry.key, entry]))
+  const ordered: CycleEntry[] = []
+  for (const key of CYCLE_DISPLAY_ORDER) {
+    const entry = byKey.get(key)
+    if (entry !== undefined) ordered.push(entry)
+  }
+  for (const entry of cycle) {
+    if (!ordered.includes(entry)) ordered.push(entry)
+  }
+  return ordered
+}
+
+/**
+ * 一个阶段部分应该写回哪一份过滤配置：独立阶段写自身目录
+ * （bootstrap / compaction）；常驻期（active）与同形折叠组写静态过滤。
+ */
+export function phaseConfigKey(entry: CycleEntry): 'bootstrap' | 'compaction' | 'static' {
+  if (entry.merged.length > 1) return 'static'
+  return entry.key === 'active' ? 'static' : entry.key
+}
 
 /** 在当前 include/exclude 配置下，某个工具是否被隐藏。 */
 export function isToolHidden(name: string, toolsCfg: ToolsCfg | undefined): boolean {
@@ -241,12 +317,15 @@ export function editView(cfg: Config, target: string | undefined): Config {
   const ovr = cfg.overrides?.[target] ?? {}
   return {
     sections: ovr.sections ?? cfg.sections,
+    sectionsBootstrap: ovr.sectionsBootstrap ?? cfg.sectionsBootstrap,
+    sectionsCompaction: ovr.sectionsCompaction ?? cfg.sectionsCompaction,
     replace: ovr.replace ?? cfg.replace,
     inject: ovr.inject ?? cfg.inject,
     tools: {
       exclude: ovr.tools?.exclude ?? cfg.tools?.exclude,
       include: ovr.tools?.include ?? cfg.tools?.include,
       bootstrap: ovr.tools?.bootstrap ?? cfg.tools?.bootstrap,
+      compaction: ovr.tools?.compaction ?? cfg.tools?.compaction,
     },
     presets: cfg.presets,
     activePreset: cfg.activePreset,
@@ -312,4 +391,9 @@ export function removePreset(presets: Preset[], id: string, activeId?: string): 
     presets: presets.filter((p) => p.id !== id),
     activeId: activeId === id ? undefined : activeId,
   }
+}
+
+/** 生成预设 id：时间戳 + 随机段（base36），够用且无需额外依赖。 */
+export function genId(): string {
+  return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }

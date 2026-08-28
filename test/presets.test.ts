@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import {
   addImportedPresets,
   buildPresetData,
+  deriveCycle,
   mergeSections,
+  phaseSignature,
   removeSection,
   resolveOrder,
   toggleTool,
@@ -135,4 +137,52 @@ test('addImportedPresets filters junk entries and skips same-name presets', () =
     { name: 'B', data: {} },
   ], () => 'p' + (++n))
   assert.deepEqual(out.map((p) => p.name), ['A', 'B'])
+})
+
+// ── agent 周期推导：deriveCycle / phaseSignature ─────────────────────────────
+
+function previewOf(name: string, sectionNames: string[], toolNames: string[], text = ''): { name: string; sections: Array<{ name: string; text: string }>; text: string; tools: Array<{ name: string; description: string }> } {
+  return { name, sections: sectionNames.map((n) => ({ name: n, text: 't' + n })), text, tools: toolNames.map((n) => ({ name: n, description: '' })) }
+}
+
+test('deriveCycle: anchored 风格三态签名互异 → 三个阶段全部保留', () => {
+  const views = {
+    bootstrap: previewOf('b', ['a', 'b'], ['bash', 'str_replace_editor']),
+    compaction: previewOf('c', ['a', 'b'], ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'ask_user_question', 'todo_write']),
+    active: previewOf('a', ['a', 'b'], ['bash', 'str_replace_editor', 'dev_tool_search', 'skill_search', 'skill_load']),
+  }
+  const cycle = deriveCycle(views)
+  assert.deepEqual(cycle.map((e) => e.key), ['bootstrap', 'compaction', 'active'])
+  assert.ok(cycle.every((e) => e.merged.length === 1))
+})
+
+test('deriveCycle: 三态同形（standard / minimal）折叠为单个常驻阶段', () => {
+  const same = previewOf('x', ['a', 'b'], ['read', 'write', 'edit'], 'TEXT')
+  const cycle = deriveCycle({ bootstrap: same, compaction: { ...same, name: 'c' }, active: { ...same, name: 'a' } })
+  assert.deepEqual(cycle.map((e) => e.key), ['bootstrap'])
+  assert.deepEqual(cycle[0]!.merged, ['bootstrap', 'compaction', 'active'])
+})
+
+test('deriveCycle: 只差渲染文本也算不同阶段（提示词不同即一阶段）', () => {
+  const a = previewOf('b', ['a', 'b'], ['read', 'write'], 'PERSONA-A')
+  const b = previewOf('a', ['a', 'b'], ['read', 'write'], 'PERSONA-B')
+  const cycle = deriveCycle({ bootstrap: a, compaction: a, active: b })
+  assert.deepEqual(cycle.map((e) => e.key), ['bootstrap', 'active'])
+  assert.deepEqual(cycle[0]!.merged, ['bootstrap', 'compaction'])
+})
+
+test('deriveCycle: 拉取失败的 null 装配绝不与其它阶段折叠', () => {
+  const ok = previewOf('a', ['a'], ['read'], 'T')
+  const cycle = deriveCycle({ bootstrap: null, compaction: ok, active: ok })
+  assert.deepEqual(cycle.map((e) => e.key), ['bootstrap', 'compaction'])
+  assert.ok(cycle.some((e) => e.key === 'bootstrap' && e.merged.length === 1))
+})
+
+test('phaseSignature: 工具顺序不影响签名（稳定排序）', () => {
+  const p1 = previewOf('x', ['a'], ['read', 'write'])
+  const p2 = previewOf('x', ['a'], ['write', 'read'])
+  assert.equal(phaseSignature('active', p1), phaseSignature('active', p2))
+  // 段序影响签名（提示词顺序不同）
+  const p3 = previewOf('x', ['b', 'a'], ['read', 'write'])
+  assert.notEqual(phaseSignature('active', p1), phaseSignature('active', p3))
 })

@@ -9,11 +9,11 @@
  * 由 tsdown 打包为 client/client.js（__ModuleLoader__ factory bundle）；
  * 唯一的外部依赖是 loader 模块表中的 react 入口。
  */
-import { createElement as h, useEffect, useState, type ReactElement } from 'react'
+import { createElement as h, useEffect, useRef, useState, type ReactElement } from 'react'
 import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
-import type { AgentPresetInfo, Config, Inventory } from './types.ts'
-import { editView, setOverrideField } from './presets.ts'
+import type { AgentPresetInfo, Config, CycleEntry, Inventory, PhaseViewKey, Preview } from './types.ts'
+import { buildPresetData, deriveCycle, editView, genId, mergeSections } from './presets.ts'
 import { SectionsTab } from './SectionsTab.tsx'
 import { ToolsTab } from './ToolsTab.tsx'
 import { PresetsTab } from './PresetsTab.tsx'
@@ -25,6 +25,15 @@ const AGENT_PRESETS_URL = '/api/prompt-customizer/agent-presets'
 const CONFIG_URL = '/api/prompt-customizer/config'
 const CONFIG_SET_URL = '/api/prompt-customizer/config/set'
 const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
+const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
+const PRESETS_CREATE_URL = '/api/prompt-customizer/presets'
+const PREVIEW_URL = '/api/prompt-customizer/preview'
+
+/** 三阶段预览装配（模型视角）：提示词/工具/预览 Tab 的统一数据源。 */
+type PhaseViews = Record<PhaseViewKey, Preview | null>
+
+/** 三套名义装配的共享布局：顺序固定，供 deriveCycle 去重。 */
+const VIEW_KEYS: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
 
 export const name = 'prompt-customizer'
 export const inject = ['slots', 'locale']
@@ -70,19 +79,51 @@ export function apply(ctx: ClientContext): void {
 
 /**
  * 面板根组件：拉取配置与清单、维护 Tab 状态，把各 Tab 子视图装配起来。
- * 配置来自插件自有 /config 路由（写操作返回最新配置直接采纳）；清单来自
- * /inventory，可通过「刷新」按钮手动重取。
+ * 配置来自插件自有 /config 路由；清单来自 /inventory，可通过「刷新」按钮
+ * 手动重取。提示词/工具 Tab 的编辑只改内存草稿，由「保存」按钮经
+ * /config/apply 一次写盘（写错的配置不点保存就不会进文件）。
  */
+
+/** 可编辑的配置字段（含每阶段独立段屏蔽名单）。 */
+type EditField = 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools'
+
+/** 编辑域草稿：提示词/工具 Tab 共享的未保存字段 + 脏标记。
+ *  只记录用户实际编辑过的字段（首次编辑只写那一项），保存时也只提交这些
+ *  字段 —— 未编辑的字段继续回落全局 / 继承，避免一次保存冻结全部继承值。 */
+interface EditDraft {
+  sections?: Config['sections']
+  sectionsBootstrap?: Config['sectionsBootstrap']
+  sectionsCompaction?: Config['sectionsCompaction']
+  replace?: Config['replace']
+  inject?: Config['inject']
+  tools?: Config['tools']
+  dirty: boolean
+}
 
 function Panel({ t }: { t: Translate }): ReactElement {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [inv, setInv] = useState<Inventory | null>(null)
+  // 三阶段预览装配：模型视角的唯一数据源（加载中为 null）。
+  const [phases, setPhases] = useState<PhaseViews | null>(null)
+  // 该预设真实拥有的阶段（agent 周期）：由三套名义装配按 (段, 工具) 签名
+  // 去重得出，驱动工具/预览 Tab 的显示 —— 只渲染真正不同的阶段。
+  const [cycle, setCycle] = useState<CycleEntry[] | null>(null)
   const [agentPresets, setAgentPresets] = useState<AgentPresetInfo[]>([])
   const [tab, setTab] = useState<'sections' | 'tools' | 'presets' | 'preview'>('sections')
   const [error, setError] = useState<string | null>(null)
   const [refreshId, setRefreshId] = useState(0)
   // 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级 override）。
   const [target, setTarget] = useState<string | undefined>(undefined)
+  // 配置写入计数：每次成功写配置后 +1，驱动 PreviewTab 重载。
+  // （以下 hooks 必须在任何提前 return 之前声明 —— hooks 顺序不能随加载状态变化。）
+  const [version, setVersion] = useState(0)
+  // 编辑域草稿：null = 无草稿（Tab 显示磁盘值）。提示词 ↔ 工具切换保留；
+  // 切到预设/预览 Tab 或切换编辑目标时丢弃（脏草稿先经确认）。
+  const [draft, setDraft] = useState<EditDraft | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
+  const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = (): void => {
     fetch(CONFIG_URL + `?t=${Date.now()}`)
@@ -98,31 +139,72 @@ function Panel({ t }: { t: Translate }): ReactElement {
 
   const refresh = (): void => {
     const qs = target ? `?scope=${encodeURIComponent(target)}` : ''
-    fetch(INVENTORY_URL + qs)
-      .then((r) => r.json())
-      .then((data: Inventory) => { setInv(data); setError(null); setRefreshId((n) => n + 1) })
+    // 三阶段预览并行拉取：提示词 / 工具 / 预览三个 Tab 全部以这套装配结果
+    // 为唯一数据源 —— 静态清单只是注册表视角（不含伪 agent 阶段裁剪、
+    // pre-step 注入等运行时规则），与它保持一致才是"所见即模型所见"。
+    // 同时按 (段, 工具) 签名推导该预设真实拥有的阶段（agent 周期），
+    // 工具/预览 Tab 据此只显示真正不同的阶段，而非固定三态。
+    const params = (phase: string): string =>
+      `${qs}${qs ? '&' : '?'}phase=${phase}&t=${Date.now()}`
+    const grab = (phase: string): Promise<Preview | null> =>
+      fetch(PREVIEW_URL + params(phase))
+        .then((r) => r.json())
+        .then((body: Preview) => (body?.ok === false ? null : body))
+        .catch(() => null)
+    // 「本系统全部提示词/工具」面板是全局注册表，永不随编辑目标切换 ——
+    // 清单请求不带 scope，三阶段预览仍带 scope（作为该预设的真实装配）。
+    Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL).then((r) => r.json())])
+      .then(([boot, comp, act, inventoryData]) => {
+        const views: PhaseViews = { bootstrap: boot, compaction: comp, active: act }
+        setPhases(views)
+        setCycle(deriveCycle(views))
+        setInv(inventoryData as Inventory)
+        setError(null)
+        setRefreshId((n) => n + 1)
+      })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
-  // 挂载时与切换编辑目标后：清单切到对应 scope 与生效配置。
+  // 挂载时与切换编辑目标后：清单与三阶段预览切到对应 scope。
   useEffect(refresh, [target])
 
   // 枚举已安装的 agent 预设（roster 实时读取），给目标选择器与预览选择器供货。
-  useEffect(() => {
+  // 抽成函数：保存预设成功后也要立即刷新目标下拉。
+  const fetchPresets = (): void => {
     fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`)
       .then((r) => r.json())
       .then((body) => setAgentPresets(Array.isArray(body?.presets) ? body.presets as AgentPresetInfo[] : []))
       .catch(() => setAgentPresets([]))
-  }, [])
+  }
+  useEffect(() => { fetchPresets() }, [])
 
   if (cfg === null) {
     return h('div', { style: s.muted }, t('loading'))
   }
 
-  // 编辑视图：agent 预设目标时展示 override 回落合并后的配置；
-  // 写入走 POST 到插件自有路由，返回的最新配置直接采纳。
-  // version 在每次成功写入后 +1，驱动 PreviewTab 重载。
-  const [version, setVersion] = useState(0)
-  const view = editView(cfg, target)
+  // 保存成功/失败后的短促闪示消息（3 秒自动消失；err 用红色样式）。
+  const showFlash = (text: string, kind: 'ok' | 'err' = 'ok'): void => {
+    if (flashTimer.current !== null) clearTimeout(flashTimer.current)
+    setFlash(text)
+    setFlashKind(kind)
+    flashTimer.current = setTimeout(() => setFlash(null), 3200)
+  }
+
+  // 编辑视图：草稿存在时以草稿覆盖对应字段（提示词/工具 Tab 的共享编辑域）。
+  // 草稿只含用户实际编辑过的字段，未编辑字段回落基线 —— 绝不把继承值
+  // 冻结进 override。
+  const base = editView(cfg, target)
+  const view: Config = draft
+    ? {
+        ...base,
+        sections: draft.sections ?? base.sections,
+        sectionsBootstrap: draft.sectionsBootstrap ?? base.sectionsBootstrap,
+        sectionsCompaction: draft.sectionsCompaction ?? base.sectionsCompaction,
+        replace: draft.replace ?? base.replace,
+        inject: draft.inject ?? base.inject,
+        tools: draft.tools ?? base.tools,
+      }
+    : base
+
   const writeField = (field: string, value: unknown): void => {
     const url = value === undefined ? CONFIG_UNSET_URL : CONFIG_SET_URL
     fetch(url, {
@@ -139,42 +221,156 @@ function Panel({ t }: { t: Translate }): ReactElement {
       })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
-  // 定制四字段：全局目标直写顶层；预设目标合成完整 overrides 记录后整体写。
-  const write = (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown): void => {
-    if (!target) writeField(field, value)
-    else writeField('overrides', setOverrideField(cfg, target, field, value))
+
+  // 提示词/工具 Tab 的写入：只改内存草稿，不落盘。草稿只记录被编辑的
+  // 这一个字段（不携带其余字段的继承值）—— 保存时也只会提交编辑过的
+  // 字段，未编辑字段继续回落全局 / 继承。target 缺省时写全局顶层；
+  // 预设目标由 /config/apply 写 overrides[id]（字段级接管语义在保存时生效）。
+  const edit = (field: EditField, value: unknown): void => {
+    setDraft((d) => ({
+      ...(d ?? { dirty: false }),
+      [field]: value,
+      dirty: true,
+    }))
+  }
+
+  // 统一保存：草稿里实际编辑过的字段一次 POST 到 /config/apply，成功后清
+  // 草稿并采纳最新配置。失败时保留草稿（改完可以再试，不会丢）。
+  const save = (): void => {
+    if (draft === null || saving) return
+    const EDITED_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
+    const patch: Record<string, unknown> = {}
+    for (const field of EDITED_FIELDS) {
+      if (Object.hasOwn(draft, field)) patch[field] = draft[field]
+    }
+    setSaving(true)
+    fetch(CONFIG_APPLY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target, patch }),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'save failed')
+        setCfg(body.config as Config)
+        setDraft(null)
+        setError(null)
+        setVersion((n) => n + 1)
+        showFlash(t('saveOk'))
+      })
+      .catch((e: unknown) => setError(`${t('saveFail')}: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => setSaving(false))
+  }
+
+  // 预设 Tab 的「应用」：显式意图直接落盘（不经草稿），四字段补丁一次写入
+  // 当前编辑目标。调用点已在离开编辑域时清空草稿，不会有并发草稿写盘。
+  const writePatch = (patch: { sections?: unknown; replace?: unknown; inject?: unknown; tools?: unknown }): void => {
+    fetch(CONFIG_APPLY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target, patch }),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
+        setCfg(body.config as Config)
+        setError(null)
+        setVersion((n) => n + 1)
+      })
+      .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
 
+  // 切换 Tab：提示词 ↔ 工具是同一编辑域，草稿保留；切到预设/预览即离开
+  // 编辑域，脏草稿经确认后丢弃。
+  const switchTab = (next: 'sections' | 'tools' | 'presets' | 'preview'): void => {
+    const leaving = (tab === 'sections' || tab === 'tools') && (next === 'presets' || next === 'preview')
+    if (leaving) {
+      if (draft?.dirty && !window.confirm(t('discardConfirm'))) return
+      setDraft(null)
+    }
+    setTab(next)
+  }
+
+  // 切换编辑目标：草稿基线随目标变化，脏草稿先经确认再丢弃。
+  const switchTarget = (next: string | undefined): void => {
+    if (draft?.dirty && !window.confirm(t('discardConfirm'))) return
+    setDraft(null)
+    setTarget(next)
+  }
+
+  // 快捷「存为预设」：把当前编辑内容（含未保存草稿）保存为一个新的 agent
+  // 预设 —— 服务端在 `~/.dsh/.agent-presets/<name>/` 创建文件夹与预设文件，
+  // 同时把当前配置写进 overrides[name]。同名报错由服务端 409 返回。
+  const saveAsPreset = (): void => {
+    const presetName = window.prompt(t('saveAsPresetAsk'), '')
+    if (presetName === null) return // 用户取消
+    const name = presetName.trim()
+    if (name.length === 0) return
+    fetch(PRESETS_CREATE_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        config: {
+          sections: view.sections ?? [],
+          sectionsBootstrap: view.sectionsBootstrap ?? [],
+          sectionsCompaction: view.sectionsCompaction ?? [],
+          replace: view.replace ?? {},
+          inject: view.inject ?? [],
+          tools: view.tools ?? {},
+        },
+      }),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? t('saveAsPresetFail'))
+        load()
+        fetchPresets()
+        showFlash(t('saveAsPresetOk'), 'ok')
+      })
+      .catch((e: unknown) => showFlash(`${t('saveAsPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err'))
+  }
+
   return h('div', { style: s.root }, [
     h('div', { style: s.bar }, [
-      h('button', { style: tab === 'sections' ? s.tabActive : s.tab, onClick: () => setTab('sections') }, t('tabsSections')),
-      h('button', { style: tab === 'tools' ? s.tabActive : s.tab, onClick: () => setTab('tools') }, t('tabsTools')),
-      h('button', { style: tab === 'presets' ? s.tabActive : s.tab, onClick: () => setTab('presets') }, t('tabsPresets')),
-      h('button', { style: tab === 'preview' ? s.tabActive : s.tab, onClick: () => setTab('preview') }, t('tabsPreview')),
+      h('button', { style: tab === 'sections' ? s.tabActive : s.tab, onClick: () => switchTab('sections') }, t('tabsSections')),
+      h('button', { style: tab === 'tools' ? s.tabActive : s.tab, onClick: () => switchTab('tools') }, t('tabsTools')),
+      h('button', { style: tab === 'presets' ? s.tabActive : s.tab, onClick: () => switchTab('presets') }, t('tabsPresets')),
+      h('button', { style: tab === 'preview' ? s.tabActive : s.tab, onClick: () => switchTab('preview') }, t('tabsPreview')),
       h('select', {
         style: { ...s.input, marginLeft: 6 },
         value: target ?? '',
-        onChange: (e: { target: { value: string } }) => setTarget(e.target.value || undefined),
+        onChange: (e: { target: { value: string } }) => switchTarget(e.target.value || undefined),
         title: t('targetHint'),
       }, [
         h('option', { value: '' }, t('targetGlobal')),
         ...agentPresets.map((p) => h('option', { key: p.id, value: p.id },
           `${p.name}${p.broken ? ` (${t('broken')})` : ''}`)),
       ]),
+      h('button', {
+        style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
+        disabled: !draft?.dirty || saving,
+        onClick: save,
+      }, t('save')),
+      h('button', { style: s.saveBtn, onClick: saveAsPreset, title: t('saveAsPreset') }, t('saveAsPreset')),
       h('button', { style: s.refresh, onClick: refresh }, t('refresh')),
     ]),
     error ? h('div', { style: s.error }, String(error)) : null,
+    flash ? h('div', { style: flashKind === 'err' ? s.error : s.noticeOk }, flash) : null,
     target && agentPresets.find((p) => p.id === target)?.broken
       ? h('div', { style: s.error }, t('brokenPreset'))
       : null,
+    inv?.scopeResolved === false
+      ? h('div', { style: s.noticeWarn }, t('scopeFallback'))
+      : null,
     tab === 'sections'
-      ? h(SectionsTab, { cfg: view, inv, t, write })
+      ? h(SectionsTab, { cfg: view, inv, phases, cycle, t, write: edit })
       : tab === 'tools'
-        ? h(ToolsTab, { cfg: view, inv, t, write })
+        ? h(ToolsTab, { cfg: view, inv, phases, cycle, t, write: edit })
         : tab === 'presets'
-          ? h(PresetsTab, { cfg: view, inv, t, write, writeGlobal })
-          : h(PreviewTab, { t, active: tab === 'preview', refreshId, agentPresets, version }),
+          ? h(PresetsTab, { cfg: view, inv, t, writePatch, writeGlobal })
+          : h(PreviewTab, { t, active: tab === 'preview', refreshId, target, version, phases, cycle }),
   ])
 }

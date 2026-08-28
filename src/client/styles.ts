@@ -38,5 +38,9 @@ export const s = (() => {
     muted: { color: 'rgba(128,128,128,.75)', fontSize: 12 },
     error: { color: '#f85149', fontSize: 12, marginBottom: 6 },
     noticeOk: { color: '#3fb950', fontSize: 12, marginBottom: 6 },
+    noticeWarn: { color: '#d29922', fontSize: 12, marginBottom: 6 },
+    groupTitle: { display: 'flex', gap: 8, alignItems: 'baseline', marginTop: 8, marginBottom: 2, color: 'rgba(128,128,128,.9)', fontSize: 12 },
+    saveBtn: { padding: '4px 12px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit' },
+    saveBtnDirty: { padding: '4px 12px', border: '1px solid #d29922', borderRadius: 6, background: 'rgba(210,153,34,.15)', cursor: 'pointer', color: 'inherit' },
   }
 })()

@@ -1,0 +1,778 @@
+# dsh-prompt-customizer 配置（唯一权威）。
+# 手工编辑即时生效（下次读取时）；删除本文件后重启会从旧版 settings.yaml 迁移。
+inject:
+  - name: harness:source
+    order: 0
+    text: ""
+    phase: always
+    custom: false
+  - name: app:web-surface
+    order: 1
+    text: ""
+    phase: always
+    custom: false
+  - name: deployment:persona
+    order: 2
+    text: ""
+    phase: always
+    custom: false
+  - name: plan:policy
+    order: 3
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:read
+    order: 4
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:write
+    order: 5
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:edit
+    order: 6
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:glob
+    order: 7
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:grep
+    order: 8
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:pwsh
+    order: 9
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:jobs
+    order: 10
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:web_search
+    order: 11
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:goal
+    order: 12
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:workflow
+    order: 13
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:ralph
+    order: 14
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:subagent
+    order: 15
+    text: ""
+    phase: always
+    custom: false
+  - name: tool:subagent_fork
+    order: 16
+    text: ""
+    phase: always
+    custom: false
+  - name: ui:deliverable-file-references
+    order: 17
+    text: ""
+    phase: always
+    custom: false
+replace: {}
+tools:
+  exclude:
+    - undo_snapshot
+    - undo_safe_mode
+    - undo_restore
+    - undo_recent
+    - undo_prune
+    - undo_list
+    - undo_import
+    - undo_export
+    - undo_diff
+    - image_compare
+    - image_batch
+    - image_crop
+    - computer_click
+    - computer_drag
+    - computer_get_cursor_position
+    - computer_keypress
+    - computer_move_mouse
+    - computer_screenshot
+    - computer_scroll
+    - computer_set_mode
+    - computer_type
+    - computer_wait
+    - image_palette
+    - image_ocr
+    - image_sample
+    - image_scan
+  include: []
+  bootstrap:
+    exclude: []
+    include: []
+  compaction:
+    exclude: []
+    include: []
+sections:
+  - tool:dsh-undo-savepoint
+presets:
+  - id: p_mta49tr2abxnx
+    name: "1"
+    data:
+      sections:
+        - ui:deliverable-file-references
+        - tool:dsh-undo-savepoint
+      replace: {}
+      order:
+        - name: harness:identity
+          text: ""
+          custom: false
+        - name: harness:source
+          after: harness:identity
+          text: ""
+          custom: false
+        - name: app:web-surface
+          after: harness:source
+          text: ""
+          custom: false
+        - name: deployment:persona
+          after: app:web-surface
+          text: ""
+          custom: false
+        - name: plan:policy
+          after: deployment:persona
+          text: ""
+          custom: false
+        - name: tool:read
+          after: plan:policy
+          text: ""
+          custom: false
+        - name: tool:write
+          after: tool:read
+          text: ""
+          custom: false
+        - name: tool:edit
+          after: tool:write
+          text: ""
+          custom: false
+        - name: tool:glob
+          after: tool:edit
+          text: ""
+          custom: false
+        - name: tool:grep
+          after: tool:glob
+          text: ""
+          custom: false
+        - name: tool:pwsh
+          after: tool:grep
+          text: ""
+          custom: false
+        - name: tool:jobs
+          after: tool:pwsh
+          text: ""
+          custom: false
+        - name: tool:web_search
+          after: tool:jobs
+          text: ""
+          custom: false
+        - name: tool:goal
+          after: tool:web_search
+          text: ""
+          custom: false
+        - name: tool:workflow
+          after: tool:goal
+          text: ""
+          custom: false
+        - name: tool:ralph
+          after: tool:workflow
+          text: ""
+          custom: false
+        - name: tool:subagent
+          after: tool:ralph
+          text: ""
+          custom: false
+        - name: tool:subagent_fork
+          after: tool:subagent
+          text: ""
+          custom: false
+        - name: ui:deliverable-file-references
+          after: tool:subagent_fork
+          text: ""
+          custom: false
+        - name: tool:dsh-undo-savepoint
+          after: ui:deliverable-file-references
+          text: ""
+          custom: false
+      tools:
+        exclude:
+          - undo_snapshot
+          - undo_safe_mode
+          - undo_restore
+          - undo_recent
+          - undo_prune
+          - undo_list
+          - undo_import
+          - undo_export
+          - undo_diff
+          - image_compare
+          - image_batch
+          - image_crop
+          - computer_click
+          - computer_drag
+          - computer_get_cursor_position
+          - computer_keypress
+          - computer_move_mouse
+          - computer_screenshot
+          - computer_scroll
+          - computer_set_mode
+          - computer_type
+          - computer_wait
+        include: []
+overrides:
+  cordis:
+    sections:
+      - tool:dsh-undo-savepoint
+    replace: {}
+    inject:
+      - name: harness:identity
+        order: 0
+        text: ""
+        phase: always
+        custom: false
+      - name: harness:source
+        order: 1
+        text: ""
+        phase: always
+        custom: false
+      - name: app:web-surface
+        order: 2
+        text: ""
+        phase: always
+        custom: false
+      - name: deployment:persona
+        order: 3
+        text: ""
+        phase: always
+        custom: false
+      - name: plan:policy
+        order: 4
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:read
+        order: 5
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:write
+        order: 6
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:edit
+        order: 7
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:glob
+        order: 8
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:grep
+        order: 9
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:pwsh
+        order: 10
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:jobs
+        order: 11
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:web_search
+        order: 12
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:goal
+        order: 13
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:workflow
+        order: 14
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:ralph
+        order: 15
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent
+        order: 16
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent_fork
+        order: 17
+        text: ""
+        phase: always
+        custom: false
+      - name: ui:deliverable-file-references
+        order: 18
+        text: ""
+        phase: always
+        custom: false
+    tools:
+      exclude:
+        - undo_snapshot
+        - undo_safe_mode
+        - undo_restore
+        - undo_recent
+        - undo_prune
+        - undo_list
+        - undo_import
+        - undo_export
+        - undo_diff
+        - image_compare
+        - image_batch
+        - image_crop
+        - computer_click
+        - computer_drag
+        - computer_get_cursor_position
+        - computer_keypress
+        - computer_move_mouse
+        - computer_screenshot
+        - computer_scroll
+        - computer_set_mode
+        - computer_type
+        - computer_wait
+        - image_palette
+        - image_ocr
+        - image_sample
+        - image_scan
+      include: []
+      bootstrap:
+        exclude: []
+        include: []
+      compaction:
+        exclude: []
+        include: []
+  code:
+    sections:
+      - ui:deliverable-file-references
+      - tool:dsh-undo-savepoint
+      - tool:write
+    replace: {}
+    inject:
+      - name: harness:identity
+        order: 0
+        text: ""
+        phase: always
+        custom: false
+      - name: harness:source
+        order: 1
+        text: ""
+        phase: always
+        custom: false
+      - name: app:web-surface
+        order: 2
+        text: ""
+        phase: always
+        custom: false
+      - name: deployment:persona
+        order: 3
+        text: ""
+        phase: always
+        custom: false
+      - name: plan:policy
+        order: 4
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:read
+        order: 5
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:write
+        order: 6
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:edit
+        order: 7
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:glob
+        order: 8
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:grep
+        order: 9
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:pwsh
+        order: 10
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:jobs
+        order: 11
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:web_search
+        order: 12
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:goal
+        order: 13
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:workflow
+        order: 14
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:ralph
+        order: 15
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent
+        order: 16
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent_fork
+        order: 17
+        text: ""
+        phase: always
+        custom: false
+      - name: ui:deliverable-file-references
+        order: 18
+        text: ""
+        phase: always
+        custom: false
+    tools:
+      exclude:
+        - undo_snapshot
+        - undo_safe_mode
+        - undo_restore
+        - undo_recent
+        - undo_prune
+        - undo_list
+        - undo_import
+        - undo_export
+        - undo_diff
+        - image_compare
+        - image_batch
+        - image_crop
+        - computer_click
+        - computer_drag
+        - computer_get_cursor_position
+        - computer_keypress
+        - computer_move_mouse
+        - computer_screenshot
+        - computer_scroll
+        - computer_set_mode
+        - computer_type
+        - computer_wait
+        - image_palette
+        - image_ocr
+        - image_sample
+        - image_scan
+      include: []
+      bootstrap:
+        exclude: []
+        include: []
+      compaction:
+        exclude: []
+        include: []
+  anchored-standard:
+    sections:
+      - ui:deliverable-file-references
+      - tool:dsh-undo-savepoint
+    replace: {}
+    inject:
+      - name: harness:source
+        order: 0
+        text: ""
+        phase: always
+        custom: false
+      - name: app:web-surface
+        order: 1
+        text: ""
+        phase: always
+        custom: false
+      - name: deployment:persona
+        order: 2
+        text: ""
+        phase: always
+        custom: false
+      - name: plan:policy
+        order: 3
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:read
+        order: 4
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:write
+        order: 5
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:edit
+        order: 6
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:glob
+        order: 7
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:grep
+        order: 8
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:pwsh
+        order: 9
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:jobs
+        order: 10
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:web_search
+        order: 11
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:goal
+        order: 12
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:workflow
+        order: 13
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:ralph
+        order: 14
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent
+        order: 15
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent_fork
+        order: 16
+        text: ""
+        phase: always
+        custom: false
+      - name: ui:deliverable-file-references
+        order: 17
+        text: ""
+        phase: always
+        custom: false
+    tools:
+      exclude:
+        - undo_snapshot
+        - undo_safe_mode
+        - undo_restore
+        - undo_recent
+        - undo_prune
+        - undo_list
+        - undo_import
+        - undo_export
+        - undo_diff
+        - image_compare
+        - image_batch
+        - image_crop
+        - computer_click
+        - computer_drag
+        - computer_get_cursor_position
+        - computer_keypress
+        - computer_move_mouse
+        - computer_screenshot
+        - computer_scroll
+        - computer_set_mode
+        - computer_type
+        - computer_wait
+        - image_palette
+        - image_ocr
+        - image_sample
+        - image_scan
+      include: []
+      bootstrap:
+        exclude: []
+        include: []
+      compaction:
+        exclude: []
+        include: []
+  zero-anchored-standard:
+    sections:
+      - tool:dsh-undo-savepoint
+    replace: {}
+    inject:
+      - name: harness:source
+        order: 0
+        text: ""
+        phase: always
+        custom: false
+      - name: app:web-surface
+        order: 1
+        text: ""
+        phase: always
+        custom: false
+      - name: deployment:persona
+        order: 2
+        text: ""
+        phase: always
+        custom: false
+      - name: plan:policy
+        order: 3
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:read
+        order: 4
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:write
+        order: 5
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:edit
+        order: 6
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:glob
+        order: 7
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:grep
+        order: 8
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:pwsh
+        order: 9
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:jobs
+        order: 10
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:web_search
+        order: 11
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:goal
+        order: 12
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:workflow
+        order: 13
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:ralph
+        order: 14
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent
+        order: 15
+        text: ""
+        phase: always
+        custom: false
+      - name: tool:subagent_fork
+        order: 16
+        text: ""
+        phase: always
+        custom: false
+      - name: ui:deliverable-file-references
+        order: 17
+        text: ""
+        phase: always
+        custom: false
+    tools:
+      exclude:
+        - undo_snapshot
+        - undo_safe_mode
+        - undo_restore
+        - undo_recent
+        - undo_prune
+        - undo_list
+        - undo_import
+        - undo_export
+        - undo_diff
+        - image_compare
+        - image_batch
+        - image_crop
+        - computer_click
+        - computer_drag
+        - computer_get_cursor_position
+        - computer_keypress
+        - computer_move_mouse
+        - computer_screenshot
+        - computer_scroll
+        - computer_set_mode
+        - computer_type
+        - computer_wait
+        - image_palette
+        - image_ocr
+        - image_sample
+        - image_scan
+      include: []
+      bootstrap:
+        exclude: []
+        include: []
+      compaction:
+        exclude: []
+        include: []

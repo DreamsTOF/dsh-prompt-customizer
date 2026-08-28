@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeConfig, filterInjectByPhase, pickToolsFilter, applyToolFilter } from '../lib/effective.js'
+import { mergeConfig, filterInjectByPhase, pickToolsFilter, pickSectionsForStatus, applyToolFilter } from '../lib/effective.js'
 import { createPromotion, presetOfSession } from '../lib/promotion.js'
 
 // ── 字段级覆盖合并 ──────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ const GLOBAL = {
 
 test('empty override falls back to global entirely', () => {
   assert.deepEqual(mergeConfig(GLOBAL, {}), {
-    sections: ['a'], replace: { a: 'A' }, inject: [{ name: 'x', order: 0, text: 'X' }], tools: { exclude: ['t1'], include: [] },
+    sections: ['a'], sectionsBootstrap: [], sectionsCompaction: [], replace: { a: 'A' }, inject: [{ name: 'x', order: 0, text: 'X' }], tools: { exclude: ['t1'], include: [] },
   })
 })
 
@@ -37,8 +37,13 @@ test('bootstrap-only tools config counts as an override', () => {
   assert.deepEqual(merged.tools, { bootstrap: { include: ['bash'] } })
 })
 
+test('compaction-only tools config counts as an override', () => {
+  const merged = mergeConfig(GLOBAL, { tools: { compaction: { include: ['bash'] } } })
+  assert.deepEqual(merged.tools, { compaction: { include: ['bash'] } })
+})
+
 test('missing global fields default sanely', () => {
-  assert.deepEqual(mergeConfig(undefined, undefined), { sections: [], replace: {}, inject: [], tools: {} })
+  assert.deepEqual(mergeConfig(undefined, undefined), { sections: [], sectionsBootstrap: [], sectionsCompaction: [], replace: {}, inject: [], tools: {} })
 })
 
 // ── 阶段过滤 ────────────────────────────────────────────────────────────────
@@ -47,36 +52,81 @@ const INJECT = [
   { name: 'always', phase: 'always' },
   { name: 'boot', phase: 'bootstrap' },
   { name: 'post', phase: 'active' },
+  { name: 'compact', phase: 'compaction' },
 ]
 
-test('pre-promotion keeps always+bootstrap, drops active', () => {
-  assert.deepEqual(filterInjectByPhase(INJECT, false).map((x) => x.name), ['always', 'boot'])
+test('pre-promotion keeps always+bootstrap, drops active/compaction', () => {
+  assert.deepEqual(filterInjectByPhase(INJECT, { promoted: false, boundary: -1 }).map((x) => x.name), ['always', 'boot'])
 })
 
-test('promoted keeps always+active, drops bootstrap', () => {
-  assert.deepEqual(filterInjectByPhase(INJECT, true).map((x) => x.name), ['always', 'post'])
+test('promoted keeps always+active, drops bootstrap/compaction', () => {
+  assert.deepEqual(filterInjectByPhase(INJECT, { promoted: true, boundary: -1 }).map((x) => x.name), ['always', 'post'])
+})
+
+test('compaction window keeps always+compaction (独立注入阶段)', () => {
+  assert.deepEqual(filterInjectByPhase(INJECT, { promoted: false, boundary: 1 }).map((x) => x.name), ['always', 'compact'])
 })
 
 test('unknown or missing phase behaves like always', () => {
   const weird = [...INJECT, { name: 'w', phase: 'nonsense' }, { name: 'n', text: '' }]
   // w/n 按 always 保留，boot 被丢弃：promoted 视图 = always×2 + post + n。
-  assert.equal(filterInjectByPhase(weird, true).length, 4)
-  assert.deepEqual(filterInjectByPhase(undefined, true), [])
+  assert.equal(filterInjectByPhase(weird, { promoted: true, boundary: -1 }).length, 4)
+  assert.deepEqual(filterInjectByPhase(undefined, { promoted: true, boundary: -1 }), [])
 })
 
 // ── 工具阶段选择与过滤 ──────────────────────────────────────────────────────
 
 const TOOLS = [{ name: 'a' }, { name: 'b' }, { name: 'c' }]
+// promotion.status() 的三种形态：引导期、压缩后未晋级、已晋级。
+const BOOT = { promoted: false, boundary: -1 }
+const POST_COMPACT = { promoted: false, boundary: 5 }
+const ACTIVE = { promoted: true, boundary: -1 }
 
 test('pre-promotion uses the bootstrap keep-set when configured', () => {
   const cfg = { exclude: ['a'], include: [], bootstrap: { exclude: [], include: ['b'] } }
-  assert.deepEqual(pickToolsFilter(cfg, false), { exclude: [], include: ['b'] })
-  assert.deepEqual(pickToolsFilter(cfg, true), { exclude: ['a'], include: [] })
+  assert.deepEqual(pickToolsFilter(cfg, BOOT), { exclude: [], include: ['b'] })
+  assert.deepEqual(pickToolsFilter(cfg, ACTIVE), { exclude: ['a'], include: [] })
+})
+
+test('post-compaction pre-promotion prefers the compaction keep-set', () => {
+  const cfg = {
+    exclude: ['a'], include: [],
+    bootstrap: { exclude: [], include: ['b'] },
+    compaction: { exclude: [], include: ['c'] },
+  }
+  assert.deepEqual(pickToolsFilter(cfg, POST_COMPACT), { exclude: [], include: ['c'] })
+  // 压缩后一旦重新晋级，回到静态过滤。
+  assert.deepEqual(pickToolsFilter(cfg, ACTIVE), { exclude: ['a'], include: [] })
+})
+
+test('empty compaction catalog falls back to bootstrap after compaction', () => {
+  const cfg = {
+    exclude: ['a'], include: [],
+    bootstrap: { exclude: [], include: ['b'] },
+    compaction: { exclude: [], include: [] },
+  }
+  assert.deepEqual(pickToolsFilter(cfg, POST_COMPACT), { exclude: [], include: ['b'] })
 })
 
 test('empty bootstrap catalog never activates phasing', () => {
   const cfg = { exclude: ['a'], include: [], bootstrap: { exclude: [], include: [] } }
-  assert.deepEqual(pickToolsFilter(cfg, false), { exclude: ['a'], include: [] })
+  assert.deepEqual(pickToolsFilter(cfg, BOOT), { exclude: ['a'], include: [] })
+})
+
+// ── 每阶段独立段屏蔽（与工具三态对称） ──────────────────────────────────────
+
+test('pickSectionsForStatus: guide/compact 各自生效并优先于 global', () => {
+  const cfg = { sectionsBootstrap: ['boot-only'], sectionsCompaction: ['comp-only'] }
+  assert.deepEqual(pickSectionsForStatus(cfg, BOOT), ['boot-only'])
+  assert.deepEqual(pickSectionsForStatus(cfg, POST_COMPACT), ['comp-only'])
+  assert.deepEqual(pickSectionsForStatus(cfg, ACTIVE), [])
+})
+
+test('pickSectionsForStatus: 空名单回落全局（不启用阶段化）', () => {
+  const cfg = { sectionsBootstrap: [], sectionsCompaction: [] }
+  assert.deepEqual(pickSectionsForStatus(cfg, BOOT), [])
+  assert.deepEqual(pickSectionsForStatus(cfg, POST_COMPACT), [])
+  assert.deepEqual(pickSectionsForStatus(undefined, BOOT), [])
 })
 
 test('applyToolFilter matches previous include/exclude semantics', () => {
