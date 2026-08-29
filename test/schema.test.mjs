@@ -7,18 +7,18 @@ test('accepts a valid config and preserves known fields', () => {
     sections: ['tool:read'],
     replace: { 'tool:read': 'custom text' },
     inject: [{ name: 'harness:identity', order: 0, text: '' }],
-    tools: { exclude: ['tool:x'], include: [] },
+    tools: { exclude: ['tool:x'] },
   })
   assert.deepEqual(value.sections, ['tool:read'])
   assert.equal(value.replace['tool:read'], 'custom text')
   assert.equal(value.inject[0].name, 'harness:identity')
-  assert.deepEqual(value.tools, { exclude: ['tool:x'], include: [], bootstrap: { exclude: [], include: [] }, compaction: { exclude: [], include: [] } })
+  assert.deepEqual(value.tools, { exclude: ['tool:x'], add: [], bootstrap: { exclude: [], add: [] }, compaction: { exclude: [], add: [] } })
 })
 
 test('defaults missing fields', () => {
   const value = Config({})
   assert.deepEqual(value.sections, [])
-  assert.deepEqual(value.tools, { exclude: [], include: [], bootstrap: { exclude: [], include: [] }, compaction: { exclude: [], include: [] } })
+  assert.deepEqual(value.tools, { exclude: [], add: [], bootstrap: { exclude: [], add: [] }, compaction: { exclude: [], add: [] } })
   assert.deepEqual(value.overrides, {})
   assert.deepEqual(value.presets, [])
   assert.equal(value.activePreset, undefined)
@@ -33,7 +33,7 @@ test('accepts presets with relative order and activePreset', () => {
         sections: ['tool:read'],
         replace: { 'tool:read': 'custom' },
         order: [{ name: 'harness:identity', after: 'harness:source', text: '' }],
-        tools: { exclude: ['tool:x'], include: [] },
+        tools: { exclude: ['tool:x'] },
       },
     }],
     activePreset: 'p1',

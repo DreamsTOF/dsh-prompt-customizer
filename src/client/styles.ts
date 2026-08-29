@@ -35,6 +35,9 @@ export const s = (() => {
     editBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
     editInput: { padding: '6px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', color: 'inherit', fontFamily: 'inherit', fontSize: 12, resize: 'vertical', width: '100%', boxSizing: 'border-box' },
     input: { padding: '4px 6px', border: '1px solid rgba(128,128,128,.35)', borderRadius: 6, background: 'transparent', color: 'inherit' },
+    // 原生下拉的弹出列表不吃继承色（浅色底 + 继承的浅色字会看不见）：
+    // 用系统色对（Canvas/CanvasText）跟随宿主 color-scheme，深浅主题下都可读。
+    option: { backgroundColor: 'Canvas', color: 'CanvasText' },
     muted: { color: 'rgba(128,128,128,.75)', fontSize: 12 },
     error: { color: '#f85149', fontSize: 12, marginBottom: 6 },
     noticeOk: { color: '#3fb950', fontSize: 12, marginBottom: 6 },

@@ -1,6 +1,6 @@
-/** 工具预览：当前定制（include/exclude 之后）最终对模型可见的工具目录，
- *  只读、白名单风格。列出即代表可见——这里没有「已屏蔽」状态。
- *  本视图绝不修改黑名单/白名单配置。 */
+/** 工具预览：当前定制（黑名单过滤之后）最终对模型可见的工具目录，
+ *  只读、清单式呈现：列出即代表模型看得见 —— 这里没有「已屏蔽」状态。
+ *  本视图绝不修改黑名单配置。 */
 import { createElement as h, type ReactElement } from 'react'
 import type { Translate } from './locales.ts'
 import { s } from './styles.ts'

@@ -1,10 +1,14 @@
-/** 预设 Tab：保存 / 应用 / 导出 / 导入完整的定制快照。
+/** 配置 Tab：两种「预设」分开 ——
+ *  - 保存当前配置：本插件内的配置快照库（config.presets），可应用 / 导出 / 导入，
+ *    不会变成可选的 agent 预设；
+ *  - 存为 agent 预设：整体 fork 当前编辑目标的预设目录，并把当前定制写进它的
+ *    覆盖项，新预设随即出现在顶部的编辑目标选择器里。
  *  导入导出经 preset-io 双端适配：Tauri 2 桌面走原生对话框，Web 走
  *  下载 / 文件选择；成功 / 失败 / 取消都有面板内消息条提示。 */
 import { createElement as h, useEffect, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
-import type { Config, Inventory, Preset } from './types.ts'
+import type { Config, Inventory, PhaseViewKey, Preview, Preset } from './types.ts'
 import type { Translate } from './locales.ts'
-import { addImportedPresets, applyPresetData, buildPresetData, genId, mergeSections, removePreset } from './presets.ts'
+import { addImportedPresets, applyPresetData, buildPresetData, genId, mergeSections, PART_ORDER, removePreset, type ConfigPatch } from './presets.ts'
 import { decodePresetExport, exportPresetFile, importPresetFile } from './preset-io.ts'
 import { s } from './styles.ts'
 
@@ -14,17 +18,26 @@ interface Notice {
   text: string
 }
 
-export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
+export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveAsPreset, forkSource }: {
   cfg: Config
   inv: Inventory | null
+  /** Panel 并行拉取的三阶段装配：快照只捕获当前装配里真实存在的段。 */
+  phases: Record<PhaseViewKey, Preview | null> | null
   t: Translate
-  /** 应用预设：四字段补丁一次落盘（显式意图，不经草稿）。 */
-  writePatch: (patch: { sections?: unknown; replace?: unknown; inject?: unknown; tools?: unknown }) => void
+  /** 应用预设：完整补丁一次落盘（显式意图，不经草稿）。 */
+  writePatch: (patch: ConfigPatch) => void
   /** 预设库专用：永远写在全局字段（presets / activePreset 不分作用域）。 */
   writeGlobal: (field: string, value: unknown) => void
+  /** 存为 agent 预设：fork 当前编辑目标的预设目录并写入 overrides[新名]。 */
+  saveAsPreset: (name: string) => Promise<boolean>
+  /** fork 来源的显示名（当前编辑目标预设）；undefined = 全局目标，由服务端回落默认预设。 */
+  forkSource: string | undefined
 }): ReactElement {
   const presets = cfg.presets ?? []
   const [name, setName] = useState('')
+  // 「存为 agent 预设」的名字与在途标记（与服务端往返期间禁用按钮）。
+  const [agentName, setAgentName] = useState('')
+  const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   // Web 回退用的隐藏文件输入（tauri 不可用时才点它）。
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -43,7 +56,17 @@ export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
   }
 
   const blockedNames = new Set(cfg.sections ?? [])
-  const merged = mergeSections(inv, cfg, blockedNames)
+  // 快照的捕获宇宙 = 当前预设三个阶段装配里真实存在的段名。「本系统全部提示词」
+  // 是跨预设只增不减的并集池，直接拿它当捕获集合会把别的预设独有段名灌进快照，
+  // 应用回来就是一条条空白幽灵段。装配数据未就绪（宇宙为空）时不过滤，避免捕获成空。
+  const assemblyNames = new Set<string>()
+  for (const key of PART_ORDER) {
+    for (const sec of phases?.[key]?.baseSections ?? []) assemblyNames.add(sec.name)
+  }
+  const mergedAll = mergeSections(inv, cfg, blockedNames)
+  const merged = assemblyNames.size === 0
+    ? mergedAll
+    : mergedAll.filter((sec) => sec.source === 'custom' || assemblyNames.has(sec.name))
   const currentNames = new Set(merged.map((sec) => sec.name))
 
   // 把当前定制捕获为新预设（完整快照）。绝对顺序会被转成相对形式
@@ -63,8 +86,7 @@ export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
   // 四个定制字段以一个补丁写入当前编辑目标（全局顶层或 overrides[id]）；
   // 快照库（presets / activePreset）永远保持在全局。
   const applyPreset = (preset: Preset): void => {
-    const patch = applyPresetData(preset.data, cfg, currentNames)
-    writePatch({ sections: patch.sections, replace: patch.replace, inject: patch.inject, tools: patch.tools })
+    writePatch(applyPresetData(preset.data, cfg, currentNames))
     writeGlobal('activePreset', preset.id)
   }
 
@@ -127,6 +149,17 @@ export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
     reader.readAsText(file)
   }
 
+  // 存为 agent 预设：fork 当前编辑目标的预设目录 + 把当前定制写进它的覆盖项。
+  // 成败由服务端返回，提示统一走面板顶部的消息条（Panel 的 flash），这里只在
+  // 成功时清空输入框，避免同一条消息显示两遍。
+  const createAgentPreset = async (): Promise<void> => {
+    const trimmed = agentName.trim()
+    if (trimmed.length === 0 || creating) return
+    setCreating(true)
+    if (await saveAsPreset(trimmed)) setAgentName('')
+    setCreating(false)
+  }
+
   return h('div', { style: s.list }, [
     notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.error }, notice.text) : null,
     h('div', { style: s.injectBox }, [
@@ -134,6 +167,14 @@ export function PresetsTab({ cfg, inv, t, writePatch, writeGlobal }: {
       h('div', { style: s.injectRow }, [
         h('input', { style: { ...s.input, flex: 1 }, placeholder: t('presetName'), value: name, onChange: (e: ChangeEvent<HTMLInputElement>) => setName(e.target.value) }),
         h('button', { style: s.mini, onClick: saveCurrent }, t('save')),
+      ]),
+    ]),
+    h('div', { style: s.injectBox }, [
+      h('div', { style: s.rowTitle }, t('saveAsPresetCard')),
+      h('div', { style: s.muted }, t('saveAsPresetHint', { name: forkSource ?? t('forkSourceDefault') })),
+      h('div', { style: s.injectRow }, [
+        h('input', { style: { ...s.input, flex: 1 }, placeholder: t('agentPresetName'), value: agentName, onChange: (e: ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value) }),
+        h('button', { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => { void createAgentPreset() } }, t('saveAsPreset')),
       ]),
     ]),
     h('div', { style: s.injectBox }, [

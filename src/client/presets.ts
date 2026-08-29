@@ -1,5 +1,5 @@
 /** 纯函数的预设 / 段操作助手，同时被客户端 UI 与 Node 测试复用（不触碰 IO 与 React）。 */
-import type { Config, CycleEntry, Inventory, OverrideData, PhaseViewKey, Preset, PresetData, Preview, ToolsConfig } from './types.ts'
+import type { Config, Inventory, OverrideData, Phase, PhaseViewKey, Preset, PresetData, ToolsConfig } from './types.ts'
 
 export interface Section {
   name: string
@@ -11,12 +11,67 @@ export interface Section {
   source?: 'system' | 'custom'
 }
 
-/** 应用预设后需要回写到设置作用域的那部分配置字段。 */
+/** 应用预设后需要回写到设置作用域的那部分配置字段。
+ *  阶段名单为可选：旧快照不带 → 应用时保留当前值，绝不抹掉。 */
 export interface ConfigPatch {
   sections: string[]
+  sectionsBootstrap?: string[]
+  sectionsCompaction?: string[]
   replace: Record<string, string>
-  inject: Array<{ name: string; order: number; text: string }>
+  inject: ResolvedInject[]
   tools: ToolsConfig
+}
+
+/** 快照捕获的阶段 order 空间（always 之外的三个阶段）。 */
+const CAPTURE_PHASES: Array<'bootstrap' | 'active' | 'compaction'> = ['bootstrap', 'active', 'compaction']
+
+/** 把一条有序名字转成相对链（每段记住它的前一段），text / custom 只给 custom 段。 */
+function toChain(names: string[], textOf: (name: string) => string, customOf: (name: string) => boolean, phase?: Phase): NonNullable<PresetData['order']> {
+  return names.map((name, i) => ({
+    name,
+    after: i > 0 ? names[i - 1] : undefined,
+    text: customOf(name) ? (textOf(name) ?? '') : '',
+    custom: customOf(name),
+    ...(phase !== undefined ? { phase } : {}),
+  }))
+}
+
+/**
+ * 从当前配置构建预设快照（完整捕获，含每阶段独立设定）。
+ *
+ * 全局相对链派生自合并后的完整段列表（而不仅是 `cfg.inject`），这样即使保存前
+ * 只是屏蔽了几个段（没有重排），预设仍会携带完整的有序集合，应用时才能得到一个
+ * 有意义的「激活列表」。在此之上，bootstrap / active / compaction 各再带一条自己
+ * 的相对链 —— 数据源就是 UI 逐阶段持久化的注入条目（每阶段独立的 order 空间），
+ * 否则阶段化的名单与排序在「导出 → 导入 → 应用」后就丢了。
+ */
+export function buildPresetData(cfg: Config, merged: Section[]): PresetData {
+  const globalNames = merged.map((sec) => sec.name)
+  const textOf = new Map(merged.map((sec) => [sec.name, sec.text ?? ''] as const))
+  const customOf = new Map(merged.map((sec) => [sec.name, sec.source === 'custom'] as const))
+  const order = toChain(globalNames, (n) => textOf.get(n) ?? '', (n) => customOf.get(n) === true)
+  for (const phase of CAPTURE_PHASES) {
+    const items = (cfg.inject ?? [])
+      .filter((item) => item.phase === phase)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    if (items.length === 0) continue
+    order.push(...toChain(
+      items.map((item) => item.name),
+      (n) => items.find((item) => item.name === n)?.text ?? '',
+      (n) => items.find((item) => item.name === n)?.custom === true,
+      phase,
+    ))
+  }
+  const data: PresetData = {
+    sections: cfg.sections,
+    replace: cfg.replace,
+    order,
+    tools: cfg.tools,
+  }
+  // 非空才捕获：没有阶段名单的配置导出的快照与改动前逐键一致。
+  if ((cfg.sectionsBootstrap ?? []).length > 0) data.sectionsBootstrap = cfg.sectionsBootstrap
+  if ((cfg.sectionsCompaction ?? []).length > 0) data.sectionsCompaction = cfg.sectionsCompaction
+  return data
 }
 
 /**
@@ -51,21 +106,23 @@ export function mergeSections(inv: Inventory | null, cfg: Config, blockedNames: 
   return [...map.values()].sort((a, b) => a.order - b.order).map((sec, i) => ({ ...sec, order: i }))
 }
 
+/** ConfigPatch 里对外的注入条目（always 组刻意不带 phase 键）。 */
+export interface ResolvedInject {
+  name: string
+  order: number
+  text: string
+  custom?: boolean
+  phase?: Phase
+}
+
 /**
- * 把预设里的相对顺序解析为绝对有序列表（0..n-1）。
- * 没有锚点（或锚点不在集合中）的段按预设原始顺序排在最前；每个带锚点的段
- * 插到其锚点之后；剩余的段（存在环）追加到末尾。
+ * 把一条相对链解析为绝对有序名字（0..n-1）。
+ * 没有锚点（或锚点不在本组内）的名字按原始顺序排在最前；每个带锚点的名字
+ * 插到其锚点之后；剩余的名字（存在环）追加到末尾。
  */
-export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: string; order: number; text: string; custom?: boolean }> {
-  const list = presetOrder ?? []
+function resolveChain(list: Array<{ name: string; after?: string }>): string[] {
   const afterMap = new Map<string, string | undefined>()
-  const textMap = new Map<string, string>()
-  const customMap = new Map<string, boolean>()
-  for (const sec of list) {
-    afterMap.set(sec.name, sec.after)
-    textMap.set(sec.name, sec.text)
-    customMap.set(sec.name, sec.custom === true)
-  }
+  for (const sec of list) afterMap.set(sec.name, sec.after)
 
   const result: string[] = []
   const placed = new Set<string>()
@@ -92,30 +149,36 @@ export function resolveOrder(presetOrder: PresetData['order']): Array<{ name: st
   for (const sec of list) {
     if (!placed.has(sec.name)) { result.push(sec.name); placed.add(sec.name) }
   }
-
-  return result.map((name, i) => ({ name, order: i, text: textMap.get(name) ?? '', custom: customMap.get(name) }))
+  return result
 }
 
 /**
- * 从当前配置构建预设快照。order 列表派生自合并后的完整段列表（而不仅是
- * `cfg.inject`），这样即使保存前只是屏蔽了几个段（没有重排），预设仍会携带
- * 完整的有序集合，应用时才能得到一个有意义的「激活列表」。
+ * 把快照里的相对顺序解析为注入条目列表。
+ *
+ * order 条目可以带 `phase`：同名而不同 phase 的多条 = 该段在多个阶段各有自己的
+ * 位置（每阶段有独立的 order 空间，与 UI 的 phaseInjectEntries 一致）。无 phase
+ * 的条目属于 always 组 —— 也就是旧快照的单一全局序，输出形状与旧实现逐键一致
+ * （刻意不写 phase 键，「保存 → 应用 = 不动点」的不变量依赖键形状完全相同）。
  */
-export function buildPresetData(cfg: Config, merged: Section[]): PresetData {
-  // 只有 custom（本插件注入）的段才把自身文本写进预设的 order 列表；
-  // system 段保留空文本，应用预设时就只会重排它们，绝不冻结其动态生成的内容。
-  const order = merged.map((sec, i) => ({
-    name: sec.name,
-    after: i > 0 ? merged[i - 1].name : undefined,
-    text: sec.source === 'custom' ? (sec.text ?? '') : '',
-    custom: sec.source === 'custom',
-  }))
-  return {
-    sections: cfg.sections,
-    replace: cfg.replace,
-    order,
-    tools: cfg.tools,
+export function resolveOrder(presetOrder: PresetData['order']): ResolvedInject[] {
+  const list = presetOrder ?? []
+  const groups = new Map<Phase, NonNullable<PresetData['order']>>([['always', []]])
+  for (const sec of list) {
+    const phase = sec.phase ?? 'always'
+    const group = groups.get(phase)
+    if (group) group.push(sec)
+    else groups.set(phase, [sec])
   }
+  const out: ResolvedInject[] = []
+  for (const [phase, members] of groups) {
+    const textMap = new Map(members.map((x) => [x.name, x.text ?? '']))
+    const customMap = new Map(members.map((x) => [x.name, x.custom === true]))
+    const names = resolveChain(members)
+    out.push(...names.map((name, i) => (phase === 'always'
+      ? { name, order: i, text: textMap.get(name) ?? '', custom: customMap.get(name) }
+      : { name, order: i, text: textMap.get(name) ?? '', custom: customMap.get(name), phase })))
+  }
+  return out
 }
 
 /**
@@ -158,22 +221,26 @@ export function applyPresetData(data: PresetData, cfg: Config, currentNames: Rea
     for (const name of activeNames) blocked.delete(name)
   }
 
-  // 阶段性目录（bootstrap / compaction）不属于预设快照：应用预设只换
-  // 静态过滤，目录配置保留当前值不被抹掉（缺席时不留下显式 undefined 键，
-  // 「保存→应用 = 不动点」的不变量依赖键形状完全一致）。
+  // 阶段化字段一律「快照有则覆盖，缺省则保留当前值」：旧快照（没有这些键）
+  // 应用后仍只换静态过滤，绝不把用户已有的阶段目录与阶段名单抹平。
+  // 缺席时不留下显式 undefined 键 —— 「保存→应用 = 不动点」的不变量依赖键形状。
   const keptCatalogs: ToolsConfig = {}
-  if (cfg.tools?.bootstrap !== undefined) keptCatalogs.bootstrap = cfg.tools.bootstrap
-  if (cfg.tools?.compaction !== undefined) keptCatalogs.compaction = cfg.tools.compaction
-  return {
+  const bootstrap = data.tools?.bootstrap !== undefined ? data.tools.bootstrap : cfg.tools?.bootstrap
+  const compaction = data.tools?.compaction !== undefined ? data.tools.compaction : cfg.tools?.compaction
+  if (bootstrap !== undefined) keptCatalogs.bootstrap = bootstrap
+  if (compaction !== undefined) keptCatalogs.compaction = compaction
+  const patch: ConfigPatch = {
     sections: [...blocked],
     replace: { ...(cfg.replace ?? {}), ...(data.replace ?? {}) },
     inject,
     tools: {
       exclude: data.tools?.exclude ?? [],
-      include: data.tools?.include ?? [],
       ...keptCatalogs,
     },
   }
+  if (Array.isArray(data.sectionsBootstrap)) patch.sectionsBootstrap = data.sectionsBootstrap
+  if (Array.isArray(data.sectionsCompaction)) patch.sectionsCompaction = data.sectionsCompaction
+  return patch
 }
 
 /**
@@ -194,115 +261,57 @@ export function removeSection(name: string, cfg: Config): Pick<Config, 'sections
 
 // ── 工具过滤 ─────────────────────────────────────────────────────────────
 
-export type ToolsCfg = { exclude?: string[]; include?: string[] }
+export type ToolsCfg = { exclude?: string[] }
+
+/** 三个阶段部分的固定展示顺序：引导期 → 常驻期 → 压缩受控期。
+ *  恒定全部渲染 —— 预设没有某个阶段时该部分只是空的，绝不隐藏。 */
+export const PART_ORDER: PhaseViewKey[] = ['bootstrap', 'active', 'compaction']
 
 /**
- * 一套阶段装配的 (提示词, 工具) 指纹 —— 段名 / 工具名（稳定排序）/ 渲染
- * 文本任一不同即视为不同阶段（与「提示词/工具和上一轮不同即为一阶段」
- * 的定义一致）。装配为 null（拉取失败）时返回该阶段专属的哨兵签名 ——
- * 绝不与其它阶段折叠，宁可单独成组也不冒充相同。
+ * 一个阶段部分写回哪一份过滤配置：引导期 → `tools.bootstrap`、压缩受控期 →
+ * `tools.compaction`、常驻期 → 静态 `tools.exclude`。三份名单互不继承。
  */
-export function phaseSignature(key: PhaseViewKey, preview: Preview | null): string {
-  if (preview === null) return `__null:${key}`
-  const sections = (preview.sections ?? []).map((x) => x.name).join(',')
-  const tools = (preview.tools ?? []).map((t) => (typeof t === 'string' ? t : t.name)).sort().join(',')
-  return sections + '\u0000' + tools + '\u0000' + (preview.text ?? '')
+export function phaseConfigKey(key: PhaseViewKey): 'bootstrap' | 'compaction' | 'static' {
+  return key === 'active' ? 'static' : key
 }
 
 /**
- * 从三套名义装配推导预设真实拥有的阶段（agent 周期）：按 (提示词, 工具)
- * 签名去重，只保留真正不同的提示词 / 工具组合。返回顺序固定为
- * bootstrap → compaction → active（分组去重的锚定阅读顺序），每组取
- * 首个名义视图为代表。
+ * 把一个阶段的 exclude 名单写回整份工具配置，返回新对象（其余阶段原样保留）。
+ * 一次拖放可能要同时改两个阶段的名单（搬移 = 源阶段隐藏 + 目标阶段显示），必须
+ * 在同一个对象上连续套完再落一次写入 —— 分两次写会各自基于旧 cfg 计算而互相覆盖。
  */
-export function deriveCycle(views: Record<PhaseViewKey, Preview | null>): CycleEntry[] {
-  const order: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
-  const cycle: CycleEntry[] = []
-  const bySignature = new Map<string, CycleEntry>()
-  for (const key of order) {
-    const sig = phaseSignature(key, views[key])
-    const existing = bySignature.get(sig)
-    if (existing !== undefined) {
-      existing.merged.push(key)
-      continue
-    }
-    const entry: CycleEntry = { key, merged: [key] }
-    bySignature.set(sig, entry)
-    cycle.push(entry)
-  }
-  return cycle
-}
-
-/** 周期三阶段的展示顺序：引导期 → 常驻期 → 压缩受控期。 */
-export const CYCLE_DISPLAY_ORDER: PhaseViewKey[] = ['bootstrap', 'active', 'compaction']
-
-/**
- * 把推导出的周期按展示顺序重排（去重分组后的条目，键映射到展示顺序；
- * 未知键的组（如拉取失败的哨兵组）追加在末尾，绝不丢弃）。
- */
-export function cycleInDisplayOrder(cycle: CycleEntry[]): CycleEntry[] {
-  const byKey = new Map(cycle.map((entry) => [entry.key, entry]))
-  const ordered: CycleEntry[] = []
-  for (const key of CYCLE_DISPLAY_ORDER) {
-    const entry = byKey.get(key)
-    if (entry !== undefined) ordered.push(entry)
-  }
-  for (const entry of cycle) {
-    if (!ordered.includes(entry)) ordered.push(entry)
-  }
-  return ordered
+export function withPhaseExclude(tools: ToolsConfig | undefined, key: PhaseViewKey, exclude: string[]): ToolsConfig {
+  const base = tools ?? {}
+  const target = phaseConfigKey(key)
+  if (target === 'bootstrap') return { ...base, bootstrap: { ...(base.bootstrap ?? {}), exclude } }
+  if (target === 'compaction') return { ...base, compaction: { ...(base.compaction ?? {}), exclude } }
+  return { ...base, exclude }
 }
 
 /**
- * 一个阶段部分应该写回哪一份过滤配置：独立阶段写自身目录
- * （bootstrap / compaction）；常驻期（active）与同形折叠组写静态过滤。
+ * 把一个阶段的 add 名单（要加回该阶段的工具）写回整份工具配置，返回新对象。
+ * 与 withPhaseExclude 对称：常驻期写静态 `tools.add`，引导期写 `tools.bootstrap.add`，
+ * 压缩受控期写 `tools.compaction.add`，其余阶段原样保留。
  */
-export function phaseConfigKey(entry: CycleEntry): 'bootstrap' | 'compaction' | 'static' {
-  if (entry.merged.length > 1) return 'static'
-  return entry.key === 'active' ? 'static' : entry.key
+export function withPhaseAdd(tools: ToolsConfig | undefined, key: PhaseViewKey, add: string[]): ToolsConfig {
+  const base = tools ?? {}
+  const target = phaseConfigKey(key)
+  if (target === 'bootstrap') return { ...base, bootstrap: { ...(base.bootstrap ?? {}), add } }
+  if (target === 'compaction') return { ...base, compaction: { ...(base.compaction ?? {}), add } }
+  return { ...base, add }
 }
 
-/** 在当前 include/exclude 配置下，某个工具是否被隐藏。 */
+/** 某个工具在当前黑名单配置下是否被隐藏。 */
 export function isToolHidden(name: string, toolsCfg: ToolsCfg | undefined): boolean {
-  const include = toolsCfg?.include ?? []
-  const exclude = toolsCfg?.exclude ?? []
-  return include.length > 0 ? !include.includes(name) : exclude.includes(name)
+  return (toolsCfg?.exclude ?? []).includes(name)
 }
 
 /** 切换某个工具的隐藏状态，返回新的工具配置（不改原对象）。 */
 export function toggleTool(name: string, currentlyHidden: boolean, toolsCfg: ToolsCfg | undefined): ToolsCfg {
-  const include = toolsCfg?.include ?? []
-  const exclude = toolsCfg?.exclude ?? []
-  if (include.length > 0) {
-    const next = include.slice()
-    if (currentlyHidden) {
-      next.push(name)
-      // 白名单模式下重新显示工具时，必须同时清掉残留的黑名单条目，
-      // 否则该名字会同时留在两个列表里，用户日后切回黑名单模式时它又会
-      // 变成隐藏。
-      const nextExclude = exclude.filter((n) => n !== name)
-      return { exclude: nextExclude, include: next }
-    }
-    const i = next.indexOf(name)
-    if (i >= 0) next.splice(i, 1)
-    return { exclude, include: next }
-  }
-  const next = exclude.slice()
-  if (currentlyHidden) { const i = next.indexOf(name); if (i >= 0) next.splice(i, 1) }
-  else next.push(name)
-  return { exclude: next, include }
-}
-
-/**
- * 在 include（白名单）与 exclude（黑名单）两种模式间切换。开启 include 模式
- * 时会丢弃当前工具集里不认识的名称，并从当前未被排除的工具中初始化白名单；
- * 关闭时清空白名单（只保留认识的 exclude 名称）。
- */
-export function setToolMode(on: boolean, toolsCfg: ToolsCfg | undefined, toolNames: string[]): ToolsCfg {
-  const known = new Set(toolNames)
-  const exclude = (toolsCfg?.exclude ?? []).filter((n) => known.has(n))
-  if (on) return { exclude, include: toolNames.filter((n) => !exclude.includes(n)) }
-  return { exclude, include: [] }
+  const exclude = (toolsCfg?.exclude ?? []).slice()
+  if (currentlyHidden) { const i = exclude.indexOf(name); if (i >= 0) exclude.splice(i, 1) }
+  else if (!exclude.includes(name)) exclude.push(name)
+  return { exclude }
 }
 
 // ── 按 agent 预设的覆盖编辑 ─────────────────────────────────────────────
@@ -323,7 +332,7 @@ export function editView(cfg: Config, target: string | undefined): Config {
     inject: ovr.inject ?? cfg.inject,
     tools: {
       exclude: ovr.tools?.exclude ?? cfg.tools?.exclude,
-      include: ovr.tools?.include ?? cfg.tools?.include,
+      add: ovr.tools?.add ?? cfg.tools?.add,
       bootstrap: ovr.tools?.bootstrap ?? cfg.tools?.bootstrap,
       compaction: ovr.tools?.compaction ?? cfg.tools?.compaction,
     },

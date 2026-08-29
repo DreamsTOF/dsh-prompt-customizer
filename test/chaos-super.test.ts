@@ -7,7 +7,7 @@
  *                         S-14 导出→JSON 往返→导入→应用（与直接应用逐字段对比）
  *                         S-15 删除当前激活的预设
  *                         S-16 极端拖拽（拖到首位 / 末位）
- *                         S-17 白名单全勾选 → 全取消 → 回黑名单循环
+ *                         S-17 黑名单可逆极值（全隐藏 → 精确恢复原集合）
  *                         S-18 同名注入段反复覆盖
  *                         S-19 连续切换 3~5 个预设的链
  *                         S-20 稀疏/残缺预设攻击（缺 tools、幽灵锚、sections 含幽灵名）
@@ -38,7 +38,6 @@ import {
   presetExportFilename,
   removePreset,
   removeSection,
-  setToolMode,
   toggleTool,
   type Section,
 } from '../src/client/presets.ts'
@@ -99,7 +98,7 @@ function makeWorld(rnd: Rnd): World {
 }
 
 function freshCfg(): Config {
-  return { sections: [], replace: {}, inject: [], tools: { exclude: [], include: [] }, presets: [] }
+  return { sections: [], replace: {}, inject: [], tools: { exclude: [] }, presets: [] }
 }
 
 // ── UI 同构操作（复用导出的纯函数）───────────────────────────────────────────
@@ -227,13 +226,14 @@ function checkInvariants(w: World, cfg: Config, tag: string): void {
   for (const p of presets) for (const o of p.data.order ?? []) known.add(o.name)
   for (const b of sections) assert.ok(known.has(b), `${tag}: 被屏蔽的 ${b} 指向真实段`)
 
-  const inc = cfg.tools?.include ?? []
   const exc = cfg.tools?.exclude ?? []
-  assert.ok(inc.every((t) => w.tools.includes(t)), `${tag}: include ⊆ 工具全集`)
   assert.ok(exc.every((t) => w.tools.includes(t)), `${tag}: exclude ⊆ 工具全集`)
-  assert.equal(new Set(inc).size, inc.length, `${tag}: include 无重复`)
   assert.equal(new Set(exc).size, exc.length, `${tag}: exclude 无重复`)
-  for (const t of inc) assert.ok(!exc.includes(t), `${tag}: include/exclude 不相交 (${t})`)
+  for (const phase of ['bootstrap', 'compaction'] as const) {
+    const list = cfg.tools?.[phase]?.exclude ?? []
+    assert.ok(list.every((t) => w.tools.includes(t)), `${tag}: ${phase}.exclude ⊆ 工具全集`)
+    assert.equal(new Set(list).size, list.length, `${tag}: ${phase}.exclude 无重复`)
+  }
 
   // S2 跨端契约：客户端 cfg 必须通过宿主 schema 并关键结构无损。
   let normalized: ReturnType<typeof HostSchema>
@@ -338,7 +338,7 @@ test('io: encode→decode→import 走真实文件格式无损往返', () => {
       sections: ['s0'],
       replace: { s0: 'R' },
       order: [{ name: 's0', after: undefined, text: '', custom: true }],
-      tools: { exclude: ['t1'], include: [] },
+      tools: { exclude: ['t1'] },
     },
   }
   const text = encodePresetExport(preset)
@@ -557,7 +557,7 @@ function runSuperChaos(seed: number, steps: number): void {
     assert.deepEqual(reExported, exported, `${tag}: 再次序列化结果一致`)
   }
 
-  /** 预设 data 完整性：sections ⊆ order 名、tools 子集合法。 */
+  /** 预设 data 完整性：sections ⊆ order 名、tools 与各阶段目录的 exclude 合法。 */
   const checkPresetData = (preset: Preset, tag: string): void => {
     const orderNames = new Set((preset.data.order ?? []).map((o) => o.name))
     for (const n of preset.data.sections ?? []) {
@@ -565,18 +565,17 @@ function runSuperChaos(seed: number, steps: number): void {
     }
     for (const t of preset.data.tools?.exclude ?? [])
       assert.ok(w.tools.includes(t), `${tag}: 预设 exclude ${t} ∈ 工具全集`)
-    for (const t of preset.data.tools?.include ?? [])
-      assert.ok(w.tools.includes(t), `${tag}: 预设 include ${t} ∈ 工具全集`)
+    for (const phase of ['bootstrap', 'compaction'] as const) {
+      for (const t of preset.data.tools?.[phase]?.exclude ?? [])
+        assert.ok(w.tools.includes(t), `${tag}: 预设 ${phase}.exclude ${t} ∈ 工具全集`)
+    }
   }
 
-  /** 工具模式一致性：include 非空 → 白名单模式，exclude 命中 → 隐藏。 */
-  const checkToolModeConsistency = (c: Config, tag: string): void => {
-    const inc = c.tools?.include ?? []
+  /** 可见性一致性：工具隐藏 ⟺ 黑名单命中它（没有第二套模式）。 */
+  const checkToolVisibilityConsistency = (c: Config, tag: string): void => {
     const exc = c.tools?.exclude ?? []
     for (const t of w.tools) {
-      const hidden = isToolHidden(t, c.tools)
-      if (inc.length > 0) assert.equal(hidden, !inc.includes(t), `${tag}: 白名单模式 ${t} 可见性`)
-      else assert.equal(hidden, exc.includes(t), `${tag}: 黑名单模式 ${t} 可见性`)
+      assert.equal(isToolHidden(t, c.tools), exc.includes(t), `${tag}: ${t} 可见性只由 exclude 决定`)
     }
   }
 
@@ -629,10 +628,18 @@ function runSuperChaos(seed: number, steps: number): void {
         const t = rnd.pick(w.tools)
         cfg = { ...cfg, tools: toggleTool(t, isToolHidden(t, cfg.tools), cfg.tools) }
       } else if (roll < 17) {
-        // S-17 白名单全勾选 → 全取消 → 回黑名单
-        let tools = setToolMode(true, cfg.tools, w.tools)
-        for (const t of w.tools) tools = toggleTool(t, isToolHidden(t, tools), tools)
-        cfg = { ...cfg, tools: setToolMode(false, tools, w.tools) }
+        // S-17 黑名单可逆极值：全部隐藏 → 再恢复原本可见的那批 → 必须回到原集合
+        const before = [...(cfg.tools?.exclude ?? [])]
+        let tools: { exclude: string[] } = { exclude: before.slice() }
+        // toggleTool 是「翻转」语义：只对该项目执行一次翻转才是单向操作。
+        for (const t of w.tools) if (!isToolHidden(t, tools)) tools = toggleTool(t, false, tools)
+        assert.deepEqual([...(tools.exclude ?? [])].sort(), [...new Set([...before, ...w.tools])].sort(), `${tag} S-17 全隐藏后应无任何可见工具`)
+        cfg = { ...cfg, tools }
+        checkToolVisibilityConsistency(cfg, `${tag} S-17 全隐藏后`)
+        for (const t of w.tools) if (!before.includes(t)) tools = toggleTool(t, true, tools)
+        cfg = { ...cfg, tools }
+        assert.deepEqual([...(cfg.tools?.exclude ?? [])].sort(), before.sort(), `${tag}: S-17 恢复后 exclude 必须与操作前逐字相同`)
+        checkToolVisibilityConsistency(cfg, `${tag} S-17 恢复后`)
       } else if (roll < 19) {
         // S-18 同名注入覆盖 + S-20 稀疏/残缺预设（合并提高覆盖率）
         if (rnd.bool(0.4)) {
@@ -681,7 +688,7 @@ function runSuperChaos(seed: number, steps: number): void {
         assert.deepEqual(applied.sections, snapshotted.sections, `${tag}: 不动点 sections`)
         assert.deepEqual(applied.replace, snapshotted.replace, `${tag}: 不动点 replace`)
         assert.deepEqual(applied.tools, snapshotted.tools, `${tag}: 不动点 tools`)
-        checkToolModeConsistency(snapshotted, `${tag} 保存`)
+        checkToolVisibilityConsistency(snapshotted, `${tag} 保存`)
         cfg = snapshotted
       } else if (roll < 22) {
         // S-13 快照链：应用后立刻另存
@@ -704,21 +711,26 @@ function runSuperChaos(seed: number, steps: number): void {
           roundTripCheck(rnd.pick(cfg.presets!), tag)
         }
       } else if (roll < 25) {
-        // 工具模式切换一致性：交替白/黑名单，验证模式语义不泄漏
+        // 阶段目录抖动：引导期 / 压缩期各写一份随机黑名单，必须各自独立、
+        // 互不污染，也不改动静态过滤。
         if ((cfg.presets ?? []).length > 0) {
-          let tools = setToolMode(true, cfg.tools, w.tools)
-          cfg = { ...cfg, tools }
-          checkToolModeConsistency(cfg, `${tag} 切白`)
-          // 随机切换几个工具再回黑名单
-          for (let k = 0; k < 3 && k < w.tools.length; k++) {
-            const t = rnd.pick(w.tools)
-            tools = toggleTool(t, isToolHidden(t, cfg.tools), cfg.tools)
-            cfg = { ...cfg, tools }
+          const pick = () => w.tools.filter(() => rnd.bool(0.5))
+          const bootstrap = pick()
+          const compaction = pick()
+          const staticExclude = [...(cfg.tools?.exclude ?? [])]
+          cfg = {
+            ...cfg,
+            tools: {
+              exclude: staticExclude,
+              bootstrap: { exclude: bootstrap },
+              compaction: { exclude: compaction },
+            },
           }
-          tools = setToolMode(false, cfg.tools, w.tools)
-          cfg = { ...cfg, tools }
-          checkToolModeConsistency(cfg, `${tag} 切黑`)
-          checkPresetData(rnd.pick(cfg.presets!), `${tag} 工具切后预设`)
+          assert.deepEqual(cfg.tools?.bootstrap?.exclude, bootstrap, `${tag}: 引导期目录被污染`)
+          assert.deepEqual(cfg.tools?.compaction?.exclude, compaction, `${tag}: 压缩期目录被污染`)
+          assert.deepEqual(cfg.tools?.exclude, staticExclude, `${tag}: 阶段目录写动到了静态过滤`)
+          checkToolVisibilityConsistency(cfg, `${tag} 阶段目录后`)
+          checkPresetData(rnd.pick(cfg.presets!), `${tag} 阶段目录后预设`)
         }
       } else if (roll < 26) {
         // 完整导入导出往返 + 重复导入去重 + 序列化字段守恒
@@ -733,7 +745,7 @@ function runSuperChaos(seed: number, steps: number): void {
           cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], serialized, () => nid()) }
           assert.equal((cfg.presets ?? []).length, before, `${tag}: 重复导入去重`)
           // 导入数组：多条一次性导入，只新增不重复
-          const newEntry = { name: `NEW-${step}`, data: { sections: w.sys.slice(0, 2), replace: {}, order: w.sys.slice(0, 2).map((n, i) => ({ name: n, text: '', custom: false })), tools: w.tools.length > 0 ? { exclude: [w.tools[0]!], include: [] } : { exclude: [], include: [] } } }
+          const newEntry = { name: `NEW-${step}`, data: { sections: w.sys.slice(0, 2), replace: {}, order: w.sys.slice(0, 2).map((n, i) => ({ name: n, text: '', custom: false })), tools: w.tools.length > 0 ? { exclude: [w.tools[0]!] } : { exclude: [] } } }
           const arr = [decodePresetExport(encodePresetExport(preset)), newEntry]
           const before2 = (cfg.presets ?? []).length
           cfg = { ...cfg, presets: addImportedPresets(cfg.presets ?? [], arr, () => nid()) }
@@ -752,14 +764,14 @@ function runSuperChaos(seed: number, steps: number): void {
             sections: w.sys.slice(0, 3),
             replace: complexReplace,
             order: w.sys.slice(0, 3).map((n, i) => ({ name: n, text: '', custom: false })),
-            tools: { exclude: w.tools.slice(0, 2), include: [] },
+            tools: { exclude: w.tools.slice(0, 2) },
           },
         }
         cfg = { ...cfg, presets: [...(cfg.presets ?? []), complexPreset] }
         const before = cfg
         cfg = uiApplyW(w, cfg, complexPreset)
         checkAfterApply(w, before, complexPreset, cfg, `${tag} 复杂应用`)
-        checkToolModeConsistency(cfg, `${tag} 复杂后工具`)
+        checkToolVisibilityConsistency(cfg, `${tag} 复杂后工具`)
         // 替换文本在 merge 视图中可见
         const mergedAfter = mergedOf(w, cfg)
         for (const n of w.sys.slice(0, 3)) {
@@ -808,7 +820,7 @@ function runSuperChaos(seed: number, steps: number): void {
           cfg = uiDragTo(w, cfg, rnd.pick(ns), rnd.bool() ? 0 : ns.length - 1)
           checkSectionOrdering(cfg, `${tag} 拖拽后`)
         }
-        checkToolModeConsistency(cfg, `${tag} 重排后工具`)
+        checkToolVisibilityConsistency(cfg, `${tag} 重排后工具`)
       } else {
         // S-21 手动段全部删除后立即重建一个
         for (const x of (cfg.inject ?? []).filter((x) => x.custom)) cfg = uiRemoveCustom(cfg, x.name!)

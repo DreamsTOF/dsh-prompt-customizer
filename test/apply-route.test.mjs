@@ -51,7 +51,7 @@ test('global patch writes top-level fields', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], {
-    patch: { sections: ['a'], tools: { exclude: ['t'], include: [] } },
+    patch: { sections: ['a'], tools: { exclude: ['t'] } },
   })
   assert.equal(res.status, 200)
   assert.equal(res.body.ok, true)

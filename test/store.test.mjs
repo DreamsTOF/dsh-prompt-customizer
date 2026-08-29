@@ -22,7 +22,7 @@ test('write then read round-trips through config.yaml with schema defaults', () 
   store.setField('sections', ['a', 'b'])
   assert.deepEqual(store.readResolved().sections, ['a', 'b'])
   // 缺省字段补默认值
-  assert.deepEqual(store.readResolved().tools, { exclude: [], include: [], bootstrap: { exclude: [], include: [] }, compaction: { exclude: [], include: [] } })
+  assert.deepEqual(store.readResolved().tools, { exclude: [], add: [], bootstrap: { exclude: [], add: [] }, compaction: { exclude: [], add: [] } })
   // 磁盘文件确实是合法 yaml 且只含写入的字段
   const onDisk = parse(fs.readFileSync(file, 'utf8'))
   assert.deepEqual(onDisk, { sections: ['a', 'b'] })

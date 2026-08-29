@@ -12,8 +12,8 @@
 import { createElement as h, useEffect, useRef, useState, type ReactElement } from 'react'
 import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
-import type { AgentPresetInfo, Config, CycleEntry, Inventory, PhaseViewKey, Preview } from './types.ts'
-import { buildPresetData, deriveCycle, editView, genId, mergeSections } from './presets.ts'
+import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
+import { editView, type ConfigPatch } from './presets.ts'
 import { SectionsTab } from './SectionsTab.tsx'
 import { ToolsTab } from './ToolsTab.tsx'
 import { PresetsTab } from './PresetsTab.tsx'
@@ -32,7 +32,7 @@ const PREVIEW_URL = '/api/prompt-customizer/preview'
 /** 三阶段预览装配（模型视角）：提示词/工具/预览 Tab 的统一数据源。 */
 type PhaseViews = Record<PhaseViewKey, Preview | null>
 
-/** 三套名义装配的共享布局：顺序固定，供 deriveCycle 去重。 */
+/** 三套名义装配的共享布局：顺序固定，refresh 按此并行拉取。 */
 const VIEW_KEYS: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
 
 export const name = 'prompt-customizer'
@@ -105,9 +105,6 @@ function Panel({ t }: { t: Translate }): ReactElement {
   const [inv, setInv] = useState<Inventory | null>(null)
   // 三阶段预览装配：模型视角的唯一数据源（加载中为 null）。
   const [phases, setPhases] = useState<PhaseViews | null>(null)
-  // 该预设真实拥有的阶段（agent 周期）：由三套名义装配按 (段, 工具) 签名
-  // 去重得出，驱动工具/预览 Tab 的显示 —— 只渲染真正不同的阶段。
-  const [cycle, setCycle] = useState<CycleEntry[] | null>(null)
   const [agentPresets, setAgentPresets] = useState<AgentPresetInfo[]>([])
   const [tab, setTab] = useState<'sections' | 'tools' | 'presets' | 'preview'>('sections')
   const [error, setError] = useState<string | null>(null)
@@ -142,8 +139,8 @@ function Panel({ t }: { t: Translate }): ReactElement {
     // 三阶段预览并行拉取：提示词 / 工具 / 预览三个 Tab 全部以这套装配结果
     // 为唯一数据源 —— 静态清单只是注册表视角（不含伪 agent 阶段裁剪、
     // pre-step 注入等运行时规则），与它保持一致才是"所见即模型所见"。
-    // 同时按 (段, 工具) 签名推导该预设真实拥有的阶段（agent 周期），
-    // 工具/预览 Tab 据此只显示真正不同的阶段，而非固定三态。
+    // 三个阶段部分恒定显示（预设没有某个阶段时该部分只是空的），
+    // 不再按 (段, 工具) 签名去重折叠。
     const params = (phase: string): string =>
       `${qs}${qs ? '&' : '?'}phase=${phase}&t=${Date.now()}`
     const grab = (phase: string): Promise<Preview | null> =>
@@ -155,9 +152,7 @@ function Panel({ t }: { t: Translate }): ReactElement {
     // 清单请求不带 scope，三阶段预览仍带 scope（作为该预设的真实装配）。
     Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL).then((r) => r.json())])
       .then(([boot, comp, act, inventoryData]) => {
-        const views: PhaseViews = { bootstrap: boot, compaction: comp, active: act }
-        setPhases(views)
-        setCycle(deriveCycle(views))
+        setPhases({ bootstrap: boot, compaction: comp, active: act })
         setInv(inventoryData as Inventory)
         setError(null)
         setRefreshId((n) => n + 1)
@@ -165,7 +160,9 @@ function Panel({ t }: { t: Translate }): ReactElement {
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
   // 挂载时与切换编辑目标后：清单与三阶段预览切到对应 scope。
-  useEffect(refresh, [target])
+  // version 入依赖：保存/写配置成功后 +1，驱动三阶段预览重新拉取
+  // （PreviewTab 的数据源是 phases，不重拉就会一直显示保存前的装配）。
+  useEffect(refresh, [target, version])
 
   // 枚举已安装的 agent 预设（roster 实时读取），给目标选择器与预览选择器供货。
   // 抽成函数：保存预设成功后也要立即刷新目标下拉。
@@ -262,9 +259,10 @@ function Panel({ t }: { t: Translate }): ReactElement {
       .finally(() => setSaving(false))
   }
 
-  // 预设 Tab 的「应用」：显式意图直接落盘（不经草稿），四字段补丁一次写入
-  // 当前编辑目标。调用点已在离开编辑域时清空草稿，不会有并发草稿写盘。
-  const writePatch = (patch: { sections?: unknown; replace?: unknown; inject?: unknown; tools?: unknown }): void => {
+  // 预设 Tab 的「应用」：显式意图直接落盘（不经草稿），完整补丁一次写入
+  // 当前编辑目标（含每阶段独立名单与阶段工具目录）。调用点已在离开编辑域时
+  // 清空草稿，不会有并发草稿写盘。
+  const writePatch = (patch: ConfigPatch): void => {
     fetch(CONFIG_APPLY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -281,6 +279,9 @@ function Panel({ t }: { t: Translate }): ReactElement {
   }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
+  // 提示词 Tab 解除继承自全局的屏蔽时使用的全局通道（与 writeGlobal 同源，
+  // 收窄了字段类型以匹配 SectionsTab 的 prop 签名）。
+  const writeGlobalField = writeField as (field: 'sections', value: unknown) => void
 
   // 切换 Tab：提示词 ↔ 工具是同一编辑域，草稿保留；切到预设/预览即离开
   // 编辑域，脏草稿经确认后丢弃。
@@ -300,19 +301,20 @@ function Panel({ t }: { t: Translate }): ReactElement {
     setTarget(next)
   }
 
-  // 快捷「存为预设」：把当前编辑内容（含未保存草稿）保存为一个新的 agent
-  // 预设 —— 服务端在 `~/.dsh/.agent-presets/<name>/` 创建文件夹与预设文件，
-  // 同时把当前配置写进 overrides[name]。同名报错由服务端 409 返回。
-  const saveAsPreset = (): void => {
-    const presetName = window.prompt(t('saveAsPresetAsk'), '')
-    if (presetName === null) return // 用户取消
+  // 「存为预设」：把当前编辑内容（含未保存草稿）fork 成一个新的 agent 预设 ——
+  // 宿主 authoring API 整体复制来源预设目录（组成文件 / 伴生 .mjs / 技能目录），
+  // 同时把当前配置写进 overrides[name]。来源 = 当前编辑目标；全局目标由服务端
+  // 回落到 roster 默认预设。名字非法 / 同名由服务端报错。
+  // 返回是否成功，让配置 Tab 用面板内消息条提示（不再用 window.prompt / 顶部按钮）。
+  const saveAsPreset = (presetName: string): Promise<boolean> => {
     const name = presetName.trim()
-    if (name.length === 0) return
-    fetch(PRESETS_CREATE_URL, {
+    if (name.length === 0) return Promise.resolve(false)
+    return fetch(PRESETS_CREATE_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name,
+        from: target,
         config: {
           sections: view.sections ?? [],
           sectionsBootstrap: view.sectionsBootstrap ?? [],
@@ -329,8 +331,12 @@ function Panel({ t }: { t: Translate }): ReactElement {
         load()
         fetchPresets()
         showFlash(t('saveAsPresetOk'), 'ok')
+        return true
       })
-      .catch((e: unknown) => showFlash(`${t('saveAsPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err'))
+      .catch((e: unknown) => {
+        showFlash(`${t('saveAsPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err')
+        return false
+      })
   }
 
   return h('div', { style: s.root }, [
@@ -345,8 +351,8 @@ function Panel({ t }: { t: Translate }): ReactElement {
         onChange: (e: { target: { value: string } }) => switchTarget(e.target.value || undefined),
         title: t('targetHint'),
       }, [
-        h('option', { value: '' }, t('targetGlobal')),
-        ...agentPresets.map((p) => h('option', { key: p.id, value: p.id },
+        h('option', { value: '', style: s.option }, t('targetGlobal')),
+        ...agentPresets.map((p) => h('option', { key: p.id, value: p.id, style: s.option },
           `${p.name}${p.broken ? ` (${t('broken')})` : ''}`)),
       ]),
       h('button', {
@@ -354,7 +360,6 @@ function Panel({ t }: { t: Translate }): ReactElement {
         disabled: !draft?.dirty || saving,
         onClick: save,
       }, t('save')),
-      h('button', { style: s.saveBtn, onClick: saveAsPreset, title: t('saveAsPreset') }, t('saveAsPreset')),
       h('button', { style: s.refresh, onClick: refresh }, t('refresh')),
     ]),
     error ? h('div', { style: s.error }, String(error)) : null,
@@ -366,11 +371,30 @@ function Panel({ t }: { t: Translate }): ReactElement {
       ? h('div', { style: s.noticeWarn }, t('scopeFallback'))
       : null,
     tab === 'sections'
-      ? h(SectionsTab, { cfg: view, inv, phases, cycle, t, write: edit })
+      ? h(SectionsTab, {
+          cfg: view,
+          inv,
+          phases,
+          target,
+          globalSections: cfg.sections,
+          ownedSections: target ? cfg.overrides?.[target]?.sections : undefined,
+          t,
+          write: edit,
+          writeGlobalField,
+        })
       : tab === 'tools'
-        ? h(ToolsTab, { cfg: view, inv, phases, cycle, t, write: edit })
+        ? h(ToolsTab, { cfg: view, inv, phases, t, write: edit })
         : tab === 'presets'
-          ? h(PresetsTab, { cfg: view, inv, t, writePatch, writeGlobal })
-          : h(PreviewTab, { t, active: tab === 'preview', refreshId, target, version, phases, cycle }),
+          ? h(PresetsTab, {
+              cfg: view,
+              inv,
+              phases,
+              t,
+              writePatch,
+              writeGlobal,
+              saveAsPreset,
+              forkSource: target ? (agentPresets.find((p) => p.id === target)?.name ?? target) : undefined,
+            })
+          : h(PreviewTab, { t, active: tab === 'preview', refreshId, target, version, phases }),
   ])
 }

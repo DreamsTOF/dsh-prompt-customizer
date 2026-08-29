@@ -1,17 +1,20 @@
-/** 工具 Tab：四个部分 —— 引导期 / 常驻期 / 压缩受控期（预设真实拥有的
- *  阶段，按 (提示词, 工具) 签名去重、按 引导→常驻→压缩受控 顺序展示）+
- *  本系统全部工具（只读池）。
- *  - 上三段每行 = 该阶段的模型可见目录（预过滤视图，隐藏后仍在列表可反选），
- *    勾选 = 该阶段可见 / 隐藏（写该阶段的 exclude）。
- *  - 全部工具 = 注册表原始目录（只读，无可见性修改），作为补充池。
- *  - 拖动：全部 → 上三段 = 加入该阶段 include（复制语义，出现勾选框）；
- *    上三段之间 = 复制（源保留）；上三段 → 全部 = 从该阶段移除。
- *  - 阶段部分只在真正的 agent 周期里存在时渲染（standard 等单形态预设
- *    只显示一个「常驻」部分 —— 折叠组写静态过滤）。 */
+/** 工具 Tab：四个部分 —— 引导期 / 常驻期 / 压缩受控期（三个阶段恒定显示，
+ *  预设没有某个阶段时该部分只是空的）+ 本系统全部工具（只读池）。
+ *  - 上三段每行 = 该阶段进入过滤的目录 ∪ 用户加回的工具（预过滤视图，隐藏后
+ *    仍在列表可反选），勾选 = 该阶段可见 / 隐藏。三份名单互不继承。
+ *  - 「加回」：被该阶段默认裁掉、但仍在当前预设注册表里的工具，可以拖进来重新
+ *    出现（写该阶段的 add 名单，装配时从注册表查回 schema 追加）。注册表里根本
+ *    没有的（别的预设独有）加不进来，界面明确说明。
+ *  - 全部工具 = 跨预设累积的注册表并集（只读池），每行标出该工具在三个阶段的
+ *    状态；它按定义比任何单一预设都大，所以里面的工具完全可能不在当前预设注册表。
+ *  - 拖动：全部 → 某阶段 = 让该工具在这一阶段出现；阶段 → 阶段 = 搬移（源阶段
+ *    隐藏 + 目标阶段显示）；上三段 → 全部 = 在该阶段隐藏它。
+ *  - 只有黑名单，没有白名单：每个动作只作用于被拖 / 被点的那一个工具，绝不
+ *    因为「拖进了一个工具」而把该阶段其它工具一起关掉。 */
 import { createElement as h, useState, type CSSProperties, type ReactElement, type DragEvent } from 'react'
-import type { Config, CycleEntry, Inventory, PhaseViewKey, Preview } from './types.ts'
+import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
-import { phaseConfigKey, cycleInDisplayOrder } from './presets.ts'
+import { PART_ORDER, isToolHidden, withPhaseAdd, withPhaseExclude } from './presets.ts'
 import { s } from './styles.ts'
 
 /** Panel 并行拉取的三阶段装配（与 PreviewTab 同一形状）。 */
@@ -20,102 +23,141 @@ type PhaseViews = Record<PhaseViewKey, Preview | null>
 /** 拖拽来源：全部池，或某个阶段部分。 */
 type DragSource = { kind: 'all' } | { kind: 'part'; key: PhaseViewKey }
 
-/** 某阶段过滤配置（{exclude, include}）：独立阶段写自身目录；折叠组/常驻期写静态。 */
-interface FilterCfg { exclude: string[]; include: string[] }
+/** 一次拖放的反馈（ok = 已写入，warn = 什么都没改并说明原因）。 */
+type Notice = { kind: 'ok' | 'warn'; text: string }
 
-export function ToolsTab({ cfg, inv, phases, cycle, t, write }: {
+export function ToolsTab({ cfg, inv, phases, t, write }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
-  /** 该预设真实拥有的阶段（agent 周期）：决定上三段是否渲染及其顺序。 */
-  cycle: CycleEntry[] | null
   t: Translate
   write: (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown) => void
 }): ReactElement {
   const [dragFrom, setDragFrom] = useState<DragSource | null>(null)
   const [draggedName, setDraggedName] = useState<string | null>(null)
   const [dropHint, setDropHint] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
 
-  // 阶段部分：周期去重后的条目按 引导→常驻→压缩受控 展示；周期未就绪
-  //（加载中）时回退三态名义部分，就绪后收敛为真实阶段。
-  const parts: CycleEntry[] = cycle !== null
-    ? cycleInDisplayOrder(cycle)
-    : phases === null
-      ? []
-      : ([['bootstrap'], ['active'], ['compaction']] as PhaseViewKey[][]).map(([key]) => ({ key, merged: [key] }))
-
-  // 某阶段部分的过滤配置与写回目标。
-  const filterOf = (entry: CycleEntry): FilterCfg => {
-    const target = phaseConfigKey(entry)
+  // 某阶段自己的黑名单 / 加回名单（三份互不继承）。
+  const excludeOf = (key: PhaseViewKey): string[] => {
     const tools = cfg.tools ?? {}
-    if (target === 'bootstrap') return { exclude: tools.bootstrap?.exclude ?? [], include: tools.bootstrap?.include ?? [] }
-    if (target === 'compaction') return { exclude: tools.compaction?.exclude ?? [], include: tools.compaction?.include ?? [] }
-    return { exclude: tools.exclude ?? [], include: tools.include ?? [] }
+    const list = key === 'bootstrap' ? tools.bootstrap?.exclude : key === 'compaction' ? tools.compaction?.exclude : tools.exclude
+    return list ?? []
   }
-  const setFilter = (entry: CycleEntry, next: FilterCfg): void => {
-    const target = phaseConfigKey(entry)
+  const addOf = (key: PhaseViewKey): string[] => {
     const tools = cfg.tools ?? {}
-    if (target === 'bootstrap') {
-      write('tools', { ...tools, bootstrap: { ...(tools.bootstrap ?? {}), exclude: next.exclude, include: next.include } })
-    } else if (target === 'compaction') {
-      write('tools', { ...tools, compaction: { ...(tools.compaction ?? {}), exclude: next.exclude, include: next.include } })
-    } else {
-      write('tools', { ...tools, exclude: next.exclude, include: next.include })
-    }
+    const list = key === 'bootstrap' ? tools.bootstrap?.add : key === 'compaction' ? tools.compaction?.add : tools.add
+    return list ?? []
+  }
+  // 一次写入同时落该阶段的 exclude 与 add（在同一份 tools 上叠完再写一次，
+  // 分两次写会各自基于旧 cfg 计算而互相覆盖）。
+  const writeLists = (key: PhaseViewKey, exclude: string[], add: string[]): void => {
+    write('tools', withPhaseAdd(withPhaseExclude(cfg.tools ?? {}, key, exclude), key, add))
   }
 
-  // 阶段部分的可见行：该阶段模型可见目录（预过滤，含被隐藏项可反选）+ 拖入的 include 条目。
-  const rowsOf = (entry: CycleEntry): Array<{ name: string; description: string; hidden: boolean }> => {
-    const filter = filterOf(entry)
-    const base = (phases?.[entry.key]?.baseTools ?? []).map((tool) => ({
+  // 该阶段的装配目录（进入本插件过滤的工具原文）与该预设注册表（能加回的来源）。
+  const catalogOf = (key: PhaseViewKey): string[] => (phases?.[key]?.baseTools ?? []).map((tool) => tool.name)
+  const isInCatalog = (key: PhaseViewKey, name: string): boolean => catalogOf(key).includes(name)
+  // 注册表三个阶段共享同一 scope，取第一个非空的即可。
+  const registry: Set<string> = (() => {
+    const list = PART_ORDER.map((key) => phases?.[key]?.registryTools).find((x) => Array.isArray(x) && x.length > 0) ?? []
+    return new Set(list)
+  })()
+  const isInRegistry = (name: string): boolean => registry.has(name)
+
+  // 该工具在某阶段是否「在场」（在目录里且没被隐藏，或已加回）。
+  const presentIn = (key: PhaseViewKey, name: string): boolean =>
+    addOf(key).includes(name) || (isInCatalog(key, name) && !excludeOf(key).includes(name))
+
+  // 把一个工具放进某阶段（复制语义，绝不改动其它阶段）：不在该阶段目录里就加进
+  // add 名单；`hidden` 决定它在目标阶段是可见还是隐藏（拖拽时继承源阶段的状态）。
+  const addToPhase = (key: PhaseViewKey, name: string, hidden: boolean): void => {
+    let exclude = excludeOf(key)
+    let add = addOf(key)
+    if (!isInCatalog(key, name) && !add.includes(name)) add = [...add, name]
+    exclude = hidden
+      ? (exclude.includes(name) ? exclude : [...exclude, name])
+      : exclude.filter((x) => x !== name)
+    writeLists(key, exclude, add)
+  }
+
+  // 阶段部分里的行 = 该阶段进入过滤的目录 ∪ 已加回（但尚未出现在装配里）的工具。
+  const rowsOf = (key: PhaseViewKey): Array<{ name: string; description: string; hidden: boolean; added: boolean }> => {
+    const filter = { exclude: excludeOf(key) }
+    const catalog = (phases?.[key]?.baseTools ?? []).map((tool) => ({
       name: tool.name,
       description: tool.description ?? '',
-      hidden: filter.exclude.includes(tool.name),
+      hidden: isToolHidden(tool.name, filter),
+      added: false,
     }))
-    const byName = new Map(base.map((row) => [row.name, row]))
-    for (const name of filter.include ?? []) {
-      if (!byName.has(name)) byName.set(name, { name, description: '', hidden: filter.exclude.includes(name) })
+    const names = new Set(catalog.map((row) => row.name))
+    const added = addOf(key)
+      .filter((name) => !names.has(name))
+      .map((name) => ({ name, description: '', hidden: false, added: true }))
+    return [...catalog, ...added]
+  }
+
+  // 勾选 / 取消勾选：只动这一个工具在本阶段的可见性。
+  const toggleHide = (key: PhaseViewKey, name: string, currentlyHidden: boolean): void => {
+    if (currentlyHidden) {
+      addToPhase(key, name, false)
+    } else {
+      let exclude = excludeOf(key)
+      let add = addOf(key)
+      if (add.includes(name)) add = add.filter((x) => x !== name)
+      else if (!exclude.includes(name)) exclude = [...exclude, name]
+      writeLists(key, exclude, add)
     }
-    return [...byName.values()]
+    setNotice(null)
   }
 
-  const toggleHide = (entry: CycleEntry, name: string, currentlyHidden: boolean): void => {
-    const filter = filterOf(entry)
-    const exclude = filter.exclude.slice()
-    if (currentlyHidden) { const i = exclude.indexOf(name); if (i >= 0) exclude.splice(i, 1) }
-    else if (!exclude.includes(name)) exclude.push(name)
-    setFilter(entry, { ...filter, exclude })
-  }
+  const phaseNoun = (key: PhaseViewKey): string =>
+    key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
 
-  // 加入一个部分（复制语义）：不进 exclude、进 include —— 拖入即可见并显示勾选框。
-  const addToPart = (entry: CycleEntry, name: string): void => {
-    const filter = filterOf(entry)
-    setFilter(entry, {
-      include: filter.include.includes(name) ? filter.include : [...filter.include, name],
-      exclude: filter.exclude.filter((x) => x !== name),
+  // 拖到阶段部分 = 复制：目标阶段多一份，源阶段原样不动；隐藏状态跟着走
+  //（源阶段是禁用的，复制过去也是禁用，启用同理）。
+  const dropOnPart = (dest: PhaseViewKey, name: string, from: DragSource): void => {
+    if (!isInCatalog(dest, name) && !isInRegistry(name)) {
+      setNotice({ kind: 'warn', text: t('toolNotInRegistry', { name }) })
+      return
+    }
+    const copied = from.kind === 'part' && from.key !== dest
+    const hidden = copied ? excludeOf(from.key).includes(name) : false
+    addToPhase(dest, name, hidden)
+    setNotice({
+      kind: 'ok',
+      text: copied
+        ? t('toolCopied', { name, from: phaseNoun(from.key), to: phaseNoun(dest) })
+        : isInCatalog(dest, name)
+          ? t('toolShown', { name, to: phaseNoun(dest) })
+          : t('toolAdded', { name, phase: phaseNoun(dest) }),
     })
   }
-  // 从部分移除（拖回全部池）：该阶段的名单与屏蔽都清掉。
-  const removeFromPart = (entry: CycleEntry, name: string): void => {
-    const filter = filterOf(entry)
-    setFilter(entry, {
-      include: filter.include.filter((x) => x !== name),
-      exclude: filter.exclude.filter((x) => x !== name),
-    })
+
+  // 拖回「全部」池 = 把它从来源那个阶段拿掉：加回的工具撤销加回，原生工具隐藏。
+  const dropOnAll = (name: string, from: DragSource): void => {
+    if (from.kind !== 'part') return
+    const key = from.key
+    let exclude = excludeOf(key)
+    let add = addOf(key)
+    if (add.includes(name)) {
+      add = add.filter((x) => x !== name)
+    } else if (!exclude.includes(name)) {
+      exclude = [...exclude, name]
+    }
+    writeLists(key, exclude, add)
+    setNotice({ kind: 'ok', text: t('toolHiddenIn', { name, to: phaseNoun(key) }) })
   }
 
-  // 某阶段模型可见数（与预览同源）：post/预过滤。
-  const visibleCount = (entry: CycleEntry): string => {
-    const preview = phases?.[entry.key]
-    if (preview === undefined || preview === null) return '?'
-    const pre = (preview.baseTools ?? []).length
-    return `${preview.tools.length} / ${pre}`
+  // 某阶段的「启用 / 总数」：本部分列出的行里有多少对模型可见。
+  // 模型视角的真实目录数看预览 Tab —— 装配本身没给出、又没加回的工具不会进模型。
+  const visibleCount = (key: PhaseViewKey): string => {
+    const rows = rowsOf(key)
+    return `${rows.filter((row) => !row.hidden).length} / ${rows.length}`
   }
 
   const partNoun = (key: PhaseViewKey): string =>
     key === 'bootstrap' ? t('toolsPartGuide') : key === 'compaction' ? t('toolsPartControlled') : t('toolsPartResident')
-  const partLabel = (entry: CycleEntry): string =>
-    entry.merged.length > 1 ? t('phaseAlways') : partNoun(entry.key)
 
   // ── 拖拽 ──────────────────────────────────────────────────────────────────
   const startDrag = (e: DragEvent, from: DragSource, name: string): void => {
@@ -136,11 +178,10 @@ export function ToolsTab({ cfg, inv, phases, cycle, t, write }: {
   const zoneDrop = (e: DragEvent, zone: string): void => {
     e.preventDefault()
     if (dragFrom && draggedName) {
-      if (zone === 'all') {
-        if (dragFrom.kind === 'part') removeFromPart(parts.find((p) => p.key === dragFrom.key)!, draggedName)
-      } else {
-        const dest = parts.find((p) => p.key === zone.replace('part:', ''))
-        if (dest) addToPart(dest, draggedName)
+      if (zone === 'all') dropOnAll(draggedName, dragFrom)
+      else {
+        const dest = zone.replace('part:', '') as PhaseViewKey
+        if (PART_ORDER.includes(dest)) dropOnPart(dest, draggedName, dragFrom)
       }
     }
     setDragFrom(null)
@@ -156,19 +197,28 @@ export function ToolsTab({ cfg, inv, phases, cycle, t, write }: {
     description: typeof tool === 'string' ? '' : (tool.description ?? ''),
   }))
 
-  const renderPhasePart = (entry: CycleEntry): ReactElement => {
-    const rows = rowsOf(entry)
-    const zoneKey = `part:${entry.key}`
+  // 池行上的三阶段状态标记（引 / 常 / 压）：绿 = 可见或已加回，灰 = 已隐藏，暗 = 不在。
+  const markStyle = (key: PhaseViewKey, name: string): CSSProperties => {
+    if (presentIn(key, name)) return { ...s.badgeOk, padding: '0 3px' }
+    if (isInCatalog(key, name)) return { ...s.badgeBlocked, padding: '0 3px' }
+    return { ...s.muted, opacity: 0.45, padding: '0 3px' }
+  }
+  const markKey = (key: PhaseViewKey): string =>
+    key === 'bootstrap' ? 'phaseShortGuide' : key === 'active' ? 'phaseShortResident' : 'phaseShortControlled'
+
+  const renderPhasePart = (key: PhaseViewKey): ReactElement => {
+    const rows = rowsOf(key)
+    const zoneKey = `part:${key}`
     return h('div', {
-      key: entry.key,
+      key: zoneKey,
       style: s.injectBox,
       onDragOver: (e: DragEvent) => zoneDragOver(e, zoneKey),
       onDrop: (e: DragEvent) => zoneDrop(e, zoneKey),
       ...(zoneStyle(zoneKey) ?? {}),
     }, [
       h('div', { style: s.rowTitle }, [
-        h('span', null, partLabel(entry)),
-        h('span', { style: s.orderTag }, `${t('phaseVisible')} ${visibleCount(entry)}`),
+        h('span', null, partNoun(key)),
+        h('span', { style: s.orderTag }, `${t('phaseVisible')} ${visibleCount(key)}`),
         rows.length === 0 ? h('span', { style: s.muted }, t('dragHint')) : null,
       ]),
       h('div', { style: s.toolWrap }, rows.map((row) => h('span', {
@@ -176,13 +226,13 @@ export function ToolsTab({ cfg, inv, phases, cycle, t, write }: {
         style: { ...s.toolChip, cursor: 'move', display: 'inline-flex', alignItems: 'center', gap: 4 },
         title: row.description.slice(0, 120),
         draggable: true,
-        onDragStart: (e: DragEvent) => startDrag(e, { kind: 'part', key: entry.key }, row.name),
+        onDragStart: (e: DragEvent) => startDrag(e, { kind: 'part', key }, row.name),
         onDragEnd: endDrag,
       }, [
         h('input', {
           type: 'checkbox',
           checked: !row.hidden,
-          onChange: () => toggleHide(entry, row.name, row.hidden),
+          onChange: () => toggleHide(key, row.name, row.hidden),
           style: { margin: 0, cursor: 'pointer' },
         }),
         h('span', { style: row.hidden ? s.badgeBlocked : s.badgeOk }, row.name),
@@ -192,7 +242,8 @@ export function ToolsTab({ cfg, inv, phases, cycle, t, write }: {
 
   return h('div', {}, [
     h('div', { style: s.muted }, t('toolsFourHint')),
-    parts.map(renderPhasePart),
+    notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.noticeWarn }, notice.text) : null,
+    PART_ORDER.map(renderPhasePart),
     // 全部工具：本系统注册表的完整目录，只读池（不可勾选，供拖入三个阶段）。
     h('div', {
       style: s.injectBox,
