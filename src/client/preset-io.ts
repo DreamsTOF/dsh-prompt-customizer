@@ -129,9 +129,10 @@ export function readPickedFile(reader: FileReaderLike, file: unknown): Promise<s
 
 // ── 纯文件格式 ──────────────────────────────────────────────────────────────
 
-/** 把单个预设编码为导出文件的 JSON 格式（单对象格式）。 */
-export function encodePresetExport(preset: Preset): string {
-  return JSON.stringify({ name: preset.name, data: preset.data }, null, 2)
+/** 把单个预设编码为导出文件的 JSON 格式（单对象格式）。`envBlocklist`
+ *  是全局环境变量黑名单的随行快照：导入端按并集并入（见 PresetsTab）。 */
+export function encodePresetExport(preset: Preset, envBlocklist?: string[]): string {
+  return JSON.stringify({ name: preset.name, data: preset.data, ...(Array.isArray(envBlocklist) ? { envBlocklist } : {}) }, null, 2)
 }
 
 /**
@@ -186,10 +187,10 @@ export type ExportResult = { ok: boolean; via: 'tauri' | 'browser'; cancelled?: 
  * 导出一个预设：宿主能提供原生对话框时走 tauri 保存（cancelled = 用户
  * 拒绝，绝不回退下载）；否则走 Web 下载。
  */
-export async function exportPresetFile(preset: Preset, io?: PresetIoEnv): Promise<ExportResult> {
+export async function exportPresetFile(preset: Preset, io?: PresetIoEnv, envBlocklist?: string[]): Promise<ExportResult> {
   const env = io ?? makeIoEnv()
   try {
-    const text = encodePresetExport(preset)
+    const text = encodePresetExport(preset, envBlocklist)
     const filename = presetExportFilename(preset.name)
     if (env.tauri) {
       const out = await env.saveText(filename, text)

@@ -18,7 +18,7 @@ interface Notice {
   text: string
 }
 
-export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveAsPreset, forkSource }: {
+export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveAsPreset, forkSource, onReset, envBlocklist }: {
   cfg: Config
   inv: Inventory | null
   /** Panel 并行拉取的三阶段装配：快照只捕获当前装配里真实存在的段。 */
@@ -32,9 +32,15 @@ export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveA
   saveAsPreset: (name: string) => Promise<boolean>
   /** fork 来源的显示名（当前编辑目标预设）；undefined = 全局目标，由服务端回落默认预设。 */
   forkSource: string | undefined
+  /** 恢复初始状态：清空全部定制并关闭 forceSections（与不装插件等效）。 */
+  onReset: () => void
+  /** 全局环境变量黑名单（永远顶层字段，不分作用域）；导出随行、导入并集。 */
+  envBlocklist: string[]
 }): ReactElement {
   const presets = cfg.presets ?? []
   const [name, setName] = useState('')
+  // 黑名单「添加」输入框的暂存值。
+  const [blockInput, setBlockInput] = useState('')
   // 「存为 agent 预设」的名字与在途标记（与服务端往返期间禁用按钮）。
   const [agentName, setAgentName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -100,7 +106,7 @@ export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveA
   // 时）回退为下载。saved/downloaded = 成功；用户取消单独提示，不算失败。
   const exportPreset = async (preset: Preset): Promise<void> => {
     try {
-      const res = await exportPresetFile(preset)
+      const res = await exportPresetFile(preset, undefined, envBlocklist)
       if (res.ok) show('ok', t('exportOk'))
       else if (res.cancelled) show('ok', t('exportCancel'))
       else show('error', `${t('exportFail')}${res.message ? ': ' + res.message : ''}`)
@@ -110,15 +116,24 @@ export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveA
   }
 
   // 解析导入文本 → 去重追加 → 提示新增数量。解析失败提示错误。
+  // 单对象格式的文件还可能随行携带全局环境变量黑名单：与当前名单并集合并
+  // （只增不减），新增条数一并报进提示。
   const importParsed = (text: string): void => {
     try {
       const parsed = decodePresetExport(text)
       const next = addImportedPresets(presets, parsed, genId)
       const added = next.length - presets.length
-      if (added <= 0) show('ok', t('importNone'))
+      const fileBlock = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        && Array.isArray((parsed as { envBlocklist?: unknown }).envBlocklist)
+        ? ((parsed as { envBlocklist?: unknown[] }).envBlocklist ?? []).filter((e): e is string => typeof e === 'string')
+        : []
+      const fresh = fileBlock.filter((e) => !envBlocklist.includes(e))
+      if (fresh.length > 0) writeGlobal('envBlocklist', [...envBlocklist, ...fresh])
+      const mergedNote = fresh.length > 0 ? t('importBlockMerge', { count: fresh.length }) : ''
+      if (added <= 0) show('ok', t('importNone') + mergedNote)
       else {
         writeGlobal('presets', next)
-        show('ok', `${t('importOk')} (+${added})`)
+        show('ok', `${t('importOk')} (+${added})${mergedNote}`)
       }
     } catch (e) {
       show('error', `${t('importFail')}: ${e instanceof Error ? e.message : String(e)}`)
@@ -160,6 +175,17 @@ export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveA
     setCreating(false)
   }
 
+  // 环境变量黑名单：全局字段，改动即写（与 forceSections 同一通道，不经草稿）。
+  const removeBlockEntry = (entry: string): void => {
+    writeGlobal('envBlocklist', envBlocklist.filter((e) => e !== entry))
+  }
+  const addBlockEntry = (): void => {
+    const entry = blockInput.trim()
+    setBlockInput('')
+    if (entry === '' || envBlocklist.includes(entry)) return
+    writeGlobal('envBlocklist', [...envBlocklist, entry])
+  }
+
   return h('div', { style: s.list }, [
     notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.error }, notice.text) : null,
     h('div', { style: s.injectBox }, [
@@ -182,6 +208,58 @@ export function PresetsTab({ cfg, inv, phases, t, writePatch, writeGlobal, saveA
       h('div', { style: s.injectRow }, [
         h('button', { style: s.mini, onClick: () => { void importPreset() } }, t('import')),
         h('input', { ref: fileRef, type: 'file', accept: '.json,application/json', style: { display: 'none' }, onChange: onImportFile }),
+      ]),
+    ]),
+    h('div', { style: s.injectBox }, [
+      h('div', { style: s.rowTitle }, t('forceTitle')),
+      h('div', { style: s.muted }, t('forceHint')),
+      h('div', { style: s.injectRow }, [
+        h('label', { style: s.switchWrap }, [
+          h('input', {
+            type: 'checkbox',
+            checked: cfg.forceSections !== false,
+            // forceSections 是全局字段，与 presets/activePreset 一样永远写顶层。
+            onChange: (e: ChangeEvent<HTMLInputElement>) => writeGlobal('forceSections', e.target.checked),
+          }),
+          h('span', { style: cfg.forceSections !== false ? s.badgeOk : s.badgeBlocked },
+            cfg.forceSections !== false ? t('forceOn') : t('forceOff')),
+        ]),
+      ]),
+    ]),
+    h('div', { style: s.injectBox }, [
+      h('div', { style: s.rowTitle }, t('envBlockTitle')),
+      h('div', { style: s.muted }, t('envBlockHint')),
+      h('div', { style: { ...s.toolWrap, marginTop: 6 } }, envBlocklist.map((entry) => h('span', {
+        key: entry,
+        style: { ...s.toolChip, display: 'inline-flex', alignItems: 'center', gap: 4 },
+      }, [
+        entry,
+        h('span', { style: { cursor: 'pointer' }, title: t('delete'), onClick: () => removeBlockEntry(entry) }, '×'),
+      ]))),
+      envBlocklist.length === 0 ? h('div', { style: s.muted }, t('envBlockEmpty')) : null,
+      h('div', { style: { ...s.injectRow, marginTop: 6 } }, [
+        h('input', {
+          style: { ...s.input, flex: 1 },
+          placeholder: t('envBlockAdd'),
+          value: blockInput,
+          onChange: (e: ChangeEvent<HTMLInputElement>) => setBlockInput(e.target.value),
+        }),
+        h('button', { style: s.mini, disabled: blockInput.trim() === '', onClick: addBlockEntry }, t('envBlockAddAction')),
+      ]),
+      h('details', { style: { marginTop: 6 } }, [
+        h('summary', { style: { ...s.muted, cursor: 'pointer' } }, `${t('envVarsTitle')} (${inv?.variables?.length ?? 0})`),
+        h('div', { style: { ...s.muted, marginTop: 4 } }, t('envVarsHint')),
+        h('div', { style: { ...s.toolWrap, marginTop: 4 } }, (inv?.variables ?? []).map((name) => h('span', { key: name, style: s.toolChip }, `{{${name}}}`))),
+      ]),
+    ]),
+    h('div', { style: s.injectBox }, [
+      h('div', { style: s.rowTitle }, t('resetTitle')),
+      h('div', { style: s.muted }, t('resetHint')),
+      h('div', { style: s.injectRow }, [
+        h('button', { style: s.mini, onClick: () => {
+          // 二次确认：清空不可撤销，必须明确点头才动手。
+          if (window.confirm(t('resetConfirm'))) onReset()
+        } }, t('resetAction')),
       ]),
     ]),
     presets.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,

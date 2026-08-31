@@ -1,7 +1,7 @@
 {
   "name": "dsh-prompt-customizer",
   "description": "System-prompt & tool customizer for DeepSeek Harness with a settings-panel UI: block / replace / inject prompt sections by name, and hide tools from the model catalog by exclude/include. Config lives in the plugin's own ~/.dsh/prompt-customizer/config.yaml (auto-migrated once from the legacy settings.yaml section).",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "private": false,
   "main": "lib/index.js",

@@ -30,6 +30,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Config as HostSchema } from '../lib/schema.js'
 import {
+  DEFAULT_ENV_BLOCKLIST,
+  envVarName,
+  isBlockedEnvKey,
+  listVariableNames,
+  registerVariables,
+} from '../lib/vars.js'
+import {
   addImportedPresets,
   applyPresetData,
   buildPresetData,
@@ -851,4 +858,81 @@ function runSuperChaos(seed: number, steps: number): void {
 
 test('super-chaos: 随机大世界 + 扩展操作池 + 跨端 schema 双向契约，全程不变量成立', () => {
   for (let seed = 1; seed <= 50; seed++) runSuperChaos(seed, 150)
+})
+
+// ── S-23 提示词变量（lib/vars.js）不变量 ─────────────────────────────────────
+// 宿主严格渲染把一切非法变量名 / undefined provider 变成整段装配失败，
+// 所以这里不进随机操作池，而是对映射 / 黑名单 / 注册做确定性 + 模糊不变量。
+const HOST_VAR_NAME = /^[a-z][a-z0-9_]*$/
+
+test('S-23: 环境变量映射、黑名单语义与注册契约的不变量', () => {
+  const rnd = new Rnd(20260831)
+
+  // V1 映射：已知用例精确；模糊键的输出要么 undefined 要么必然合法。
+  assert.equal(envVarName('PATH'), 'env_path')
+  assert.equal(envVarName('USER.NAME'), 'env_user_name')
+  assert.equal(envVarName(''), undefined)
+  assert.equal(envVarName('___'), undefined)
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-%@ /\\:'
+  for (let i = 0; i < 2000; i++) {
+    const key = Array.from({ length: 1 + rnd.int(24) }, () => chars.charAt(rnd.int(chars.length))).join('')
+    const name = envVarName(key)
+    if (name !== undefined) assert.ok(HOST_VAR_NAME.test(name), `envVarName('${key}') → '${name}' 违反宿主命名规则`)
+  }
+
+  // V2 黑名单语义：`*` 通配 / 否则精确整串匹配，一律大小写不敏感。
+  assert.ok(isBlockedEnvKey('OPENAI_API_KEY', ['*api_key*']))
+  assert.ok(isBlockedEnvKey('openai_api_key', ['*API_KEY*']))
+  assert.ok(isBlockedEnvKey('DATABASE_URL', ['DATABASE_URL']))
+  assert.ok(isBlockedEnvKey('database_url', ['DATABASE_URL']))
+  assert.ok(!isBlockedEnvKey('DATABASE_URL_X', ['DATABASE_URL']), '精确条目不得通配')
+  assert.ok(!isBlockedEnvKey('PATH', DEFAULT_ENV_BLOCKLIST))
+  assert.ok(!isBlockedEnvKey('HOME', []), '空黑名单放行一切')
+
+  // V3 预填黑名单必须拦下常见密钥 / 凭据类键。
+  for (const secret of ['OPENAI_API_KEY', 'GITHUB_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'DB_PASSWORD', 'AUTH_HEADER', 'REDIS_DSN', 'SQL_CONNECTION_STRING', 'DATABASE_URL']) {
+    assert.ok(isBlockedEnvKey(secret, DEFAULT_ENV_BLOCKLIST), `预填黑名单漏过 ${secret}`)
+  }
+
+  // V4 注册契约：假 systemPrompt 收集注册 —— 保留字缺席、名字合法、
+  // provider 恒返回字符串（严格渲染把 undefined 当错误）、值忠实于 env。
+  const registered = new Map<string, () => unknown>()
+  const disposed: string[] = []
+  const dispose = registerVariables({
+    variable: (name: string, provider: () => unknown) => {
+      registered.set(name, provider)
+      return () => { disposed.push(name) }
+    },
+  }, DEFAULT_ENV_BLOCKLIST)
+  for (const reserved of ['provider', 'model', 'cwd']) assert.ok(!registered.has(reserved), `保留字 ${reserved} 不得注册`)
+  for (const [name, provider] of registered) {
+    assert.ok(HOST_VAR_NAME.test(name), `注册名 '${name}' 违反宿主命名规则`)
+    assert.equal(typeof provider(), 'string', `provider ${name} 必须返回字符串`)
+  }
+  const seen = new Set<string>()
+  for (const [key, value] of Object.entries(process.env)) {
+    const mapped = envVarName(key)
+    if (mapped === undefined || isBlockedEnvKey(key, DEFAULT_ENV_BLOCKLIST) || seen.has(mapped)) continue
+    seen.add(mapped)
+    assert.equal(registered.get(mapped)?.(), value ?? '', `env ${key} 映射值不忠实`)
+  }
+
+  // V5 清单 ≡ 注册集合，且含全部内置事实变量、有序。
+  const listed = listVariableNames(DEFAULT_ENV_BLOCKLIST)
+  for (const builtin of ['date', 'time', 'datetime', 'weekday', 'hostname', 'platform', 'arch', 'username', 'home', 'shell', 'locale', 'node_version']) {
+    assert.ok(listed.includes(builtin), `内置变量 ${builtin} 缺失`)
+  }
+  assert.deepEqual(new Set(listed), new Set(registered.keys()), '清单与注册集合不一致')
+  assert.deepEqual(listed, [...listed].sort(), '清单必须有序')
+
+  // 注销守恒：一次 dispose 注销全部注册。
+  dispose()
+  assert.equal(disposed.length, registered.size, 'dispose 必须注销全部注册')
+
+  // V6 导出随行黑名单：传了才写、往返无损；不传不产生字段。
+  const preset: Preset = { id: 'vars-1', name: 'VARS', data: { sections: [], replace: {}, order: [], tools: { exclude: [] } } }
+  const parsed = decodePresetExport(encodePresetExport(preset, ['*TOKEN*', 'FOO'])) as { name: string; envBlocklist?: string[] }
+  assert.equal(parsed.name, 'VARS')
+  assert.deepEqual(parsed.envBlocklist, ['*TOKEN*', 'FOO'])
+  assert.ok(!('envBlocklist' in (JSON.parse(encodePresetExport(preset)) as object)), '未传黑名单不得写字段')
 })

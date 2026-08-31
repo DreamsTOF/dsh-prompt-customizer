@@ -137,9 +137,12 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
   // 逐阶段的「段级定制没进最终提示词」警示：每个部分按自己那一阶段的装配结果
   // 判定 —— 有 complete 段整段接管就说接管，否则探测本插件产出的段是否被下游
   // 丢弃（丢弃规则不止 persona complete 一种）。
+  // forceSections（默认开）已在装配入口绕开这两类压制，警示不再成立；只有
+  // 显式关闭（降级路径）或强制覆盖失效（服务端会恢复 takenOverBy）才显示。
   const partNote = (key: PhaseViewKey): ReactElement | null => {
     const view = phases?.[key]
     if (view === undefined || view === null) return null
+    if (cfg.forceSections !== false) return null
     if (view.takenOverBy !== undefined) {
       return h('div', { style: s.noticeWarn }, t('sectionsTakenOver', { name: view.takenOverBy }))
     }
@@ -463,7 +466,7 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
               h('textarea', { style: s.editInput, value: draft, onChange: (e: ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value), rows: 3 }),
               h('div', { style: s.injectRow }, [
                 h('button', { style: s.mini, onClick: () => commitReplace(key, row) }, t('save')),
-                h('button', { style: s.mini, onClick: () => setEditing(null) }, t('clearInput')),
+                h('button', { style: s.mini, onClick: () => setDraft('') }, t('clearInput')),
                 !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name))
                   ? h('button', { style: s.mini, onClick: () => restoreReplace(key, row) }, t('restore'))
                   : null,

@@ -26,6 +26,7 @@ const CONFIG_URL = '/api/prompt-customizer/config'
 const CONFIG_SET_URL = '/api/prompt-customizer/config/set'
 const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
+const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
 const PRESETS_CREATE_URL = '/api/prompt-customizer/presets'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
 
@@ -283,6 +284,25 @@ function Panel({ t }: { t: Translate }): ReactElement {
   // 收窄了字段类型以匹配 SectionsTab 的 prop 签名）。
   const writeGlobalField = writeField as (field: 'sections', value: unknown) => void
 
+  // 恢复初始状态：服务端清空全部定制并关闭 forceSections（与不装插件等效）。
+  // 二次确认由配置 Tab 的调用点负责；成功后清草稿、重拉全部视图。
+  const resetAll = (): void => {
+    fetch(CONFIG_RESET_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'reset failed')
+        setCfg(body.config as Config)
+        setDraft(null)
+        setError(null)
+        setVersion((n) => n + 1)
+        showFlash(t('resetOk'))
+      })
+      .catch((e: unknown) => setError(`${t('resetFail')}: ${e instanceof Error ? e.message : String(e)}`))
+  }
+
   // 切换 Tab：提示词 ↔ 工具是同一编辑域，草稿保留；切到预设/预览即离开
   // 编辑域，脏草稿经确认后丢弃。
   const switchTab = (next: 'sections' | 'tools' | 'presets' | 'preview'): void => {
@@ -394,6 +414,9 @@ function Panel({ t }: { t: Translate }): ReactElement {
               writeGlobal,
               saveAsPreset,
               forkSource: target ? (agentPresets.find((p) => p.id === target)?.name ?? target) : undefined,
+              onReset: resetAll,
+              // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
+              envBlocklist: cfg.envBlocklist ?? [],
             })
           : h(PreviewTab, { t, active: tab === 'preview', refreshId, target, version, phases }),
   ])

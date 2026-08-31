@@ -90,6 +90,19 @@ Two things that bite:
 
 The Preview tab shows the final system prompt and tool catalog after **all** plugins have filtered, switchable per phase. It reads the same assembly as the prompt and tools tabs, so what you see is what the model sees. The tools view reports "visible to the model / registry total" side by side — presets such as PTC or Code Mode wrap the whole catalog into a single `run_code`, so the registry alone misleads.
 
+### Prompt template variables
+
+The host registers only `provider` / `model` / `cwd` as template variables; referencing any other `{{name}}` in section text makes the whole assembly fail. This plugin adds two more families through the official extension point:
+
+- **Built-in system facts**: `date` / `time` / `datetime` / `weekday` / `hostname` / `platform` / `arch` / `username` / `home` / `shell` / `locale` / `node_version`, computed fresh at every assembly.
+- **Every environment variable**: each `process.env` key maps to `env_<lowercase, non-alphanumerics collapsed to _>`, e.g. `PATH` → `{{env_path}}`, `USER.NAME` → `{{env_user_name}}`.
+
+**Blocklist (`envBlocklist`)**: environment variables often carry secrets, and anything in the prompt is sent to the model with every request, so keys matching the blocklist are never registered. The prefilled entries cover common credential-style keys (`SECRET` / `TOKEN` / `PASSWORD` / `API_KEY` / `*_DSN` and friends); entries support `*` wildcards and are case-insensitive. The environment variable blocklist card in the panel lets you add or remove entries at any time, and its collapsible list shows the variables actually registered right now. Blocklist changes take effect at the next assembly (whether you edit the panel or `config.yaml` by hand).
+
+**Carried by export / import**: exporting a preset writes the current blocklist along with it; import merges it in by union (grow-only), consistent with the snapshot library semantics.
+
+The cost of strict rendering: referencing an unregistered name (such as a key the blocklist blocks) makes the **whole assembly fail** rather than rendering empty — only use names that appear in the panel's variable list.
+
 ### Config snapshots and agent presets
 
 - **Save current config** — capture the complete customization of the current scope (per-phase block lists, per-phase ordering and phase tool catalogs) as a reusable snapshot.
@@ -135,6 +148,7 @@ Code map:
 | `lib/index.js` | host half: assembly hook, five HTTP routes, agent-preset fork, one-off legacy cleanup |
 | `lib/effective.js` | pure functions: field-level override merge, phase selection (injections / tool catalogs), blacklist filtering |
 | `lib/promotion.js` | derives `{promoted, boundary}` from durable events — compaction resets, subagents always promoted |
+| `lib/vars.js` | prompt variables: built-in system facts + full env mapping / blocklist, lazily re-synced at the assembly entry by signature |
 | `lib/sectionOps.mjs` | phase-state pure functions **shared by the panel and the unit tests** (which list to write, injection identity, reorder, per-phase persistence) |
 | `lib/store.js` / `lib/catalog.js` | atomic write + last-good fallback config store; cross-preset section/tool accumulation cache |
 | `src/client/` | the panel (React written with `h()`, no JSX sugar), bundled into `client/client.js` |
@@ -176,7 +190,7 @@ One part per phase, chip-listing the catalog entering that phase's filter, title
 
 ### Config tab
 
-Three cards: **Save current config** (snapshot), **Save as agent preset** (fork the current target's preset directory), **Import config**. Each snapshot row is Apply / Export / Delete, and the active row carries an "in use" badge.
+Five cards: **Save current config** (snapshot), **Save as agent preset** (fork the current target's preset directory), **Import config**, **Environment variable blocklist** (add/remove entries, inspect the variables actually registered right now), **Force override switch**. Each snapshot row is Apply / Export / Delete, and the active row carries an "in use" badge.
 
 ### Edit target and saving
 
