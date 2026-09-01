@@ -1,6 +1,6 @@
 /**
  * 提示词段面板纯逻辑单测：与 SectionsTab.tsx 共用 lib/sectionOps.mjs。
- * 覆盖：阶段映射、每阶段独立屏蔽（写回目标 + union 恢复）、注入身份与删除背书、
+ * 覆盖：阶段映射、每阶段独立屏蔽（三态互不继承）、注入身份与删除背书、
  * 阶段独立的文本通道、行重排/拖入、逐阶段持久化（虚拟 order 连续编号）。
  */
 import { test } from 'node:test'
@@ -40,10 +40,10 @@ test('注入段出现在哪些阶段部分（acceptsInjectFor 矩阵）', () => 
   assert.ok(acceptsInjectFor('active', 'always'))
 })
 
-test('每阶段独立屏蔽名单 = 全局 + 阶段 union', () => {
+test('每阶段独立屏蔽名单：三态互不继承', () => {
   const cfg = { sections: ['a'], sectionsBootstrap: ['b'], sectionsCompaction: ['c'] }
-  assert.deepEqual(deniedNames(cfg, 'bootstrap'), ['a', 'b'])
-  assert.deepEqual(deniedNames(cfg, 'compaction'), ['a', 'c'])
+  assert.deepEqual(deniedNames(cfg, 'bootstrap'), ['b'])
+  assert.deepEqual(deniedNames(cfg, 'compaction'), ['c'])
   assert.deepEqual(deniedNames(cfg, 'active'), ['a'])
 })
 
@@ -90,14 +90,18 @@ test('屏蔽写回目标：引导期 → sectionsBootstrap，常驻期 → secti
   assert.deepEqual(act, { sections: ['x'] })
 })
 
-test('恢复是 union 安全的：同时从阶段名单与全局名单移除', () => {
+test('恢复是阶段独立的：只动本阶段名单，不碰其它阶段', () => {
   const cfg = { sections: ['x'], sectionsBootstrap: ['x', 'y'] }
   const patch = blockPatch(cfg, 'bootstrap', 'x', false)
-  // 从 sectionsBootstrap 移除，且全局 sections 里的 x 一并清掉（否则仍被挡）。
-  assert.deepEqual(patch, { sectionsBootstrap: ['y'], sections: [] })
-  // 只存在全局时也能恢复
+  // 只从 sectionsBootstrap 移除；全局 sections 里的 x 保持不变（引导期解除
+  // 屏蔽不再连带改动常驻期）。
+  assert.deepEqual(patch, { sectionsBootstrap: ['y'] })
+  // 只存在全局时也能恢复（常驻期名单）
   const patch2 = blockPatch(cfg, 'active', 'x', false)
   assert.deepEqual(patch2, { sections: [] })
+  // 常驻期屏蔽只写 sections，绝不写进阶段名单
+  const actBlock = blockPatch(cfg, 'active', 'z', true)
+  assert.deepEqual(actBlock, { sections: ['x', 'z'] })
 })
 
 test('重排：上移/下移一格', () => {

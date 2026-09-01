@@ -159,3 +159,21 @@ test('旧快照（无阶段键）应用时保留当前阶段设定，且注入�
   // 键形状守恒：always 组条目绝不带 phase 键
   for (const item of applied.inject) assert.equal('phase' in item, false, JSON.stringify(item))
 })
+
+test('应用时匹配不上的段默认跳过：跨系统导入不凭空建段', () => {
+  // 快照里带一个当前系统没有的段（哪怕带文本 / custom 标记）。
+  const data = {
+    sections: [],
+    replace: {},
+    order: [
+      { name: 'a', after: undefined, text: '', custom: false },
+      { name: 'ghost', after: 'a', text: 'GHOST', custom: true },
+    ],
+    tools: { exclude: [], include: [] },
+  }
+  const applied = applyPresetData(data, { inject: [] }, new Set(['a', 'b']))
+  // ghost 匹配不上 → 整条跳过，绝不带着文本被创建出来；匹配上的 a 正常加载。
+  assert.deepEqual(applied.inject.map((x) => x.name), ['a'])
+  // 当前系统里有、预设里没有的 b 仍按规则屏蔽。
+  assert.deepEqual(applied.sections, ['b'])
+})

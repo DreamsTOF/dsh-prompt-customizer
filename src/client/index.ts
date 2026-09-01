@@ -110,8 +110,11 @@ function Panel({ t }: { t: Translate }): ReactElement {
   const [tab, setTab] = useState<'sections' | 'tools' | 'presets' | 'preview'>('sections')
   const [error, setError] = useState<string | null>(null)
   const [refreshId, setRefreshId] = useState(0)
-  // 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级 override）。
+  // 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级覆盖）。
   const [target, setTarget] = useState<string | undefined>(undefined)
+  // 三态同步（默认关）：勾选后提示词 / 工具 Tab 的屏蔽与解除屏蔽对三个阶段
+  // 一起生效（只作用于同名的那一项）。仅在提示词 / 工具两个 Tab 显示。
+  const [syncAll, setSyncAll] = useState(false)
   // 配置写入计数：每次成功写配置后 +1，驱动 PreviewTab 重载。
   // （以下 hooks 必须在任何提前 return 之前声明 —— hooks 顺序不能随加载状态变化。）
   const [version, setVersion] = useState(0)
@@ -280,9 +283,6 @@ function Panel({ t }: { t: Translate }): ReactElement {
   }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
-  // 提示词 Tab 解除继承自全局的屏蔽时使用的全局通道（与 writeGlobal 同源，
-  // 收窄了字段类型以匹配 SectionsTab 的 prop 签名）。
-  const writeGlobalField = writeField as (field: 'sections', value: unknown) => void
 
   // 恢复初始状态：服务端清空全部定制并关闭 forceSections（与不装插件等效）。
   // 二次确认由配置 Tab 的调用点负责；成功后清草稿、重拉全部视图。
@@ -375,6 +375,20 @@ function Panel({ t }: { t: Translate }): ReactElement {
         ...agentPresets.map((p) => h('option', { key: p.id, value: p.id, style: s.option },
           `${p.name}${p.broken ? ` (${t('broken')})` : ''}`)),
       ]),
+      tab === 'sections' || tab === 'tools'
+        ? h('label', {
+            style: { ...s.muted, marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', whiteSpace: 'nowrap' },
+            title: t('syncAllPhasesHint'),
+          }, [
+            h('input', {
+              type: 'checkbox',
+              checked: syncAll,
+              onChange: (e: { target: { checked: boolean } }) => setSyncAll(e.target.checked),
+              style: { margin: 0, cursor: 'pointer' },
+            }),
+            t('syncAllPhases'),
+          ])
+        : null,
       h('button', {
         style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
         disabled: !draft?.dirty || saving,
@@ -395,15 +409,12 @@ function Panel({ t }: { t: Translate }): ReactElement {
           cfg: view,
           inv,
           phases,
-          target,
-          globalSections: cfg.sections,
-          ownedSections: target ? cfg.overrides?.[target]?.sections : undefined,
+          syncAll,
           t,
           write: edit,
-          writeGlobalField,
         })
       : tab === 'tools'
-        ? h(ToolsTab, { cfg: view, inv, phases, t, write: edit })
+        ? h(ToolsTab, { cfg: view, inv, phases, t, write: edit, syncAll })
         : tab === 'presets'
           ? h(PresetsTab, {
               cfg: view,

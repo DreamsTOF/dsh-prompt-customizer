@@ -10,7 +10,9 @@
  *  - 拖动：全部 → 某阶段 = 让该工具在这一阶段出现；阶段 → 阶段 = 搬移（源阶段
  *    隐藏 + 目标阶段显示）；上三段 → 全部 = 在该阶段隐藏它。
  *  - 只有黑名单，没有白名单：每个动作只作用于被拖 / 被点的那一个工具，绝不
- *    因为「拖进了一个工具」而把该阶段其它工具一起关掉。 */
+ *    因为「拖进了一个工具」而把该阶段其它工具一起关掉。
+ *  - 「三态同步」勾选（默认关）：勾选 / 取消勾选对三个阶段一起生效，只作用
+ *    于同名的那一个工具；拖拽仍按复制 / 搬移语义只动涉及的阶段。 */
 import { createElement as h, useState, type CSSProperties, type ReactElement, type DragEvent } from 'react'
 import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -26,10 +28,12 @@ type DragSource = { kind: 'all' } | { kind: 'part'; key: PhaseViewKey }
 /** 一次拖放的反馈（ok = 已写入，warn = 什么都没改并说明原因）。 */
 type Notice = { kind: 'ok' | 'warn'; text: string }
 
-export function ToolsTab({ cfg, inv, phases, t, write }: {
+export function ToolsTab({ cfg, inv, phases, syncAll, t, write }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
+  /** 三态同步（默认关）：勾选后隐藏 / 显示对三个阶段一起生效（只作用于同名工具）。 */
+  syncAll?: boolean
   t: Translate
   write: (field: 'sections' | 'replace' | 'inject' | 'tools', value: unknown) => void
 }): ReactElement {
@@ -99,6 +103,29 @@ export function ToolsTab({ cfg, inv, phases, t, write }: {
 
   // 勾选 / 取消勾选：只动这一个工具在本阶段的可见性。
   const toggleHide = (key: PhaseViewKey, name: string, currentlyHidden: boolean): void => {
+    if (syncAll) {
+      // 三态同步（可选）：对三个阶段各自的名单做同一个可见性翻转 —— 只作用
+      // 于同名的这一个工具。必须在一份 tools 上把三个阶段叠完再写一次：
+      // edit 对同一字段是整体替换，逐阶段各写一次会互相覆盖只留下最后一次。
+      let tools = cfg.tools
+      for (const k of PART_ORDER) {
+        const add = addOf(k)
+        const exclude = excludeOf(k)
+        if (currentlyHidden) {
+          // 显示：只从该阶段 exclude 移除，绝不顺手把没加回的工具加进 add。
+          tools = withPhaseExclude(tools, k, exclude.filter((x) => x !== name))
+        } else if (add.includes(name)) {
+          // 隐藏：已加回的撤销加回。
+          tools = withPhaseAdd(tools, k, add.filter((x) => x !== name))
+        } else if (!exclude.includes(name)) {
+          // 隐藏：原生的进该阶段 exclude。
+          tools = withPhaseExclude(tools, k, [...exclude, name])
+        }
+      }
+      write('tools', tools)
+      setNotice(null)
+      return
+    }
     if (currentlyHidden) {
       addToPhase(key, name, false)
     } else {

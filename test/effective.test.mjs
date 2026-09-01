@@ -75,9 +75,26 @@ test('瀑布流输入（无 order 字段）也能用：按数组序稳定排序'
   assert.deepEqual(out.map((s) => s.name), ['x', 'y'])
 })
 
-test('pickSectionsForStatus：压缩受控期优先于引导期', () => {
-  const cfg = { sectionsBootstrap: ['b'], sectionsCompaction: ['c'] }
+test('pickSectionsForStatus：三态互不继承，各取自己那份名单', () => {
+  const cfg = { sections: ['r'], sectionsBootstrap: ['b'], sectionsCompaction: ['c'] }
   assert.deepEqual(pickSectionsForStatus(cfg, { promoted: false, boundary: 1 }), ['c'])
   assert.deepEqual(pickSectionsForStatus(cfg, { promoted: false, boundary: -1 }), ['b'])
-  assert.deepEqual(pickSectionsForStatus(cfg, { promoted: true, boundary: -1 }), [])
+  assert.deepEqual(pickSectionsForStatus(cfg, { promoted: true, boundary: -1 }), ['r'])
+  // 压缩受控期没有名单就是空，绝不回落引导期或常驻期
+  const partial = { sections: ['r'], sectionsBootstrap: ['b'] }
+  assert.deepEqual(pickSectionsForStatus(partial, { promoted: false, boundary: 1 }), [])
+  // 常驻期名单也不泄漏进引导期
+  assert.deepEqual(pickSectionsForStatus(partial, { promoted: false, boundary: -1 }), ['b'])
+  assert.deepEqual(pickSectionsForStatus(partial, { promoted: true, boundary: -1 }), ['r'])
+})
+
+test('三态屏蔽互不影响：一个阶段的屏蔽不波及另一个阶段', () => {
+  const cfg = { sections: ['a'], sectionsBootstrap: ['b'], sectionsCompaction: [], replace: {}, inject: [] }
+  const secs = rawSections([['a', 0, 'A'], ['b', 1, 'B']])
+  // 常驻期：a 被屏蔽
+  assert.deepEqual(applySectionPolicy(secs, cfg, STATUS).map((s) => s.name), ['b'])
+  // 引导期：只有引导期名单生效，a 不受常驻期屏蔽牵连
+  assert.deepEqual(applySectionPolicy(secs, cfg, { promoted: false, boundary: -1 }).map((s) => s.name), ['a'])
+  // 压缩受控期：无名单，a、b 都在
+  assert.deepEqual(applySectionPolicy(secs, cfg, { promoted: false, boundary: 1 }).map((s) => s.name), ['a', 'b'])
 })

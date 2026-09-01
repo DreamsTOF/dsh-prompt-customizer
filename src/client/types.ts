@@ -85,7 +85,7 @@ export interface Preview {
 /** 解析后的命名空间配置对象（即作用域中的 value）。 */
 export interface Config {
   sections?: string[]
-  /** 每阶段独立段屏蔽：引导期 / 压缩受控期的额外屏蔽名单（空 = 回落全局）。 */
+  /** 每阶段独立段屏蔽：引导期 / 压缩受控期各自的屏蔽名单（与常驻期互不影响）。 */
   sectionsBootstrap?: string[]
   sectionsCompaction?: string[]
   replace?: Record<string, string>
@@ -115,7 +115,7 @@ export interface Preset {
  *  可选字段一律「缺省 = 旧快照」：应用时旧快照没有的字段保留当前配置不抹掉。 */
 export interface PresetData {
   sections?: string[]
-  /** 引导期 / 压缩受控期的额外屏蔽名单（空 = 回落全局）。 */
+  /** 引导期 / 压缩受控期各自的屏蔽名单（与常驻期互不影响）。 */
   sectionsBootstrap?: string[]
   sectionsCompaction?: string[]
   replace?: Record<string, string>

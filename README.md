@@ -1,6 +1,41 @@
-# dsh-prompt-customizer
+<p align="center">
+  <img src="assets/logo.svg" alt="dsh-prompt-customizer" width="180">
+</p>
 
-> [English](README.en.md) | **简体中文**
+<h1 align="center">dsh-prompt-customizer</h1>
+
+<p align="center">
+  <strong>DeepSeek Harness 的系统提示词与工具目录定制器。<br>
+  按名称屏蔽 / 替换 / 注入 / 排序提示词段，按会话阶段与 agent 预设分层 —— 全部在设置面板里完成。</strong>
+</p>
+
+<p align="center">
+  <a href="README.en.md">English</a> ·
+  <strong>简体中文</strong>
+</p>
+
+<p align="center">
+  <a href="#安装">安装</a> •
+  <a href="#功能特性">功能特性</a> •
+  <a href="#使用说明">使用说明</a> •
+  <a href="#工作原理">工作原理</a> •
+  <a href="#已知限制">已知限制</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.4.1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
+  <img src="https://img.shields.io/badge/DeepSeek_Harness-Plugin-blueviolet.svg" alt="DeepSeek Harness Plugin">
+  <img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version">
+  <img src="https://img.shields.io/npm/dm/dsh-prompt-customizer" alt="npm downloads">
+  <img src="https://img.shields.io/github/stars/DreamsTOF/dsh-prompt-customizer?style=social" alt="GitHub Stars">
+</p>
+
+<p align="center">
+  <img src="assets/banner.svg" alt="system prompt → block · replace · inject · sort" width="900">
+</p>
+
+---
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) 插件，让你在设置面板里控制**系统提示词**和**工具目录**。
 
@@ -34,22 +69,22 @@
 
 完整的转移关系（引导期也能不经常驻期直接进压缩受控期）：
 
-| 当前阶段 | 事件 | 去向 |
-| --- | --- | --- |
-| 引导期 | 首个 durable `tool/call` / `assistant/message` | **常驻期** |
-| 引导期 | `compaction/end` | **压缩受控期** |
-| 常驻期 | `compaction/end`（晋级复位） | **压缩受控期** |
-| 压缩受控期 | 压缩之后新的 durable 信号 | **常驻期** |
-| 任意 | 子代理会话（`delegationDepth > 0`） | 恒为**常驻期** |
-| 任意 | 无会话的读取（清单、预览） | 恒为**常驻期** |
+| 当前阶段   | 事件                                           | 去向           |
+| ---------- | ---------------------------------------------- | -------------- |
+| 引导期     | 首个 durable `tool/call` / `assistant/message` | **常驻期**     |
+| 引导期     | `compaction/end`                               | **压缩受控期** |
+| 常驻期     | `compaction/end`（晋级复位）                   | **压缩受控期** |
+| 压缩受控期 | 压缩之后新的 durable 信号                      | **常驻期**     |
+| 任意       | 子代理会话（`delegationDepth > 0`）            | 恒为**常驻期** |
+| 任意       | 无会话的读取（清单、预览）                     | 恒为**常驻期** |
 
 每个阶段各解析出什么 —— 面板的三个部分与配置字段一一对应：
 
-| 面板里的部分 | 生效的段屏蔽 | 注入段的 `phase` | 生效的工具黑名单 |
-| --- | --- | --- | --- |
-| 引导期提示词 / 引导期工具 | `sections` ∪ `sectionsBootstrap` | `bootstrap`（+ `always`） | `tools.bootstrap.exclude`，未配置则回落静态 |
-| 常驻期提示词 / 常驻期工具 | `sections` | `active`（+ `always`） | `tools.exclude`（静态） |
-| 压缩受控期提示词 / 工具 | `sections` ∪ `sectionsCompaction` | `compaction`（+ `always`） | `tools.compaction.exclude`，未配置则回落引导期，再回落静态 |
+| 面板里的部分              | 生效的段屏蔽         | 注入段的 `phase`           | 生效的工具黑名单                                           |
+| ------------------------- | -------------------- | -------------------------- | ---------------------------------------------------------- |
+| 引导期提示词 / 引导期工具 | `sectionsBootstrap`  | `bootstrap`（+ `always`）  | `tools.bootstrap.exclude`，未配置则回落静态                |
+| 常驻期提示词 / 常驻期工具 | `sections`           | `active`（+ `always`）     | `tools.exclude`（静态）                                    |
+| 压缩受控期提示词 / 工具   | `sectionsCompaction` | `compaction`（+ `always`） | `tools.compaction.exclude`，未配置则回落引导期，再回落静态 |
 
 两点容易踩：
 
@@ -76,7 +111,7 @@
 - **替换**：编辑该段文本，编辑框预填当前生效文本（动态段会尽力解析出真实内容再回显）。
 - **注入**：每个阶段部分底部都能按名称 + 文本新建一段，带 `手动` 徽标，随时可删除。
 - **排序**：整行拖拽（拖到某行上方/下方出现插入线）或 ↑/↓ 箭头。顺序以 0 起始的连续虚拟下标存储，不会出现重复或小数 order，也不需要手填数字。
-- **每阶段独立**：引导期屏蔽写 `sectionsBootstrap`，压缩受控期写 `sectionsCompaction`，常驻期写 `sections`；三者的排序空间互不干扰，因此「引导期只留 5 段、常驻期全开」是可以分别表达的。
+- **每阶段独立**：引导期屏蔽写 `sectionsBootstrap`，压缩受控期写 `sectionsCompaction`，常驻期写 `sections`；三份名单互不继承、互不影响，排序空间也互不干扰，因此「引导期只留 5 段、常驻期全开」可以分别表达 —— 在一个阶段屏蔽 / 恢复某段，绝不会改变它在其它阶段的状态。从其它阶段（或全部池）拖进当前阶段即成为当前阶段的独立副本（带原文写入本阶段注入条目），源阶段保持原样。
 - **强制覆盖（`forceSections`，默认开）**：包装宿主的装配入口，最终提示词段直接从注册表原始段重建 —— 预设插件自身的阶段裁段（如 liangshen 引导期 20→1）与 persona 的 `complete: true` 整段接管都无法再改写本插件的屏蔽 / 替换 / 注入 / 排序结果；工具目录与动态上下文保持预设与宿主行为。设为 `false` 退回瀑布流内过滤（此时完整段接管仍会压制段级定制）。
 
 ### 工具目录
@@ -107,7 +142,7 @@
 ### 配置快照与 agent 预设
 
 - **保存当前配置**：把当前作用域的完整定制（含每阶段屏蔽名单、每阶段排序、阶段工具目录）存成一份可复用的配置快照。
-- **应用**：同名段被覆盖、快照独有段被添加、快照名单之外的当前段被默认屏蔽；快照里没有的阶段字段保留你当前的值，不会被抹掉。同一时间只有一份在用。
+- **应用**：同名段被覆盖、快照名单之外的当前段被默认屏蔽；快照里当前系统匹配不上的段默认跳过（跨系统导入不凭空建段），快照里没有的阶段字段保留你当前的值，不会被抹掉。同一时间只有一份在用。
 - **导出 / 导入**：配置快照以 JSON 往返（Tauri 桌面走原生对话框，Web 走下载 / 文件选择），同名预设会被跳过。顺序以相对形式存储（每段记住它跟随谁），快照因此可跨不同段集合移植。
 - **存为 agent 预设**：整体**复制**当前编辑目标的预设目录（组成文件、伴生脚本、技能目录一并带走）到用户预设根，再把当前定制写进它的覆盖项。新预设随即出现在顶部选择器里 —— 它是一个真正可切换的 agent 预设，而不只是一份配置副本。
 
@@ -144,15 +179,15 @@
 
 代码地图：
 
-| 路径 | 作用 |
-| --- | --- |
-| `lib/index.js` | 宿主端：装配钩子、五条 HTTP 路由、agent 预设 fork、遗留字段一次性清理 |
-| `lib/effective.js` | 纯函数：字段级 override 合并、阶段选取（注入段 / 工具目录）、黑名单过滤 |
-| `lib/promotion.js` | 由 durable 事件推导 `{promoted, boundary}`，压缩复位、子代理恒已晋级 |
-| `lib/vars.js` | 提示词变量：内置系统事实 + env 全量映射 / 黑名单，装配入口按签名懒同步 |
-| `lib/sectionOps.mjs` | **面板与单测共用**的阶段状态纯函数（名单写回目标、注入身份、重排、逐阶段持久化） |
-| `lib/store.js` / `lib/catalog.js` | 原子写 + last-good 回落的配置存储；跨预设段/工具累积登记表 |
-| `src/client/` | 面板（React，无 JSX 语法糖依赖，`h()` 直写），构建进 `client/client.js` |
+| 路径                              | 作用                                                                             |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `lib/index.js`                    | 宿主端：装配钩子、五条 HTTP 路由、agent 预设 fork、遗留字段一次性清理            |
+| `lib/effective.js`                | 纯函数：字段级 override 合并、阶段选取（注入段 / 工具目录）、黑名单过滤          |
+| `lib/promotion.js`                | 由 durable 事件推导 `{promoted, boundary}`，压缩复位、子代理恒已晋级             |
+| `lib/vars.js`                     | 提示词变量：内置系统事实 + env 全量映射 / 黑名单，装配入口按签名懒同步           |
+| `lib/sectionOps.mjs`              | **面板与单测共用**的阶段状态纯函数（名单写回目标、注入身份、重排、逐阶段持久化） |
+| `lib/store.js` / `lib/catalog.js` | 原子写 + last-good 回落的配置存储；跨预设段/工具累积登记表                       |
+| `src/client/`                     | 面板（React，无 JSX 语法糖依赖，`h()` 直写），构建进 `client/client.js`          |
 
 关键约定：阶段逻辑只有一份实现 —— `lib/sectionOps.mjs` 既被 tsdown 打进浏览器包，也被
 `node --test` 直接 import 跑单测，所以「测试通过」和「界面行为」之间不存在第二套代码。
@@ -225,3 +260,15 @@ npm run check   # typecheck + build + 全量单测
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=DreamsTOF/dsh-prompt-customizer&type=Date)](https://star-history.com/#DreamsTOF/dsh-prompt-customizer&Date)
+
+---
+
+<p align="center">
+  <strong>⭐ 如果这个插件让你的系统提示词更干净、工具目录更听话，就给它一个 star 吧！</strong>
+</p>

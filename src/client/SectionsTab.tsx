@@ -9,8 +9,8 @@
  *  - 被屏蔽的段与普通段一模一样：留在列表原位、一样可操作（拖拽/箭头/替换/
  *    恢复/删除），随时可互相转换，唯一区别是屏蔽勾选框与「已屏蔽」徽标 ——
  *    屏蔽只意味着不注入模型，不剥夺任何编辑能力（v1 语义）。屏蔽勾选直接
- *    绑定当前生效名单（deniedNames = 全局 + 该阶段名单，含未保存草稿），
- *    点击立即反馈。
+ *    绑定该阶段自己的名单（deniedNames 三态互相独立，含未保存草稿），
+ *    点击立即反馈 —— 屏蔽一个阶段绝不连带屏蔽另一个阶段。
  *  - 重排（拖入/箭头）走 `persistPhase`：把该阶段全部行重写为连续整数
  *    虚拟 order（系统段写空文本 = 仅 order 覆盖，服务端保留原文；custom 段
  *    保留文本）—— UI 行序叠加同一份 order 立即重排，拖动即时可见。
@@ -26,13 +26,15 @@
  *    在目标阶段被屏蔽则同步解除屏蔽 —— 行立即出现）。上三段 → 全部：从该
  *    阶段移除 —— custom 段删除注入条目；系统段等价于屏蔽该阶段（系统段是
  *    装配的一部分，无法真正删除）。
- *  - 解除屏蔽按份额归属分流写入：继承自全局名单的屏蔽直接改全局名单（立即
- *    写盘通道）—— override 无法表达「比全局更宽松」（空名单回落全局，解除
- *    会在保存后复现）；override 自报名单与阶段名单的份额走目标草稿。
+ *  - 屏蔽 / 解除屏蔽的写入严格落在当前编辑目标的草稿里（全局默认 → 全局名单；
+ *    agent 预设 → 该预设自己的 override，显式空名单也是接管语义）—— 预设之间
+ *    互相独立：在 A 预设里的任何屏蔽 / 解除屏蔽对 B 预设与全局默认零影响。
  *  - 每个阶段部分按自己那一阶段的装配结果给出警示：该 scope 有 complete 段
  *    整段接管最终提示词，或本插件产出的段被下游装配规则丢弃时，明确写出
  *    「段级定制不会（完全）进入模型看到的提示词」，避免提示词 Tab 与预览 Tab
  *    各说各话。
+ *  - 「三态同步」勾选（默认关）：屏蔽勾选对三个阶段一起生效，只作用于同名
+ *    的那一段；拖拽 / 排序仍按各自阶段的副本语义只动本阶段。
  *
  *  全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
  *  覆盖同一份代码）。
@@ -55,7 +57,7 @@ interface PartRow {
   custom: boolean
   /** 本阶段的用户替换文本（空串 = 本阶段没改过文本）—— 三个阶段各一份，互不影响。 */
   override: string
-  /** 该阶段生效名单（全局 + 阶段独立）是否屏蔽了此段：仅影响展示，不剥夺操作。 */
+  /** 该阶段自己的屏蔽名单（三态互相独立）是否屏蔽了此段：仅影响展示，不剥夺操作。 */
   blocked: boolean
 }
 
@@ -70,20 +72,14 @@ interface DragSource {
 /** 编辑态的键：段名之外还要带阶段，否则三个部分里同名的行会同时展开编辑器。 */
 const editKey = (key: PhaseViewKey, name: string): string => `${key}:${name}`
 
-export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSections, t, write, writeGlobalField }: {
+export function SectionsTab({ cfg, inv, phases, syncAll, t, write }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
-  /** 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级覆盖）。 */
-  target: string | undefined
-  /** 原始全局段屏蔽名单（未叠加 override / 草稿）——解除屏蔽时判定份额归属。 */
-  globalSections: string[] | undefined
-  /** 目标 override 自己的段屏蔽名单（未叠加草稿）；undefined = 该 override 没有名单。 */
-  ownedSections: string[] | undefined
+  /** 三态同步（默认关）：勾选后屏蔽 / 解除屏蔽对三个阶段一起生效（只作用于同名段）。 */
+  syncAll?: boolean
   t: Translate
   write: (field: 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools', value: unknown) => void
-  /** 全局字段的立即写入通道（不经目标草稿）：解除继承自全局的屏蔽时使用。 */
-  writeGlobalField: (field: 'sections', value: unknown) => void
 }): ReactElement {
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -216,39 +212,24 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
     return rows
   }
 
-  // 屏蔽 / 恢复一个段。屏蔽永远走当前目标的草稿（override 可以表达「比全局
-  // 更严格」）。解除屏蔽按屏蔽份额的归属分流：阶段名单与 override 自报名单
-  // 走草稿；继承自全局的屏蔽必须直接改全局名单 —— override 表达不了「比全局
-  // 更宽松」（空名单回落全局，解除会在保存后失效并复现）。
+  // 屏蔽 / 恢复一个段（三态名单互相独立：blockPatch 只动本阶段自己的名单，
+  // 一个阶段的屏蔽 / 恢复绝不波及另一个阶段）。写入严格落在**当前编辑目标**
+  // 的草稿里 —— 目标是全局默认就改全局名单，目标是某个 agent 预设就写它自己
+  // 的 override（字段级接管，mergeConfig / editView 对显式空数组也是接管语义，
+  // 所以「比全局更宽松」的解除照样能表达）。绝不跨目标改写：在 A 预设里的
+  // 屏蔽 / 解除屏蔽对 B 预设与全局默认零影响，预设之间互相独立。
   const applyBlock = (key: PhaseViewKey, name: string, blocked: boolean): void => {
-    if (blocked || !target) {
-      const patch = blockPatch(cfg, key, name, blocked)
-      for (const [field, value] of Object.entries(patch)) {
-        // 名单未变化时不写，避免把继承值冻结进 override。
-        if (JSON.stringify(value) === JSON.stringify((cfg as Record<string, unknown>)[field] ?? [])) continue
-        write(field as 'sections' | 'sectionsBootstrap' | 'sectionsCompaction', value)
-      }
-      return
-    }
-    const patch = blockPatch(cfg, key, name, false)
-    const effectiveOwned = ownedSections && ownedSections.length > 0 ? ownedSections : undefined
+    const patch = blockPatch(cfg, key, name, blocked)
     for (const [field, value] of Object.entries(patch)) {
-      if (field === 'sections') {
-        // 全局份额：override 未接管名单（或解除后会把名单清空）时，全局名单
-        // 里的该段必须从全局移除，否则空名单回落全局后屏蔽复现。
-        if ((globalSections ?? []).includes(name) && (!effectiveOwned || ownedSections!.includes(name))) {
-          writeGlobalField('sections', (globalSections ?? []).filter((n) => n !== name))
-        }
-        // override 自报名单里的份额：走草稿。
-        if (effectiveOwned?.includes(name)) write('sections', value)
-        continue
-      }
-      if (JSON.stringify(value) === JSON.stringify((cfg as Record<string, unknown>)[field] ?? [])) continue
-      write(field as 'sectionsBootstrap' | 'sectionsCompaction', value)
+      write(field as 'sections' | 'sectionsBootstrap' | 'sectionsCompaction', value)
     }
   }
-  const toggleBlocked = (key: PhaseViewKey, name: string): void =>
-    applyBlock(key, name, !deniedNames(cfg, key).includes(name))
+  const toggleBlocked = (key: PhaseViewKey, name: string): void => {
+    const blocked = !deniedNames(cfg, key).includes(name)
+    // 三态同步（可选）：屏蔽 / 解除屏蔽一次写全三个阶段 —— 只作用于同名的这
+    // 一段，名单无变化的阶段拿到空补丁，不会产生写入。
+    for (const k of syncAll ? PART_ORDER : [key]) applyBlock(k, name, blocked)
+  }
 
   // 该阶段中某名字是否在该阶段的装配输入里（判断拖入是「解除屏蔽」还是
   // 「凭空注入」）。
@@ -337,14 +318,16 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
     const pos = e.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
     setDropTarget({ part: key, name, pos })
   }
-  // 从「全部」池把一个该阶段原本没有的系统段加进来：带上它的原文作为本阶段
-  // 文本 —— 注入条目带文本，服务端才会把它真正建出来（幽灵防线只放行带文本的
-  // 条目）。该阶段已有的段不在此列（只是排序/解除屏蔽）。动态段没有可带的
-  // 原文，加不了，返回 blocked 让调用方提示。
+  // 拖入一个该阶段原本没有的系统段（来源：全部池或其它阶段部分）：带上它的
+  // 原文作为本阶段文本 —— 注入条目带文本，服务端才会把它真正建出来（幽灵
+  // 防线只放行带文本的条目）。跨部分拖入即本阶段的独立副本：源阶段保留原样，
+  // 本阶段写入自己的注入条目（文本 + order）。该阶段已有的段不在此列（只是
+  // 排序/解除屏蔽）。动态段没有可带的原文（base 视图为「<动态生成>」占位），
+  // 加不了，返回 blocked 让调用方提示。
   const carryFor = (key: PhaseViewKey, source: DragSource, name: string): { text: string; blocked: boolean } => {
-    if (source.kind !== 'all' || source.custom) return { text: '', blocked: false }
+    if (source.custom) return { text: '', blocked: false }
     if (inBaseOf(key, name)) return { text: '', blocked: false }
-    if (source.text === '') return { text: '', blocked: true }
+    if (source.text === '' || source.text.startsWith('<')) return { text: '', blocked: true }
     return { text: source.text, blocked: false }
   }
   // 拖入/重排：把 dragName 插入到目标行上/下方（已存在则移动位置）。
@@ -366,8 +349,8 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
     }
     const next = reorderInsert(rows, dragName, targetName, pos, newRow)
     if (next === null) return
-    // 从全部池拖入一个被本阶段屏蔽的系统段：解除该阶段屏蔽，否则装配仍会过滤。
-    if (dragSource.kind === 'all' && inBaseOf(key, dragName) && deniedNames(cfg, key).includes(dragName)) {
+    // 从其它部分/全部池拖入一个被本阶段屏蔽的系统段：解除该阶段屏蔽，否则装配仍会过滤。
+    if (dragSource.key !== key && inBaseOf(key, dragName) && deniedNames(cfg, key).includes(dragName)) {
       applyBlock(key, dragName, false)
     }
     persistPhase(key, next)
@@ -398,7 +381,7 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
           override: carry.text,
           blocked: false,
         })
-        if (dragSource.kind === 'all' && inBaseOf(key, dragName) && deniedNames(cfg, key).includes(dragName)) {
+        if (dragSource.key !== key && inBaseOf(key, dragName) && deniedNames(cfg, key).includes(dragName)) {
           applyBlock(key, dragName, false)
         }
         persistPhase(key, next)
@@ -444,7 +427,7 @@ export function SectionsTab({ cfg, inv, phases, target, globalSections, ownedSec
       key: row.name,
       style: rowStyle,
       draggable: true,
-      onDragStart: (e: DragEvent) => startDrag(e, row.name, { kind: 'part', key, text: row.custom ? (row.override || row.text) : '', custom: row.custom }),
+      onDragStart: (e: DragEvent) => startDrag(e, row.name, { kind: 'part', key, text: row.override || row.text, custom: row.custom }),
       onDragOver: (e: DragEvent) => rowDragOver(e, key, row.name),
       onDrop: (e: DragEvent) => rowDrop(e, key, row.name),
       onDragEnd: endDrag,

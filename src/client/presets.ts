@@ -184,7 +184,7 @@ export function resolveOrder(presetOrder: PresetData['order']): ResolvedInject[]
 /**
  * 计算应用预设时的配置补丁：
  *  - 同名段被覆盖（顺序列表在运行时驱动这一行为）
- *  - 预设中有、当前提示词中没有的段被添加
+ *  - 预设中有、当前系统里匹配不上的段默认跳过（跨系统导入不凭空建段）
  *  - 当前有、但不在预设有序列表中的段默认被屏蔽
  *  - 只有预设的「激活段」（在 order 列表且不在其屏蔽名单中）被解除屏蔽；
  *    预设自己屏蔽的段保持屏蔽。
@@ -196,14 +196,19 @@ export function resolveOrder(presetOrder: PresetData['order']): ResolvedInject[]
 export function applyPresetData(data: PresetData, cfg: Config, currentNames: ReadonlySet<string>): ConfigPatch {
   const presetOrder = data.order ?? []
   const presetNames = new Set(presetOrder.map((x) => x.name))
-  const blocked = new Set(data.sections ?? [])
+  // 黑名单同样按当前系统过滤：匹配不上的名字跳过（屏蔽不存在的段没有意义，
+  // 还会污染配置，让下一次快照出现「sections ⊆ order」被破坏的孤儿名单）。
+  const blocked = new Set((data.sections ?? []).filter((n) => currentNames.has(n)))
 
   // 注入列表 = 预设解析出的顺序，再追加当前配置中存在、但预设列表没有的
   // 自定义注入段。让它们留在 `inject` 里才能保持可见；随后统一置为禁用。
   // 被保留的自定义段接在预设自身的下标之后；若预设只覆盖一小部分段，它们
   // 可能与清单原生 order 并列——合并视图按稳定排序（清单在前），顺序仍是
   // 确定性的，且下一次重排/持久化会把所有下标重新连续化。
-  const inject = resolveOrder(presetOrder)
+  // 预设 order 先按当前系统的段名过滤（匹配不上就跳过，绝不凭空建段）——
+  // 在解析前过滤让保留条目的 order 保持按组连续；锚点被过滤掉时
+  // resolveChain 会把该条目回退到组尾，顺序仍然确定。
+  const inject = resolveOrder(presetOrder.filter((x) => currentNames.has(x.name)))
   const kept = new Set(inject.map((x) => x.name))
   let order = inject.length
   for (const item of cfg.inject ?? []) {

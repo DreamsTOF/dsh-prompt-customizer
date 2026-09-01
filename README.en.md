@@ -1,6 +1,41 @@
-# dsh-prompt-customizer
+<p align="center">
+  <img src="assets/logo.svg" alt="dsh-prompt-customizer" width="180">
+</p>
 
-> **English** | [简体中文](README.md)
+<h1 align="center">dsh-prompt-customizer</h1>
+
+<p align="center">
+  <strong>System-prompt &amp; tool-catalog customizer for DeepSeek Harness.<br>
+  Block / replace / inject / reorder prompt sections by name, layered by session phase and agent preset — all from a settings-panel UI.</strong>
+</p>
+
+<p align="center">
+  <strong>English</strong> ·
+  <a href="README.md">简体中文</a>
+</p>
+
+<p align="center">
+  <a href="#installation">Installation</a> •
+  <a href="#features">Features</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#how-it-works">How it works</a> •
+  <a href="#known-limitations">Known limitations</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.4.1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
+  <img src="https://img.shields.io/badge/DeepSeek_Harness-Plugin-blueviolet.svg" alt="DeepSeek Harness Plugin">
+  <img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version">
+  <img src="https://img.shields.io/npm/dm/dsh-prompt-customizer" alt="npm downloads">
+  <img src="https://img.shields.io/github/stars/DreamsTOF/dsh-prompt-customizer?style=social" alt="GitHub Stars">
+</p>
+
+<p align="center">
+  <img src="assets/banner.svg" alt="system prompt → block · replace · inject · sort" width="900">
+</p>
+
+---
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin that lets you control the **system prompt** and the **tool catalog** from a settings-panel UI.
 
@@ -34,26 +69,26 @@ events**: the first durable `tool/call` or `assistant/message` promotes, and a
 
 Every transition (note the guide period can reach compaction-controlled without passing through resident):
 
-| Current phase | Event | Next |
-| --- | --- | --- |
-| Guide | first durable `tool/call` / `assistant/message` | **Resident** |
-| Guide | `compaction/end` | **Compaction-controlled** |
-| Resident | `compaction/end` (promotion reset) | **Compaction-controlled** |
-| Compaction-controlled | a new durable signal after the compaction | **Resident** |
-| Any | subagent session (`delegationDepth > 0`) | always **Resident** |
-| Any | read with no session (inventory, preview) | always **Resident** |
+| Current phase         | Event                                           | Next                      |
+| --------------------- | ----------------------------------------------- | ------------------------- |
+| Guide                 | first durable `tool/call` / `assistant/message` | **Resident**              |
+| Guide                 | `compaction/end`                                | **Compaction-controlled** |
+| Resident              | `compaction/end` (promotion reset)              | **Compaction-controlled** |
+| Compaction-controlled | a new durable signal after the compaction       | **Resident**              |
+| Any                   | subagent session (`delegationDepth > 0`)        | always **Resident**       |
+| Any                   | read with no session (inventory, preview)       | always **Resident**       |
 
 What each phase resolves to — the three panel parts map one-to-one onto config fields:
 
-| Panel part | Effective section blocks | Injected `phase` | Effective tool blacklist |
-| --- | --- | --- | --- |
-| Guide-period sections / tools | `sections` ∪ `sectionsBootstrap` | `bootstrap` (+ `always`) | `tools.bootstrap.exclude`, falling back to static when unset |
-| Resident-period sections / tools | `sections` | `active` (+ `always`) | `tools.exclude` (static) |
-| Compaction-controlled sections / tools | `sections` ∪ `sectionsCompaction` | `compaction` (+ `always`) | `tools.compaction.exclude`, falling back to bootstrap, then static |
+| Panel part                             | Effective section blocks | Injected `phase`          | Effective tool blacklist                                           |
+| -------------------------------------- | ------------------------ | ------------------------- | ------------------------------------------------------------------ |
+| Guide-period sections / tools          | `sectionsBootstrap`      | `bootstrap` (+ `always`)  | `tools.bootstrap.exclude`, falling back to static when unset       |
+| Resident-period sections / tools       | `sections`               | `active` (+ `always`)     | `tools.exclude` (static)                                           |
+| Compaction-controlled sections / tools | `sectionsCompaction`     | `compaction` (+ `always`) | `tools.compaction.exclude`, falling back to bootstrap, then static |
 
 Two things that bite:
 
-- **`always` injections are present in all three phases**, and each phase has its own ordering space — which is why this plugin emits phase entries *after* the `always` group: the assembly applies inject records in array order and the last write wins, so the phase order is what survives.
+- **`always` injections are present in all three phases**, and each phase has its own ordering space — which is why this plugin emits phase entries _after_ the `always` group: the assembly applies inject records in array order and the last write wins, so the phase order is what survives.
 - **A phase view is "what this state resolves to", not "what the session has been".** Native preset phase rules (zero-tool bootstrap, warmup, …) are in play at the same moment and may still change the result after other plugins — see [Known limitations](#known-limitations).
 
 ## UI
@@ -81,7 +116,7 @@ Two things that bite:
 ### Tool catalog
 
 - **Blacklist only** (`exclude`) — unchecking a tool hides it **in that phase**; checking it back restores it. There is no whitelist mode: it silenced `exclude` entirely, and a single drag could quietly switch off every other tool in the phase while offering no expressive gain.
-- **Dragging in = make that one tool visible in the phase** (remove it from the phase blacklist); dragging back to *All system tools* hides it there. Every action touches only the tool you dragged.
+- **Dragging in = make that one tool visible in the phase** (remove it from the phase blacklist); dragging back to _All system tools_ hides it there. Every action touches only the tool you dragged.
 - **Phase catalogs** — bootstrap and compaction each have their own blacklist. Runtime precedence is **compaction > bootstrap > static**: after a compaction with a compaction catalog configured, it applies; otherwise an un-promoted session uses the bootstrap catalog; everything else uses the static filter.
 - **Narrowing only, never widening** — the filter operates on the catalog the assembly already produced. A tool a phase never had cannot be made to appear here; that means editing the preset's composition.
 - Only the model-facing catalog is affected; the tools themselves and routing keep working.
@@ -106,13 +141,13 @@ The cost of strict rendering: referencing an unregistered name (such as a key th
 ### Config snapshots and agent presets
 
 - **Save current config** — capture the complete customization of the current scope (per-phase block lists, per-phase ordering and phase tool catalogs) as a reusable snapshot.
-- **Apply** — same-name sections are overridden, snapshot-only sections are added, and current sections outside the snapshot list are blocked. Phase fields the snapshot does not carry keep your current values instead of being wiped. Only one snapshot is active at a time.
+- **Apply** — same-name sections are overridden, current sections outside the snapshot list are blocked, and snapshot sections that do not match the current system are skipped (cross-system imports never fabricate sections). Phase fields the snapshot does not carry keep your current values instead of being wiped. Only one snapshot is active at a time.
 - **Export / import** — snapshots round-trip as JSON (native save/open dialogs under Tauri, download / file picker on web); same-name presets are skipped. Order is stored relatively (each section records which section it follows), so snapshots stay portable across different section sets.
 - **Save as agent preset** — **copy** the whole preset directory of the current edit target (composition file, companion scripts, skill directories) into the user preset root, then write the current customization into its override. The new preset immediately appears in the target selector: a real switchable agent preset, not merely a config copy.
 
 ### Cross-preset registry pool
 
-*All system sections* / *All system tools* do not follow the edit target: they are a **union across presets that only ever grows** (same name — last seen wins; new name — appended), filled in as you browse presets and stored in the derived cache `catalog.yaml`, which rebuilds itself if deleted.
+_All system sections_ / _All system tools_ do not follow the edit target: they are a **union across presets that only ever grows** (same name — last seen wins; new name — appended), filled in as you browse presets and stored in the derived cache `catalog.yaml`, which rebuilds itself if deleted.
 
 ## How it works
 
@@ -143,15 +178,15 @@ The full path a change takes from the panel to the model:
 
 Code map:
 
-| Path | Role |
-| --- | --- |
-| `lib/index.js` | host half: assembly hook, five HTTP routes, agent-preset fork, one-off legacy cleanup |
-| `lib/effective.js` | pure functions: field-level override merge, phase selection (injections / tool catalogs), blacklist filtering |
-| `lib/promotion.js` | derives `{promoted, boundary}` from durable events — compaction resets, subagents always promoted |
-| `lib/vars.js` | prompt variables: built-in system facts + full env mapping / blocklist, lazily re-synced at the assembly entry by signature |
-| `lib/sectionOps.mjs` | phase-state pure functions **shared by the panel and the unit tests** (which list to write, injection identity, reorder, per-phase persistence) |
-| `lib/store.js` / `lib/catalog.js` | atomic write + last-good fallback config store; cross-preset section/tool accumulation cache |
-| `src/client/` | the panel (React written with `h()`, no JSX sugar), bundled into `client/client.js` |
+| Path                              | Role                                                                                                                                            |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/index.js`                    | host half: assembly hook, five HTTP routes, agent-preset fork, one-off legacy cleanup                                                           |
+| `lib/effective.js`                | pure functions: field-level override merge, phase selection (injections / tool catalogs), blacklist filtering                                   |
+| `lib/promotion.js`                | derives `{promoted, boundary}` from durable events — compaction resets, subagents always promoted                                               |
+| `lib/vars.js`                     | prompt variables: built-in system facts + full env mapping / blocklist, lazily re-synced at the assembly entry by signature                     |
+| `lib/sectionOps.mjs`              | phase-state pure functions **shared by the panel and the unit tests** (which list to write, injection identity, reorder, per-phase persistence) |
+| `lib/store.js` / `lib/catalog.js` | atomic write + last-good fallback config store; cross-preset section/tool accumulation cache                                                    |
+| `src/client/`                     | the panel (React written with `h()`, no JSX sugar), bundled into `client/client.js`                                                             |
 
 The key convention: phase logic exists once. `lib/sectionOps.mjs` is both bundled into the
 browser by tsdown and imported directly by `node --test`, so there is no second
@@ -186,7 +221,7 @@ The three phase parts (bootstrap / resident / compaction-controlled) are **alway
 
 ### Tools tab
 
-One part per phase, chip-listing the catalog entering that phase's filter, titled `阶段可见 enabled / total`. Check to keep a tool visible in that phase, uncheck to hide it; dragging a tool in from *All system tools* only makes **that one tool** visible in the phase, and dragging it back hides it there. For what the model actually receives, use the tools view in the Preview tab.
+One part per phase, chip-listing the catalog entering that phase's filter, titled `阶段可见 enabled / total`. Check to keep a tool visible in that phase, uncheck to hide it; dragging a tool in from _All system tools_ only makes **that one tool** visible in the phase, and dragging it back hides it there. For what the model actually receives, use the tools view in the Preview tab.
 
 ### Config tab
 
@@ -207,7 +242,7 @@ All of the below are measured, and the panel shows a yellow warning in exactly t
 
 - **Some presets have no section-composed prompt.** If a section is registered with `complete: true` (dsh-persona's wholesale takeover), the host restores that single section as the entire `sections` array **after** the assembly waterfall — so this plugin's blocking / replacement / injection / ordering never reaches the model (tool filtering still applies). The panel says so explicitly ("taken over wholesale by `deployment:persona`"). The only way to make section customization work is to turn off `complete` in that agent preset.
 - **Dropping sections has more than one cause.** Besides `complete` takeover, a preset can also trim sections itself for a specific phase (measured: 20 → 1 sections during bootstrap, with no `complete` section in the registry). The panel therefore also compares names mechanically: it diffs the sections this plugin emitted against the final assembly and reports "emitted N, model sees M" when they disagree.
-- **The synthetic session behind a preview can degrade.** Phase views are driven by a fabricated session; some preset plugins throw on it, so that phase falls back to an agent-less assembly and is marked degraded — i.e. it shows the result *without* native phase narrowing.
+- **The synthetic session behind a preview can degrade.** Phase views are driven by a fabricated session; some preset plugins throw on it, so that phase falls back to an agent-less assembly and is marked degraded — i.e. it shows the result _without_ native phase narrowing.
 - **Replacing a dynamically generated section freezes its content.** Sections like `app:web-surface` are generated at assembly time (embedding the current web port and so on). After replacing, the text is fixed at the value you edited and no longer tracks runtime state. To keep following it, block the section instead.
 - **Dynamic text resolution is best-effort.** The panel calls a dynamic section's generator with a minimal context to echo real content; sections that need richer context and throw fall back to `<动态生成>`, with no other effect. Also, sections containing `{{model}}` / `{{cwd}}` style variables show the **unsubstituted template** in the list — the Preview tab is where the substituted final text appears.
 - **Export depends on the host allowing downloads.** The web fallback uses a browser download: if the host webview silently drops it, the panel still reports "exported" while no file lands. Import (file picker) is unaffected.
@@ -225,3 +260,15 @@ The browser half is built with [tsdown](https://github.com/rolldown/tsdown) into
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=DreamsTOF/dsh-prompt-customizer&type=Date)](https://star-history.com/#DreamsTOF/dsh-prompt-customizer&Date)
+
+---
+
+<p align="center">
+  <strong>⭐ If this plugin keeps your system prompt cleaner and your tool catalog tamer, give it a star!</strong>
+</p>
