@@ -1,10 +1,31 @@
 {
   "name": "dsh-prompt-customizer",
   "description": "System-prompt & tool customizer for DeepSeek Harness with a settings-panel UI: block / replace / inject prompt sections by name, and hide tools from the model catalog by exclude/include. Config lives in the plugin's own ~/.dsh/prompt-customizer/config.yaml (auto-migrated once from the legacy settings.yaml section).",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "private": false,
   "main": "lib/index.js",
+  "author": "DreamsTOF",
+  "license": "MIT",
+  "homepage": "https://github.com/DreamsTOF/dsh-prompt-customizer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DreamsTOF/dsh-prompt-customizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DreamsTOF/dsh-prompt-customizer/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "system-prompt",
+    "prompt-engineering",
+    "tool-filter",
+    "cordis",
+    "plugin",
+    "agent"
+  ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.client.json --noEmit",
     "build": "tsdown",
@@ -59,6 +80,5 @@
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "license": "MIT"
+  }
 }

@@ -23,12 +23,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.1-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
-  <img src="https://img.shields.io/badge/DeepSeek_Harness-Plugin-blueviolet.svg" alt="DeepSeek Harness Plugin">
-  <img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version">
-  <img src="https://img.shields.io/npm/dm/dsh-prompt-customizer" alt="npm downloads">
-  <img src="https://img.shields.io/github/stars/DreamsTOF/dsh-prompt-customizer?style=social" alt="GitHub Stars">
+  <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/releases"><img src="https://img.shields.io/badge/version-0.4.2-blue.svg" alt="Version"></a>
+  <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
+  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek_Harness-Plugin-blueviolet.svg" alt="DeepSeek Harness Plugin"></a>
+  <a href="https://www.npmjs.com/package/dsh-prompt-customizer"><img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/dsh-prompt-customizer"><img src="https://img.shields.io/npm/dm/dsh-prompt-customizer" alt="npm downloads"></a>
+  <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/stargazers"><img src="https://img.shields.io/github/stars/DreamsTOF/dsh-prompt-customizer?style=social" alt="GitHub Stars"></a>
+</p>
+
+<p align="center">
+  <b>⭐ GitHub 仓库：<a href="https://github.com/DreamsTOF/dsh-prompt-customizer">DreamsTOF/dsh-prompt-customizer</a></b> —— 觉得有用就点个 Star；问题与需求请提 <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/issues">Issue</a>
 </p>
 
 <p align="center">
