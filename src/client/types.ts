@@ -92,8 +92,7 @@ export interface Config {
   /** custom 为隐藏标记：true 表示本插件注入（可删除），不依赖名字碰撞识别。 */
   inject?: Array<{ name: string; order: number; text: string; phase?: Phase; custom?: boolean }>
   tools?: ToolsConfig
-  /** 强制覆盖（默认 true）：装配入口重建提示词段，所有预设一律以本插件为准。
-   *  为 false 时退回瀑布流内过滤（complete 接管 / 预设裁段可能压过定制）。 */
+  /** 强制覆盖开关（默认开）：装配入口重建提示词段，所有预设一律以本插件为准。 */
   forceSections?: boolean
   /** 环境变量黑名单（全局字段）：命中的 process.env 键不注册为提示词变量。
    *  条目支持 `*` 通配、大小写不敏感；缺省 = 预填的常见密钥类名单。 */

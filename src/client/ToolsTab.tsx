@@ -11,8 +11,8 @@
  *    隐藏 + 目标阶段显示）；上三段 → 全部 = 在该阶段隐藏它。
  *  - 只有黑名单，没有白名单：每个动作只作用于被拖 / 被点的那一个工具，绝不
  *    因为「拖进了一个工具」而把该阶段其它工具一起关掉。
- *  - 「三态同步」勾选（默认关）：勾选 / 取消勾选对三个阶段一起生效，只作用
- *    于同名的那一个工具；拖拽仍按复制 / 搬移语义只动涉及的阶段。 */
+ *  - 「三态同步」勾选（默认关）：勾选 / 取消勾选与拖入 / 拖出（工具的加减）
+ *    对三个阶段一起生效，只作用于同名的那一个工具。 */
 import { createElement as h, useState, type CSSProperties, type ReactElement, type DragEvent } from 'react'
 import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -57,6 +57,21 @@ export function ToolsTab({ cfg, inv, phases, syncAll, t, write }: {
   // 分两次写会各自基于旧 cfg 计算而互相覆盖）。
   const writeLists = (key: PhaseViewKey, exclude: string[], add: string[]): void => {
     write('tools', withPhaseAdd(withPhaseExclude(cfg.tools ?? {}, key, exclude), key, add))
+  }
+
+  // 三态同步写入（syncAll 开启时）：对三个阶段各自的 exclude / add 名单做同一
+  // 变换，叠进一份 tools 后一次写入 —— edit 对 tools 是整体替换，逐阶段各写
+  // 一次会互相覆盖只留下最后一次。变换返回 null = 该阶段无可做的改动，跳过。
+  const writeSynced = (
+    apply: (key: PhaseViewKey, exclude: string[], add: string[]) => { exclude: string[]; add: string[] } | null,
+  ): void => {
+    let tools = cfg.tools
+    for (const k of PART_ORDER) {
+      const next = apply(k, excludeOf(k), addOf(k))
+      if (next === null) continue
+      tools = withPhaseExclude(withPhaseAdd(tools, k, next.add), k, next.exclude)
+    }
+    write('tools', tools)
   }
 
   // 该阶段的装配目录（进入本插件过滤的工具原文）与该预设注册表（能加回的来源）。
@@ -104,25 +119,13 @@ export function ToolsTab({ cfg, inv, phases, syncAll, t, write }: {
   // 勾选 / 取消勾选：只动这一个工具在本阶段的可见性。
   const toggleHide = (key: PhaseViewKey, name: string, currentlyHidden: boolean): void => {
     if (syncAll) {
-      // 三态同步（可选）：对三个阶段各自的名单做同一个可见性翻转 —— 只作用
-      // 于同名的这一个工具。必须在一份 tools 上把三个阶段叠完再写一次：
-      // edit 对同一字段是整体替换，逐阶段各写一次会互相覆盖只留下最后一次。
-      let tools = cfg.tools
-      for (const k of PART_ORDER) {
-        const add = addOf(k)
-        const exclude = excludeOf(k)
-        if (currentlyHidden) {
-          // 显示：只从该阶段 exclude 移除，绝不顺手把没加回的工具加进 add。
-          tools = withPhaseExclude(tools, k, exclude.filter((x) => x !== name))
-        } else if (add.includes(name)) {
-          // 隐藏：已加回的撤销加回。
-          tools = withPhaseAdd(tools, k, add.filter((x) => x !== name))
-        } else if (!exclude.includes(name)) {
-          // 隐藏：原生的进该阶段 exclude。
-          tools = withPhaseExclude(tools, k, [...exclude, name])
-        }
-      }
-      write('tools', tools)
+      // 三态同步：显示 = 各阶段 exclude 移除（绝不顺手把没加回的工具加进 add）；
+      // 隐藏 = 已加回的撤销加回、原生的进该阶段 exclude。
+      writeSynced((_k, exclude, add) => {
+        if (currentlyHidden) return { exclude: exclude.filter((x) => x !== name), add }
+        if (add.includes(name)) return { exclude, add: add.filter((x) => x !== name) }
+        return exclude.includes(name) ? null : { exclude: [...exclude, name], add }
+      })
       setNotice(null)
       return
     }
@@ -148,6 +151,16 @@ export function ToolsTab({ cfg, inv, phases, syncAll, t, write }: {
       setNotice({ kind: 'warn', text: t('toolNotInRegistry', { name }) })
       return
     }
+    if (syncAll) {
+      // 三态同步：拖入 = 三个阶段都让它出现（该阶段目录里没有的就写进各自的
+      // add 名单）；同名已有的阶段只解除隐藏，不动其它工具。
+      writeSynced((k, exclude, add) => ({
+        exclude: exclude.filter((x) => x !== name),
+        add: !isInCatalog(k, name) && !add.includes(name) ? [...add, name] : add,
+      }))
+      setNotice({ kind: 'ok', text: t('toolSyncShown', { name }) })
+      return
+    }
     const copied = from.kind === 'part' && from.key !== dest
     const hidden = copied ? excludeOf(from.key).includes(name) : false
     addToPhase(dest, name, hidden)
@@ -165,6 +178,15 @@ export function ToolsTab({ cfg, inv, phases, syncAll, t, write }: {
   const dropOnAll = (name: string, from: DragSource): void => {
     if (from.kind !== 'part') return
     const key = from.key
+    if (syncAll) {
+      // 三态同步：拖回「全部」= 三个阶段一起拿掉（已加回的撤销加回，原生的隐藏）。
+      writeSynced((_k, exclude, add) => {
+        if (add.includes(name)) return { exclude, add: add.filter((x) => x !== name) }
+        return exclude.includes(name) ? null : { exclude: [...exclude, name], add }
+      })
+      setNotice({ kind: 'ok', text: t('toolSyncHidden', { name }) })
+      return
+    }
     let exclude = excludeOf(key)
     let add = addOf(key)
     if (add.includes(name)) {

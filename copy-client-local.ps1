@@ -8,8 +8,10 @@ if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'npm run build 失败，已中止
 Pop-Location
 
 # 整目录拷贝：按文件名逐条列会漏掉新增的 lib 文件（catalog.js 就是这么被漏掉的）。
+# 注意 -Recurse 必须带上：Copy-Item 的通配拷贝不递归子目录，lib 下的新增子目录
+#（如 lib\zh 中文段译本）只会漏掉 / 复制成空壳，启动时 import 直接失败。
 New-Item -ItemType Directory -Force -Path "$dst\client" | Out-Null
 New-Item -ItemType Directory -Force -Path "$dst\lib" | Out-Null
 Copy-Item "$src\client\client.js" "$dst\client\client.js" -Force
-Copy-Item "$src\lib\*" "$dst\lib\" -Force
+Copy-Item "$src\lib\*" "$dst\lib\" -Recurse -Force
 Write-Host "Done"

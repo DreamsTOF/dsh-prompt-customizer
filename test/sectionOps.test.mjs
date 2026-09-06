@@ -14,6 +14,11 @@ import {
   blockPatch,
   reorderInsert,
   phaseInjectEntries,
+  mergedPhaseInjectEntries,
+  phaseRows,
+  zhMergedInjectEntries,
+  zhRevertInjectEntries,
+  zhApplied,
 } from '../lib/sectionOps.mjs'
 
 test('阶段 → 名单写回目标 / 注入阶段 映射', () => {
@@ -149,6 +154,146 @@ test('逐阶段持久化：连续虚拟 order，系统行空文本，custom 行�
 test('压缩受控期持久化写入 compaction 阶段条目', () => {
   const list = phaseInjectEntries({ inject: [] }, 'compaction', [{ name: 's', custom: true, text: 'T' }])
   assert.deepEqual(list, [{ name: 's', order: 0, text: 'T', phase: 'compaction', custom: true }])
+})
+
+test('三态同步持久化：一次写全三个阶段，always 条目原样保留', () => {
+  const cfg = {
+    inject: [
+      { name: 'x', order: 0, text: 'ALWAYS', custom: true },
+      { name: 'stale', order: 9, text: 'OLD', phase: 'compaction', custom: true },
+    ],
+  }
+  const list = mergedPhaseInjectEntries(cfg, {
+    bootstrap: [{ name: 'sys', custom: false, text: '', override: 'BOOT' }],
+    active: [{ name: 'sys', custom: false, text: '', override: '' }],
+    compaction: [{ name: 'fresh', custom: true, text: 'NEW', override: '' }],
+  })
+  // always 原样保留在最前；stale 的旧 compaction 条目被本阶段新条目替换
+  assert.deepEqual(list, [
+    { name: 'x', order: 0, text: 'ALWAYS', custom: true },
+    { name: 'sys', order: 0, text: 'BOOT', phase: 'bootstrap', custom: false },
+    { name: 'sys', order: 0, text: '', phase: 'active', custom: false },
+    { name: 'fresh', order: 0, text: 'NEW', phase: 'compaction', custom: true },
+  ])
+})
+
+test('三态同步持久化：空阶段集合产出空段，同名文本按行 override 优先', () => {
+  const list = mergedPhaseInjectEntries({ inject: [] }, {
+    bootstrap: [],
+    active: [{ name: 'a', custom: true, text: 'MINE', override: 'REPLACED' }],
+    compaction: [{ name: 'b', custom: false, text: '', override: '' }],
+  })
+  assert.deepEqual(list, [
+    { name: 'a', order: 0, text: 'REPLACED', phase: 'active', custom: true },
+    { name: 'b', order: 0, text: '', phase: 'compaction', custom: false },
+  ])
+})
+
+test('phaseRows：post ∪ 被屏蔽 ∪ 本阶段注入，文本 post 优先，custom 身份只认标记', () => {
+  const cfg = {
+    sections: ['resident-blocked'],
+    sectionsBootstrap: ['gone'],
+    inject: [{ name: 'inj', order: 0, text: 'INJ-TEXT', phase: 'bootstrap', custom: true }],
+  }
+  const view = {
+    baseSections: [
+      { name: 'a', text: 'A', blocked: false },
+      { name: 'gone', text: 'G', blocked: true },
+      { name: 'resident-blocked', text: 'RB', blocked: false },
+    ],
+    sections: [{ name: 'a', text: 'A-POST' }],
+  }
+  const rows = phaseRows(cfg, view, 'bootstrap')
+  // 注入行不在装配里 → text 为空、custom 文本走 override；blocked 只认本阶段
+  // 自己的名单（sectionsBootstrap），常驻期名单（sections）不泄漏进引导期。
+  assert.deepEqual(rows.map((r) => [r.name, r.text, r.blocked, r.custom, r.override]), [
+    ['a', 'A-POST', false, false, ''],
+    ['inj', '', false, true, 'INJ-TEXT'],
+    ['gone', 'G', true, false, ''],
+  ])
+  // 无该阶段视图 = 空行集（绝不臆造）
+  assert.deepEqual(phaseRows(cfg, null, 'compaction'), [])
+})
+
+test('zhMergedInjectEntries：命中行覆盖为中文（函数译本拿原文），未命中/自定义段原样，always 保留', () => {
+  const cfg = {
+    sections: [],
+    inject: [
+      { name: 'always-x', order: 0, text: 'ALWAYS', custom: true },
+      { name: 'persona', order: 0, text: '', phase: 'bootstrap', custom: false },
+      { name: 'keep', order: 1, text: '', phase: 'bootstrap', custom: false },
+      { name: 'mine', order: 2, text: 'USER', phase: 'bootstrap', custom: true },
+    ],
+  }
+  const view = {
+    baseSections: [
+      { name: 'persona', text: 'EN PERSONA', blocked: false },
+      { name: 'keep', text: 'KEEP EN', blocked: false },
+      { name: 'mine', text: 'USER', blocked: false },
+    ],
+    sections: [],
+  }
+  const views = { bootstrap: view, active: null, compaction: null }
+  const zhMap = {
+    persona: '中文人格 {{model}} {{cwd}}',
+    mine: 'ZH!', // 自定义段与译本同名也绝不覆盖用户自撰内容
+    // 函数译本：无 ```ts 围栏时放弃替换（保持原样）——tools:sdk 守卫同款
+    keep: (original) => (original.includes('```ts') ? 'ZH ' + original : null),
+  }
+  const list = zhMergedInjectEntries(cfg, views, zhMap)
+  // always 条目原样保留在最前；always 自定义行在三个阶段部分都显示为行，
+  // 因此各阶段都写出自己的条目（与 phaseInjectEntries 的手动编辑行为一致：
+  // 阶段条目后写覆盖）。
+  assert.deepEqual(list, [
+    { name: 'always-x', order: 0, text: 'ALWAYS', custom: true },
+    { name: 'persona', order: 0, text: '中文人格 {{model}} {{cwd}}', phase: 'bootstrap', custom: false },
+    // keep 未命中（函数返回 null）→ 原样保留为仅 order 覆盖的系统条目
+    { name: 'keep', order: 1, text: '', phase: 'bootstrap', custom: false },
+    // mine 是自定义段 → 跳过，文本保持用户自撰
+    { name: 'mine', order: 2, text: 'USER', phase: 'bootstrap', custom: true },
+    { name: 'always-x', order: 3, text: 'ALWAYS', phase: 'bootstrap', custom: true },
+    { name: 'always-x', order: 0, text: 'ALWAYS', phase: 'active', custom: true },
+    { name: 'always-x', order: 0, text: 'ALWAYS', phase: 'compaction', custom: true },
+  ])
+})
+
+test('zhRevertInjectEntries：命中行清空替换文本回归英文，自定义段不碰', () => {
+  const cfg = {
+    sections: [],
+    inject: [
+      { name: 'persona', order: 0, text: '中文人格', phase: 'bootstrap', custom: false },
+      { name: 'keep', order: 1, text: 'MY KEEP', phase: 'bootstrap', custom: false },
+      { name: 'mine', order: 2, text: 'USER', phase: 'bootstrap', custom: true },
+    ],
+  }
+  const view = {
+    baseSections: [
+      { name: 'persona', text: '中文人格', blocked: false },
+      { name: 'keep', text: 'MY KEEP', blocked: false },
+      { name: 'mine', text: 'USER', blocked: false },
+    ],
+    sections: [],
+  }
+  const list = zhRevertInjectEntries(cfg, { bootstrap: view, active: null, compaction: null }, {
+    persona: '中文人格', keep: 'KEEP-ZH', mine: 'ZH!',
+  })
+  assert.deepEqual(list, [
+    // 命中的系统段：替换文本清空 → 仅 order 覆盖，服务端回落英文原文
+    { name: 'persona', order: 0, text: '', phase: 'bootstrap', custom: false },
+    { name: 'keep', order: 1, text: '', phase: 'bootstrap', custom: false },
+    // 自定义段不碰
+    { name: 'mine', order: 2, text: 'USER', phase: 'bootstrap', custom: true },
+  ])
+})
+
+test('zhApplied：任一条目文本等于字符串译本即开启', () => {
+  const zhMap = { persona: '中文', note: (o) => o }
+  assert.equal(zhApplied({ inject: [{ name: 'persona', text: '中文', phase: 'bootstrap' }] }, zhMap), true)
+  assert.equal(zhApplied({ inject: [{ name: 'persona', text: 'other', phase: 'bootstrap' }] }, zhMap), false)
+  // 函数译本条目不参与探测
+  assert.equal(zhApplied({ inject: [{ name: 'note', text: 'x', phase: 'bootstrap' }] }, zhMap), false)
+  assert.equal(zhApplied({ inject: [] }, zhMap), false)
+  assert.equal(zhApplied({}, zhMap), false)
 })
 // ── 阶段独立的文本通道（回归：改一个阶段的文本不能波及其它阶段） ───────────
 

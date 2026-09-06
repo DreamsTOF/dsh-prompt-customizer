@@ -14,6 +14,8 @@ import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
 import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import { editView, type ConfigPatch } from './presets.ts'
+import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied } from '../../lib/sectionOps.mjs'
+import { ZH_SECTIONS } from '../../lib/zh/index.mjs'
 import { SectionsTab } from './SectionsTab.tsx'
 import { ToolsTab } from './ToolsTab.tsx'
 import { PresetsTab } from './PresetsTab.tsx'
@@ -284,6 +286,21 @@ function Panel({ t }: { t: Translate }): ReactElement {
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
 
+  // 「中文提示词」开关（提示词 Tab 工具栏，刷新按钮旁）：开 = 把名字对得上
+  // 译本（lib/zh/）的段一次性覆盖为中文，关 = 清掉这些段的替换文本回归英文
+  // —— 两个方向都走编辑草稿（edit），与手动编辑同一条保存路径。状态从配置
+  // 探测（zhApplied），不新增字段。三阶段装配未就绪时拒绝执行（否则会把对应
+  // 阶段的注入条目当作空集写掉）。
+  const zhOn = zhApplied(view, ZH_SECTIONS)
+  const toggleZh = (): void => {
+    if (phases === null || phases.bootstrap === null || phases.active === null || phases.compaction === null) {
+      showFlash(t('zhNotReady'), 'err')
+      return
+    }
+    edit('inject', zhOn ? zhRevertInjectEntries(view, phases, ZH_SECTIONS) : zhMergedInjectEntries(view, phases, ZH_SECTIONS))
+    showFlash(zhOn ? t('zhReverted') : t('zhApplied'))
+  }
+
   // 恢复初始状态：服务端清空全部定制并关闭 forceSections（与不装插件等效）。
   // 二次确认由配置 Tab 的调用点负责；成功后清草稿、重拉全部视图。
   const resetAll = (): void => {
@@ -395,6 +412,20 @@ function Panel({ t }: { t: Translate }): ReactElement {
         onClick: save,
       }, t('save')),
       h('button', { style: s.refresh, onClick: refresh }, t('refresh')),
+      tab === 'sections'
+        ? h('label', {
+            style: { ...s.muted, marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', whiteSpace: 'nowrap' },
+            title: t('zhHint'),
+          }, [
+            h('input', {
+              type: 'checkbox',
+              checked: zhOn,
+              onChange: toggleZh,
+              style: { margin: 0, cursor: 'pointer' },
+            }),
+            t('zhSwitch'),
+          ])
+        : null,
     ]),
     error ? h('div', { style: s.error }, String(error)) : null,
     flash ? h('div', { style: flashKind === 'err' ? s.error : s.noticeOk }, flash) : null,

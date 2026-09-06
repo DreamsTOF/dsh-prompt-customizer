@@ -1,7 +1,19 @@
-Copy-Item "c:\code\dsh-prompt-customizer\client\client.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\client\client.js" -Force
-Copy-Item "c:\code\dsh-prompt-customizer\lib\index.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\lib\index.js" -Force
-Copy-Item "c:\code\dsh-prompt-customizer\lib\schema.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\lib\schema.js" -Force
-Copy-Item "c:\code\dsh-prompt-customizer\lib\effective.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\lib\effective.js" -Force
-Copy-Item "c:\code\dsh-prompt-customizer\lib\promotion.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\lib\promotion.js" -Force
-Copy-Item "c:\code\dsh-prompt-customizer\lib\store.js" "C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer\lib\store.js" -Force
+$src = 'D:\dsh-pulgn\dsh-prompt-customizer'
+$dst = 'C:\Users\Administrator\.dsh\profiles\web\node_modules\dsh-prompt-customizer'
+
+
+
+# 先构建客户端：client.js 是 tsdown 产物，改过 src/ 不 build 就会复制旧产物。
+Push-Location $src
+npm run build
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'npm run build 失败，已中止复制' }
+Pop-Location
+
+# 整目录拷贝：按文件名逐条列会漏掉新增的 lib 文件（catalog.js 就是这么被漏掉的）。
+# 注意 -Recurse 必须带上：Copy-Item 的通配拷贝不递归子目录，lib 下的新增子目录
+#（如 lib\zh 中文段译本）只会漏掉 / 复制成空壳，启动时 import 直接失败。
+New-Item -ItemType Directory -Force -Path "$dst\client" | Out-Null
+New-Item -ItemType Directory -Force -Path "$dst\lib" | Out-Null
+Copy-Item "$src\client\client.js" "$dst\client\client.js" -Force
+Copy-Item "$src\lib\*" "$dst\lib\" -Recurse -Force
 Write-Host "Done"

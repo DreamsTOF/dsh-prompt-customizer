@@ -33,8 +33,9 @@
  *    整段接管最终提示词，或本插件产出的段被下游装配规则丢弃时，明确写出
  *    「段级定制不会（完全）进入模型看到的提示词」，避免提示词 Tab 与预览 Tab
  *    各说各话。
- *  - 「三态同步」勾选（默认关）：屏蔽勾选对三个阶段一起生效，只作用于同名
- *    的那一段；拖拽 / 排序仍按各自阶段的副本语义只动本阶段。
+ *  - 「三态同步」勾选（默认关）：屏蔽勾选与替换文本对三个阶段一起生效，只作
+ *    用于同名的那一段（某阶段没有的名字保持原样）；拖拽 / 排序仍按各自阶段
+ *    的副本语义只动本阶段。
  *
  *  全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
  *  覆盖同一份代码）。
@@ -43,7 +44,7 @@ import { createElement as h, useRef, useState, type CSSProperties, type ReactEle
 import type { Config, Inventory, Phase, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER } from './presets.ts'
-import { injectPhaseOf, injectedAt, deniedNames, blockPatch, reorderInsert, phaseInjectEntries } from '../../lib/sectionOps.mjs'
+import { injectPhaseOf, deniedNames, blockPatch, reorderInsert, phaseInjectEntries, mergedPhaseInjectEntries, phaseRows } from '../../lib/sectionOps.mjs'
 import { s } from './styles.ts'
 
 /** Panel 并行拉取的三阶段装配（与 PreviewTab 同一形状）。 */
@@ -149,68 +150,9 @@ export function SectionsTab({ cfg, inv, phases, syncAll, t, write }: {
     return null
   }
 
-  // 一个阶段部分的全部行：行集合 = 「真实进入该阶段装配的段」（post 视图，
-  // 与预览同源 —— 预设原生阶段插件裁剪掉的段不出现在这里）∪「被屏蔽的段」
-  //（屏蔽名单含未保存草稿，随时可反选）∪「配置里属于该阶段的自定义注入段」。
-  // 顺序以 base（预过滤）视图的骨架为底，再叠加「该阶段的注入 order」草稿序
-  // —— 未保存的重排立即反映到界面。文本 post 优先（替换 / 注入结果），回退
-  // base 原文与注入文本。身份只认注入条目的 custom 隐藏标记，绝不互相转换。
-  const rowsOf = (key: PhaseViewKey): PartRow[] => {
-    const replace = cfg.replace ?? {}
-    const view = phases?.[key]
-    const denied = new Set(deniedNames(cfg, key))
-    const postByName = new Map((view?.sections ?? []).map((sec) => [sec.name, sec] as const))
-    const baseByName = new Map((view?.baseSections ?? []).map((sec) => [sec.name, sec] as const))
-    // 本部分的注入身份（含未保存草稿）：phase = 本阶段注入阶段，names = 本部分
-    // 可见的注入段名，custom = 自定义段身份，text = 本阶段生效的用户文本，
-    // order = 本阶段草稿序。
-    const { phase, names: injectedHere, custom: customNames, text, order: phaseOrder } = injectedAt(cfg, key)
-    const names: string[] = []
-    const seen = new Set<string>()
-    const push = (name: string): void => { if (!seen.has(name)) { seen.add(name); names.push(name) } }
-    // base 骨架顺序里取 post 段与被屏蔽段（保持自然位置）。被屏蔽取并集：
-    // 当前草稿名单（切换立即反馈）∪ 上次保存的名单（base 的 blocked 标记 ——
-    // 刚解除屏蔽的行不会立即消失，仍可再勾回去）。
-    for (const sec of view?.baseSections ?? []) {
-      if (postByName.has(sec.name) || denied.has(sec.name) || sec.blocked === true) push(sec.name)
-    }
-    // post 独有段 = 本插件注入进去的段（post 恒为 base 减去屏蔽再加上注入），
-    // 追加在尾部。但它来自「上次保存」的服务端结果，删除只改草稿，所以必须
-    // 有当前 inject 条目背书 —— 否则刚删掉的自定义段会以「系统段」复活（身份
-    // 只认 inject 的 custom 标记，条目没了就被判成系统），再经一次重排就被写成
-    // custom:false 空文本，用户填的内容被抹平。
-    for (const name of postByName.keys()) {
-      if (baseByName.has(name) || injectedHere.has(name)) push(name)
-    }
-    // 精确属于该阶段的注入条目：自定义段始终显示；系统段在装配输入里见过
-    //（base/post）**或**带着用户为该阶段填的文本（= 从全部池显式加进来的）才
-    // 显示 —— 既让拖入立即出现，又不让历史遗留的陈旧条目把装配里根本没有的段带回来。
-    for (const item of cfg.inject ?? []) {
-      if ((item.phase ?? 'always') !== phase) continue
-      if (item.custom === true || text.get(item.name) || baseByName.has(item.name) || postByName.has(item.name)) push(item.name)
-    }
-    // 跨阶段生效的自定义段（如 always）。
-    for (const name of customNames) push(name)
-    const rows = names.map((name) => {
-      // 本阶段的用户替换文本：只认属于本阶段的注入条目（injectedAt 已按阶段筛）。
-      const override = text.get(name) ?? ''
-      return {
-        name,
-        text: postByName.get(name)?.text ?? baseByName.get(name)?.text ?? '',
-        replaced: override !== '' || Object.hasOwn(replace, name),
-        custom: customNames.has(name),
-        override,
-        blocked: denied.has(name),
-      }
-    })
-    // 草稿序叠加：该阶段有注入 order 就按它重排当前行（未保存的拖动/箭头
-    // 立即生效）；无 order 的行走 base 骨架相对序（稳定排序）。
-    if (phaseOrder.size > 0) {
-      const fallback = new Map(rows.map((row, i) => [row.name, i] as const))
-      rows.sort((a, b) => (phaseOrder.get(a.name) ?? fallback.get(a.name) ?? 0) - (phaseOrder.get(b.name) ?? fallback.get(b.name) ?? 0))
-    }
-    return rows
-  }
+  // 一个阶段部分的全部行：纯逻辑在 lib/sectionOps.mjs 的 phaseRows（UI 与
+  // node --test 单测共用同一份实现，注释见彼处）。
+  const rowsOf = (key: PhaseViewKey): PartRow[] => phaseRows(cfg, phases?.[key] ?? null, key)
 
   // 屏蔽 / 恢复一个段（三态名单互相独立：blockPatch 只动本阶段自己的名单，
   // 一个阶段的屏蔽 / 恢复绝不波及另一个阶段）。写入严格落在**当前编辑目标**
@@ -279,8 +221,20 @@ export function SectionsTab({ cfg, inv, phases, syncAll, t, write }: {
     setDraft(row.override || row.text)
   }
   const commitReplace = (key: PhaseViewKey, row: PartRow): void => {
-    const next = rowsOf(key).map((r) => (r.name !== row.name ? r : { ...r, override: draft, text: draft }))
-    persistPhase(key, next)
+    const patchRow = (r: PartRow): PartRow => (r.name !== row.name ? r : { ...r, override: draft, text: draft })
+    if (syncAll) {
+      // 三态同步（可选）：替换文本一次写全三个阶段 —— 只改各阶段里同名的那
+      // 一行，名字不在某阶段的行原样保留（不凭空建段）。edit 对 inject 是
+      // 整体替换，必须把三个阶段叠进同一份列表一次写入，分三次写会互相覆盖。
+      const rowsByKey = {} as Record<PhaseViewKey, PartRow[]>
+      for (const k of PART_ORDER) {
+        const rows = rowsOf(k)
+        rowsByKey[k] = k === key || rows.some((r) => r.name === row.name) ? rows.map(patchRow) : rows
+      }
+      write('inject', mergedPhaseInjectEntries(cfg, rowsByKey))
+    } else {
+      persistPhase(key, rowsOf(key).map(patchRow))
+    }
     setEditing(null)
   }
   const restoreReplace = (key: PhaseViewKey, row: PartRow): void => {
