@@ -57,8 +57,6 @@ export interface Preview {
   scope?: unknown
   /** false = 预设 scope 未能挂载，预览回退到了全局层装配。 */
   scopeResolved?: boolean
-  /** true = 伪会话让某个预设插件抛错，本次预览降级为无会话装配。 */
-  degraded?: boolean
   /** 非空 = 该 scope 有一以 `complete: true` 注册的段（值为段名）整段接管
    *  最终提示词：宿主在装配瀑布流**之后**把 sections 还原成那一条段，本插件
    *  的段级屏蔽 / 替换 / 注入 / 排序都不会进入模型看到的提示词（工具过滤不受影响）。 */

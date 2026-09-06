@@ -1,45 +1,39 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fakeAgentFor } from '../lib/index.js'
 import { createPromotion } from '../lib/promotion.js'
 
-// ── 伪会话 agent：预览三态驱动原生阶段裁剪规则 ──────────────────────────────
+// ── 晋级 tracker：会话阶段（bootstrap / compaction / active）的三态推导 ──────
 //
-// 预设原生的 bootstrap 插件（zero-tool / router 等）在 assemble 瀑布流里用
-// 与 compaction-epoch.mjs 同构的 tracker 读伪 agent 的 durable 事件推导阶段。
-// 这里验证 fakeAgentFor 的合成事件经过我们自己的 promotion.status() 后得到
-// 与 UI 三态一致的结果（bootstrap 未晋级 / compaction 未晋级 boundary>=0 /
-// active 已晋级）。
+// 阶段视图（预览的 ?phase= 与运行时 promotion.status）都由这份 tracker 驱动：
+// durable 事件触发晋级（bootstrap → active），compaction/end 复位到压缩受控期。
+// 这里验证最小 agent 形状（与 durable 会话事件同构，只认 type 与 seq）经
+// promotion.status() 后得到与 UI 三态一致的结果（未晋级 / boundary>=0 未晋级 /
+// 已晋级）。
+//
+// 历史：预览曾用 fakeAgentFor 合成伪会话 agent 喂给宿主装配，让旧版预设的
+// 阶段裁剪插件在只读预览里运行；最新 harness 的裁剪已移到 agent-loop 层，
+// 且 roster 不变量对「未加入预设的 agent」直接 fail —— 预览已改为纯 scope
+// 诊断装配，伪会话随之删除，只保留这份 tracker 的三态语义测试。
 
-test('fake agent for bootstrap phase: no events, not promoted, no boundary', () => {
-  const agent = fakeAgentFor('bootstrap', 'standard')
-  assert.equal(agent.session.id, 'prompt-customizer-preview-bootstrap')
-  assert.deepEqual(agent.session.events, [])
-  assert.equal(agent.session.header.agentPreset, 'standard')
-  assert.equal(agent.session.header.delegationDepth, 0)
-  assert.equal(typeof agent.session.header.cwd, 'string')
-  assert.equal(agent.options.model, '')
-  const status = createPromotion().status(agent)
+/** 最小 agent 形状（与 promotion.observe 消费的 durable 事件同构）。 */
+function agentWith(events) {
+  return {
+    session: { id: 'test-session', events, header: { delegationDepth: 0, agentPreset: 'standard', cwd: process.cwd(), meta: {} } },
+    options: { provider: '', model: '' },
+  }
+}
+
+test('bootstrap phase: no events, not promoted, no boundary', () => {
+  const status = createPromotion().status(agentWith([]))
   assert.deepEqual(status, { boundary: -1, promoted: false })
 })
 
-test('fake agent for compaction phase: compaction/end resets promotion', () => {
-  const agent = fakeAgentFor('compaction', 'standard')
-  assert.deepEqual(agent.session.events, [{ type: 'compaction/end', seq: 1 }])
-  const status = createPromotion().status(agent)
+test('compaction phase: compaction/end resets promotion', () => {
+  const status = createPromotion().status(agentWith([{ type: 'compaction/end', seq: 1 }]))
   assert.deepEqual(status, { boundary: 1, promoted: false })
 })
 
-test('fake agent for active phase: promotion signal after boundary', () => {
-  const agent = fakeAgentFor('active', 'standard')
-  assert.deepEqual(agent.session.events, [{ type: 'assistant/message', seq: 1 }])
-  const status = createPromotion().status(agent)
+test('active phase: promotion signal after boundary', () => {
+  const status = createPromotion().status(agentWith([{ type: 'assistant/message', seq: 1 }]))
   assert.deepEqual(status, { boundary: -1, promoted: true })
-})
-
-test('fake agent session id is stable per phase (memoize-safe, no unbounded growth)', () => {
-  // 原生 tracker 的状态按 session.id 记忆：同一 phase 的 id 必须恒定，
-  // 否则反复预览会让宿主进程里的 Map 无限增长。
-  assert.equal(fakeAgentFor('bootstrap', 'a').session.id, fakeAgentFor('bootstrap', 'b').session.id)
-  assert.notEqual(fakeAgentFor('bootstrap', 'a').session.id, fakeAgentFor('active', 'a').session.id)
 })

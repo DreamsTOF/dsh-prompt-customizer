@@ -10,7 +10,7 @@ import { defineConfig } from 'tsdown'
 const id = 'dsh-prompt-customizer'
 
 /** Externals resolved from the loader module table at runtime. */
-const CLIENT_EXTERNALS = ['react', 'react/jsx-runtime', 'react-dom']
+const CLIENT_EXTERNALS = ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client']
 
 export default defineConfig({
   entry: { client: 'src/client/index.ts' },
