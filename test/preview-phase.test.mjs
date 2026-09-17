@@ -15,10 +15,11 @@ import { createPromotion } from '../lib/promotion.js'
 // 且 roster 不变量对「未加入预设的 agent」直接 fail —— 预览已改为纯 scope
 // 诊断装配，伪会话随之删除，只保留这份 tracker 的三态语义测试。
 
-/** 最小 agent 形状（与 promotion.observe 消费的 durable 事件同构）。 */
+/** 最小 agent 形状（与 promotion.observe 消费的 durable 事件同构；宿主
+ *  0.1.2-alpha.4 起会话历史经 session.snapshotEvents() 读取）。 */
 function agentWith(events) {
   return {
-    session: { id: 'test-session', events, header: { delegationDepth: 0, agentPreset: 'standard', cwd: process.cwd(), meta: {} } },
+    session: { id: 'test-session', snapshotEvents: () => events, header: { delegationDepth: 0, agentPreset: 'standard', cwd: process.cwd(), meta: {} } },
     options: { provider: '', model: '' },
   }
 }
