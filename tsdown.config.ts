@@ -23,10 +23,12 @@ export default defineConfig({
   dts: false,
   sourcemap: true,
   clean: false,
-  external: [...CLIENT_EXTERNALS],
-  // Anything NOT in the loader module table must inline instead — a require()
-  // the table cannot answer is a guaranteed runtime throw.
-  noExternal: (source: string) => (CLIENT_EXTERNALS.includes(source) ? undefined : true),
+  deps: {
+    neverBundle: [...CLIENT_EXTERNALS],
+    // Anything NOT in the loader module table must inline instead — a require()
+    // the table cannot answer is a guaranteed runtime throw.
+    alwaysBundle: (source: string) => (CLIENT_EXTERNALS.includes(source) ? undefined : true),
+  },
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
     'import.meta.env.MODE': JSON.stringify('production'),

@@ -110,6 +110,7 @@ test('apply migrates the legacy section once, then the new file wins', () => {
   const handlers = []
   const ctx = {
     on: (name, h) => { if (name === 'system-prompt/assemble') handlers.push(h) },
+    inject: () => {},
     get: (key) => key === 'settings' ? { documentPath: master } : undefined,
     effect: () => {},
   }
@@ -136,6 +137,7 @@ test('apply does not overwrite an existing config file with the legacy section',
 
   const ctx = {
     on: () => {},
+    inject: () => {},
     get: (key) => key === 'settings' ? { documentPath: master } : undefined,
     effect: () => {},
   }

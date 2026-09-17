@@ -46,9 +46,14 @@ function makeCtx() {
     on: (event, handler) => {
       if (event === 'system-prompt/assemble') assembleHandler = handler
     },
-    get: (name) => (name === 'webServer'
-      ? { register: (r) => { routes[r.path] = r.handler; return () => {} } }
-      : name === 'systemPrompt' ? sp : undefined),
+    inject: () => {},
+    get: (name) => {
+      if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
+      if (name === 'systemPrompt') return sp
+      // 信任闸：connection 视为已认证放行（拒绝路径见 trust-gate.test.mjs）。
+      if (name === 'connection') return { requestRejection: () => undefined }
+      return undefined
+    },
     systemPrompt: sp,
     tools: { schemas: () => [] },
     effect: () => {},

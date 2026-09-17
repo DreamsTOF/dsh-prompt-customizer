@@ -1,7 +1,8 @@
 /**
  * 连接信任闸测试：自建 webServer 路由必须先问 connection.requestRejection
  * （宿主 0.1.2-alpha.1 起：Host/Origin 围栏 + 浏览器 Cookie 认证）；被拒请求
- * 绝不触达业务处理器，connection 缺席（无浏览器认证面的组合）时不阻断。
+ * 绝不触达业务处理器。闸本身不可用（connection 服务缺席）时 fail-closed：
+ * 本插件的路由会写盘，「没有认证面」不等于「无需认证」。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -18,6 +19,7 @@ function makeCtx(rejection) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-trust-'))
   const ctx = {
     on: () => {},
+    inject: () => {},
     get: (name) => {
       if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
       if (name === 'connection') {
@@ -30,7 +32,7 @@ function makeCtx(rejection) {
   return { ctx, routes, dataDir }
 }
 
-/** 事件式 req/res 的最小 mock；信任闸回纯文本，因此 end 不解析 JSON。 */
+/** 事件式 req/res 的最小 mock；信任闸回纯文本或 JSON，因此 end 不强制解析。 */
 async function call(handler, body) {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))]
   const req = {
@@ -69,10 +71,11 @@ test('401 unauthenticated rejection never reaches the handler', async () => {
   assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false, '被拒请求不得写盘')
 })
 
-test('a composition without the connection service keeps its routes reachable', async () => {
+test('a composition without the connection service refuses to serve (fail-closed)', async () => {
   const { ctx, routes, dataDir } = makeCtx(undefined)
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], { patch: { sections: ['a'] } })
-  assert.equal(res.status, 200, '没有认证面可绕过的组合不应被闸住')
-  assert.deepEqual(JSON.parse(res.text).config.sections, ['a'])
+  assert.equal(res.status, 503)
+  assert.match(JSON.parse(res.text).error, /connection service unavailable/)
+  assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false, '闸不可用时不得写盘')
 })

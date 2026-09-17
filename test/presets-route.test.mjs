@@ -23,9 +23,12 @@ function harness({ roster } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-presets-'))
   const ctx = {
     on: () => {},
+    inject: () => {},
     get: (name) => {
       if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
       if (name === 'agentPresets') return roster
+      // 信任闸：connection 视为已认证放行（拒绝路径见 trust-gate.test.mjs）。
+      if (name === 'connection') return { requestRejection: () => undefined }
       return undefined
     },
     effect: () => {},

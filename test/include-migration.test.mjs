@@ -18,6 +18,7 @@ function boot(config, { dir } = {}) {
   const logs = []
   const ctx = {
     on: () => {},
+    inject: () => {},
     get: () => undefined,
     effect: () => {},
     logger: { info: (m) => logs.push(String(m)), warn: (m) => logs.push(String(m)) },

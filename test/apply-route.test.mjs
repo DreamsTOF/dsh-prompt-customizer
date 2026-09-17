@@ -10,15 +10,20 @@ import os from 'node:os'
 import path from 'node:path'
 import { apply } from '../lib/index.js'
 
-/** Minimal Cordis ctx：只提供 webServer mock，其余服务缺席（可选获取）。 */
+/** Minimal Cordis ctx：webServer + 已认证的 connection mock，其余服务缺席（可选获取）。 */
 function makeCtx() {
   const routes = {}
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-apply-'))
   const ctx = {
     on: () => {},
-    get: (name) => name === 'webServer'
-      ? { register: (r) => { routes[r.path] = r.handler; return () => {} } }
-      : undefined,
+    inject: () => {},
+    get: (name) => {
+      if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
+      // 信任闸：本文件测业务行为，connection 视为已认证放行；
+      // 拒绝路径（401/403/503）由 trust-gate.test.mjs 覆盖。
+      if (name === 'connection') return { requestRejection: () => undefined }
+      return undefined
+    },
     effect: () => {},
   }
   return { ctx, routes, dataDir }
