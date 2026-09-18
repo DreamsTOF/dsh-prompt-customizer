@@ -1,0 +1,8 @@
+Game_name:DreamsTOF/dsh-prompt-customizer 仓库概览;
+Game_key:repo2gal_DreamsTOF_dsh-prompt-customizer_overview;
+Title_img:WebGAL_New_Enter_Image.webp;
+Title_bgm:s_Title.mp3;
+Game_Logo:WebGalEnter.webp;
+Enable_Appreciation:true;
+Enable_Continue:true;
+Enable_flowchart:true;
