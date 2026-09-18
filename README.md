@@ -41,6 +41,19 @@
 
 ---
 
+## 在线试玩：仓库概览 galgame
+
+本仓库被做成了可游玩的 [WebGAL](https://github.com/OpenWebGAL/WebGAL) 视觉小说：**138 个节拍、一次分支选择**，由项目化身「dsh-prompt-customizer」与「JavaScript」带你走完 —— 这个插件是什么、核心功能怎么用、怎么安装、目录地图、工作原理和已知限制。
+
+<p align="center">
+  <a href="https://dreamstof.github.io/dsh-prompt-customizer/"><b>▶ 立即在线游玩</b></a>
+</p>
+
+- 在线版：<https://dreamstof.github.io/dsh-prompt-customizer/>（站点源在 [`gh-pages`](https://github.com/DreamsTOF/dsh-prompt-customizer/tree/gh-pages) 分支）
+- 本地版：克隆 `gh-pages` 单分支后在目录里起一个静态服务器，例如 `python -m http.server 8000`，再打开 `http://localhost:8000`
+
+---
+
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) 插件，让你在侧边栏的独立面板里控制**系统提示词**和**工具目录**（仿宿主能力管理页：顶部 agent 预设 Tab、左栏勾选列表 + 底部三态过滤、右栏实时预览）。
 
 其他插件注入的提示词段可能污染你的系统提示词。本插件让你按名称**屏蔽**、**替换**、**注入**、**排序**提示词段，并把工具从**模型可见目录**里隐藏 —— 全程实时生效，不需要改动任何其他插件。
