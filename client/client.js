@@ -7,9 +7,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -25,670 +22,28 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// src/client/skill-source/styles.ts
-function injectSkillRowStyles() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById("dsh-prompt-customizer-skill-source-styles") !== null) return;
-  const style = document.createElement("style");
-  style.id = "dsh-prompt-customizer-skill-source-styles";
-  style.textContent = CSS;
-  document.head.appendChild(style);
-}
-var CSS, skillCss;
-var init_styles = __esm({
-  "src/client/skill-source/styles.ts"() {
-    CSS = `
-.triad-skill-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.triad-skill-row {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  height: 24px;
-  min-width: 0;
-}
-
-.triad-skill-row[data-expandable] {
-  cursor: pointer;
-}
-
-.triad-skill-card[data-state='running'] .triad-skill-row::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 300px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
-    transparent 100%
-  );
-  animation: dsh-prompt-customizer-skill-row-sweep 2.6s ease-out infinite;
-  pointer-events: none;
-}
-
-@keyframes dsh-prompt-customizer-skill-row-sweep {
-  0% { left: -300px; }
-  90%, 100% { left: 100%; }
-}
-
-.triad-skill-leading {
-  position: relative;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 6px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.triad-skill-chevron {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.triad-skill-iconIdle {
-  display: inline-flex;
-  opacity: 1;
-  transition: opacity 100ms ease;
-}
-
-.triad-skill-chevronHover {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  opacity: 0;
-  transition: opacity 100ms ease;
-}
-
-.triad-skill-row:hover .triad-skill-iconIdle {
-  opacity: 0;
-}
-
-.triad-skill-row:hover .triad-skill-chevronHover {
-  opacity: 1;
-}
-
-.triad-skill-title {
-  flex: none;
-  font-size: 14px;
-  line-height: 24px;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.triad-skill-separator {
-  flex: none;
-  width: 2px;
-  height: 2px;
-  border-radius: 1px;
-  margin: 0 8px;
-  background: var(--dsw-alias-label-caption);
-}
-
-.triad-skill-summary {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  line-height: 24px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.triad-skill-errorSummary {
-  color: var(--dsw-alias-state-error-primary);
-}
-
-.triad-skill-bodyWrap {
-  display: flex;
-  flex-direction: column;
-}
-
-.triad-skill-instructionsCard {
-  display: flex;
-  flex-direction: column;
-  max-height: 260px;
-  margin: 4px 0 4px 4px;
-  overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  background: var(--dsw-alias-markdown-code-block);
-}
-
-.triad-skill-instructionsHeader {
-  flex: none;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-  background: var(--dsw-alias-markdown-code-block-banner);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  color: var(--dsw-alias-label-caption);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.triad-skill-instructions {
-  min-height: 0;
-  margin: 0;
-  padding: 10px 12px 12px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font: var(--dsw-font-markdown-code-block-small);
-  color: var(--dsw-alias-label-secondary);
-}
-
-.triad-skill-instructions[data-error] {
-  color: var(--dsw-alias-state-error-primary);
-}
-
-.triad-skill-instructions::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  border-radius: 6px;
-}
-
-.triad-skill-instructions::-webkit-scrollbar-track {
-  margin: 6px 0;
-}
-
-.triad-skill-inspectButton {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 4px;
-  margin: 4px 0 2px 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
-  background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  line-height: 16px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 100ms ease;
-}
-
-.triad-skill-card:hover .triad-skill-inspectButton,
-.triad-skill-inspectButton:focus-visible {
-  opacity: 1;
-}
-
-.triad-skill-inspectButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-  color: var(--dsw-alias-label-primary);
-}
-
-.triad-skill-visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .triad-skill-card[data-state='running'] .triad-skill-row::after {
-    animation: none;
-    display: none;
-  }
-
-  .triad-skill-iconIdle,
-  .triad-skill-chevronHover,
-  .triad-skill-inspectButton {
-    transition: none;
-  }
-}
-`;
-    skillCss = {
-      card: "triad-skill-card",
-      row: "triad-skill-row",
-      leading: "triad-skill-leading",
-      chevron: "triad-skill-chevron",
-      iconIdle: "triad-skill-iconIdle",
-      chevronHover: "triad-skill-chevronHover",
-      title: "triad-skill-title",
-      separator: "triad-skill-separator",
-      summary: "triad-skill-summary",
-      errorSummary: "triad-skill-errorSummary",
-      bodyWrap: "triad-skill-bodyWrap",
-      instructionsCard: "triad-skill-instructionsCard",
-      instructionsHeader: "triad-skill-instructionsHeader",
-      instructions: "triad-skill-instructions",
-      inspectButton: "triad-skill-inspectButton",
-      visuallyHidden: "triad-skill-visuallyHidden"
-    };
-  }
-});
-
-// src/client/skill-source/SkillRow.tsx
-function firstLine(text) {
-  const newline = text.indexOf("\n");
-  return newline === -1 ? text : text.slice(0, newline);
-}
-function skillName(argsRaw, callId) {
-  try {
-    const parsed = JSON.parse(argsRaw);
-    if (typeof parsed === "object" && parsed !== null) {
-      const name = parsed.name;
-      if (typeof name === "string" && name !== "") return firstLine(name);
-    }
-  } catch {
-  }
-  return argsRaw === "" ? callId : firstLine(argsRaw);
-}
-function resultText(block) {
-  if (!("kind" in block)) return null;
-  const parts = [];
-  for (const item of block.content) {
-    parts.push(item.type === "text" ? item.text : JSON.stringify(item, null, 2));
-  }
-  if (parts.length === 0 && block.error !== void 0) {
-    parts.push(`${block.error.name}: ${block.error.code}`);
-  }
-  return parts.join("\n") || null;
-}
-function skillRowModel(block) {
-  const settled = "kind" in block;
-  const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? "";
-  const state = !settled ? "running" : block.error?.code === "interrupted" ? "stopped" : block.isError ? "error" : "ok";
-  const output = resultText(block);
-  return {
-    name: skillName(argsRaw, block.callId),
-    output,
-    errorSummary: state === "error" && output !== null ? firstLine(output) : null,
-    state
-  };
-}
-function leadingFor(state) {
-  switch (state) {
-    case "error":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: "error" });
-    case "stopped":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: "warning" });
-    default:
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconSkillOutline16, { size: 14 });
-  }
-}
-function disclosureLeading(state, open, expandable) {
-  if (open) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconChevronDownOutline14, { className: skillCss.chevron });
-  const icon = leadingFor(state);
-  if (!expandable) return icon;
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: skillCss.iconIdle, children: icon }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconChevronDownOutline14, { className: `${skillCss.chevron} ${skillCss.chevronHover}` })
-  ] });
-}
-function stateStatus(state, t) {
-  switch (state) {
-    case "running":
-      return t("row.running");
-    case "error":
-      return t("row.failed");
-    case "stopped":
-      return t("row.stopped");
-    default:
-      return null;
-  }
-}
-function SkillRow({ block, inspect, t }) {
-  const model = skillRowModel(block);
-  const [expanded, setExpanded] = (0, import_react.useState)(false);
-  const expandable = model.output !== null;
-  const open = expanded && expandable;
-  const status = stateStatus(model.state, t);
-  const summary = model.errorSummary ?? model.name;
-  const toggleExpand = () => {
-    setExpanded((value) => !value);
-  };
-  const toggleFromKeyboard = (event) => {
-    if (!expandable || event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    toggleExpand();
-  };
-  const disclosureProps = expandable ? {
-    role: "button",
-    tabIndex: 0,
-    "aria-expanded": open,
-    onClick: toggleExpand,
-    onKeyDown: toggleFromKeyboard
-  } : {};
-  const leading = disclosureLeading(model.state, open, expandable);
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: skillCss.card, "data-tool": "skill", "data-state": model.state, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-      "div",
-      {
-        className: skillCss.row,
-        "data-expandable": expandable || void 0,
-        ...disclosureProps,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: skillCss.leading, children: leading }),
-          status !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: skillCss.visuallyHidden, children: status }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: skillCss.title, children: "Skill" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: skillCss.separator, "aria-hidden": true }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: model.errorSummary === null ? skillCss.summary : `${skillCss.summary} ${skillCss.errorSummary}`, children: summary })
-        ]
-      }
-    ),
-    open ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: skillCss.bodyWrap, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: skillCss.instructionsCard, "aria-label": t("row.instructions"), children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: skillCss.instructionsHeader, children: t("row.instructions") }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: skillCss.instructions, "data-error": model.state === "error" || void 0, children: model.output })
-      ] }),
-      inspect !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: skillCss.inspectButton, onClick: inspect, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconInspectOutline12, {}),
-        "Inspect"
-      ] }) : null
-    ] }) : null
-  ] });
-}
-var import_react, import_dsh_client_ui_primitives, import_jsx_runtime;
-var init_SkillRow = __esm({
-  "src/client/skill-source/SkillRow.tsx"() {
-    import_react = require("react");
-    import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
-    init_styles();
-    import_jsx_runtime = require("react/jsx-runtime");
-  }
-});
-
-// src/client/skill-source/locales.ts
-var NS, zh, en;
-var init_locales = __esm({
-  "src/client/skill-source/locales.ts"() {
-    NS = "skill";
-    zh = {
-      "row.running": "\u6B63\u5728\u52A0\u8F7D skill",
-      "row.failed": "skill \u52A0\u8F7D\u5931\u8D25",
-      "row.stopped": "skill \u52A0\u8F7D\u5DF2\u4E2D\u6B62",
-      "row.instructions": "\u8BF4\u660E",
-      "menu.userOnly": "\u4EC5\u7528\u6237"
-    };
-    en = {
-      "row.running": "Loading skill",
-      "row.failed": "Skill load failed",
-      "row.stopped": "Skill load stopped",
-      "row.instructions": "Instructions",
-      "menu.userOnly": "user-only"
-    };
-  }
-});
-
-// src/client/skill-source/index.ts
-var skill_source_exports = {};
-__export(skill_source_exports, {
-  apply: () => apply,
-  invalidateSkillCache: () => invalidateSkillCache
-});
-function fetchPresets() {
-  if (presetsCache !== void 0 && Date.now() - presetsCache.at < SNAPSHOT_TTL_MS) {
-    return presetsCache.promise;
-  }
-  const promise = fetch("/api/skill-toggles/presets", {
-    headers: { accept: "application/json" }
-  }).then((response) => response.ok ? response.json() : null).catch(() => null);
-  presetsCache = { at: Date.now(), promise };
-  return promise;
-}
-function sessionPresetOf(sessionId) {
-  try {
-    const sessions = rootCtx?.get?.("sessions");
-    const byId = sessions?.list?.getSnapshot?.()?.byId;
-    const preset = byId?.[sessionId]?.agentPreset;
-    return typeof preset === "string" && preset !== "" ? preset : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function notifyListeners(sessionId) {
-  for (const listener of [...lexiconListeners.get(sessionId) ?? []]) {
-    try {
-      listener();
-    } catch (error) {
-      console.error("[skill-source] lexicon listener failed:", error);
-    }
-  }
-}
-function fetchSnapshot(sessionId) {
-  const existing = fetches.get(sessionId);
-  if (existing !== void 0 && Date.now() - existing.fetchedAt < SNAPSHOT_TTL_MS) {
-    return existing.promise;
-  }
-  const abort = new AbortController();
-  const entry = { promise: void 0, fetchedAt: Date.now(), abort };
-  const promise = (async () => {
-    const [listResponse, toggleResponse, presetWire] = await Promise.all([
-      fetch("/api/skill-manager/list", {
-        headers: { accept: "application/json" },
-        signal: abort.signal
-      }),
-      fetch("/api/skill-toggles/status", {
-        headers: { accept: "application/json" },
-        signal: abort.signal
-      }).catch(() => null),
-      fetchPresets()
-    ]);
-    const body = await listResponse.json();
-    if (!listResponse.ok) throw new Error(body.error ?? `skill list failed (${String(listResponse.status)})`);
-    let enabled = {};
-    if (toggleResponse !== null && toggleResponse.ok) {
-      const toggles = await toggleResponse.json();
-      if (toggles.skills !== void 0) enabled = toggles.skills;
-    }
-    const presetId = sessionPresetOf(sessionId);
-    const overrides = presetId === void 0 ? void 0 : presetWire?.overrides?.[presetId];
-    if (overrides !== void 0) {
-      const merged = { ...enabled };
-      for (const [name, state] of Object.entries(overrides)) {
-        if (state === false) merged[name] = false;
-      }
-      enabled = merged;
-    }
-    return { ...body, enabled };
-  })();
-  entry.promise = promise;
-  fetches.set(sessionId, entry);
-  promise.then(
-    (snapshot) => {
-      entry.settled = snapshot;
-      notifyListeners(sessionId);
-    },
-    () => {
-      if (fetches.get(sessionId) === entry) fetches.delete(sessionId);
-    }
-  );
-  return promise;
-}
-function invalidateSkillCache(sessionId) {
-  presetsCache = void 0;
-  if (sessionId === void 0) {
-    for (const key of [...fetches.keys()]) {
-      const entry2 = fetches.get(key);
-      if (entry2 === void 0) continue;
-      fetches.delete(key);
-      entry2.abort.abort();
-      notifyListeners(key);
-    }
-    return;
-  }
-  const entry = fetches.get(sessionId);
-  if (entry === void 0) return;
-  fetches.delete(sessionId);
-  entry.abort.abort();
-  notifyListeners(sessionId);
-}
-function skillEnabled(snapshot, name) {
-  return snapshot.enabled[name] !== false;
-}
-function allSkillNames(snapshot) {
-  const names = [];
-  for (const bundle of snapshot.bundles) {
-    for (const skill of bundle.skills) {
-      if (skillEnabled(snapshot, skill.name)) names.push(skill.name);
-    }
-  }
-  for (const skill of snapshot.loose) {
-    if (skillEnabled(snapshot, skill.name)) names.push(skill.name);
-  }
-  return names;
-}
-function skillsOf(snapshot, bundleId) {
-  const source = bundleId === LOOSE_ID ? snapshot.loose : snapshot.bundles.find((bundle) => bundle.id === bundleId)?.skills ?? [];
-  return source.filter((skill) => skillEnabled(snapshot, skill.name));
-}
-function parseLevelQuery(query) {
-  const match = /^([a-z0-9_-]+):(.*)$/.exec(query);
-  if (match === null) return null;
-  return { bundleId: match[1], rest: match[2] };
-}
-function skillCandidate(skill) {
-  return { name: skill.name, description: skill.description, value: `${SKILL_MARK}${skill.name}` };
-}
-function bundleCandidate(snapshot, bundle) {
-  const enabledCount = skillsOf(snapshot, bundle.id).length;
-  if (enabledCount === 0) return null;
-  return {
-    name: bundle.name,
-    description: `${String(enabledCount)} \u4E2A\u6280\u80FD`,
-    value: `${BUNDLE_MARK}${bundle.id}`
-  };
-}
-function apply(ctx) {
-  rootCtx = ctx;
-  ctx.effect(() => {
-    return () => {
-      if (rootCtx === ctx) rootCtx = void 0;
-    };
-  }, "skill-source: root ctx capture");
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), "skill-source: dictionaries");
-  injectSkillRowStyles();
-  ctx.slots.inject("tool.call.toolview", () => ctx.slots.register(
-    { name: "tool.call.toolview", key: "skill", locale: NS },
-    SkillRow
-  ));
-  const inputTriggers = ctx.get("inputTriggers");
-  if (inputTriggers === void 0) {
-    console.warn("[skill-source] inputTriggers \u670D\u52A1\u4E0D\u53EF\u7528,\u6280\u80FD slash \u6E90\u672A\u6CE8\u518C");
-    return;
-  }
-  const source = {
-    trigger: "/",
-    name: "skill",
-    order: 2,
-    async candidates(session, req) {
-      let snapshot;
-      try {
-        snapshot = await fetchSnapshot(session.sessionId);
-      } catch {
-        return [];
-      }
-      if (req.signal.aborted) return [];
-      const level = parseLevelQuery(req.query);
-      if (level !== null && skillsOf(snapshot, level.bundleId).length > 0) {
-        return skillsOf(snapshot, level.bundleId).filter((skill) => skill.name.startsWith(level.rest)).map(skillCandidate);
-      }
-      const bundles = snapshot.bundles.filter((bundle) => bundle.name.startsWith(req.query) || bundle.id.startsWith(req.query)).map((bundle) => bundleCandidate(snapshot, bundle)).filter((candidate) => candidate !== null);
-      const looseEnabled = skillsOf(snapshot, LOOSE_ID);
-      if (looseEnabled.length > 0) {
-        bundles.push({
-          name: "\u6563\u88C5\u6280\u80FD",
-          description: `${String(looseEnabled.length)} \u4E2A\u6280\u80FD`,
-          value: `${BUNDLE_MARK}${LOOSE_ID}`
-        });
-      }
-      return bundles;
-    },
-    warm(session) {
-      fetchSnapshot(session.sessionId).catch(() => {
-      });
-    },
-    lexicon(session) {
-      const entry = fetches.get(session.sessionId);
-      return entry?.settled === void 0 ? void 0 : allSkillNames(entry.settled);
-    },
-    subscribeLexicon(session, listener) {
-      const key = session.sessionId;
-      const listeners = lexiconListeners.get(key) ?? /* @__PURE__ */ new Set();
-      listeners.add(listener);
-      lexiconListeners.set(key, listeners);
-      return () => {
-        listeners.delete(listener);
-        if (listeners.size === 0) lexiconListeners.delete(key);
-      };
-    },
-    onPick({ candidate }) {
-      const value = candidate.value ?? "";
-      if (value.startsWith(BUNDLE_MARK)) {
-        const bundleId = value.slice(BUNDLE_MARK.length);
-        return { text: `/${bundleId}:`, continue: true };
-      }
-      return { text: `/${candidate.name} ` };
-    }
-  };
-  ctx.effect(() => {
-    let unregister;
-    try {
-      unregister = inputTriggers.registerSource(source);
-    } catch (error) {
-      console.warn("[skill-source] /skill \u6E90\u6CE8\u518C\u5931\u8D25(\u53EF\u80FD\u5185\u6838 ui-skill \u4ECD\u6FC0\u6D3B):", error);
-    }
-    return () => {
-      if (unregister !== void 0) unregister();
-      for (const key of [...fetches.keys()]) {
-        fetches.get(key)?.abort.abort();
-        fetches.delete(key);
-      }
-      lexiconListeners.clear();
-    };
-  }, "skill-source: slash source");
-}
-var BUNDLE_MARK, SKILL_MARK, LOOSE_ID, SNAPSHOT_TTL_MS, fetches, lexiconListeners, rootCtx, presetsCache;
-var init_skill_source = __esm({
-  "src/client/skill-source/index.ts"() {
-    init_SkillRow();
-    init_locales();
-    init_styles();
-    BUNDLE_MARK = "bundle:";
-    SKILL_MARK = "skill:";
-    LOOSE_ID = "_loose";
-    SNAPSHOT_TTL_MS = 30 * 1e3;
-    fetches = /* @__PURE__ */ new Map();
-    lexiconListeners = /* @__PURE__ */ new Map();
-  }
-});
-
 // src/client/index.ts
 var index_exports = {};
 __export(index_exports, {
-  apply: () => apply3,
+  apply: () => apply2,
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
-init_skill_source();
 
 // src/client/skills/entry.tsx
-var import_react19 = require("react");
+var import_react18 = require("react");
 var import_client = require("react-dom/client");
 
 // src/client/skills/SkillsPanel.tsx
-var import_react16 = require("react");
-var import_dsh_client_ui_primitives11 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_react15 = require("react");
+var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/popover-shell.tsx
-var import_react3 = require("react");
+var import_react2 = require("react");
 var import_react_dom = require("react-dom");
 
 // src/client/modal-animation.ts
-var import_react2 = require("react");
+var import_react = require("react");
 var MODAL_ANIM_MS = 240;
 var STYLE_ID = "dsh-prompt-customizer-modal-animation-styles";
 var SHEET = `
@@ -772,16 +127,16 @@ function modalMaskAnimClass(closing) {
 }
 var modalStaggerClass = "dsh-modal-stagger";
 function useModalClose(open, onClose, durationMs = MODAL_ANIM_MS) {
-  const [closing, setClosing] = (0, import_react2.useState)(false);
-  const timerRef = (0, import_react2.useRef)(null);
-  const closingRef = (0, import_react2.useRef)(false);
-  (0, import_react2.useLayoutEffect)(() => {
+  const [closing, setClosing] = (0, import_react.useState)(false);
+  const timerRef = (0, import_react.useRef)(null);
+  const closingRef = (0, import_react.useRef)(false);
+  (0, import_react.useLayoutEffect)(() => {
     if (open) {
       closingRef.current = false;
       setClosing(false);
     }
   }, [open]);
-  const requestClose = (0, import_react2.useCallback)(() => {
+  const requestClose = (0, import_react.useCallback)(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     setClosing(true);
@@ -789,14 +144,14 @@ function useModalClose(open, onClose, durationMs = MODAL_ANIM_MS) {
       onClose();
     }, durationMs);
   }, [onClose, durationMs]);
-  (0, import_react2.useEffect)(() => () => {
+  (0, import_react.useEffect)(() => () => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
   }, []);
   return { closing, requestClose };
 }
 
 // src/client/popover-shell.tsx
-var import_jsx_runtime2 = require("react/jsx-runtime");
+var import_jsx_runtime = require("react/jsx-runtime");
 var STYLE_ID2 = "dsh-popover-shell-styles";
 var FALLBACK_MAIN_LEFT = 280;
 var NARROW_VP = 768;
@@ -900,9 +255,9 @@ function PopoverShell({
   solid = false,
   children
 }) {
-  const [vw, setVw] = (0, import_react3.useState)(window.innerWidth);
-  const [mainLeft, setMainLeft] = (0, import_react3.useState)(readMainLeft);
-  (0, import_react3.useEffect)(() => {
+  const [vw, setVw] = (0, import_react2.useState)(window.innerWidth);
+  const [mainLeft, setMainLeft] = (0, import_react2.useState)(readMainLeft);
+  (0, import_react2.useEffect)(() => {
     const reread = () => {
       setVw(window.innerWidth);
       setMainLeft(readMainLeft());
@@ -923,7 +278,7 @@ function PopoverShell({
   const narrow = vw < NARROW_VP;
   const mode = narrow ? "sheet" : "drawer";
   const style = narrow ? void 0 : { left: mainLeft };
-  (0, import_react3.useEffect)(() => {
+  (0, import_react2.useEffect)(() => {
     if (closing) return void 0;
     const onKey = (event) => {
       if (event.key === "Escape") onClose();
@@ -934,9 +289,9 @@ function PopoverShell({
     };
   }, [closing, onClose]);
   return (0, import_react_dom.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-      narrow && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "psh-mask", "data-anim": anim, "aria-hidden": "true", onClick: onClose }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      narrow && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "psh-mask", "data-anim": anim, "aria-hidden": "true", onClick: onClose }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "div",
         {
           className: `psh-card ${modalDrawerAnimClass(closing)}`,
@@ -957,97 +312,97 @@ function PopoverShell({
   );
 }
 function PshBody({ children, className }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: className !== void 0 && className !== "" ? `psh-body ${className}` : "psh-body", children });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: className !== void 0 && className !== "" ? `psh-body ${className}` : "psh-body", children });
 }
 
 // src/client/prompt/Panel.tsx
-var import_react10 = require("react");
-var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_react9 = require("react");
+var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/icons.tsx
-var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 function catStroke() {
   return { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 }
 function CatAllIcon({ size = 16 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "4", y: "4", width: "16", height: "16", rx: "4.5", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M9.2 9.2h5.6v5.6H9.2Z", fill: "#FFFFFF", opacity: ".92" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "4", y: "4", width: "16", height: "16", rx: "4.5", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M9.2 9.2h5.6v5.6H9.2Z", fill: "#FFFFFF", opacity: ".92" })
   ] });
 }
 function LockGlyph({ size = 10 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), strokeWidth: 2, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "5", y: "10.5", width: "14", height: "9", rx: "2.4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M8.2 10.5V8.4a3.8 3.8 0 0 1 7.6 0v2.1" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), strokeWidth: 2, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "5", y: "10.5", width: "14", height: "9", rx: "2.4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M8.2 10.5V8.4a3.8 3.8 0 0 1 7.6 0v2.1" })
   ] });
 }
 function CloudUpIcon({ size = 18 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M17.7 9.5A5.2 5.2 0 0 0 7.6 8.2 4 4 0 0 0 6.5 16h10.9a3.8 3.8 0 0 0 .5-7.6Z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 17.5v-5M9.6 14.6 12 12.2l2.4 2.4" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M17.7 9.5A5.2 5.2 0 0 0 7.6 8.2 4 4 0 0 0 6.5 16h10.9a3.8 3.8 0 0 0 .5-7.6Z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 17.5v-5M9.6 14.6 12 12.2l2.4 2.4" })
   ] });
 }
 function SortDirIcon({ dir, size = 12 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: dir === "asc" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 19V5M5.8 10.8 12 4.6l6.2 6.2" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 5v14M5.8 13.2 12 19.4l6.2-6.2" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: dir === "asc" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 19V5M5.8 10.8 12 4.6l6.2 6.2" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 5v14M5.8 13.2 12 19.4l6.2-6.2" }) });
 }
 function FolderBlueIcon({ size = 17 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M3.5 7.2a2.2 2.2 0 0 1 2.2-2.2h4l2 2.1h6.6a2.2 2.2 0 0 1 2.2 2.2v7.5a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2Z", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M3.5 9.5h17v1.6a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2Z", fill: "#FFFFFF", opacity: ".25" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M3.5 7.2a2.2 2.2 0 0 1 2.2-2.2h4l2 2.1h6.6a2.2 2.2 0 0 1 2.2 2.2v7.5a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2Z", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M3.5 9.5h17v1.6a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2Z", fill: "#FFFFFF", opacity: ".25" })
   ] });
 }
 function ArrowRightIcon({ size = 13 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 12h14M13 6l6 6-6 6" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M5 12h14M13 6l6 6-6 6" }) });
 }
 function GuideArtIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "150", height: "86", viewBox: "0 0 150 86", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("defs", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("linearGradient", { id: "skm-guide-book", x1: "0", y1: "0", x2: "0", y2: "1", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "0", stopColor: "#9DB7F7" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "1", stopColor: "#6E8FF0" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "150", height: "86", viewBox: "0 0 150 86", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("defs", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("linearGradient", { id: "skm-guide-book", x1: "0", y1: "0", x2: "0", y2: "1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "0", stopColor: "#9DB7F7" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "1", stopColor: "#6E8FF0" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("linearGradient", { id: "skm-guide-page", x1: "0", y1: "0", x2: "1", y2: "1", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "0", stopColor: "#FFFFFF" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "1", stopColor: "#D9E4FF" })
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("linearGradient", { id: "skm-guide-page", x1: "0", y1: "0", x2: "1", y2: "1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "0", stopColor: "#FFFFFF" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "1", stopColor: "#D9E4FF" })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M96 34 L141 52 L120 66 L78 50 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M84 32 L50 52 L28 44 L64 26 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M64 26 L96 34 L78 50 L50 52 Z", fill: "url(#skm-guide-book)", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M50 52 L28 44 L30 56 L52 66 Z", fill: "#B7C9F5", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M78 50 L120 66 L118 78 L76 62 Z", fill: "#A9BEF1", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "73", cy: "44", r: "9", fill: "#FFFFFF", opacity: ".85" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "73", cy: "44", r: "5.5", fill: "#6E8FF0" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M118 10c.6 2.6 1.6 3.6 4.2 4.2-2.6.6-3.6 1.6-4.2 4.2-.6-2.6-1.6-3.6-4.2-4.2 2.6-.6 3.6-1.6 4.2-4.2Z", fill: "#BCCFFF" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M126 26c.4 1.7 1 2.3 2.7 2.7-1.7.4-2.3 1-2.7 2.7-.4-1.7-1-2.3-2.7-2.7 1.7-.4 2.3-1 2.7-2.7Z", fill: "#C9D9FF" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "111", cy: "24", r: "2", fill: "#C9D9FF" })
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M96 34 L141 52 L120 66 L78 50 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M84 32 L50 52 L28 44 L64 26 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M64 26 L96 34 L78 50 L50 52 Z", fill: "url(#skm-guide-book)", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M50 52 L28 44 L30 56 L52 66 Z", fill: "#B7C9F5", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M78 50 L120 66 L118 78 L76 62 Z", fill: "#A9BEF1", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "73", cy: "44", r: "9", fill: "#FFFFFF", opacity: ".85" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "73", cy: "44", r: "5.5", fill: "#6E8FF0" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M118 10c.6 2.6 1.6 3.6 4.2 4.2-2.6.6-3.6 1.6-4.2 4.2-.6-2.6-1.6-3.6-4.2-4.2 2.6-.6 3.6-1.6 4.2-4.2Z", fill: "#BCCFFF" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M126 26c.4 1.7 1 2.3 2.7 2.7-1.7.4-2.3 1-2.7 2.7-.4-1.7-1-2.3-2.7-2.7 1.7-.4 2.3-1 2.7-2.7Z", fill: "#C9D9FF" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "111", cy: "24", r: "2", fill: "#C9D9FF" })
   ] });
 }
 function GuideArtIconSmall() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "1.5", y: "2", width: "13", height: "12", rx: "2.5", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M4.5 5h7M4.5 8h7M4.5 11h4.5", stroke: "#FFFFFF", strokeWidth: "1.3", strokeLinecap: "round" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "1.5", y: "2", width: "13", height: "12", rx: "2.5", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M4.5 5h7M4.5 8h7M4.5 11h4.5", stroke: "#FFFFFF", strokeWidth: "1.3", strokeLinecap: "round" })
   ] });
 }
 function CopyIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
   ] });
 }
 function CheckIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("polyline", { points: "20 6 9 17 4 12" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("polyline", { points: "20 6 9 17 4 12" }) });
 }
 function SearchIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
   ] });
 }
 function TagIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "7", y1: "7", x2: "7.01", y2: "7" })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("line", { x1: "7", y1: "7", x2: "7.01", y2: "7" })
   ] });
 }
 
@@ -2616,8 +1971,8 @@ function zhMergedInjectEntries(cfg, views, zhMap) {
       if (row.custom) return row;
       const entry = zhMap?.[row.name];
       if (entry === void 0) return row;
-      const zh2 = typeof entry === "function" ? entry(row.text) : entry;
-      return zh2 ? { ...row, override: zh2, text: zh2 } : row;
+      const zh = typeof entry === "function" ? entry(row.text) : entry;
+      return zh ? { ...row, override: zh, text: zh } : row;
     });
   }
   return mergedPhaseInjectEntries(cfg, patched);
@@ -2635,8 +1990,8 @@ function zhRevertInjectEntries(cfg, views, zhMap) {
 function zhApplied(cfg, zhMap) {
   for (const item of cfg?.inject ?? []) {
     if (item === null || typeof item !== "object" || typeof item.name !== "string") continue;
-    const zh2 = zhMap?.[item.name];
-    if (typeof zh2 === "string" && zh2 !== "" && item.text === zh2) return true;
+    const zh = zhMap?.[item.name];
+    if (typeof zh === "string" && zh !== "" && item.text === zh) return true;
   }
   return false;
 }
@@ -2832,14 +2187,14 @@ var ZH_SECTIONS = {
 };
 
 // src/client/prompt/SectionsPane.tsx
-var import_react5 = require("react");
+var import_react4 = require("react");
 
 // src/client/prompt/drag-scroll.ts
-var import_react4 = require("react");
+var import_react3 = require("react");
 var EDGE = 56;
 var MAX_STEP = 18;
 function useDragAutoScroll(ref) {
-  (0, import_react4.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     const el = ref.current;
     if (el === null) return void 0;
     let frame = 0;
@@ -2909,14 +2264,14 @@ function useDragAutoScroll(ref) {
 // src/client/prompt/SectionsPane.tsx
 var editKey = (key, name) => `${key}:${name}`;
 function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) {
-  const [filter, setFilter] = (0, import_react5.useState)("all");
-  const [editing, setEditing] = (0, import_react5.useState)(null);
-  const [draft, setDraft] = (0, import_react5.useState)("");
-  const [addOpen, setAddOpen] = (0, import_react5.useState)(false);
-  const [notice, setNotice] = (0, import_react5.useState)(null);
-  const [dragName, setDragName] = (0, import_react5.useState)(null);
-  const [dropMark, setDropMark] = (0, import_react5.useState)(null);
-  const scrollRef = (0, import_react5.useRef)(null);
+  const [filter, setFilter] = (0, import_react4.useState)("all");
+  const [editing, setEditing] = (0, import_react4.useState)(null);
+  const [draft, setDraft] = (0, import_react4.useState)("");
+  const [addOpen, setAddOpen] = (0, import_react4.useState)(false);
+  const [notice, setNotice] = (0, import_react4.useState)(null);
+  const [dragName, setDragName] = (0, import_react4.useState)(null);
+  const [dropMark, setDropMark] = (0, import_react4.useState)(null);
+  const scrollRef = (0, import_react4.useRef)(null);
   useDragAutoScroll(scrollRef);
   const rowsOf = (key) => phaseRows(cfg, phases?.[key] ?? null, key);
   const applyBlock = (key, name, blocked) => {
@@ -3059,7 +2414,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (payload.from !== phase) return;
     removeFromPhase(payload.name);
   };
-  (0, import_react5.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     setPhaseDropHandler((key, payload) => {
       if (payload.kind !== "section" || key === phase) return;
       addFromPool(key, payload.name, payload.text ?? "", stageLabel(phase));
@@ -3072,11 +2427,11 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (view === void 0 || view === null) return null;
     if (cfg.forceSections !== false) return null;
     if (view.takenOverBy !== void 0) {
-      return (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("sectionsTakenOver", { name: view.takenOverBy }));
+      return (0, import_react4.createElement)("div", { style: s.noticeWarn }, t("sectionsTakenOver", { name: view.takenOverBy }));
     }
     const lost = view.lostSections;
     if (lost !== void 0) {
-      return (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("sectionsLost", { emitted: lost.emitted, survived: lost.survived }));
+      return (0, import_react4.createElement)("div", { style: s.noticeWarn }, t("sectionsLost", { emitted: lost.emitted, survived: lost.survived }));
     }
     return null;
   };
@@ -3084,7 +2439,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const renderRow = (key, row, index, total) => {
     if (!rowVisible(row)) return null;
     const mark = dropMark !== null && dropMark.startsWith(`${row.name}:`) ? dropMark.slice(row.name.length + 1) : null;
-    return (0, import_react5.createElement)("div", {
+    return (0, import_react4.createElement)("div", {
       key: row.name,
       style: {
         ...s.row,
@@ -3103,7 +2458,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       onDrop: (event) => dropOnRow(event, row)
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框 / 文本域的选择手势一起吃掉。
-      (0, import_react5.createElement)("span", {
+      (0, import_react4.createElement)("span", {
         draggable: true,
         title: t("drag"),
         style: s.dragHandle,
@@ -3117,37 +2472,37 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           finishDrag();
         }
       }, "\u283F"),
-      (0, import_react5.createElement)("input", {
+      (0, import_react4.createElement)("input", {
         type: "checkbox",
         checked: !row.blocked,
         onChange: () => toggleBlocked(key, row.name),
         title: row.blocked ? t("blockedOn") : t("blockedOff"),
         style: { margin: 0, cursor: "pointer", flex: "none" }
       }),
-      (0, import_react5.createElement)("div", { style: s.rowBody }, [
-        (0, import_react5.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react5.createElement)("span", { style: s.code }, row.name),
-          (0, import_react5.createElement)("span", { style: s.orderTag }, "#" + index),
-          (0, import_react5.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
-          row.replaced ? (0, import_react5.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
-          row.blocked ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
+      (0, import_react4.createElement)("div", { style: s.rowBody }, [
+        (0, import_react4.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react4.createElement)("span", { style: s.code }, row.name),
+          (0, import_react4.createElement)("span", { style: s.orderTag }, "#" + index),
+          (0, import_react4.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
+          row.replaced ? (0, import_react4.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
+          row.blocked ? (0, import_react4.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
         ]),
-        isEditing(key, row) ? (0, import_react5.createElement)("div", { style: s.editBox }, [
-          (0, import_react5.createElement)("textarea", { style: s.editInput, value: draft, onChange: (e) => setDraft(e.target.value), rows: 3 }),
-          (0, import_react5.createElement)("div", { style: s.injectRow }, [
-            (0, import_react5.createElement)("button", { style: s.mini, onClick: () => commitReplace(key, row) }, t("save")),
-            (0, import_react5.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
-            !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
+        isEditing(key, row) ? (0, import_react4.createElement)("div", { style: s.editBox }, [
+          (0, import_react4.createElement)("textarea", { style: s.editInput, value: draft, onChange: (e) => setDraft(e.target.value), rows: 3 }),
+          (0, import_react4.createElement)("div", { style: s.injectRow }, [
+            (0, import_react4.createElement)("button", { style: s.mini, onClick: () => commitReplace(key, row) }, t("save")),
+            (0, import_react4.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
+            !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
           ])
-        ]) : (0, import_react5.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.custom ? t("empty") : t("dynamic")))
+        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.custom ? t("empty") : t("dynamic")))
       ]),
-      (0, import_react5.createElement)("div", { style: s.arrowCol }, [
-        (0, import_react5.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
-        (0, import_react5.createElement)("button", { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t("moveDown") }, "\u2193")
+      (0, import_react4.createElement)("div", { style: s.arrowCol }, [
+        (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
+        (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t("moveDown") }, "\u2193")
       ]),
-      isEditing(key, row) ? null : (0, import_react5.createElement)("button", { style: s.mini, onClick: () => startReplace(key, row) }, t("replace")),
-      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
-      row.custom ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t("delete") }, t("delete")) : null
+      isEditing(key, row) ? null : (0, import_react4.createElement)("button", { style: s.mini, onClick: () => startReplace(key, row) }, t("replace")),
+      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
+      row.custom ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t("delete") }, t("delete")) : null
     ]);
   };
   const rows = rowsOf(phase);
@@ -3156,8 +2511,8 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const offCount = rows.length - onCount;
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.blocked : row.blocked);
   const poolSections = inv?.sections ?? [];
-  return (0, import_react5.createElement)("div", { style: s.colLeft }, [
-    (0, import_react5.createElement)("div", {
+  return (0, import_react4.createElement)("div", { style: s.colLeft }, [
+    (0, import_react4.createElement)("div", {
       ref: scrollRef,
       style: { ...s.colScroll, ...dropMark === "list" ? s.dropZone : {} },
       // 列表空白处 = 「本阶段末尾」的投放点（池里拖进来的段也从这里进）。
@@ -3169,11 +2524,11 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       },
       onDrop: dropOnList
     }, [
-      notice ? (0, import_react5.createElement)("div", { style: s.noticeWarn }, notice) : null,
+      notice ? (0, import_react4.createElement)("div", { style: s.noticeWarn }, notice) : null,
       partNote(phase),
       rows.map((row, i) => renderRow(phase, row, i, rows.length)),
-      rows.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
-      addOpen ? (0, import_react5.createElement)(InjectForm, {
+      rows.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
+      addOpen ? (0, import_react4.createElement)(InjectForm, {
         onAdd: (name, text) => {
           addSection(name, text, injectPhaseOf(phase));
           setAddOpen(false);
@@ -3184,7 +2539,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       // 本系统全部提示词：跨预设累积的只读池（折叠区）。加入某个阶段靠拖拽：
       // 把行拖进上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段
       // （行上不再放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
-      (0, import_react5.createElement)("details", {
+      (0, import_react4.createElement)("details", {
         style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
         onDragOver: (event) => {
           if (!acceptsDrop(event, "section")) return;
@@ -3194,14 +2549,14 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
         },
         onDrop: dropOnPool
       }, [
-        (0, import_react5.createElement)(
+        (0, import_react4.createElement)(
           "summary",
           { style: { ...s.muted, cursor: "pointer" } },
           `${t("allSectionsTitle")} (${poolSections.length})`
         ),
-        (0, import_react5.createElement)("div", { style: { ...s.muted, marginBottom: 4 } }, t("sectionsFourHint")),
-        poolSections.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
-        poolSections.map((sec) => (0, import_react5.createElement)("div", {
+        (0, import_react4.createElement)("div", { style: { ...s.muted, marginBottom: 4 } }, t("sectionsFourHint")),
+        poolSections.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
+        poolSections.map((sec) => (0, import_react4.createElement)("div", {
           key: sec.name,
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
@@ -3209,15 +2564,15 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           onDragStart: (event) => beginDrag(event, { kind: "section", name: sec.name, from: "pool", text: sec.text ?? "" }),
           onDragEnd: finishDrag
         }, [
-          (0, import_react5.createElement)("div", { style: s.rowBody }, [
-            (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, sec.name)),
-            (0, import_react5.createElement)("div", { style: s.preview }, String(sec.text ?? "").slice(0, 140) || t("dynamic"))
+          (0, import_react4.createElement)("div", { style: s.rowBody }, [
+            (0, import_react4.createElement)("div", { style: s.rowTitle }, (0, import_react4.createElement)("span", { style: s.code }, sec.name)),
+            (0, import_react4.createElement)("div", { style: s.preview }, String(sec.text ?? "").slice(0, 140) || t("dynamic"))
           ])
         ]))
       ]),
       // 「+ 注入」入口放在滚动区末尾：新段通常追加在当前阶段列表尾部。
-      (0, import_react5.createElement)("div", { style: { ...s.injectRow, marginTop: 8 } }, [
-        (0, import_react5.createElement)(
+      (0, import_react4.createElement)("div", { style: { ...s.injectRow, marginTop: 8 } }, [
+        (0, import_react4.createElement)(
           "button",
           { style: s.mini, onClick: () => setAddOpen(!addOpen), title: t("injectNew") },
           addOpen ? `\xD7 ${t("clearInput")}` : `+ ${t("injectNew")}`
@@ -3225,19 +2580,19 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 / 已停用），只统计当前阶段。
-    (0, import_react5.createElement)("div", { style: s.colFoot }, [
-      (0, import_react5.createElement)("div", { style: s.seg }, [
-        (0, import_react5.createElement)(
+    (0, import_react4.createElement)("div", { style: s.colFoot }, [
+      (0, import_react4.createElement)("div", { style: s.seg }, [
+        (0, import_react4.createElement)(
           "button",
           { style: filter === "all" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("all") },
           `${t("filterAll")} ${rows.length}`
         ),
-        (0, import_react5.createElement)(
+        (0, import_react4.createElement)(
           "button",
           { style: filter === "on" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("on") },
           `${t("filterOn")} ${onCount}`
         ),
-        (0, import_react5.createElement)(
+        (0, import_react4.createElement)(
           "button",
           { style: filter === "off" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("off") },
           `${t("filterOff")} ${offCount}`
@@ -3247,29 +2602,29 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   ]);
 }
 function InjectForm({ onAdd, phaseLabel, t }) {
-  const [name, setName] = (0, import_react5.useState)("");
-  const [text, setText] = (0, import_react5.useState)("");
+  const [name, setName] = (0, import_react4.useState)("");
+  const [text, setText] = (0, import_react4.useState)("");
   const submit = () => {
     if (!name.trim()) return;
     onAdd(name.trim(), text);
     setName("");
     setText("");
   };
-  return (0, import_react5.createElement)("div", { style: s.injectRow }, [
-    (0, import_react5.createElement)("input", { style: { ...s.input, width: "30%" }, placeholder: t("name"), value: name, onChange: (e) => setName(e.target.value) }),
-    (0, import_react5.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: `${t("text")}\uFF08${phaseLabel}\uFF09`, value: text, onChange: (e) => setText(e.target.value) }),
-    (0, import_react5.createElement)("button", { style: s.mini, onClick: submit }, t("add"))
+  return (0, import_react4.createElement)("div", { style: s.injectRow }, [
+    (0, import_react4.createElement)("input", { style: { ...s.input, width: "30%" }, placeholder: t("name"), value: name, onChange: (e) => setName(e.target.value) }),
+    (0, import_react4.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: `${t("text")}\uFF08${phaseLabel}\uFF09`, value: text, onChange: (e) => setText(e.target.value) }),
+    (0, import_react4.createElement)("button", { style: s.mini, onClick: submit }, t("add"))
   ]);
 }
 
 // src/client/prompt/ToolsPane.tsx
-var import_react6 = require("react");
+var import_react5 = require("react");
 function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
-  const [filter, setFilter] = (0, import_react6.useState)("all");
-  const [notice, setNotice] = (0, import_react6.useState)(null);
-  const [dragName, setDragName] = (0, import_react6.useState)(null);
-  const [dropMark, setDropMark] = (0, import_react6.useState)(null);
-  const scrollRef = (0, import_react6.useRef)(null);
+  const [filter, setFilter] = (0, import_react5.useState)("all");
+  const [notice, setNotice] = (0, import_react5.useState)(null);
+  const [dragName, setDragName] = (0, import_react5.useState)(null);
+  const [dropMark, setDropMark] = (0, import_react5.useState)(null);
+  const scrollRef = (0, import_react5.useRef)(null);
   useDragAutoScroll(scrollRef);
   const excludeOf = (key) => {
     const tools = cfg.tools ?? {};
@@ -3284,10 +2639,10 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const writeLists = (key, exclude, add) => {
     write("tools", withPhaseAdd(withPhaseExclude(cfg.tools ?? {}, key, exclude), key, add));
   };
-  const writeSynced = (apply4) => {
+  const writeSynced = (apply3) => {
     let tools = cfg.tools;
     for (const k of PART_ORDER) {
-      const next = apply4(k, excludeOf(k), addOf(k));
+      const next = apply3(k, excludeOf(k), addOf(k));
       if (next === null) continue;
       tools = withPhaseExclude(withPhaseAdd(tools, k, next.add), k, next.exclude);
     }
@@ -3388,7 +2743,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     setDropMark(null);
     if (payload.from === phase) removeFromPhase(phase, payload.name);
   };
-  (0, import_react6.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     setPhaseDropHandler((key, payload) => dropToolInto(key, payload));
     return () => setPhaseDropHandler(null);
   });
@@ -3399,7 +2754,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.hidden : row.hidden);
   const renderRow = (row) => {
     if (!rowVisible(row)) return null;
-    return (0, import_react6.createElement)("div", {
+    return (0, import_react5.createElement)("div", {
       key: row.name,
       style: {
         ...s.row,
@@ -3417,7 +2772,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       onDrop: dropOnPane
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框的手势一起吃掉。
-      (0, import_react6.createElement)("span", {
+      (0, import_react5.createElement)("span", {
         draggable: true,
         title: t("drag"),
         style: s.dragHandle,
@@ -3431,20 +2786,20 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           finishDrag();
         }
       }, "\u283F"),
-      (0, import_react6.createElement)("input", {
+      (0, import_react5.createElement)("input", {
         type: "checkbox",
         checked: !row.hidden,
         onChange: () => toggleHide(phase, row.name, row.hidden),
         title: row.hidden ? t("hiddenOn") : t("hiddenOff"),
         style: { margin: 0, cursor: "pointer", flex: "none" }
       }),
-      (0, import_react6.createElement)("div", { style: s.rowBody }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react6.createElement)("span", { style: s.code }, row.name),
-          row.added ? (0, import_react6.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
-          row.hidden ? (0, import_react6.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
+      (0, import_react5.createElement)("div", { style: s.rowBody }, [
+        (0, import_react5.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react5.createElement)("span", { style: s.code }, row.name),
+          row.added ? (0, import_react5.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
+          row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
         ]),
-        row.description !== "" ? (0, import_react6.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
+        row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
       ])
     ]);
   };
@@ -3452,8 +2807,8 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     name: tool.name,
     description: typeof tool === "string" ? "" : tool.description ?? ""
   }));
-  return (0, import_react6.createElement)("div", { style: s.colLeft }, [
-    (0, import_react6.createElement)("div", {
+  return (0, import_react5.createElement)("div", { style: s.colLeft }, [
+    (0, import_react5.createElement)("div", {
       ref: scrollRef,
       style: { ...s.colScroll, ...dropMark === "list" ? s.dropZone : {} },
       // 列表空白处投放：池里 / 别的阶段拖来的工具放进本阶段。
@@ -3465,14 +2820,14 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       },
       onDrop: dropOnPane
     }, [
-      (0, import_react6.createElement)("div", { style: s.muted }, t("toolsFourHint")),
-      notice ? (0, import_react6.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
+      (0, import_react5.createElement)("div", { style: s.muted }, t("toolsFourHint")),
+      notice ? (0, import_react5.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
-      rows.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
+      rows.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
       // 本系统全部工具：注册表的完整目录，只读池。加入某个阶段靠拖拽：把行拖进
       // 上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段（行上不再
       // 放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
-      (0, import_react6.createElement)("details", {
+      (0, import_react5.createElement)("details", {
         style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
         onDragOver: (event) => {
           if (!acceptsDrop(event, "tool")) return;
@@ -3482,13 +2837,13 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         },
         onDrop: dropOnPool
       }, [
-        (0, import_react6.createElement)(
+        (0, import_react5.createElement)(
           "summary",
           { style: { ...s.muted, cursor: "pointer" } },
           `${t("allToolsTitle")} (${allTools.length})`
         ),
-        allTools.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
-        allTools.map((tool) => (0, import_react6.createElement)("div", {
+        allTools.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
+        allTools.map((tool) => (0, import_react5.createElement)("div", {
           key: tool.name,
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
@@ -3496,27 +2851,27 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           onDragStart: (event) => beginDrag(event, { kind: "tool", name: tool.name, from: "pool" }),
           onDragEnd: finishDrag
         }, [
-          (0, import_react6.createElement)("div", { style: s.rowBody }, [
-            (0, import_react6.createElement)("div", { style: s.rowTitle }, (0, import_react6.createElement)("span", { style: s.code }, tool.name)),
-            (0, import_react6.createElement)("div", { style: s.preview }, tool.description.slice(0, 120))
+          (0, import_react5.createElement)("div", { style: s.rowBody }, [
+            (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, tool.name)),
+            (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120))
           ])
         ]))
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。
-    (0, import_react6.createElement)("div", { style: s.colFoot }, [
-      (0, import_react6.createElement)("div", { style: s.seg }, [
-        (0, import_react6.createElement)(
+    (0, import_react5.createElement)("div", { style: s.colFoot }, [
+      (0, import_react5.createElement)("div", { style: s.seg }, [
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "all" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("all") },
           `${t("filterAll")} ${rows.length}`
         ),
-        (0, import_react6.createElement)(
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "on" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("on") },
           `${t("filterOn")} ${onCount}`
         ),
-        (0, import_react6.createElement)(
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "off" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("off") },
           `${t("filterOff")} ${offCount}`
@@ -3527,7 +2882,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
 }
 
 // src/client/prompt/PresetsPane.tsx
-var import_react7 = require("react");
+var import_react6 = require("react");
 
 // src/client/prompt/preset-io.ts
 function isTauriEnv(win) {
@@ -3633,9 +2988,9 @@ async function importPresetFile(io) {
 
 // src/client/prompt/PresetsPane.tsx
 function useNotice() {
-  const [notice, setNotice] = (0, import_react7.useState)(null);
-  const noticeTimer = (0, import_react7.useRef)(null);
-  (0, import_react7.useEffect)(() => () => {
+  const [notice, setNotice] = (0, import_react6.useState)(null);
+  const noticeTimer = (0, import_react6.useRef)(null);
+  (0, import_react6.useEffect)(() => () => {
     if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
   }, []);
   const show = (kind, text) => {
@@ -3647,9 +3002,9 @@ function useNotice() {
 }
 function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist }) {
   const presets = cfg.presets ?? [];
-  const [name, setName] = (0, import_react7.useState)("");
+  const [name, setName] = (0, import_react6.useState)("");
   const { notice, show } = useNotice();
-  const fileRef = (0, import_react7.useRef)(null);
+  const fileRef = (0, import_react6.useRef)(null);
   const blockedNames = new Set(cfg.sections ?? []);
   const assemblyNames = /* @__PURE__ */ new Set();
   for (const key of PART_ORDER) {
@@ -3726,46 +3081,46 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     reader.onerror = () => show("error", t("importFail"));
     reader.readAsText(file);
   };
-  return (0, import_react7.createElement)("div", { style: s.colLeft }, [
-    (0, import_react7.createElement)("div", { style: s.colScroll }, [
-      notice ? (0, import_react7.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.error }, notice.text) : null,
-      (0, import_react7.createElement)("div", { style: s.groupHead }, t("libraryTitle")),
-      (0, import_react7.createElement)("div", { style: s.injectBox }, [
-        (0, import_react7.createElement)("div", { style: s.injectRow }, [
-          (0, import_react7.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("presetName"), value: name, onChange: (e) => setName(e.target.value) }),
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: saveCurrent }, t("save"))
+  return (0, import_react6.createElement)("div", { style: s.colLeft }, [
+    (0, import_react6.createElement)("div", { style: s.colScroll }, [
+      notice ? (0, import_react6.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.error }, notice.text) : null,
+      (0, import_react6.createElement)("div", { style: s.groupHead }, t("libraryTitle")),
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("presetName"), value: name, onChange: (e) => setName(e.target.value) }),
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: saveCurrent }, t("save"))
         ]),
-        (0, import_react7.createElement)("div", { style: s.injectRow }, [
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
             void importPreset();
           } }, t("import")),
-          (0, import_react7.createElement)("input", { ref: fileRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: onImportFile })
+          (0, import_react6.createElement)("input", { ref: fileRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: onImportFile })
         ])
       ]),
-      presets.length === 0 ? (0, import_react7.createElement)("div", { style: s.muted }, t("empty")) : null,
+      presets.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
       presets.map((preset) => {
         const active = cfg.activePreset === preset.id;
-        return (0, import_react7.createElement)("div", { key: preset.id, style: s.row }, [
-          (0, import_react7.createElement)("div", { style: s.rowBody }, [
-            (0, import_react7.createElement)("div", { style: s.rowTitle }, [
-              (0, import_react7.createElement)("span", { style: s.code }, preset.name),
-              active ? (0, import_react7.createElement)("span", { style: s.badgeOk }, t("active")) : null
+        return (0, import_react6.createElement)("div", { key: preset.id, style: s.row }, [
+          (0, import_react6.createElement)("div", { style: s.rowBody }, [
+            (0, import_react6.createElement)("div", { style: s.rowTitle }, [
+              (0, import_react6.createElement)("span", { style: s.code }, preset.name),
+              active ? (0, import_react6.createElement)("span", { style: s.badgeOk }, t("active")) : null
             ])
           ]),
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => applyPreset(preset) }, t("apply")),
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => applyPreset(preset) }, t("apply")),
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
             void exportPreset(preset);
           } }, t("export")),
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => deletePreset(preset.id) }, t("delete"))
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => deletePreset(preset.id) }, t("delete"))
         ]);
       })
     ])
   ]);
 }
 function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onReset, envBlocklist }) {
-  const [agentName, setAgentName] = (0, import_react7.useState)("");
-  const [creating, setCreating] = (0, import_react7.useState)(false);
-  const [blockInput, setBlockInput] = (0, import_react7.useState)("");
+  const [agentName, setAgentName] = (0, import_react6.useState)("");
+  const [creating, setCreating] = (0, import_react6.useState)(false);
+  const [blockInput, setBlockInput] = (0, import_react6.useState)("");
   const createAgentPreset = async () => {
     const trimmed = agentName.trim();
     if (trimmed.length === 0 || creating) return;
@@ -3782,31 +3137,31 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
     if (entry === "" || envBlocklist.includes(entry)) return;
     writeGlobal("envBlocklist", [...envBlocklist, entry]);
   };
-  return (0, import_react7.createElement)("div", { style: s.colRight }, [
-    (0, import_react7.createElement)("div", { style: s.colRightScroll }, [
-      (0, import_react7.createElement)("div", { style: s.injectBox }, [
-        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("saveAsPresetCard")),
-        (0, import_react7.createElement)("div", { style: s.muted }, t("saveAsPresetHint", { name: forkSource ?? t("forkSourceDefault") })),
-        (0, import_react7.createElement)("div", { style: s.injectRow }, [
-          (0, import_react7.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("agentPresetName"), value: agentName, onChange: (e) => setAgentName(e.target.value) }),
-          (0, import_react7.createElement)("button", { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => {
+  return (0, import_react6.createElement)("div", { style: s.colRight }, [
+    (0, import_react6.createElement)("div", { style: s.colRightScroll }, [
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("saveAsPresetCard")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("saveAsPresetHint", { name: forkSource ?? t("forkSourceDefault") })),
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("agentPresetName"), value: agentName, onChange: (e) => setAgentName(e.target.value) }),
+          (0, import_react6.createElement)("button", { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => {
             void createAgentPreset();
           } }, t("saveAsPreset"))
         ])
       ]),
-      (0, import_react7.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
-      (0, import_react7.createElement)("div", { style: s.injectBox }, [
-        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("forceTitle")),
-        (0, import_react7.createElement)("div", { style: s.muted }, t("forceHint")),
-        (0, import_react7.createElement)("div", { style: s.injectRow }, [
-          (0, import_react7.createElement)("label", { style: s.switchWrap }, [
-            (0, import_react7.createElement)("input", {
+      (0, import_react6.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("forceTitle")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("forceHint")),
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("label", { style: s.switchWrap }, [
+            (0, import_react6.createElement)("input", {
               type: "checkbox",
               checked: cfg.forceSections !== false,
               // forceSections 是全局字段，与 presets/activePreset 一样永远写顶层。
               onChange: (e) => writeGlobal("forceSections", e.target.checked)
             }),
-            (0, import_react7.createElement)(
+            (0, import_react6.createElement)(
               "span",
               { style: cfg.forceSections !== false ? s.badgeOk : s.badgeBlocked },
               cfg.forceSections !== false ? t("forceOn") : t("forceOff")
@@ -3814,37 +3169,37 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
           ])
         ])
       ]),
-      (0, import_react7.createElement)("div", { style: s.injectBox }, [
-        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("envBlockTitle")),
-        (0, import_react7.createElement)("div", { style: s.muted }, t("envBlockHint")),
-        (0, import_react7.createElement)("div", { style: { ...s.toolWrap, marginTop: 6 } }, envBlocklist.map((entry) => (0, import_react7.createElement)("span", {
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("envBlockTitle")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("envBlockHint")),
+        (0, import_react6.createElement)("div", { style: { ...s.toolWrap, marginTop: 6 } }, envBlocklist.map((entry) => (0, import_react6.createElement)("span", {
           key: entry,
           style: { ...s.toolChip, display: "inline-flex", alignItems: "center", gap: 4 }
         }, [
           entry,
-          (0, import_react7.createElement)("span", { style: { cursor: "pointer" }, title: t("delete"), onClick: () => removeBlockEntry(entry) }, "\xD7")
+          (0, import_react6.createElement)("span", { style: { cursor: "pointer" }, title: t("delete"), onClick: () => removeBlockEntry(entry) }, "\xD7")
         ]))),
-        envBlocklist.length === 0 ? (0, import_react7.createElement)("div", { style: s.muted }, t("envBlockEmpty")) : null,
-        (0, import_react7.createElement)("div", { style: { ...s.injectRow, marginTop: 6 } }, [
-          (0, import_react7.createElement)("input", {
+        envBlocklist.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("envBlockEmpty")) : null,
+        (0, import_react6.createElement)("div", { style: { ...s.injectRow, marginTop: 6 } }, [
+          (0, import_react6.createElement)("input", {
             style: { ...s.input, flex: 1 },
             placeholder: t("envBlockAdd"),
             value: blockInput,
             onChange: (e) => setBlockInput(e.target.value)
           }),
-          (0, import_react7.createElement)("button", { style: s.mini, disabled: blockInput.trim() === "", onClick: addBlockEntry }, t("envBlockAddAction"))
+          (0, import_react6.createElement)("button", { style: s.mini, disabled: blockInput.trim() === "", onClick: addBlockEntry }, t("envBlockAddAction"))
         ]),
-        (0, import_react7.createElement)("details", { style: { marginTop: 6 } }, [
-          (0, import_react7.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("envVarsTitle")} (${inv?.variables?.length ?? 0})`),
-          (0, import_react7.createElement)("div", { style: { ...s.muted, marginTop: 4 } }, t("envVarsHint")),
-          (0, import_react7.createElement)("div", { style: { ...s.toolWrap, marginTop: 4 } }, (inv?.variables ?? []).map((varName) => (0, import_react7.createElement)("span", { key: varName, style: s.toolChip }, `{{${varName}}}`)))
+        (0, import_react6.createElement)("details", { style: { marginTop: 6 } }, [
+          (0, import_react6.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("envVarsTitle")} (${inv?.variables?.length ?? 0})`),
+          (0, import_react6.createElement)("div", { style: { ...s.muted, marginTop: 4 } }, t("envVarsHint")),
+          (0, import_react6.createElement)("div", { style: { ...s.toolWrap, marginTop: 4 } }, (inv?.variables ?? []).map((varName) => (0, import_react6.createElement)("span", { key: varName, style: s.toolChip }, `{{${varName}}}`)))
         ])
       ]),
-      (0, import_react7.createElement)("div", { style: s.injectBox }, [
-        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("resetTitle")),
-        (0, import_react7.createElement)("div", { style: s.muted }, t("resetHint")),
-        (0, import_react7.createElement)("div", { style: s.injectRow }, [
-          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("resetTitle")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("resetHint")),
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
             if (window.confirm(t("resetConfirm"))) onReset();
           } }, t("resetAction"))
         ])
@@ -3854,25 +3209,25 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
 }
 
 // src/client/prompt/PreviewPane.tsx
-var import_react9 = require("react");
+var import_react8 = require("react");
 
 // src/client/prompt/PreviewTools.tsx
-var import_react8 = require("react");
+var import_react7 = require("react");
 function norm(tool) {
   return typeof tool === "string" ? { name: tool, description: "" } : tool;
 }
 function PreviewTools({ tools, t }) {
-  if (tools.length === 0) return (0, import_react8.createElement)("div", { style: s.muted }, t("empty"));
-  return (0, import_react8.createElement)("div", { style: s.list }, [
-    (0, import_react8.createElement)("div", { style: s.rowTitle }, [
-      (0, import_react8.createElement)("span", { style: s.orderTag }, `${tools.length} ${t("previewToolCount")}`)
+  if (tools.length === 0) return (0, import_react7.createElement)("div", { style: s.muted }, t("empty"));
+  return (0, import_react7.createElement)("div", { style: s.list }, [
+    (0, import_react7.createElement)("div", { style: s.rowTitle }, [
+      (0, import_react7.createElement)("span", { style: s.orderTag }, `${tools.length} ${t("previewToolCount")}`)
     ]),
     tools.map((tool) => {
       const { name, description } = norm(tool);
-      return (0, import_react8.createElement)("div", { key: name, style: s.row }, [
-        (0, import_react8.createElement)("div", { style: s.rowBody }, [
-          (0, import_react8.createElement)("div", { style: s.rowTitle }, (0, import_react8.createElement)("span", { style: s.code }, name)),
-          (0, import_react8.createElement)("div", { style: s.preview }, String(description ?? "").slice(0, 140))
+      return (0, import_react7.createElement)("div", { key: name, style: s.row }, [
+        (0, import_react7.createElement)("div", { style: s.rowBody }, [
+          (0, import_react7.createElement)("div", { style: s.rowTitle }, (0, import_react7.createElement)("span", { style: s.code }, name)),
+          (0, import_react7.createElement)("div", { style: s.preview }, String(description ?? "").slice(0, 140))
         ])
       ]);
     })
@@ -3883,33 +3238,33 @@ function PreviewTools({ tools, t }) {
 function PreviewPane({ t, phases, phase, sub }) {
   const data = phases?.[phase] ?? null;
   const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
-  return (0, import_react9.createElement)("div", { style: s.colRight }, [
-    (0, import_react9.createElement)("div", { style: s.colRightScroll }, [
+  return (0, import_react8.createElement)("div", { style: s.colRight }, [
+    (0, import_react8.createElement)("div", { style: s.colRightScroll }, [
       // 该阶段的本插件段级产出没进最终提示词（整段接管或被下游丢弃）。
-      lossNote !== null ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
+      lossNote !== null ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
       // scope 挂载失败回退全局层时明确警示：这不是该预设的原生装配。
-      data !== null && data.scopeResolved === false ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
-      phases === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("loading")) : null,
-      phases !== null && data === null ? (0, import_react9.createElement)("div", { style: s.error }, t("previewFail")) : null,
+      data !== null && data.scopeResolved === false ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
+      phases === null ? (0, import_react8.createElement)("div", { style: s.muted }, t("loading")) : null,
+      phases !== null && data === null ? (0, import_react8.createElement)("div", { style: s.error }, t("previewFail")) : null,
       sub === "prompt" ? data ? [
-        (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react9.createElement)("span", { style: s.muted }, t("previewHint")),
-          (0, import_react9.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
+        (0, import_react8.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react8.createElement)("span", { style: s.muted }, t("previewHint")),
+          (0, import_react8.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
         ]),
-        (0, import_react9.createElement)("pre", { style: s.previewText }, data.text || t("empty"))
+        (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty"))
       ] : null : data ? [
         // 模型视角 vs 注册表视角的对照：预览按所选阶段运行全部装配规则
         //（含预设原生的阶段裁剪），某些预设（如 PTC / Code Mode）会把
         // 完整目录包装成单一工具，注册表原始目录仍列在工具子视图。
-        (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react9.createElement)("span", { style: s.muted }, t("previewToolsHint")),
-          (0, import_react9.createElement)(
+        (0, import_react8.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react8.createElement)("span", { style: s.muted }, t("previewToolsHint")),
+          (0, import_react8.createElement)(
             "span",
             { style: s.orderTag },
             `${data.tools.length} / ${data.registryTotal ?? "?"} ${t("previewToolsCount")}`
           )
         ]),
-        (0, import_react9.createElement)(PreviewTools, { tools: data.tools, t })
+        (0, import_react8.createElement)(PreviewTools, { tools: data.tools, t })
       ] : null
     ])
   ]);
@@ -3928,24 +3283,24 @@ var PREVIEW_URL = "/api/prompt-customizer/preview";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
 function Panel({ t, onClose }) {
-  const [cfg, setCfg] = (0, import_react10.useState)(null);
-  const [inv, setInv] = (0, import_react10.useState)(null);
-  const [phases, setPhases] = (0, import_react10.useState)(null);
-  const [agentPresets, setAgentPresets] = (0, import_react10.useState)([]);
-  const [mode, setMode] = (0, import_react10.useState)("sections");
-  const [error, setError] = (0, import_react10.useState)(null);
-  const [version, setVersion] = (0, import_react10.useState)(0);
-  const [phase, setPhase] = (0, import_react10.useState)("bootstrap");
-  const [dropPhase, setDropPhase] = (0, import_react10.useState)(null);
-  const syncSeq = (0, import_react10.useRef)(0);
-  const [target, setTarget] = (0, import_react10.useState)(void 0);
-  const [syncAll, setSyncAll] = (0, import_react10.useState)(false);
-  const [previewSub, setPreviewSub] = (0, import_react10.useState)("prompt");
-  const [draft, setDraft] = (0, import_react10.useState)(null);
-  const [saving, setSaving] = (0, import_react10.useState)(false);
-  const [flash, setFlash] = (0, import_react10.useState)(null);
-  const [flashKind, setFlashKind] = (0, import_react10.useState)("ok");
-  const flashTimer = (0, import_react10.useRef)(null);
+  const [cfg, setCfg] = (0, import_react9.useState)(null);
+  const [inv, setInv] = (0, import_react9.useState)(null);
+  const [phases, setPhases] = (0, import_react9.useState)(null);
+  const [agentPresets, setAgentPresets] = (0, import_react9.useState)([]);
+  const [mode, setMode] = (0, import_react9.useState)("sections");
+  const [error, setError] = (0, import_react9.useState)(null);
+  const [version, setVersion] = (0, import_react9.useState)(0);
+  const [phase, setPhase] = (0, import_react9.useState)("bootstrap");
+  const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
+  const syncSeq = (0, import_react9.useRef)(0);
+  const [target, setTarget] = (0, import_react9.useState)(void 0);
+  const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
+  const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
+  const [draft, setDraft] = (0, import_react9.useState)(null);
+  const [saving, setSaving] = (0, import_react9.useState)(false);
+  const [flash, setFlash] = (0, import_react9.useState)(null);
+  const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
+  const flashTimer = (0, import_react9.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
@@ -3953,7 +3308,7 @@ function Panel({ t, onClose }) {
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react10.useEffect)(load, []);
+  (0, import_react9.useEffect)(load, []);
   const refresh = () => {
     const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
@@ -3964,7 +3319,7 @@ function Panel({ t, onClose }) {
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     void refresh();
   }, [target, version]);
   const syncDraftPreview = () => {
@@ -3989,18 +3344,18 @@ function Panel({ t, onClose }) {
       setError(`${t("previewSyncFail")}\uFF1A${e instanceof Error ? e.message : String(e)}`);
     });
   };
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (draft === null || !draft.dirty) return void 0;
     const timer = setTimeout(syncDraftPreview, 600);
     return () => {
       clearTimeout(timer);
     };
   }, [draft, phase, target]);
-  const fetchPresets2 = () => {
+  const fetchPresets = () => {
     fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => setAgentPresets(Array.isArray(body?.presets) ? body.presets : [])).catch(() => setAgentPresets([]));
   };
-  (0, import_react10.useEffect)(() => {
-    fetchPresets2();
+  (0, import_react9.useEffect)(() => {
+    fetchPresets();
   }, []);
   const showFlash = (text, kind = "ok") => {
     if (flashTimer.current !== null) clearTimeout(flashTimer.current);
@@ -4013,7 +3368,7 @@ function Panel({ t, onClose }) {
     setDraft(null);
   };
   if (cfg === null) {
-    return (0, import_react10.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
+    return (0, import_react9.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
   }
   const base = editView(cfg, target);
   const view = draft ? {
@@ -4083,8 +3438,8 @@ function Panel({ t, onClose }) {
   const poolText = (name, fallback) => {
     if (!zhOn) return fallback;
     const entry = ZH_SECTIONS[name];
-    const zh2 = typeof entry === "function" ? entry(fallback) : entry;
-    return typeof zh2 === "string" && zh2 !== "" ? zh2 : fallback;
+    const zh = typeof entry === "function" ? entry(fallback) : entry;
+    return typeof zh === "string" && zh !== "" ? zh : fallback;
   };
   const toggleZh = () => {
     if (phases === null || phases.bootstrap === null || phases.active === null || phases.compaction === null) {
@@ -4142,7 +3497,7 @@ function Panel({ t, onClose }) {
     }).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? t("saveAsPresetFail"));
       load();
-      fetchPresets2();
+      fetchPresets();
       showFlash(t("saveAsPresetOk"), "ok");
       return true;
     }).catch((e) => {
@@ -4150,14 +3505,14 @@ function Panel({ t, onClose }) {
       return false;
     });
   };
-  const modeBtn = (key, label) => (0, import_react10.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
+  const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
   const draftDirty = draft?.dirty === true;
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
     const customized = id === void 0 ? 0 : Object.keys(cfg?.overrides?.[id] ?? {}).length;
-    return (0, import_react10.createElement)("button", {
+    return (0, import_react9.createElement)("button", {
       key: id ?? "__global__",
       type: "button",
       className: css.catItem,
@@ -4165,43 +3520,43 @@ function Panel({ t, onClose }) {
       onClick: () => switchTarget(id),
       title: bad ? `${label} \u2014 ${t("broken")}` : id === void 0 ? t("targetHint") : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
     }, [
-      (0, import_react10.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
-      (0, import_react10.createElement)("span", { className: css.catLabel }, label),
-      bad ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
-      !bad && customized > 0 ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
+      (0, import_react9.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
+      (0, import_react9.createElement)("span", { className: css.catLabel }, label),
+      bad ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
+      !bad && customized > 0 ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
     ]);
   };
-  return (0, import_react10.createElement)("div", { style: s.pRoot }, [
+  return (0, import_react9.createElement)("div", { style: s.pRoot }, [
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
-    (0, import_react10.createElement)("div", { key: "targets", className: css.topbar }, [
-      (0, import_react10.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
-        targetChip(void 0, t("targetAllTab"), (0, import_react10.createElement)(CatAllIcon, { size: 16 })),
-        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react10.createElement)(import_dsh_client_ui_primitives2.IconAgentPresetOutline16, { size: 15 }), p.broken))
+    (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
+      (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
+        targetChip(void 0, t("targetAllTab"), (0, import_react9.createElement)(CatAllIcon, { size: 16 })),
+        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutline16, { size: 15 }), p.broken))
       ])
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
     // 阶段按钮合并放在三态同步选择框左侧：左栏列表与右栏预览跟着同一个
     // 阶段状态走，一处切换两边联动。仅在提示词 / 工具两个模式显示。
-    (0, import_react10.createElement)("div", { style: s.head }, [
-      (0, import_react10.createElement)("span", { style: s.headTitle }, [
-        (0, import_react10.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
-          (0, import_react10.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          (0, import_react10.createElement)("path", { d: "M14 2v6h6" }),
-          (0, import_react10.createElement)("path", { d: "M16 13H8" }),
-          (0, import_react10.createElement)("path", { d: "M16 17H8" }),
-          (0, import_react10.createElement)("path", { d: "M10 9H8" })
+    (0, import_react9.createElement)("div", { style: s.head }, [
+      (0, import_react9.createElement)("span", { style: s.headTitle }, [
+        (0, import_react9.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
+          (0, import_react9.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+          (0, import_react9.createElement)("path", { d: "M14 2v6h6" }),
+          (0, import_react9.createElement)("path", { d: "M16 13H8" }),
+          (0, import_react9.createElement)("path", { d: "M16 17H8" }),
+          (0, import_react9.createElement)("path", { d: "M10 9H8" })
         ]),
         t("nav")
       ]),
-      (0, import_react10.createElement)("div", { style: s.seg }, [
+      (0, import_react9.createElement)("div", { style: s.seg }, [
         modeBtn("sections", t("tabsSections")),
         modeBtn("tools", t("tabsTools")),
         modeBtn("presets", t("tabsPresets"))
       ]),
-      (0, import_react10.createElement)("div", { style: s.headActions }, [
-        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react10.createElement)("button", {
+      (0, import_react9.createElement)("div", { style: s.headActions }, [
+        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react9.createElement)("button", {
           key,
           style: dropPhase === key ? phase === key ? s.segBtnDropActive : s.segBtnDrop : phase === key ? s.segBtnActive : s.segBtn,
           onClick: () => setPhase(key),
@@ -4220,12 +3575,12 @@ function Panel({ t, onClose }) {
             dropOnPhase(key, payload);
           }
         }, stageLabel(key)))) : null,
-        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react10.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
-        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("label", {
+        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
+        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("syncAllPhasesHint")
         }, [
-          (0, import_react10.createElement)("input", {
+          (0, import_react9.createElement)("input", {
             type: "checkbox",
             checked: syncAll,
             onChange: (e) => setSyncAll(e.target.checked),
@@ -4233,11 +3588,11 @@ function Panel({ t, onClose }) {
           }),
           t("syncAllPhases")
         ]) : null,
-        mode === "sections" ? (0, import_react10.createElement)("label", {
+        mode === "sections" ? (0, import_react9.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("zhHint")
         }, [
-          (0, import_react10.createElement)("input", {
+          (0, import_react9.createElement)("input", {
             type: "checkbox",
             checked: zhOn,
             onChange: toggleZh,
@@ -4245,47 +3600,47 @@ function Panel({ t, onClose }) {
           }),
           t("zhSwitch")
         ]) : null,
-        (0, import_react10.createElement)("button", {
+        (0, import_react9.createElement)("button", {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
           disabled: !draft?.dirty || saving,
           onClick: save
         }, t("save")),
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
-        (0, import_react10.createElement)("button", { style: s.saveBtn, onClick: () => {
+        (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
-        onClose === void 0 ? null : (0, import_react10.createElement)(
+        onClose === void 0 ? null : (0, import_react9.createElement)(
           "button",
           { style: s.iconBtn, onClick: onClose, "aria-label": t("close"), title: t("close") },
-          (0, import_react10.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
-            (0, import_react10.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
+          (0, import_react9.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
+            (0, import_react9.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
           ])
         )
       ])
     ]),
     // ── 消息条（错误 / 闪示 / 目标异常警示） ──
-    (0, import_react10.createElement)("div", { style: { padding: "0 14px" } }, [
-      error ? (0, import_react10.createElement)("div", { style: s.error }, String(error)) : null,
-      flash ? (0, import_react10.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
-      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react10.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
-      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null
+    (0, import_react9.createElement)("div", { style: { padding: "0 14px" } }, [
+      error ? (0, import_react9.createElement)("div", { style: s.error }, String(error)) : null,
+      flash ? (0, import_react9.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
+      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react9.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
+      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
-    (0, import_react10.createElement)(
+    (0, import_react9.createElement)(
       "div",
       { key: "body", style: s.body },
       mode === "sections" ? [
-        (0, import_react10.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
-        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
       ] : mode === "tools" ? [
-        (0, import_react10.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases, phase, syncAll, t, write: edit }),
-        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+        (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases, phase, syncAll, t, write: edit }),
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
       ] : [
-        (0, import_react10.createElement)(PresetsPane, {
+        (0, import_react9.createElement)(PresetsPane, {
           key: "presets",
           cfg: view,
           inv,
@@ -4296,7 +3651,7 @@ function Panel({ t, onClose }) {
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
         }),
-        (0, import_react10.createElement)(SettingsPane, {
+        (0, import_react9.createElement)(SettingsPane, {
           key: "settings",
           cfg: view,
           inv,
@@ -4615,7 +3970,7 @@ var DICT = {
 };
 
 // src/client/prompt/index.ts
-var NS2 = "prompt-customizer";
+var NS = "prompt-customizer";
 var bound;
 function promptT() {
   if (bound !== void 0) return bound;
@@ -4633,14 +3988,26 @@ function applyPrompt(ctx) {
     console.warn("[dsh-prompt-customizer] prompt locale unavailable: \u63D0\u793A\u8BCD\u9762\u677F\u56DE\u843D\u4E2D\u6587\u6587\u6848");
     return;
   }
-  ctx.effect(() => locale.register(NS2, DICT), "triad: prompt locale");
-  bound = locale.bind(NS2);
+  ctx.effect(() => {
+    try {
+      return locale.register(NS, DICT);
+    } catch (error) {
+      console.error("[dsh-prompt-customizer] prompt locale register failed:", error);
+      return () => {
+      };
+    }
+  }, "prompt-customizer: prompt locale");
+  try {
+    bound = locale.bind(NS);
+  } catch (error) {
+    console.warn("[dsh-prompt-customizer] prompt locale bind failed, \u56DE\u843D\u4E2D\u6587\u6587\u6848:", error);
+  }
 }
 
 // src/client/prompt/PromptView.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime3 = require("react/jsx-runtime");
 function PromptView() {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Panel, { t: promptT() }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Panel, { t: promptT() }) });
 }
 
 // src/client/skills/api.ts
@@ -4765,32 +4132,32 @@ function fileToBase64(file) {
 
 // src/client/skills/GuidePanel.tsx
 var import_react_dom2 = require("react-dom");
-var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_jsx_runtime4 = require("react/jsx-runtime");
 function CapIcon({ kind, size = 17 }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", "aria-hidden": true };
   const s2 = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
   if (kind === "ui") {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { ...common, ...s2, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "4", y: "4", width: "6.5", height: "6.5", rx: "1.4" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "13.5", y: "4", width: "6.5", height: "6.5", rx: "1.4" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "4", y: "13.5", width: "6.5", height: "6.5", rx: "1.4" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "13.5", y: "13.5", width: "6.5", height: "6.5", rx: "1.4" })
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { ...common, ...s2, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "4", y: "4", width: "6.5", height: "6.5", rx: "1.4" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "13.5", y: "4", width: "6.5", height: "6.5", rx: "1.4" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "4", y: "13.5", width: "6.5", height: "6.5", rx: "1.4" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "13.5", y: "13.5", width: "6.5", height: "6.5", rx: "1.4" })
     ] });
   }
   if (kind === "code") {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M9 7.5 5.5 12 9 16.5M15 7.5 18.5 12 15 16.5" }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M9 7.5 5.5 12 9 16.5M15 7.5 18.5 12 15 16.5" }) });
   }
   if (kind === "doc") {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { ...common, ...s2, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M6.5 4.5h7l4 4v11h-11Z" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M13.5 4.5v4h4M9 13h6M9 16h4.5" })
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { ...common, ...s2, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M6.5 4.5h7l4 4v11h-11Z" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M13.5 4.5v4h4M9 13h6M9 16h4.5" })
     ] });
   }
   if (kind === "data") {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M5 19h14M7 16v-5M12 16V8M17 16v-8.5" }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M5 19h14M7 16v-5M12 16V8M17 16v-8.5" }) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { ...common, ...s2, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) });
 }
 function GuidePanel({ t, onClose, left, top, height }) {
   const caps = [
@@ -4808,7 +4175,7 @@ function GuidePanel({ t, onClose, left, top, height }) {
   ];
   const bests = [t("guideBest1"), t("guideBest2"), t("guideBest3"), t("guideBest4")];
   return (0, import_react_dom2.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
       "aside",
       {
         className: css.guidePanel,
@@ -4816,44 +4183,44 @@ function GuidePanel({ t, onClose, left, top, height }) {
         "aria-label": t("guidePanelTitle"),
         style: { left, top, height },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guidePanelHead, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guidePanelLogo, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GuideArtIconSmall, {}) }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guidePanelTitle, children: t("guidePanelTitle") }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", className: css.guidePanelClose, "aria-label": t("guideClose"), onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.IconCloseOutline16, { size: 14, "aria-hidden": "true" }) })
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guidePanelHead, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guidePanelLogo, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GuideArtIconSmall, {}) }),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guidePanelTitle, children: t("guidePanelTitle") }),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: css.guidePanelClose, "aria-label": t("guideClose"), onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconCloseOutline16, { size: 14, "aria-hidden": "true" }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guidePanelBody, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("section", { className: css.guideSec, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guideSecHead, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideSecIcon, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.IconSkillOutline16, { size: 14, "aria-hidden": "true" }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideSecTitle, children: t("guideWhat") })
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guidePanelBody, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: css.guideSec, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideSecHead, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideSecIcon, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconSkillOutline16, { size: 14, "aria-hidden": "true" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideSecTitle, children: t("guideWhat") })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.guideWhatDesc, children: t("guideWhatDesc") }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.guideCaps, children: caps.map(([label, kind]) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: css.guideCap, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideCapIcon, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CapIcon, { kind }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideCapLabel, children: label })
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: css.guideWhatDesc, children: t("guideWhatDesc") }),
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: css.guideCaps, children: caps.map(([label, kind]) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: css.guideCap, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideCapIcon, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(CapIcon, { kind }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideCapLabel, children: label })
               ] }, label)) })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("section", { className: css.guideSec, children: steps.map(([num, title, desc]) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guideStep, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideStepNum, children: num }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guideStepBody, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.guideStepTitleRow, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideStepTitle, children: title }),
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.IconChevronRightOutline14, { className: css.guideStepArrow, size: 12, "aria-hidden": "true" })
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("section", { className: css.guideSec, children: steps.map(([num, title, desc]) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideStep, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideStepNum, children: num }),
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideStepBody, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideStepTitleRow, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideStepTitle, children: title }),
+                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconChevronRightOutline14, { className: css.guideStepArrow, size: 12, "aria-hidden": "true" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.guideStepDesc, children: desc })
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: css.guideStepDesc, children: desc })
               ] })
             ] }, num)) }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("section", { className: css.guideBest, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.guideBestTitle, children: t("guideBest") }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("ul", { className: css.guideBestList, children: bests.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("li", { className: css.guideBestItem, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CheckIcon, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: css.guideBest, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: css.guideBestTitle, children: t("guideBest") }),
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("ul", { className: css.guideBestList, children: bests.map((item) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("li", { className: css.guideBestItem, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(CheckIcon, {}),
                 item
               ] }, item)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("button", { type: "button", className: css.guideMoreBtn, onClick: onClose, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: t("guideMoreBest") }),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ArrowRightIcon, { size: 12 })
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { type: "button", className: css.guideMoreBtn, onClick: onClose, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: t("guideMoreBest") }),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ArrowRightIcon, { size: 12 })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: css.guideBestArt, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GuideArtIcon, {}) })
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideBestArt, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GuideArtIcon, {}) })
             ] })
           ] })
         ]
@@ -5281,17 +4648,17 @@ function skillT(key, params) {
 }
 
 // src/client/skills/McpAddModal.tsx
-var import_react11 = require("react");
-var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_react10 = require("react");
+var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
-  const [format, setFormat] = (0, import_react11.useState)("json");
-  const [text, setText] = (0, import_react11.useState)("");
-  const [busy, setBusy] = (0, import_react11.useState)(null);
-  const [preview, setPreview] = (0, import_react11.useState)(null);
-  const [errors, setErrors] = (0, import_react11.useState)([]);
-  const [warnings, setWarnings] = (0, import_react11.useState)([]);
-  const [notice, setNotice] = (0, import_react11.useState)(null);
+  const [format, setFormat] = (0, import_react10.useState)("json");
+  const [text, setText] = (0, import_react10.useState)("");
+  const [busy, setBusy] = (0, import_react10.useState)(null);
+  const [preview, setPreview] = (0, import_react10.useState)(null);
+  const [errors, setErrors] = (0, import_react10.useState)([]);
+  const [warnings, setWarnings] = (0, import_react10.useState)([]);
+  const [notice, setNotice] = (0, import_react10.useState)(null);
   const target = presetId === void 0 ? "global" : "preset";
   const placeholder = format === "json" ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }' : 'mcpServers:\n  my-server:\n    command: npx\n    args: ["-y", "@scope/mcp-server"]';
   const empty = text.trim() === "";
@@ -5356,9 +4723,9 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
       setBusy(null);
     });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: css.mcpAddForm, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: css.installHint, children: t("mcpPasteHint", { scope: presetId === void 0 ? t("mcpPasteScopeGlobal") : `${t("mcpPasteScopePreset")} \u201C${presetId}\u201D` }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: ["json", "yaml"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.mcpAddForm, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.installHint, children: t("mcpPasteHint", { scope: presetId === void 0 ? t("mcpPasteScopeGlobal") : `${t("mcpPasteScopePreset")} \u201C${presetId}\u201D` }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: ["json", "yaml"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "button",
       {
         type: "button",
@@ -5376,7 +4743,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
       },
       value
     )) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "textarea",
       {
         className: css.inlineInput,
@@ -5400,14 +4767,14 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
         }
       }
     ),
-    errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: css.error, role: "alert", children: errors.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { children: item }, item)) }),
-    warnings.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: css.installHint, role: "status", children: warnings.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+    errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.error, role: "alert", children: errors.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { children: item }, item)) }),
+    warnings.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installHint, role: "status", children: warnings.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
       "\xB7 ",
       item
     ] }, item)) }),
-    preview !== null && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: css.installHint, children: t("mcpPasteParsed", { n: preview.names.length, names: preview.names.join(", ") }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("pre", { style: {
+    preview !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.installHint, children: t("mcpPasteParsed", { n: preview.names.length, names: preview.names.join(", ") }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("pre", { style: {
         margin: 0,
         maxHeight: 200,
         overflow: "auto",
@@ -5417,27 +4784,27 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
         whiteSpace: "pre-wrap"
       }, children: preview.yaml })
     ] }),
-    notice !== null && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: css.mcpCopyHint, role: "status", children: notice }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: css.inlineForm, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives4.Button, { variant: "outline", type: "button", disabled: busy !== null || empty, onClick: previewNow, children: busy === "preview" ? t("mcpPasteChecking") : t("mcpPasteCheck") }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives4.Button, { variant: "primary", type: "button", disabled: busy !== null || empty, onClick: addNow, children: busy === "add" ? t("mcpPasteAdding") : t("mcpAddConfirm") }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives4.Button, { variant: "outline", type: "button", onClick: onCancel, children: t("cancel") })
+    notice !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.mcpCopyHint, role: "status", children: notice }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.inlineForm, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Button, { variant: "outline", type: "button", disabled: busy !== null || empty, onClick: previewNow, children: busy === "preview" ? t("mcpPasteChecking") : t("mcpPasteCheck") }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Button, { variant: "primary", type: "button", disabled: busy !== null || empty, onClick: addNow, children: busy === "add" ? t("mcpPasteAdding") : t("mcpAddConfirm") }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Button, { variant: "outline", type: "button", onClick: onCancel, children: t("cancel") })
     ] })
   ] });
 }
 function McpAddModal({ t, open, onClose, onAdded }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives4.Modal, { open, onClose, closeLabel: t("close"), title: t("mcpAddModalTitle"), children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(McpPasteAdd, { t, onAdded, onCancel: onClose }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Modal, { open, onClose, closeLabel: t("close"), title: t("mcpAddModalTitle"), children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(McpPasteAdd, { t, onAdded, onCancel: onClose }) });
 }
 
 // src/client/skills/McpView.tsx
-var import_react14 = require("react");
-var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_react13 = require("react");
+var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/confirm-dialog.tsx
-var import_react12 = require("react");
+var import_react11 = require("react");
 var import_react_dom3 = require("react-dom");
-var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 var STYLE_ID4 = "dsh-prompt-customizer-confirm-dialog-styles";
 var SHEET4 = `
 /* \u2500\u2500 \u906E\u7F69\uFF1A\u56FA\u5B9A\u5168\u5C4F\uFF0C\u70B9\u51FB=\u53D6\u6D88 \u2500\u2500 */
@@ -5497,7 +4864,7 @@ function ConfirmDialog({
   ensureModalAnimStyles();
   ensureDialogStyles();
   const { closing, requestClose } = useModalClose(open, onClose);
-  (0, import_react12.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!open) return void 0;
     const onKey = (event) => {
       if (event.key === "Escape") requestClose();
@@ -5516,15 +4883,15 @@ function ConfirmDialog({
     requestClose();
   };
   return (0, import_react_dom3.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `mcd-mask ${modalMaskAnimClass(closing)}`, "aria-hidden": "true", onClick: handleCancel }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mcd-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: `mcd-card ${modalAnimClass(closing)}`, role: "dialog", "aria-modal": "true", "aria-label": title, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mcd-title", children: title }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mcd-body", children: message }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mcd-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.Button, { variant: "outline", size: "sm", onClick: handleCancel, children: cancelLabel }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            import_dsh_client_ui_primitives5.Button,
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `mcd-mask ${modalMaskAnimClass(closing)}`, "aria-hidden": "true", onClick: handleCancel }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mcd-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `mcd-card ${modalAnimClass(closing)}`, role: "dialog", "aria-modal": "true", "aria-label": title, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mcd-title", children: title }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mcd-body", children: message }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mcd-actions", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives4.Button, { variant: "outline", size: "sm", onClick: handleCancel, children: cancelLabel }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            import_dsh_client_ui_primitives4.Button,
             {
               variant: danger ? "outline" : "primary",
               size: "sm",
@@ -5542,7 +4909,7 @@ function ConfirmDialog({
 }
 
 // src/client/skills/mcp-live.ts
-var import_react13 = require("react");
+var import_react12 = require("react");
 var MCP_TOOL_WATCH_INTERVAL_MS = 2e3;
 var MCP_TOOL_WATCH_TIMEOUT_MS = 15e4;
 function mcpRegisteredToolCountOf(data, serverName) {
@@ -5557,7 +4924,7 @@ function isToolRegistrationPending(registered, listed) {
   return registered === 0 && listed > 0;
 }
 function useMcpLiveState() {
-  const [status, setStatus] = (0, import_react13.useState)({ state: "loading", data: null });
+  const [status, setStatus] = (0, import_react12.useState)({ state: "loading", data: null });
   const load = () => {
     setStatus((current2) => current2.state === "ready" ? current2 : { state: "loading", data: null });
     void fetch("/api/triad/mcp-status", { headers: { accept: "application/json" } }).then((response) => {
@@ -5571,14 +4938,14 @@ function useMcpLiveState() {
       setStatus({ state: "unavailable", data: null });
     });
   };
-  (0, import_react13.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     load();
   }, []);
   return [status, load];
 }
 
 // src/client/skills/McpView.tsx
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function mcpToolNames(tools, disabledTools) {
   const known = new Set(tools.map((tool) => tool.name));
   return [...tools.map((tool) => tool.name), ...disabledTools.filter((name) => !known.has(name))];
@@ -5588,12 +4955,12 @@ function McpToolChips({ t, serverName, tools, disabledTools, locked, busy, onTog
   const names = mcpToolNames(tools, disabledTools);
   if (names.length === 0) return null;
   const off = new Set(disabledTools);
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.mcpToolChips, role: "group", "aria-label": t("mcpToolChipsAria", { name: serverName }), children: names.map((name) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpToolChips, role: "group", "aria-label": t("mcpToolChipsAria", { name: serverName }), children: names.map((name) => {
     const disabled = off.has(name);
     const isLocked = locked?.has(name) === true;
     const short = name.startsWith(prefix) ? name.slice(prefix.length) : name;
     const description = tools.find((tool) => tool.name === name)?.description ?? "";
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "button",
       {
         type: "button",
@@ -5611,7 +4978,7 @@ ${description}`}`,
           onToggle(name, disabled);
         },
         children: [
-          isLocked && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(LockGlyph, { size: 9 }),
+          isLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(LockGlyph, { size: 9 }),
           short
         ]
       },
@@ -5620,13 +4987,13 @@ ${description}`}`,
   }) });
 }
 function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn }) {
-  const [busy, setBusy] = (0, import_react14.useState)(null);
-  const [error, setError] = (0, import_react14.useState)(null);
-  const [globalOpen, setGlobalOpen] = (0, import_react14.useState)(true);
-  const [ownOpen, setOwnOpen] = (0, import_react14.useState)(true);
-  const [toolBusy, setToolBusy] = (0, import_react14.useState)(null);
-  const [removeReq, setRemoveReq] = (0, import_react14.useState)(null);
-  const [removeOwnReq, setRemoveOwnReq] = (0, import_react14.useState)(null);
+  const [busy, setBusy] = (0, import_react13.useState)(null);
+  const [error, setError] = (0, import_react13.useState)(null);
+  const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
+  const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
+  const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
+  const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
+  const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
   const presets = ready?.presets ?? [];
@@ -5768,17 +5135,17 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const needle = query.trim().toLowerCase();
   const shownGlobals = globals.filter((server) => (needle === "" || server.serverName.toLowerCase().includes(needle) || server.tools.some((tool) => tool.name.toLowerCase().includes(needle))) && (status === "all" || (scope === "" ? status === "off" ? server.config.disabled : !server.config.disabled : status === "off" ? masked.has(server.serverName) : !masked.has(server.serverName))));
   const shownOwn = ownRows.filter((row) => needle === "" || row.serverName.toLowerCase().includes(needle) || row.summary.toLowerCase().includes(needle));
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.mcpServerMain, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.hintRow, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.hintRowText, children: scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
-      scope !== "" && masked.size > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", className: css.presetReset, disabled: busy !== null, onClick: clearMasks, children: t("presetReset") })
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpServerMain, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.hintRow, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.hintRowText, children: scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
+      scope !== "" && masked.size > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.presetReset, disabled: busy !== null, onClick: clearMasks, children: t("presetReset") })
     ] }),
-    error !== null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.error, role: "alert", children: t("mcpPresetFailed", { message: error }) }),
-    maskWarn !== null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.error, role: "alert", children: maskWarn }),
-    waitingTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, role: "status", children: t("mcpWaitingTools", { names: waitingTools.join("\u3001") }) }),
-    live.state === "unavailable" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: t("mcpLiveUnavailable") }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: css.hubSection, "data-open": globalOpen ? "true" : void 0, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("header", { className: css.bundleRowOuter, "data-open": globalOpen ? "true" : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    error !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.error, role: "alert", children: t("mcpPresetFailed", { message: error }) }),
+    maskWarn !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.error, role: "alert", children: maskWarn }),
+    waitingTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, role: "status", children: t("mcpWaitingTools", { names: waitingTools.join("\u3001") }) }),
+    live.state === "unavailable" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpLiveUnavailable") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.hubSection, "data-open": globalOpen ? "true" : void 0, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("header", { className: css.bundleRowOuter, "data-open": globalOpen ? "true" : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
           "button",
           {
             type: "button",
@@ -5788,16 +5155,16 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               setGlobalOpen((value) => !value);
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconArchiveOutline20, { size: 16 }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleName, children: scope === "" ? t("mcpListTitle") : t("mcpPresetGlobalSection") }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleCount, children: shownGlobals.length }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconArchiveOutline20, { size: 16 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: scope === "" ? t("mcpListTitle") : t("mcpPresetGlobalSection") }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownGlobals.length }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
             ]
           }
         ) }),
-        globalOpen && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-          scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetMaskHint") }),
-          shownGlobals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: globals.length === 0 ? t("mcpLiveEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.mcpRecGrid, children: shownGlobals.map((server) => {
+        globalOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetMaskHint") }),
+          shownGlobals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: globals.length === 0 ? t("mcpLiveEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: shownGlobals.map((server) => {
             const isMasked = masked.has(server.serverName);
             const covered = ownNames.has(server.serverName);
             const offTools = offOf(server.serverName, "inherit");
@@ -5805,32 +5172,32 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
             const listed = server.tools.length;
             const pendingReg = isToolRegistrationPending(server.toolCount, listed);
             const lockedCount = mcpToolNames(server.tools, offTools).filter((name) => lockedTools.has(name)).length;
-            return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: css.mcpRecCard, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.mcpRecCardHead, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCardName, children: server.serverName }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCardTags, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCatTag, children: [
+            return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.mcpRecCard, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpRecCardHead, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCardName, children: server.serverName }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTags, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCatTag, children: [
                       server.toolCount > 0 ? server.toolCount : listed,
                       " ",
                       t("mcpLiveToolsOf")
                     ] }),
-                    pendingReg && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
-                    lockedCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCatTag, "data-locked": "true", title: t("mcpToolGlobalOffTip"), children: [
+                    pendingReg && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
+                    lockedCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCatTag, "data-locked": "true", title: t("mcpToolGlobalOffTip"), children: [
                       t("mcpToolGlobalOff"),
                       lockedCount > 1 ? ` ${lockedCount}` : ""
                     ] }),
-                    offTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offTools.length }) }),
-                    scope === "" ? server.config.disabled ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpLiveDisabled") }) : null : isMasked ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpPresetMasked") }) : null
+                    offTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offTools.length }) }),
+                    scope === "" ? server.config.disabled ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpLiveDisabled") }) : null : isMasked ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpPresetMasked") }) : null
                   ] })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                  import_dsh_client_ui_primitives6.Tooltip,
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  import_dsh_client_ui_primitives5.Tooltip,
                   {
                     label: scope === "" ? server.config.disabled ? t("enableSkill") : t("mcpLiveDisabled") : covered ? t("mcpPresetCoveredSwitchHint") : isMasked ? t("enableSkill") : t("mcpPresetMasked"),
                     side: "bottom",
                     delayMs: 500,
-                    children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                    children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                       "button",
                       {
                         type: "button",
@@ -5846,14 +5213,14 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                             if (!nextDisabled) onWatchTools([server.serverName]);
                           } else setMasked(server.serverName, isMasked);
                         },
-                        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
+                        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
                       }
                     )
                   }
                 )
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpRecCardDesc, children: server.config.disabled && scope === "" && server.tools.length === 0 ? `${t("mcpLiveDisabled")} \xB7 ${t("mcpToolsUnavailable")}` : t("mcpToolsHint") }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpRecCardDesc, children: server.config.disabled && scope === "" && server.tools.length === 0 ? `${t("mcpLiveDisabled")} \xB7 ${t("mcpToolsUnavailable")}` : t("mcpToolsHint") }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 McpToolChips,
                 {
                   t,
@@ -5867,9 +5234,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                   }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.mcpCardFoot, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpCardItemLabel, children: scope === "" ? t("mcpLiveConfigHint") : covered ? isMasked ? t("mcpPresetCoveredMasked") : t("mcpPresetCovered") : isMasked ? t("mcpPresetMasked") : t("mcpPresetMaskState") }) }),
-                scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: scope === "" ? t("mcpLiveConfigHint") : covered ? isMasked ? t("mcpPresetCoveredMasked") : t("mcpPresetCovered") : isMasked ? t("mcpPresetMasked") : t("mcpPresetMaskState") }) }),
+                scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",
                   {
                     type: "button",
@@ -5880,7 +5247,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       setRemoveReq(server.serverName);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
                       t("mcpRemove")
                     ]
                   }
@@ -5890,8 +5257,8 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
           }) })
         ] })
       ] }),
-      scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: css.hubSection, "data-open": ownOpen ? "true" : void 0, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("header", { className: css.bundleRowOuter, "data-open": ownOpen ? "true" : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+      scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.hubSection, "data-open": ownOpen ? "true" : void 0, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("header", { className: css.bundleRowOuter, "data-open": ownOpen ? "true" : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
           "button",
           {
             type: "button",
@@ -5901,43 +5268,43 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               setOwnOpen((value) => !value);
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconAgentPresetOutline16, { size: 16 }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleName, children: t("mcpPresetOwnSection") }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.bundleCount, children: shownOwn.length }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconAgentPresetOutline16, { size: 16 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: t("mcpPresetOwnSection") }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownOwn.length }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
             ]
           }
         ) }),
-        ownOpen && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetOwnHint") }),
-          scoped?.trust === "system" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetStorageHint") }),
-          shownOwn.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpEmptyList, children: ownRows.length === 0 ? t("mcpPresetOwnEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.mcpRecGrid, children: shownOwn.map((row) => {
+        ownOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetOwnHint") }),
+          scoped?.trust === "system" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetStorageHint") }),
+          shownOwn.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: ownRows.length === 0 ? t("mcpPresetOwnEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: shownOwn.map((row) => {
             const offOwn = offOf(row.serverName, "own");
             const ownToolNames = (row.tools ?? []).map((tool) => tool.name);
             const allDisabled = ownToolNames.length > 0 && ownToolNames.every((name) => offOwn.includes(name));
-            return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: css.mcpRecCard, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.mcpRecCardHead, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCardName, children: row.serverName }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCardTags, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, children: row.transport }),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: css.mcpRecCatTag, children: [
+            return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.mcpRecCard, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpRecCardHead, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCardName, children: row.serverName }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTags, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: row.transport }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCatTag, children: [
                       (row.registeredCount ?? 0) > 0 ? row.registeredCount : row.tools?.length ?? 0,
                       " ",
                       t("mcpLiveToolsOf")
                     ] }),
-                    isToolRegistrationPending(row.registeredCount ?? 0, row.tools?.length ?? 0) && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
-                    globals.some((item) => item.serverName === row.serverName) && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, "data-shadow": "true", title: t("mcpPresetShadowGlobalTip"), children: t("mcpPresetShadowGlobalTag") }),
-                    offOwn.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offOwn.length }) })
+                    isToolRegistrationPending(row.registeredCount ?? 0, row.tools?.length ?? 0) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
+                    globals.some((item) => item.serverName === row.serverName) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-shadow": "true", title: t("mcpPresetShadowGlobalTip"), children: t("mcpPresetShadowGlobalTag") }),
+                    offOwn.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offOwn.length }) })
                   ] })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                  import_dsh_client_ui_primitives6.Tooltip,
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  import_dsh_client_ui_primitives5.Tooltip,
                   {
                     label: ownToolNames.length === 0 ? t("mcpToolsPendingRegTip") : allDisabled ? t("mcpToolAllEnable") : offOwn.length > 0 ? `${t("mcpToolAllPartial")} \xB7 ${t("mcpToolAllDisable")}` : t("mcpToolAllDisable"),
                     side: "bottom",
                     delayMs: 400,
-                    children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                    children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                       "button",
                       {
                         type: "button",
@@ -5949,14 +5316,14 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                         onClick: () => {
                           putTools(row.serverName, ownToolNames, allDisabled, "own");
                         },
-                        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
+                        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
                       }
                     )
                   }
                 )
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.mcpRecCardDesc, children: row.summary }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpRecCardDesc, children: row.summary }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 McpToolChips,
                 {
                   t,
@@ -5969,9 +5336,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                   }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.mcpCardFoot, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.mcpCardItemLabel, children: t("mcpPresetNewSession") }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: t("mcpPresetNewSession") }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",
                   {
                     type: "button",
@@ -5981,7 +5348,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       setRemoveOwnReq(row.serverName);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
                       t("mcpRemove")
                     ]
                   }
@@ -5992,14 +5359,14 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-      import_dsh_client_ui_primitives6.Modal,
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      import_dsh_client_ui_primitives5.Modal,
       {
         open: addOwnOpen,
         onClose: onCloseAddOwn,
         closeLabel: t("close"),
         title: `${t("mcpPresetAddOwn")} \xB7 ${scoped?.name ?? scope}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           McpPasteAdd,
           {
             t,
@@ -6013,7 +5380,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         )
       }
     ),
-    removeReq !== null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    removeReq !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       ConfirmDialog,
       {
         open: true,
@@ -6032,7 +5399,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         }
       }
     ),
-    removeOwnReq !== null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    removeOwnReq !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       ConfirmDialog,
       {
         open: true,
@@ -6055,8 +5422,8 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
 }
 
 // src/client/skills/SkillCard.tsx
-var import_react15 = require("react");
-var import_dsh_client_ui_primitives7 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_react14 = require("react");
+var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/types.ts
 var PRESET_BUNDLE_CATEGORIES = ["\u5F00\u53D1", "\u8BBE\u8BA1", "\u529E\u516C\u534F\u540C", "\u6587\u6863\u77E5\u8BC6", "\u6570\u636E", "\u81EA\u52A8\u5316", "\u8FD0\u7EF4", "\u5176\u4ED6"];
@@ -6068,9 +5435,9 @@ function sortCategories(counts) {
 var ALL_PRESETS = "*";
 
 // src/client/skills/SkillCard.tsx
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function CategoryEditor({ value, onChange, label }) {
-  const [draft, setDraft] = (0, import_react15.useState)("");
+  const [draft, setDraft] = (0, import_react14.useState)("");
   const full = value.length >= MAX_BUNDLE_CATEGORIES;
   const add = (raw) => {
     const name = raw.trim().slice(0, 24);
@@ -6078,10 +5445,10 @@ function CategoryEditor({ value, onChange, label }) {
     if (name === "" || value.includes(name) || full) return;
     onChange([...value, name]);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.catEditor, children: [
-    value.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: css.catEmpty, children: skillT("bundleCatEmptyHint") }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ul", { className: css.catSelected, "aria-label": label, children: value.map((name) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("li", { className: css.catSelectedTag, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.catSelectedName, children: name }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.catEditor, children: [
+    value.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.catEmpty, children: skillT("bundleCatEmptyHint") }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("ul", { className: css.catSelected, "aria-label": label, children: value.map((name) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("li", { className: css.catSelectedTag, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.catSelectedName, children: name }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
         "button",
         {
           type: "button",
@@ -6090,11 +5457,11 @@ function CategoryEditor({ value, onChange, label }) {
           onClick: () => {
             onChange(value.filter((item) => item !== name));
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.IconCloseOutline16, { size: 11, "aria-hidden": "true" })
+          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutline16, { size: 11, "aria-hidden": "true" })
         }
       )
     ] }, name)) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: css.catSuggest, role: "group", "aria-label": skillT("bundleCatTitle"), children: PRESET_BUNDLE_CATEGORIES.filter((preset) => !value.includes(preset)).map((preset) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.catSuggest, role: "group", "aria-label": skillT("bundleCatTitle"), children: PRESET_BUNDLE_CATEGORIES.filter((preset) => !value.includes(preset)).map((preset) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "button",
       {
         type: "button",
@@ -6105,13 +5472,13 @@ function CategoryEditor({ value, onChange, label }) {
           add(preset);
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.catPresetPlus, "aria-hidden": "true", children: "+" }),
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.catPresetPlus, "aria-hidden": "true", children: "+" }),
           preset
         ]
       },
       preset
     )) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
       "input",
       {
         className: css.catInput,
@@ -6130,15 +5497,15 @@ function CategoryEditor({ value, onChange, label }) {
         }
       }
     ),
-    full && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: css.catLimit, children: skillT("bundleCatLimit", { n: MAX_BUNDLE_CATEGORIES }) })
+    full && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: css.catLimit, children: skillT("bundleCatLimit", { n: MAX_BUNDLE_CATEGORIES }) })
   ] });
 }
 function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLabel, index, onToggle, onView, onAssign, onRemove, onDelete }) {
   const files = Array.isArray(skill.files) ? skill.files : [];
   const description = skill.description ?? "";
-  const [copied, setCopied] = (0, import_react15.useState)(false);
-  const copiedTimer = (0, import_react15.useRef)(null);
-  (0, import_react15.useEffect)(() => () => {
+  const [copied, setCopied] = (0, import_react14.useState)(false);
+  const copiedTimer = (0, import_react14.useRef)(null);
+  (0, import_react14.useEffect)(() => () => {
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
   }, []);
   const flashCopied = () => {
@@ -6179,16 +5546,16 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
   };
   const toggleLabel = lockedReason ?? (enabled ? skillT("disableSkill") : skillT("enableSkill"));
   const fileMeta = typeof skill.fileCount === "number" ? skill.fileCount : files.length;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     "li",
     {
       className: css.skillCard,
       "data-off": enabled ? void 0 : "true",
       style: { "--skm-i": index },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.skillCardHead, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.skillBadge, "aria-hidden": "true", children: "skill" }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillCardHead, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillBadge, "aria-hidden": "true", children: "skill" }),
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
             "button",
             {
               type: "button",
@@ -6200,7 +5567,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
               children: skill.name
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.skillCardToggle, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillCardToggle, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
             "button",
             {
               type: "button",
@@ -6214,23 +5581,23 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 event.stopPropagation();
                 onToggle(skill, !enabled);
               },
-              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
             }
           ) })
         ] }),
-        description !== "" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: css.skillDesc, title: description, onClick: () => {
+        description !== "" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", className: css.skillDesc, title: description, onClick: () => {
           onView(skill);
         }, children: description }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.skillTags, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: `${css.tag} ${css.tagSource}`, children: bundleName ?? skillT("tagLoose") }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: `${css.tag} ${css.tagScope}`, "data-off": enabled ? void 0 : "true", children: scopeLabel }),
-          !enabled && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: `${css.tag} ${css.tagStatus}`, children: skillT("skillOffTag") }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.skillMeta, children: skillT("fileCount", { n: fileMeta }) })
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillTags, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagSource}`, children: bundleName ?? skillT("tagLoose") }),
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagScope}`, "data-off": enabled ? void 0 : "true", children: scopeLabel }),
+          !enabled && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagStatus}`, children: skillT("skillOffTag") }),
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillMeta, children: skillT("fileCount", { n: fileMeta }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.skillCardFoot, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.skillFootLabel, children: skillT("toolsLabel") }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.skillCardActions, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.Tooltip, { label: skillT("copySkillName"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillCardFoot, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillFootLabel, children: skillT("toolsLabel") }),
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillCardActions, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("copySkillName"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
               {
                 type: "button",
@@ -6239,10 +5606,10 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 "aria-label": copied ? skillT("copiedSkillName") : skillT("copySkillName"),
                 title: copied ? skillT("copiedSkillName") : skillT("copySkillName"),
                 onClick: copyName,
-                children: copied ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(CheckIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(CopyIcon, {})
+                children: copied ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(CheckIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(CopyIcon, {})
               }
             ) }),
-            bundleId !== null ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.Tooltip, { label: skillT("removeSkill"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+            bundleId !== null ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("removeSkill"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
               {
                 type: "button",
@@ -6252,9 +5619,9 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onRemove?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.IconCloseOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutline16, { size: 14, "aria-hidden": "true" })
               }
-            ) }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.Tooltip, { label: skillT("assignToBundle"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+            ) }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("assignToBundle"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
               {
                 type: "button",
@@ -6264,10 +5631,10 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onAssign?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.IconPlusOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconPlusOutline16, { size: 14, "aria-hidden": "true" })
               }
             ) }),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.Tooltip, { label: skillT("deleteSkillBtn"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("deleteSkillBtn"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
               {
                 type: "button",
@@ -6277,7 +5644,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onDelete?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_dsh_client_ui_primitives7.IconTrashOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconTrashOutline16, { size: 14, "aria-hidden": "true" })
               }
             ) })
           ] })
@@ -6288,7 +5655,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
 }
 
 // src/client/skills/SkillViewer.tsx
-var import_dsh_client_ui_primitives8 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_dsh_client_ui_primitives7 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/markdown.ts
 function escapeHtml(s2) {
@@ -6383,7 +5750,7 @@ function renderSkillMarkdown(text) {
 }
 
 // src/client/skills/SkillViewer.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 var VIEWER_FONT_SIZES = [13.5, 15, 17];
 var VIEWER_PREF_KEY = "dsh.triad.skillViewer";
 var VIEWER_FONT_LABELS = ["\u5C0F\u5B57\u53F7", "\u6807\u51C6\u5B57\u53F7", "\u5927\u5B57\u53F7"];
@@ -6405,7 +5772,7 @@ function writeViewerPrefs(prefs) {
   }
 }
 function ViewerExpandIcon({ full }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: full ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M6.2 2.2v4h-4M9.8 2.2v4h4M6.2 13.8v-4h-4M9.8 13.8v-4h4" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2.2 6.2v-4h4M13.8 6.2v-4h-4M2.2 9.8v4h4M13.8 9.8v4h-4" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: full ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M6.2 2.2v4h-4M9.8 2.2v4h4M6.2 13.8v-4h-4M9.8 13.8v-4h4" }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M2.2 6.2v-4h4M13.8 6.2v-4h-4M2.2 9.8v4h4M13.8 9.8v4h-4" }) });
 }
 function skillFileRows(files) {
   const rows = [];
@@ -6435,8 +5802,8 @@ function SkillViewer({
   onClose
 }) {
   if (viewer === null) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
-    import_dsh_client_ui_primitives8.Modal,
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    import_dsh_client_ui_primitives7.Modal,
     {
       open: true,
       onClose: () => {
@@ -6447,12 +5814,12 @@ function SkillViewer({
       className: css.viewerModal + (viewerFull ? " " + css.viewerModalFull : ""),
       contentClassName: css.viewerBody,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.viewerToolbar, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: css.viewerPath, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("b", { children: viewer.file }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: t("viewerFilesCount", { n: Array.isArray(viewer.skill.files) ? viewer.skill.files.length : 0 }) })
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.viewerToolbar, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: css.viewerPath, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("b", { children: viewer.file }),
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: t("viewerFilesCount", { n: Array.isArray(viewer.skill.files) ? viewer.skill.files.length : 0 }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.viewerToolGroup, role: "group", "aria-label": t("viewerFont"), children: VIEWER_FONT_SIZES.map((size, level) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: css.viewerToolGroup, role: "group", "aria-label": t("viewerFont"), children: VIEWER_FONT_SIZES.map((size, level) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               type: "button",
@@ -6468,7 +5835,7 @@ function SkillViewer({
             },
             size
           )) }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               type: "button",
@@ -6478,12 +5845,12 @@ function SkillViewer({
               "aria-label": viewerFull ? t("viewerExitFull") : t("viewerFull"),
               "aria-pressed": viewerFull,
               onClick: onToggleFull,
-              children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ViewerExpandIcon, { full: viewerFull })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ViewerExpandIcon, { full: viewerFull })
             }
           )
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.viewerLayout, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("nav", { className: css.viewerNav, "aria-label": t("viewerNav"), children: skillFileRows(Array.isArray(viewer.skill.files) ? viewer.skill.files : []).map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: css.viewerLayout, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("nav", { className: css.viewerNav, "aria-label": t("viewerNav"), children: skillFileRows(Array.isArray(viewer.skill.files) ? viewer.skill.files : []).map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
             "div",
             {
               className: css.viewerNavItem + (row.kind === "dir" ? " " + css.viewerNavDir : ""),
@@ -6501,7 +5868,7 @@ function SkillViewer({
             },
             row.path + "-" + String(index)
           )) }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: css.viewerContent, style: { "--skm-vfs": `${String(VIEWER_FONT_SIZES[viewerFont])}px` }, children: viewer.loading === true ? t("previewLoading") : viewer.error !== void 0 ? viewer.error : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { dangerouslySetInnerHTML: { __html: renderSkillMarkdown(viewer.content ?? "") } }) })
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: css.viewerContent, style: { "--skm-vfs": `${String(VIEWER_FONT_SIZES[viewerFont])}px` }, children: viewer.loading === true ? t("previewLoading") : viewer.error !== void 0 ? viewer.error : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { dangerouslySetInnerHTML: { __html: renderSkillMarkdown(viewer.content ?? "") } }) })
         ] })
       ]
     }
@@ -6509,8 +5876,8 @@ function SkillViewer({
 }
 
 // src/client/skills/SkillsView.tsx
-var import_dsh_client_ui_primitives9 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_dsh_client_ui_primitives8 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function SkillsView({
   t,
   state,
@@ -6552,26 +5919,26 @@ function SkillsView({
   setLooseExpanded,
   visibleLooseAll
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-    health.state === "issue" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.healthNotice, role: "status", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.healthNoticeTitle, children: t("statIssues", { n: health.report.issues.length }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { children: health.report.issues.slice(0, 4).map((issue, index) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { children: issue.message }, `${issue.code}-${String(index)}`)) })
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
+    health.state === "issue" && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.healthNotice, role: "status", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.healthNoticeTitle, children: t("statIssues", { n: health.report.issues.length }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { children: health.report.issues.slice(0, 4).map((issue, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("li", { children: issue.message }, `${issue.code}-${String(index)}`)) })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.hintRow, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.hintRowText, children: activePreset === ALL_PRESETS ? t("presetHintAll") : t("presetHintScoped", { name: presets.find((preset) => preset.id === activePreset)?.name ?? activePreset }) }),
-      activePreset !== ALL_PRESETS && Object.keys(presetOverride).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: css.presetReset, onClick: resetActivePreset, children: t("presetReset") })
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.hintRow, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.hintRowText, children: activePreset === ALL_PRESETS ? t("presetHintAll") : t("presetHintScoped", { name: presets.find((preset) => preset.id === activePreset)?.name ?? activePreset }) }),
+      activePreset !== ALL_PRESETS && Object.keys(presetOverride).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: css.presetReset, onClick: resetActivePreset, children: t("presetReset") })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `${css.mainScroll} ${modalStaggerClass}`, children: [
-      state.status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: css.status, children: t("loading") }) : null,
-      state.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.failure, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { role: "alert", children: t("error") }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_dsh_client_ui_primitives9.Button, { variant: "outline", onClick: refresh, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconRefreshOutline14, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: `${css.mainScroll} ${modalStaggerClass}`, children: [
+      state.status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: css.status, children: t("loading") }) : null,
+      state.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.failure, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { role: "alert", children: t("error") }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_dsh_client_ui_primitives8.Button, { variant: "outline", onClick: refresh, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconRefreshOutline14, {}),
           " ",
           t("retry")
         ] })
       ] }) : null,
-      state.status === "ready" && (noResults ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: css.noResult, children: t("noMatch") }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+      state.status === "ready" && (noResults ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: css.noResult, children: t("noMatch") }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
         visibleBundleAll.map((bundle) => {
           const open2 = expanded.has(bundle.id);
           const renamingThis = renameTarget?.bundleId === bundle.id;
@@ -6582,14 +5949,14 @@ function SkillsView({
           const bundleCats = bundle.categories ?? [];
           const emptyBundle = bundle.skillCount === 0;
           const openView = open2 || emptyBundle;
-          return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("section", { className: css.hubSection, "data-open": openView ? "true" : void 0, "data-empty": emptyBundle ? "true" : void 0, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+          return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("section", { className: css.hubSection, "data-open": openView ? "true" : void 0, "data-empty": emptyBundle ? "true" : void 0, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
               "header",
               {
                 className: css.bundleRowOuter,
                 "data-open": openView ? "true" : void 0,
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
                     "button",
                     {
                       type: "button",
@@ -6605,10 +5972,10 @@ function SkillsView({
                         toggleExpanded(bundle.id);
                       },
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(FolderBlueIcon, { size: 17 }) }),
-                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleName, title: bundle.name, children: bundle.name }),
-                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleCount, children: t("skillsCount", { n: bundle.skillCount }) }),
-                        bundleCats.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleCats, children: bundleCats.map((cat) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(FolderBlueIcon, { size: 17 }) }),
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleName, title: bundle.name, children: bundle.name }),
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleCount, children: t("skillsCount", { n: bundle.skillCount }) }),
+                        bundleCats.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleCats, children: bundleCats.map((cat) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                           "span",
                           {
                             className: css.bundleCatTag,
@@ -6619,11 +5986,11 @@ function SkillsView({
                           },
                           cat
                         )) }),
-                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
                       ]
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleToggle, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleToggle, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                     "button",
                     {
                       type: "button",
@@ -6637,11 +6004,11 @@ function SkillsView({
                         event.stopPropagation();
                         toggleBundle(bundle, !bundleEnabled);
                       },
-                      children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
+                      children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
                     }
                   ) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.bundleMore, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                    import_dsh_client_ui_primitives9.Menu,
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: css.bundleMore, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                    import_dsh_client_ui_primitives8.Menu,
                     {
                       open: openMenu === `bundle:${bundle.id}`,
                       onClose: () => {
@@ -6657,14 +6024,14 @@ function SkillsView({
                       },
                       portal: true,
                       items: [
-                        { id: "enable", label: t("enableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconCheckOutline16, { size: 14 }) },
-                        { id: "disable", label: t("disableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconCloseOutline16, { size: 14 }) },
+                        { id: "enable", label: t("enableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCheckOutline16, { size: 14 }) },
+                        { id: "disable", label: t("disableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCloseOutline16, { size: 14 }) },
                         { type: "separator", id: "gap" },
-                        { id: "rename", label: t("rename"), icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconEditOutline16, { size: 14 }) },
-                        { id: "cat", label: t("bundleCatEdit"), icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(TagIcon, {}) },
-                        { id: "delete", label: t("delete"), icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconTrashOutline16, { size: 14 }), danger: true }
+                        { id: "rename", label: t("rename"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEditOutline16, { size: 14 }) },
+                        { id: "cat", label: t("bundleCatEdit"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(TagIcon, {}) },
+                        { id: "delete", label: t("delete"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconTrashOutline16, { size: 14 }), danger: true }
                       ],
-                      anchor: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                      anchor: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                         "button",
                         {
                           type: "button",
@@ -6676,7 +6043,7 @@ function SkillsView({
                             event.stopPropagation();
                             setOpenMenu(openMenu === `bundle:${bundle.id}` ? null : `bundle:${bundle.id}`);
                           },
-                          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconEllipsisOutline16, { size: 15, "aria-hidden": "true" })
+                          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEllipsisOutline16, { size: 15, "aria-hidden": "true" })
                         }
                       )
                     }
@@ -6684,10 +6051,10 @@ function SkillsView({
                 ]
               }
             ),
-            renamingThis && renameTarget !== null && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { className: `${css.inlineForm} ${css.inlineFormBlock}`, onSubmit: (event) => {
+            renamingThis && renameTarget !== null && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("form", { className: `${css.inlineForm} ${css.inlineFormBlock}`, onSubmit: (event) => {
               void submitRename(event);
             }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                 "input",
                 {
                   className: css.inlineInput,
@@ -6702,28 +6069,28 @@ function SkillsView({
                   }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.Button, { variant: "primary", type: "submit", disabled: renaming || renameTarget.name.trim() === "", children: t("rename") }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.Button, { variant: "outline", type: "button", disabled: renaming, onClick: () => {
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.Button, { variant: "primary", type: "submit", disabled: renaming || renameTarget.name.trim() === "", children: t("rename") }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.Button, { variant: "outline", type: "button", disabled: renaming, onClick: () => {
                 setRenameTarget(null);
               }, children: t("cancel") })
             ] }),
-            missing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.bundleMissing, role: "status", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: t("bundleMissingN", { n: missing.length }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("code", { children: missing.join("\u3001") }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: css.bundleMissingBtn, onClick: () => {
+            missing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.bundleMissing, role: "status", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: t("bundleMissingN", { n: missing.length }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("code", { children: missing.join("\u3001") }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: css.bundleMissingBtn, onClick: () => {
                 void pruneBundle(bundle);
               }, children: t("bundlePrune") })
             ] }),
-            openView && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { className: gridClass, "data-renamed": renamedFlash === bundle.id ? "true" : void 0, children: bundle.skills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: css.bundleEmpty, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleEmptyTitle, children: t("bundleEmptyTitle") }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleEmptyHint, children: t("bundleEmptyHint") }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("button", { type: "button", className: css.bundleEmptyBtn, onClick: () => {
+            openView && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: gridClass, "data-renamed": renamedFlash === bundle.id ? "true" : void 0, children: bundle.skills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { className: css.bundleEmpty, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleEmptyTitle, children: t("bundleEmptyTitle") }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleEmptyHint, children: t("bundleEmptyHint") }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("button", { type: "button", className: css.bundleEmptyBtn, onClick: () => {
                 openInstallFor(bundle.id);
               }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CloudUpIcon, { size: 14 }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CloudUpIcon, { size: 14 }),
                 t("bundleUploadHere")
               ] })
-            ] }) : bundle.skills.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            ] }) : bundle.skills.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               SkillCard,
               {
                 skill,
@@ -6746,13 +6113,13 @@ function SkillsView({
             )) })
           ] }, bundle.id);
         }),
-        visibleLooseAll.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("section", { className: css.hubSection, "data-open": looseOpen ? "true" : void 0, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        visibleLooseAll.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("section", { className: css.hubSection, "data-open": looseOpen ? "true" : void 0, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "header",
             {
               className: css.bundleRowOuter,
               "data-open": looseOpen ? "true" : void 0,
-              children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
                 "button",
                 {
                   type: "button",
@@ -6762,16 +6129,16 @@ function SkillsView({
                     setLooseExpanded((value) => !value);
                   },
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconArchiveOutline20, { size: 16 }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleName, children: t("looseTitle") }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.bundleCount, children: t("skillsCount", { n: visibleLooseAll.length }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconArchiveOutline20, { size: 16 }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleName, children: t("looseTitle") }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleCount, children: t("skillsCount", { n: visibleLooseAll.length }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
                   ]
                 }
               )
             }
           ),
-          looseOpen && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { className: viewMode === "list" ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid, children: visibleLooseAll.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          looseOpen && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: viewMode === "list" ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid, children: visibleLooseAll.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             SkillCard,
             {
               skill,
@@ -6799,16 +6166,16 @@ function SkillsView({
 }
 
 // src/client/skills/TopBar.tsx
-var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_dsh_client_ui_primitives9 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function PanelHead({ t, kind, onKind }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "psh-head", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "psh-title", style: { flex: "none" }, children: t("panelTitle") }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": "SKILL / MCP / \u63D0\u793A\u8BCD", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "psh-head", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "psh-title", style: { flex: "none" }, children: t("panelTitle") }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": "SKILL / MCP / \u63D0\u793A\u8BCD", children: [
       ["skill", t("kindSkill")],
       ["mcp", t("kindMcp")],
       ["prompt", t("kindPrompt")]
-    ].map(([value, label]) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    ].map(([value, label]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "button",
       {
         type: "button",
@@ -6860,7 +6227,7 @@ function SkillTopBar({
   fileInput,
   acceptFiles
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     "div",
     {
       className: css.topbar,
@@ -6876,8 +6243,8 @@ function SkillTopBar({
         void onDrop(event);
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.chipRow, role: "group", "aria-label": t("presetCatTitle"), children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.chipRow, role: "group", "aria-label": t("presetCatTitle"), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -6887,15 +6254,15 @@ function SkillTopBar({
                 setActivePreset(ALL_PRESETS);
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catIcon, "data-active": activePreset === ALL_PRESETS || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CatAllIcon, { size: 16 }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catLabel, children: t("presetAll") }),
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catCount, title: t("presetCountTip", { n: enabledCountFor(ALL_PRESETS), total: totalSkills }), children: enabledCountFor(ALL_PRESETS) })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catIcon, "data-active": activePreset === ALL_PRESETS || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CatAllIcon, { size: 16 }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catLabel, children: t("presetAll") }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catCount, title: t("presetCountTip", { n: enabledCountFor(ALL_PRESETS), total: totalSkills }), children: enabledCountFor(ALL_PRESETS) })
               ]
             }
           ),
           presets.map((preset) => {
             const overrideCount = Object.values(overrides[preset.id] ?? {}).filter((state2) => state2 === false).length;
-            return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
               "button",
               {
                 type: "button",
@@ -6905,9 +6272,9 @@ function SkillTopBar({
                   setActivePreset(preset.id);
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catIcon, "data-active": activePreset === preset.id || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconAgentPresetOutline16, { size: 15 }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catLabel, children: preset.name ?? preset.id }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catIcon, "data-active": activePreset === preset.id || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutline16, { size: 15 }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catLabel, children: preset.name ?? preset.id }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "span",
                     {
                       className: css.catCount,
@@ -6922,9 +6289,9 @@ function SkillTopBar({
             );
           })
         ] }),
-        hasCategories && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.catChipRow, role: "group", "aria-label": t("bundleCatFilterAria"), children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catChipLabel, children: t("bundleCatTitle") }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+        hasCategories && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.catChipRow, role: "group", "aria-label": t("bundleCatFilterAria"), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catChipLabel, children: t("bundleCatTitle") }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -6936,14 +6303,14 @@ function SkillTopBar({
               },
               children: [
                 t("bundleCatAll"),
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catChipCount, children: bundleCount })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catChipCount, children: bundleCount })
               ]
             }
           ),
           categoryList.map((cat) => {
             const none = cat === UNCATEGORIZED;
             const active = activeCat === cat;
-            return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
               "button",
               {
                 type: "button",
@@ -6955,17 +6322,17 @@ function SkillTopBar({
                 },
                 children: [
                   none ? t("bundleCatNone") : cat,
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catChipCount, children: categoryCounts.get(cat) ?? 0 })
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catChipCount, children: categoryCounts.get(cat) ?? 0 })
                 ]
               },
               cat
             );
           })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.topbarActions, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.searchBox, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SearchIcon, {}),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.topbarActions, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.searchBox, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SearchIcon, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               "input",
               {
                 className: css.searchInput,
@@ -6978,8 +6345,8 @@ function SkillTopBar({
               }
             )
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.dropWrap, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropWrap, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
               "button",
               {
                 type: "button",
@@ -6992,17 +6359,17 @@ function SkillTopBar({
                 },
                 children: [
                   t("sortLabel"),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SortDirIcon, { dir: sortAsc ? "asc" : "desc", size: 12 }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconChevronDownOutline14, { size: 11, "aria-hidden": "true" })
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SortDirIcon, { dir: sortAsc ? "asc" : "desc", size: 12 }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutline14, { size: 11, "aria-hidden": "true" })
                 ]
               }
             ),
-            openMenu === "sort" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.bulkOverlay, "aria-label": t("close"), onClick: () => {
+            openMenu === "sort" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: css.bulkOverlay, "aria-label": t("close"), onClick: () => {
                 setOpenMenu(null);
               } }),
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.dropMenu, role: "menu", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropMenu, role: "menu", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                   "button",
                   {
                     type: "button",
@@ -7014,12 +6381,12 @@ function SkillTopBar({
                       setOpenMenu(null);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.dropCheck, "data-on": sortAsc || void 0, "aria-hidden": "true", children: sortAsc ? "\u2713" : "" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.dropCheck, "data-on": sortAsc || void 0, "aria-hidden": "true", children: sortAsc ? "\u2713" : "" }),
                       t("nameAsc")
                     ]
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                   "button",
                   {
                     type: "button",
@@ -7031,7 +6398,7 @@ function SkillTopBar({
                       setOpenMenu(null);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.dropCheck, "data-on": !sortAsc || void 0, "aria-hidden": "true", children: !sortAsc ? "\u2713" : "" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.dropCheck, "data-on": !sortAsc || void 0, "aria-hidden": "true", children: !sortAsc ? "\u2713" : "" }),
                       t("nameDesc")
                     ]
                   }
@@ -7039,11 +6406,11 @@ function SkillTopBar({
               ] })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.statusSeg, role: "group", "aria-label": t("statusAll"), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.statusSeg, role: "group", "aria-label": t("statusAll"), children: [
             ["all", t("statusAll"), enabledCount + disabledCount],
             ["on", t("statusOn"), enabledCount],
             ["off", t("statusOff"), disabledCount]
-          ].map(([value, label, count]) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          ].map(([value, label, count]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -7055,18 +6422,18 @@ function SkillTopBar({
               },
               children: [
                 label,
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.statusSegCount, children: count })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.statusSegCount, children: count })
               ]
             },
             value
           )) }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.healthInline, "data-tone": healthView.tone, title: healthView.title === "" ? void 0 : healthView.title, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: css.healthInline, "data-tone": healthView.tone, title: healthView.title === "" ? void 0 : healthView.title, children: [
             t("statSync"),
             " \xB7 ",
             healthView.label
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.toolbarSpacer }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.toolbarSpacer }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -7074,12 +6441,12 @@ function SkillTopBar({
               style: { height: 34, alignSelf: "center" },
               onClick: onRefresh,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconRefreshOutline14, { size: 14, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconRefreshOutline14, { size: 14, "aria-hidden": "true" }),
                 t("refresh")
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -7088,12 +6455,12 @@ function SkillTopBar({
               "aria-expanded": newBundleOpen || void 0,
               onClick: onNewBundle,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
                 t("newBundle")
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "button",
             {
               type: "button",
@@ -7103,12 +6470,12 @@ function SkillTopBar({
               title: t("addSkillsSub"),
               onClick: onAdd,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CloudUpIcon, { size: 15, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CloudUpIcon, { size: 15, "aria-hidden": "true" }),
                 t("addSkillsTitle")
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "input",
             {
               ref: fileInput,
@@ -7151,18 +6518,18 @@ function McpTopBar({
     return globals.filter((server) => !masked.has(server.serverName)).length + (data?.presetServers?.[presetId] ?? []).length;
   };
   const chips = [
-    { id: "", label: t("presetAll"), count: globals.length, overrides: 0, icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CatAllIcon, { size: 16 }) },
+    { id: "", label: t("presetAll"), count: globals.length, overrides: 0, icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CatAllIcon, { size: 16 }) },
     ...presets.map((preset) => ({
       id: preset.id,
       label: preset.name ?? preset.id,
       count: visibleCount(preset.id),
       overrides: maskedOf(preset.id).size,
-      icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconAgentPresetOutline16, { size: 15 })
+      icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutline16, { size: 15 })
     }))
   ];
   const conn = live.state === "ready" ? { tone: "ok", label: t("mcpConnOk"), title: t("mcpConnTip", { n: globals.length }) } : live.state === "loading" ? { tone: "pending", label: t("statChecking"), title: "" } : { tone: "warn", label: t("mcpConnDown"), title: t("mcpLiveUnavailable") };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.topbar, children: [
-    presets.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.chipRow, role: "group", "aria-label": t("mcpScopeTitle"), children: chips.map((chip) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.topbar, children: [
+    presets.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.chipRow, role: "group", "aria-label": t("mcpScopeTitle"), children: chips.map((chip) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "button",
       {
         type: "button",
@@ -7172,9 +6539,9 @@ function McpTopBar({
           onScope(chip.id);
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catIcon, "data-active": scope === chip.id || void 0, children: chip.icon }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.catLabel, children: chip.label }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catIcon, "data-active": scope === chip.id || void 0, children: chip.icon }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catLabel, children: chip.label }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "span",
             {
               className: css.catCount,
@@ -7187,10 +6554,10 @@ function McpTopBar({
       },
       chip.id === "" ? "__all__" : chip.id
     )) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.topbarActions, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.searchBox, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SearchIcon, {}),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.topbarActions, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.searchBox, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SearchIcon, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "input",
           {
             className: css.searchInput,
@@ -7203,11 +6570,11 @@ function McpTopBar({
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.statusSeg, role: "group", "aria-label": t("statusAll"), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.statusSeg, role: "group", "aria-label": t("statusAll"), children: [
         ["all", t("statusAll"), globals.length],
         ["on", t("statusOn"), globals.length - offCount],
         ["off", t("statusOff"), offCount]
-      ].map(([value, label, count]) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+      ].map(([value, label, count]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "button",
         {
           type: "button",
@@ -7219,18 +6586,18 @@ function McpTopBar({
           },
           children: [
             label,
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.statusSegCount, children: count })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.statusSegCount, children: count })
           ]
         },
         value
       )) }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.healthInline, "data-tone": conn.tone, title: conn.title === "" ? void 0 : conn.title, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: css.healthInline, "data-tone": conn.tone, title: conn.title === "" ? void 0 : conn.title, children: [
         t("mcpConnStatus"),
         " \xB7 ",
         conn.label
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.toolbarSpacer }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.toolbarSpacer }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",
         {
           type: "button",
@@ -7240,7 +6607,7 @@ function McpTopBar({
           children: t("mcpLiveRefresh")
         }
       ),
-      scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+      scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "button",
         {
           type: "button",
@@ -7248,12 +6615,12 @@ function McpTopBar({
           style: { width: "auto", marginTop: 0, height: 34, fontSize: 12 },
           onClick: onAddOwn,
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
             t("mcpPresetAddOwn")
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "button",
         {
           type: "button",
@@ -7263,7 +6630,7 @@ function McpTopBar({
           title: scope === "" ? void 0 : t("mcpAddGlobalHint"),
           onClick: onAddCustom,
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconPlusOutline16, { size: 15, "aria-hidden": "true" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 15, "aria-hidden": "true" }),
             scope === "" ? t("mcpAddServer") : t("mcpAddServerGlobal")
           ]
         }
@@ -7273,7 +6640,7 @@ function McpTopBar({
 }
 
 // src/client/skills/SkillsPanel.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 var SKILL_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 function frontmatterName(text) {
   const lines = text.split(/\r?\n/).slice(0, 80);
@@ -7287,33 +6654,33 @@ function frontmatterName(text) {
 }
 function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter, onCardMouseLeave }) {
   ensureStyles();
-  const [state, setState] = (0, import_react16.useState)({ status: "loading" });
-  const [reload, setReload] = (0, import_react16.useState)(0);
-  const [expanded, setExpanded] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
-  const [looseOpen, setLooseExpanded] = (0, import_react16.useState)(false);
-  const [viewer, setViewer] = (0, import_react16.useState)(null);
-  const [viewerFont, setViewerFont] = (0, import_react16.useState)(() => readViewerPrefs().font);
-  const [viewerFull, setViewerFull] = (0, import_react16.useState)(() => readViewerPrefs().full);
-  const [assignTarget, setAssignTarget] = (0, import_react16.useState)(null);
-  const [newBundleOpen, setNewBundleOpen] = (0, import_react16.useState)(false);
-  const [newBundleName, setNewBundleName] = (0, import_react16.useState)("");
-  const [newBundleCats, setNewBundleCats] = (0, import_react16.useState)([]);
-  const [creatingBundle, setCreatingBundle] = (0, import_react16.useState)(false);
-  const [renameTarget, setRenameTarget] = (0, import_react16.useState)(null);
-  const [renaming, setRenaming] = (0, import_react16.useState)(false);
-  const [renamedFlash, setRenamedFlash] = (0, import_react16.useState)(null);
-  const renamedTimer = (0, import_react16.useRef)(null);
-  const [confirm, setConfirm] = (0, import_react16.useState)(null);
-  const [confirming, setConfirming] = (0, import_react16.useState)(false);
-  const [install, setInstall] = (0, import_react16.useState)(null);
-  const [addOpen, setAddOpen] = (0, import_react16.useState)(false);
-  const [installName, setInstallName] = (0, import_react16.useState)("");
-  const [installDescription, setInstallDescription] = (0, import_react16.useState)("");
-  const [installBundleId, setInstallBundleId] = (0, import_react16.useState)(void 0);
-  const [installing, setInstalling] = (0, import_react16.useState)(false);
-  const [installError, setInstallError] = (0, import_react16.useState)(null);
-  const [toasts, setToasts] = (0, import_react16.useState)([]);
-  const toastTimers = (0, import_react16.useRef)([]);
+  const [state, setState] = (0, import_react15.useState)({ status: "loading" });
+  const [reload, setReload] = (0, import_react15.useState)(0);
+  const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
+  const [looseOpen, setLooseExpanded] = (0, import_react15.useState)(false);
+  const [viewer, setViewer] = (0, import_react15.useState)(null);
+  const [viewerFont, setViewerFont] = (0, import_react15.useState)(() => readViewerPrefs().font);
+  const [viewerFull, setViewerFull] = (0, import_react15.useState)(() => readViewerPrefs().full);
+  const [assignTarget, setAssignTarget] = (0, import_react15.useState)(null);
+  const [newBundleOpen, setNewBundleOpen] = (0, import_react15.useState)(false);
+  const [newBundleName, setNewBundleName] = (0, import_react15.useState)("");
+  const [newBundleCats, setNewBundleCats] = (0, import_react15.useState)([]);
+  const [creatingBundle, setCreatingBundle] = (0, import_react15.useState)(false);
+  const [renameTarget, setRenameTarget] = (0, import_react15.useState)(null);
+  const [renaming, setRenaming] = (0, import_react15.useState)(false);
+  const [renamedFlash, setRenamedFlash] = (0, import_react15.useState)(null);
+  const renamedTimer = (0, import_react15.useRef)(null);
+  const [confirm, setConfirm] = (0, import_react15.useState)(null);
+  const [confirming, setConfirming] = (0, import_react15.useState)(false);
+  const [install, setInstall] = (0, import_react15.useState)(null);
+  const [addOpen, setAddOpen] = (0, import_react15.useState)(false);
+  const [installName, setInstallName] = (0, import_react15.useState)("");
+  const [installDescription, setInstallDescription] = (0, import_react15.useState)("");
+  const [installBundleId, setInstallBundleId] = (0, import_react15.useState)(void 0);
+  const [installing, setInstalling] = (0, import_react15.useState)(false);
+  const [installError, setInstallError] = (0, import_react15.useState)(null);
+  const [toasts, setToasts] = (0, import_react15.useState)([]);
+  const toastTimers = (0, import_react15.useRef)([]);
   const pushToast = (tone, text) => {
     const id = Date.now() + Math.random();
     setToasts((current2) => [...current2.slice(-2), { id, tone, text }]);
@@ -7325,8 +6692,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const failToast = (label, error) => {
     pushToast("err", skillT("opFailed", { label, message: error instanceof Error ? error.message : String(error) }));
   };
-  const [installMetaName, setInstallMetaName] = (0, import_react16.useState)(null);
-  (0, import_react16.useEffect)(() => {
+  const [installMetaName, setInstallMetaName] = (0, import_react15.useState)(null);
+  (0, import_react15.useEffect)(() => {
     if (install === null || install.archive === true) {
       setInstallMetaName(null);
       return void 0;
@@ -7347,36 +6714,36 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [install]);
-  const [dropActive, setDropActive] = (0, import_react16.useState)(false);
-  const fileInput = (0, import_react16.useRef)(null);
-  const [toggles, setToggles] = (0, import_react16.useState)({ skills: {}, bundles: {} });
-  const [toggling, setToggling] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
-  const [presets, setPresets] = (0, import_react16.useState)([]);
-  const [overrides, setOverrides] = (0, import_react16.useState)({});
-  const [activePreset, setActivePreset] = (0, import_react16.useState)(ALL_PRESETS);
-  const [query, setQuery] = (0, import_react16.useState)("");
-  const [sourceFilter, setSourceFilter] = (0, import_react16.useState)("all");
-  const [sortAsc, setSortAsc] = (0, import_react16.useState)(true);
-  const [viewMode] = (0, import_react16.useState)("grid");
-  const [statusFilter, setStatusFilter] = (0, import_react16.useState)("all");
-  const [catFilter, setCatFilter] = (0, import_react16.useState)(null);
-  const [catTarget, setCatTarget] = (0, import_react16.useState)(null);
-  const [catDraft, setCatDraft] = (0, import_react16.useState)([]);
-  const [savingCats, setSavingCats] = (0, import_react16.useState)(false);
-  const [openMenu, setOpenMenu] = (0, import_react16.useState)(null);
-  const [health, setHealth] = (0, import_react16.useState)({ state: "loading" });
-  const [guideOpen, setGuideOpen] = (0, import_react16.useState)(false);
-  const [kind, setKind] = (0, import_react16.useState)("skill");
-  const [mcpScope, setMcpScope] = (0, import_react16.useState)("");
-  const [mcpQuery, setMcpQuery] = (0, import_react16.useState)("");
-  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react16.useState)("all");
+  const [dropActive, setDropActive] = (0, import_react15.useState)(false);
+  const fileInput = (0, import_react15.useRef)(null);
+  const [toggles, setToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
+  const [toggling, setToggling] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
+  const [presets, setPresets] = (0, import_react15.useState)([]);
+  const [overrides, setOverrides] = (0, import_react15.useState)({});
+  const [activePreset, setActivePreset] = (0, import_react15.useState)(ALL_PRESETS);
+  const [query, setQuery] = (0, import_react15.useState)("");
+  const [sourceFilter, setSourceFilter] = (0, import_react15.useState)("all");
+  const [sortAsc, setSortAsc] = (0, import_react15.useState)(true);
+  const [viewMode] = (0, import_react15.useState)("grid");
+  const [statusFilter, setStatusFilter] = (0, import_react15.useState)("all");
+  const [catFilter, setCatFilter] = (0, import_react15.useState)(null);
+  const [catTarget, setCatTarget] = (0, import_react15.useState)(null);
+  const [catDraft, setCatDraft] = (0, import_react15.useState)([]);
+  const [savingCats, setSavingCats] = (0, import_react15.useState)(false);
+  const [openMenu, setOpenMenu] = (0, import_react15.useState)(null);
+  const [health, setHealth] = (0, import_react15.useState)({ state: "loading" });
+  const [guideOpen, setGuideOpen] = (0, import_react15.useState)(false);
+  const [kind, setKind] = (0, import_react15.useState)("skill");
+  const [mcpScope, setMcpScope] = (0, import_react15.useState)("");
+  const [mcpQuery, setMcpQuery] = (0, import_react15.useState)("");
+  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react15.useState)("all");
   const [mcpLive, mcpRefreshLive] = useMcpLiveState();
-  const [mcpAddOpen, setMcpAddOpen] = (0, import_react16.useState)(false);
-  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react16.useState)(false);
-  const mcpWatchTimer = (0, import_react16.useRef)(null);
-  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react16.useState)([]);
-  const mcpLiveRef = (0, import_react16.useRef)(mcpLive);
-  (0, import_react16.useEffect)(() => {
+  const [mcpAddOpen, setMcpAddOpen] = (0, import_react15.useState)(false);
+  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react15.useState)(false);
+  const mcpWatchTimer = (0, import_react15.useRef)(null);
+  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react15.useState)([]);
+  const mcpLiveRef = (0, import_react15.useRef)(mcpLive);
+  (0, import_react15.useEffect)(() => {
     mcpLiveRef.current = mcpLive;
   }, [mcpLive]);
   const stopMcpWatch = () => {
@@ -7412,11 +6779,9 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     }, MCP_TOOL_WATCH_INTERVAL_MS);
   };
   const refresh = () => {
-    void Promise.resolve().then(() => (init_skill_source(), skill_source_exports)).then(({ invalidateSkillCache: invalidateSkillCache2 }) => invalidateSkillCache2());
     setReload((value) => value + 1);
   };
   const silentSync = () => {
-    void Promise.resolve().then(() => (init_skill_source(), skill_source_exports)).then(({ invalidateSkillCache: invalidateSkillCache2 }) => invalidateSkillCache2());
     void skillApi.list().then((snapshot) => {
       setState((current2) => current2.status === "error" ? current2 : { status: "ready", snapshot });
     }, () => {
@@ -7442,7 +6807,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       }
     );
   };
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     const timer = window.setInterval(silentSync, 3e4);
     const onVis = () => {
       if (document.visibilityState === "visible") silentSync();
@@ -7459,7 +6824,6 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     };
   }, []);
   const refreshTogglesOnly = () => {
-    void Promise.resolve().then(() => (init_skill_source(), skill_source_exports)).then(({ invalidateSkillCache: invalidateSkillCache2 }) => invalidateSkillCache2());
     void skillApi.presetStatus().then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles });
@@ -7475,7 +6839,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     );
   };
   const t = skillT;
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     let current2 = true;
     setState({ status: "loading" });
     void skillApi.list().then(
@@ -7516,13 +6880,13 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload]);
-  (0, import_react16.useEffect)(() => () => {
+  (0, import_react15.useEffect)(() => () => {
     if (renamedTimer.current !== null) window.clearTimeout(renamedTimer.current);
     if (mcpWatchTimer.current !== null) window.clearInterval(mcpWatchTimer.current);
     for (const timer of toastTimers.current) window.clearTimeout(timer);
   }, []);
-  const [guidePos, setGuidePos] = (0, import_react16.useState)(null);
-  (0, import_react16.useEffect)(() => {
+  const [guidePos, setGuidePos] = (0, import_react15.useState)(null);
+  (0, import_react15.useEffect)(() => {
     if (!guideOpen) return;
     const marker = document.querySelector("[data-skm-panel-marker]");
     const card = marker?.closest(".psh-card");
@@ -7604,9 +6968,9 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       return next;
     });
   };
-  const loadViewerContent = async (skillName2, filePath) => {
+  const loadViewerContent = async (skillName, filePath) => {
     try {
-      const res = await fetch(`/api/skill-manager/skills/${encodeURIComponent(skillName2)}/files/${encodeURIComponent(filePath)}`);
+      const res = await fetch(`/api/skill-manager/skills/${encodeURIComponent(skillName)}/files/${encodeURIComponent(filePath)}`);
       const body = await res.json();
       if (body.error !== void 0) throw new Error(String(body.error));
       setViewer((v) => v === null ? v : { ...v, loading: false, content: body.content ?? "" });
@@ -7624,7 +6988,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const toggleViewerFull = () => {
     setViewerFull((current2) => !current2);
   };
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     writeViewerPrefs({ font: viewerFont, full: viewerFull });
   }, [viewerFont, viewerFull]);
   const selectViewerFile = (filePath) => {
@@ -7817,7 +7181,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       if (state.status !== "ready") return;
       const bundle = state.snapshot.bundles.find((candidate) => candidate.id === bundleId);
       if (bundle === void 0) return;
-      await skillApi.setBundleSkills(bundleId, bundle.skills.map((skill) => skill.name).filter((skillName2) => skillName2 !== name));
+      await skillApi.setBundleSkills(bundleId, bundle.skills.map((skill) => skill.name).filter((skillName) => skillName !== name));
       pushToast("ok", skillT("removedOk", { name }));
       refresh();
     } catch (error) {
@@ -7901,7 +7265,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const trimmedName = installName.trim();
   const nameInvalid = trimmedName !== "" && !SKILL_NAME_PATTERN.test(trimmedName);
   const confirmTitle = confirm === null ? t("deleteSkillConfirm", { name: "" }) : confirm.kind === "bundle" ? t("deleteBundleConfirm", { name: confirm.bundle.name }) : t("deleteSkillConfirm", { name: confirm.name }) + (confirm.kind === "skill" && confirm.dir !== void 0 && confirm.dir !== confirm.name ? t("deleteSkillDirNote", { dir: confirm.dir }) : "");
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
     PopoverShell,
     {
       solid: true,
@@ -7917,11 +7281,11 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       size: { width: 1150, height: 860 },
       ariaLabel: t("panelTitle"),
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PanelHead, { t, kind, onKind: setKind }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(PshBody, { className: css.modalBody, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "data-skm-panel-marker": true, "aria-hidden": "true", style: { display: "none" } }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.hub, "aria-busy": state.status === "loading", children: [
-            kind === "skill" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PanelHead, { t, kind, onKind: setKind }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(PshBody, { className: css.modalBody, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "data-skm-panel-marker": true, "aria-hidden": "true", style: { display: "none" } }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.hub, "aria-busy": state.status === "loading", children: [
+            kind === "skill" && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               SkillTopBar,
               {
                 t,
@@ -7965,7 +7329,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 acceptFiles
               }
             ),
-            kind === "mcp" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+            kind === "mcp" && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               McpTopBar,
               {
                 t,
@@ -7987,7 +7351,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: css.hubMain, children: kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PromptView, {}) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.hubMain, children: kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, {}) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               McpView,
               {
                 t,
@@ -8007,7 +7371,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   setMcpAddOwnOpen(false);
                 }
               }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+            ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               SkillsView,
               {
                 t,
@@ -8053,14 +7417,14 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             ) })
           ] })
         ] }),
-        toasts.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: css.toastStack, role: "status", "aria-live": "polite", children: toasts.map((item) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: `${css.toast} ${item.tone === "err" ? css.toastErr : css.toastOk}`, "data-tone": item.tone, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("i", { className: css.toastDot, "aria-hidden": "true" }),
+        toasts.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.toastStack, role: "status", "aria-live": "polite", children: toasts.map((item) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: `${css.toast} ${item.tone === "err" ? css.toastErr : css.toastOk}`, "data-tone": item.tone, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("i", { className: css.toastDot, "aria-hidden": "true" }),
           item.text
         ] }, item.id)) }),
-        guideOpen && guidePos !== null && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(GuidePanel, { t, onClose: () => {
+        guideOpen && guidePos !== null && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(GuidePanel, { t, onClose: () => {
           setGuideOpen(false);
         }, left: guidePos.left, top: guidePos.top, height: guidePos.height }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
           McpAddModal,
           {
             t,
@@ -8073,8 +7437,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          import_dsh_client_ui_primitives11.Modal,
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          import_dsh_client_ui_primitives10.Modal,
           {
             open: newBundleOpen,
             onClose: () => {
@@ -8085,10 +7449,10 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             },
             closeLabel: t("close"),
             title: t("newBundle"),
-            children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { className: css.stackForm, onSubmit: (event) => {
+            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("form", { className: css.stackForm, onSubmit: (event) => {
               void submitNewBundle(event);
             }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                 "input",
                 {
                   className: css.inlineInput,
@@ -8102,10 +7466,10 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CategoryEditor, { value: newBundleCats, onChange: setNewBundleCats, label: t("newBundle") }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.inlineForm, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "primary", type: "submit", disabled: creatingBundle || newBundleName.trim() === "", children: t("create") }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "outline", type: "button", disabled: creatingBundle, onClick: () => {
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: newBundleCats, onChange: setNewBundleCats, label: t("newBundle") }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.inlineForm, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", type: "submit", disabled: creatingBundle || newBundleName.trim() === "", children: t("create") }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "outline", type: "button", disabled: creatingBundle, onClick: () => {
                   setNewBundleOpen(false);
                   setNewBundleCats([]);
                 }, children: t("cancel") })
@@ -8113,8 +7477,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             ] })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          import_dsh_client_ui_primitives11.Modal,
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          import_dsh_client_ui_primitives10.Modal,
           {
             open: catTarget !== null,
             onClose: () => {
@@ -8122,21 +7486,21 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             },
             closeLabel: t("close"),
             title: t("bundleCatEditTitle", { name: catTarget?.name ?? "" }),
-            children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.stackForm, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CategoryEditor, { value: catDraft, onChange: setCatDraft, label: t("bundleCatEdit") }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.inlineForm, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "primary", type: "button", disabled: savingCats, onClick: () => {
+            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.stackForm, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: catDraft, onChange: setCatDraft, label: t("bundleCatEdit") }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.inlineForm, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", type: "button", disabled: savingCats, onClick: () => {
                   void submitCategories();
                 }, children: t("bundleCatDone") }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "outline", type: "button", disabled: savingCats, onClick: () => {
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "outline", type: "button", disabled: savingCats, onClick: () => {
                   setCatTarget(null);
                 }, children: t("cancel") })
               ] })
             ] })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          import_dsh_client_ui_primitives11.Modal,
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          import_dsh_client_ui_primitives10.Modal,
           {
             open: addOpen,
             onClose: () => {
@@ -8147,7 +7511,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             },
             closeLabel: t("close"),
             title: t("addSkillsTitle"),
-            children: install === null ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+            children: install === null ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
               "div",
               {
                 className: `${css.addCard} ${dropActive ? css.addCardActive : ""}`,
@@ -8174,21 +7538,21 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   }
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: css.addCardHead, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.addCardIcon, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CloudUpIcon, { size: 22 }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.addCardTitle, children: t("bannerTitle") })
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.addCardHead, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.addCardIcon, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CloudUpIcon, { size: 22 }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.addCardTitle, children: t("bannerTitle") })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.addCardSub, children: t("bannerSub") }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: css.addDrop, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CloudUpIcon, { size: 18 }),
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.addDropText, children: t("dropHere") }),
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.addDropHint, children: t("dropFormat") })
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.addCardSub, children: t("bannerSub") }),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.addDrop, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CloudUpIcon, { size: 18 }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.addDropText, children: t("dropHere") }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.addDropHint, children: t("dropFormat") })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: css.addBtn, onClick: (event) => {
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.addBtn, onClick: (event) => {
                     event.stopPropagation();
                     fileInput.current?.click();
                   }, children: t("browseImport") }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                     "input",
                     {
                       ref: fileInput,
@@ -8203,11 +7567,11 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   )
                 ]
               }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { className: css.installForm, onSubmit: (event) => {
+            ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("form", { className: css.installForm, onSubmit: (event) => {
               void confirmInstall(event);
             }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.installRow, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.installRow, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                   "input",
                   {
                     className: css.inlineInput,
@@ -8220,7 +7584,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                     }
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                   "input",
                   {
                     className: css.inlineInput,
@@ -8233,9 +7597,9 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                     }
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: css.bundleSelect, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.visuallyHidden, children: t("installBundle") }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: css.bundleSelect, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.visuallyHidden, children: t("installBundle") }),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                     "select",
                     {
                       value: installBundleId ?? "",
@@ -8244,29 +7608,29 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                         setInstallBundleId(event.currentTarget.value === "" ? void 0 : event.currentTarget.value);
                       },
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", children: t("installLoose") }),
-                        bundles.map((bundle) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: bundle.id, children: bundle.name }, bundle.id))
+                        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "", children: t("installLoose") }),
+                        bundles.map((bundle) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: bundle.id, children: bundle.name }, bundle.id))
                       ]
                     }
                   )
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.installMeta, children: install.archive === true ? t("uploadMeta", { n: 1, folder: install.folderName }) : t("uploadMeta", { n: install.files.length, folder: install.folderName }) })
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.installMeta, children: install.archive === true ? t("uploadMeta", { n: 1, folder: install.folderName }) : t("uploadMeta", { n: install.files.length, folder: install.folderName }) })
               ] }),
-              install.archive !== true && nameInvalid && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: css.error, role: "alert", children: t("installNameInvalid") }),
-              install.archive !== true && !nameInvalid && trimmedName !== "" && installMetaName !== null && installMetaName !== trimmedName && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: css.installHint, children: t("installNameRewrite", { meta: installMetaName, name: trimmedName }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: css.installActions, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "primary", type: "submit", disabled: installing || install.archive !== true && (trimmedName === "" || nameInvalid), children: t("installConfirm") }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "outline", type: "button", disabled: installing, onClick: () => {
+              install.archive !== true && nameInvalid && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: css.error, role: "alert", children: t("installNameInvalid") }),
+              install.archive !== true && !nameInvalid && trimmedName !== "" && installMetaName !== null && installMetaName !== trimmedName && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: css.installHint, children: t("installNameRewrite", { meta: installMetaName, name: trimmedName }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.installActions, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", type: "submit", disabled: installing || install.archive !== true && (trimmedName === "" || nameInvalid), children: t("installConfirm") }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "outline", type: "button", disabled: installing, onClick: () => {
                   setInstall(null);
                   setAddOpen(false);
                 }, children: t("installCancel") })
               ] }),
-              installError !== null && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: css.error, role: "alert", children: installError })
+              installError !== null && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: css.error, role: "alert", children: installError })
             ] })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          import_dsh_client_ui_primitives11.Modal,
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          import_dsh_client_ui_primitives10.Modal,
           {
             open: confirm !== null,
             onClose: () => {
@@ -8274,17 +7638,17 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             },
             closeLabel: t("close"),
             title: confirmTitle,
-            footer: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "outline", disabled: confirming, onClick: () => {
+            footer: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "outline", disabled: confirming, onClick: () => {
                 setConfirm(null);
               }, children: t("cancel") }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.Button, { variant: "primary", disabled: confirming, onClick: () => {
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", disabled: confirming, onClick: () => {
                 void confirmDelete();
               }, children: t("delete") })
             ] })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
           SkillViewer,
           {
             t,
@@ -8299,8 +7663,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             }
           }
         ),
-        assignTarget !== null && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          import_dsh_client_ui_primitives11.Modal,
+        assignTarget !== null && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          import_dsh_client_ui_primitives10.Modal,
           {
             open: true,
             onClose: () => {
@@ -8310,7 +7674,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             title: t("assignTitle", { name: assignTarget.name }),
             className: css.assignModal,
             contentClassName: css.assignModalBody,
-            children: bundles.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: css.looseEmpty, children: t("assignEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: css.assignList, children: bundles.map((bundle, index) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("li", { style: { listStyle: "none" }, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+            children: bundles.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: css.looseEmpty, children: t("assignEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("ul", { className: css.assignList, children: bundles.map((bundle, index) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("li", { style: { listStyle: "none" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
               "button",
               {
                 type: "button",
@@ -8320,12 +7684,12 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   void doAssign(assignTarget, bundle.id);
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.assignCardIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.IconFolderOpenOutline16, { size: 16 }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: css.assignCardBody, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.assignCardName, children: bundle.name }),
-                    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.assignCardDesc, children: t("skillsCount", { n: bundle.skillCount }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconFolderOpenOutline16, { size: 16 }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.assignCardBody, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardName, children: bundle.name }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardDesc, children: t("skillsCount", { n: bundle.skillCount }) })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: css.assignGo, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_dsh_client_ui_primitives11.IconChevronDownOutline14, { size: 14 }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignGo, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconChevronDownOutline14, { size: 14 }) })
                 ]
               }
             ) }, bundle.id)) })
@@ -8337,8 +7701,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
 }
 
 // src/client/error-boundary.tsx
-var import_react17 = require("react");
-var ErrorBoundary = class extends import_react17.Component {
+var import_react16 = require("react");
+var ErrorBoundary = class extends import_react16.Component {
   constructor() {
     super(...arguments);
     __publicField(this, "state", { error: null });
@@ -8361,9 +7725,9 @@ var ErrorBoundary = class extends import_react17.Component {
 };
 
 // src/client/sidebar-nav.tsx
-var import_react18 = require("react");
+var import_react17 = require("react");
 var import_react_dom4 = require("react-dom");
-var import_jsx_runtime14 = require("react/jsx-runtime");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 var HOST_ID = "dsh-prompt-customizer-nav-host";
 var ANCHOR_SELECTOR = '[data-slot="sidebar.workspaces"]';
 var FRAME_SELECTOR = "div:has(> [data-shell-overlay])";
@@ -8432,8 +7796,8 @@ function ensureNavMount() {
   };
 }
 function useNavSlot(name) {
-  const [slot, setSlot] = (0, import_react18.useState)(null);
-  (0, import_react18.useEffect)(() => {
+  const [slot, setSlot] = (0, import_react17.useState)(null);
+  (0, import_react17.useEffect)(() => {
     let timer = 0;
     let tries = 0;
     const poll = () => {
@@ -8451,8 +7815,8 @@ function useNavSlot(name) {
   return slot;
 }
 function useRail() {
-  const [rail, setRail] = (0, import_react18.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
-  (0, import_react18.useEffect)(() => {
+  const [rail, setRail] = (0, import_react17.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
+  (0, import_react17.useEffect)(() => {
     const read = () => {
       setRail(document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
     };
@@ -8500,7 +7864,7 @@ function NavButton({
   onMouseLeave,
   onClick
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
     "button",
     {
       type: "button",
@@ -8515,7 +7879,7 @@ function NavButton({
       onClick,
       children: [
         icon,
-        !rail && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "dsh-nav-label", children: label })
+        !rail && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "dsh-nav-label", children: label })
       ]
     }
   );
@@ -8536,11 +7900,11 @@ function clickInSidebar(target) {
   return false;
 }
 function usePanelAutoClose(name, open, requestClose) {
-  (0, import_react18.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (!open) return;
     window.dispatchEvent(new CustomEvent(PANEL_OPEN_EVENT, { detail: name }));
   }, [open, name]);
-  (0, import_react18.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (!open) return void 0;
     const onSiblingOpen = (event) => {
       if (event.detail !== name) requestClose();
@@ -8569,25 +7933,25 @@ function navAnchorFrom(el) {
 }
 
 // src/client/skills/entry.tsx
-var import_jsx_runtime15 = require("react/jsx-runtime");
+var import_jsx_runtime14 = require("react/jsx-runtime");
 function anchorFromEvent(e) {
   return navAnchorFrom(e.currentTarget);
 }
 function SkillsEntry() {
   ensureModalAnimStyles();
   ensureShellStyles();
-  const [open, setOpen] = (0, import_react19.useState)(false);
-  const [anchor, setAnchor] = (0, import_react19.useState)(null);
+  const [open, setOpen] = (0, import_react18.useState)(false);
+  const [anchor, setAnchor] = (0, import_react18.useState)(null);
   const { closing, requestClose } = useModalClose(open, () => {
     setOpen(false);
   });
   const rail = useRail();
   usePanelAutoClose("skills", open, requestClose);
-  return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(import_jsx_runtime15.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       NavButton,
       {
-        icon: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("svg", { width: rail ? 18 : 16, height: rail ? 18 : 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("path", { d: "M13 2 3 14h7l-1 8 10-12h-7l1-8z" }) }),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("svg", { width: rail ? 18 : 16, height: rail ? 18 : 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "M13 2 3 14h7l-1 8 10-12h-7l1-8z" }) }),
         label: "\u80FD\u529B",
         rail,
         expanded: open,
@@ -8598,19 +7962,19 @@ function SkillsEntry() {
         }
       }
     ),
-    open && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(ErrorBoundary, { label: "\u6280\u80FD\u9762\u677F", fallback: null, onError: requestClose, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SkillsPanel, { closing, onClose: requestClose, anchor }) })
+    open && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ErrorBoundary, { label: "\u6280\u80FD\u9762\u677F", fallback: null, onError: requestClose, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SkillsPanel, { closing, onClose: requestClose, anchor }) })
   ] });
 }
 function SkillsNavApp() {
   ensureNavStyles();
-  return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(NavPortal, { name: "skills", children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SkillsEntry, {}) });
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(NavPortal, { name: "skills", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SkillsEntry, {}) });
 }
-function apply2(ctx) {
+function apply(ctx) {
   ctx.effect(() => {
     ensureNavMount();
     const holder = document.createElement("div");
     const root = (0, import_client.createRoot)(holder);
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SkillsNavApp, {}));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SkillsNavApp, {}));
     return () => {
       root.unmount();
     };
@@ -8626,9 +7990,8 @@ function safe(label, run, ctx) {
     console.error(`[dsh-prompt-customizer] ${label} failed:`, error);
   }
 }
-function apply3(ctx) {
-  safe("skills panel", apply2, ctx);
-  safe("skill source", apply, ctx);
+function apply2(ctx) {
+  safe("skills panel", apply, ctx);
   safe("prompt locale", applyPrompt, ctx);
 }
 return module.exports; } });

@@ -41,6 +41,20 @@ export function applyPrompt(ctx: ClientContext): void {
     console.warn('[dsh-prompt-customizer] prompt locale unavailable: 提示词面板回落中文文案')
     return
   }
-  ctx.effect(() => locale.register(NS, DICT), 'triad: prompt locale')
-  bound = locale.bind(NS)
+  // 命名空间是插件自己的（'prompt-customizer'）。注册失败绝不能拖垮整条客户端
+  // 插件加载链（同名注册会抛错，且谁先注册谁让后来者抛）——失败就回落插件内
+  // 自带的 zh 文案，面板照常能用。
+  ctx.effect(() => {
+    try {
+      return locale.register(NS, DICT)
+    } catch (error) {
+      console.error('[dsh-prompt-customizer] prompt locale register failed:', error)
+      return () => {}
+    }
+  }, 'prompt-customizer: prompt locale')
+  try {
+    bound = locale.bind(NS)
+  } catch (error) {
+    console.warn('[dsh-prompt-customizer] prompt locale bind failed, 回落中文文案:', error)
+  }
 }

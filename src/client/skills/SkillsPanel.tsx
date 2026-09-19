@@ -195,14 +195,11 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   }
 
   const refresh = (): void => {
-    // 技能目录变更后,同步失效 skill-source 的 slash 菜单快照缓存。
-    void import('../skill-source').then(({ invalidateSkillCache }) => invalidateSkillCache())
     setReload((value) => value + 1)
   }
 
   /** 静默同步：不置 loading，直接替换数据（自动同步机制用）。 */
   const silentSync = (): void => {
-    void import('../skill-source').then(({ invalidateSkillCache }) => invalidateSkillCache())
     void skillApi.list().then((snapshot) => {
       setState((current) => current.status === 'error'
         ? current
@@ -239,9 +236,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** 开关切换后静默同步:仅失效 slash 缓存并重拉开关状态,不重载整个面板(避免闪烁)。 */
+  /** 开关切换后静默同步:只重拉开关状态,不重载整个面板(避免闪烁)。 */
   const refreshTogglesOnly = (): void => {
-    void import('../skill-source').then(({ invalidateSkillCache }) => invalidateSkillCache())
     void skillApi.presetStatus().then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles })

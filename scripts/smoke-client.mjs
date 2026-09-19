@@ -226,13 +226,17 @@ for (const gone of ['buildActivityGrid', 'activityColor', 'ACTIVITY_COLUMNS']) {
 // ── run apply() against a stub client context ────────────────────────────
 const registered = []
 const slots = []
+const namespaces = []
 const ctx = {
   effect: (fn) => { registered.push(typeof fn === 'function' ? fn() : undefined); return () => {} },
-  locale: { register: () => () => {} },
+  locale: {
+    register: (ns) => { namespaces.push(ns); return () => {} },
+    bind: () => (key) => String(key),
+  },
   slots: {
     register: (spec, comp) => {
       if (comp === undefined) throw new Error('slots.register called without component')
-      slots.push(spec.name)
+      slots.push(spec.key === undefined ? spec.name : `${spec.name}#${spec.key}`)
       return () => {}
     },
     inject: (name, factory) => { factory?.(); return () => {} },
@@ -247,8 +251,17 @@ try {
   fail(`apply(ctx) threw: ${error?.stack ?? error}`)
 }
 
-if (!slots.includes('tool.call.toolview')) fail('skill tool row (tool.call.toolview) was not registered')
-else pass('skill tool row registered (tool.call.toolview)')
+// 内核（@deepseek-ai/dsh-client-ui-skill）owns the `skill` locale namespace, the
+// `tool.call.toolview` row keyed `skill`, and the `/` slash source. All three
+// registries throw on a duplicate name/key, and the second registrant is the one
+// that throws — so a duplicate here kills the KERNEL's apply and takes the whole
+// client plugin chain down (hit for real in 0.6.0). Assert we register none of them.
+if (slots.includes('tool.call.toolview#skill')) fail('registered the kernel-owned skill tool row (tool.call.toolview#skill)')
+else pass('no duplicate skill tool row (kernel owns tool.call.toolview#skill)')
+if (namespaces.includes('skill')) fail('registered the kernel-owned locale namespace "skill"')
+else pass('no duplicate "skill" locale namespace (kernel owns it)')
+if (namespaces.includes('prompt-customizer')) pass('prompt locale namespace registered ("prompt-customizer")')
+else fail('prompt locale namespace "prompt-customizer" was not registered')
 
 console.log(`\n${process.exitCode ? 'SMOKE FAILED' : 'SMOKE PASSED'} — ${CLIENT}`)
 // Explicit exit: stubbed modules may hold listeners/timers that keep node alive.
