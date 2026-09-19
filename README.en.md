@@ -279,6 +279,11 @@ npm run check   # typecheck + build + full test suite
 
 The browser half is built with [tsdown](https://github.com/rolldown/tsdown) into `client/client.js` (a `__ModuleLoader__` factory bundle); the host half lives in `lib/`. Phase state logic sits in `lib/sectionOps.mjs`: the same pure functions are bundled into the UI and exercised directly by `node --test`, so the tests are the shipped code.
 
+## Credits
+
+- The **SKILL and MCP halves (UI and host modules) come from [Kr-ATG/dsh-triad](https://github.com/Kr-ATG/dsh-triad)** — skill bundle management, global/per-preset toggles, layered MCP masking and per-tool enable/disable, the sidebar capability entry, and the `/` skill source all follow that project. Since 0.6.0 they ship merged with the prompt customizer in this plugin.
+- The prompt panel derives from this repository's own 0.5.x implementation.
+
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF

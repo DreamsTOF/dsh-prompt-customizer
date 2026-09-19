@@ -318,6 +318,11 @@ npm run check   # typecheck + build + 全量单测
 
 阶段性与可测的纯逻辑集中在 `vendor/prompt-customizer/`（提示词策略 / 清单登记表 / 阶段投影）与 `vendor/skill-manager/`：同一份纯函数既被两侧打包使用，也被 `node --test` 直接覆盖，测试即上线代码。`npm run check` = 构建 + 全量单测 + 两半 smoke。
 
+## 致谢
+
+- 技能（SKILL）与 MCP 两块的**界面与宿主模块来自 [Kr-ATG/dsh-triad](https://github.com/Kr-ATG/dsh-triad)**：技能集合管理、全局 / 预设双层开关、MCP 分层遮蔽与工具级启停，以及侧边栏「能力」入口与 `/` 技能源的交互和视觉都参考该项目；0.6.0 起这两块与提示词定制合并为本插件。
+- 提示词面板派生自本仓库 0.5.x 的独立实现。
+
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF
