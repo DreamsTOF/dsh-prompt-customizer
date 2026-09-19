@@ -2484,6 +2484,9 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           (0, import_react4.createElement)("span", { style: s.code }, row.name),
           (0, import_react4.createElement)("span", { style: s.orderTag }, "#" + index),
           (0, import_react4.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
+          // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
+          // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
+          agentScoped.has(row.name) ? (0, import_react4.createElement)("span", { style: s.badgeSystem, title: t("agentScopedHint") }, t("agentScoped")) : null,
           row.replaced ? (0, import_react4.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
           row.blocked ? (0, import_react4.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
         ]),
@@ -2507,6 +2510,12 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   };
   const rows = rowsOf(phase);
   const injectedNames = injectedAt(cfg, phase).names;
+  const agentScoped = /* @__PURE__ */ new Set();
+  for (const view of Object.values(phases ?? {})) {
+    for (const section of view?.baseSections ?? []) {
+      if (section.scope === "agent") agentScoped.add(section.name);
+    }
+  }
   const onCount = rows.filter((row) => !row.blocked).length;
   const offCount = rows.length - onCount;
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.blocked : row.blocked);
@@ -3813,6 +3822,8 @@ var DICT = {
     targetAllTab: "\u5168\u90E8 Agent",
     targetLabel: "\u7F16\u8F91\u76EE\u6807\uFF08Agent \u9884\u8BBE\uFF09",
     targetCustomized: "\u8BE5\u9884\u8BBE {n} \u9879\u5B9A\u5236",
+    agentScoped: "\u4F1A\u8BDD\u7EA7",
+    agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7684\u9884\u89C8\u88C5\u914D\u770B\u4E0D\u5230\u5B83\uFF0C\u4F46\u6BCF\u4E2A\u771F\u5B9E\u4F1A\u8BDD\u7684\u63D0\u793A\u8BCD\u91CC\u90FD\u6709\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u63D0\u793A\u8BCD\u91CC\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F \u2014\u2014 \u60F3\u8BA9\u5B83\u53D8\u4E2D\u6587\uFF0C\u7528\u300C\u4E2D\u6587\u63D0\u793A\u8BCD\u300D\u5F00\u5173\u6216\u624B\u52A8\u66FF\u6362\u90FD\u884C\u3002",
     settingsTitle: "\u5168\u5C40\u8BBE\u7F6E",
     libraryTitle: "\u914D\u7F6E\u5FEB\u7167\u5E93",
     draftBadge: "\u9884\u89C8\u542B\u672A\u4FDD\u5B58\u8349\u7A3F",
@@ -3962,6 +3973,8 @@ var DICT = {
     targetAllTab: "All agents",
     targetLabel: "Edit target (agent preset)",
     targetCustomized: "{n} overridden field(s)",
+    agentScoped: "session-level",
+    agentScopedHint: "This section is registered by a plugin in the agent\u2019s own scope (it is not in this preset scope\u2019s registry): the panel\u2019s preview assembly cannot see it, but every real session\u2019s prompt has it. It is in the prompt by default, and it can be blocked / replaced / reordered like any other row \u2014 use the \u201CChinese prompt\u201D toggle or a manual replacement to translate it.",
     settingsTitle: "Global settings",
     libraryTitle: "Config snapshots",
     draftBadge: "Preview includes unsaved draft",

@@ -329,6 +329,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
           h('span', { style: s.code }, row.name),
           h('span', { style: s.orderTag }, '#' + index),
           h('span', { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t('manual') : t('system')),
+          // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
+          // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
+          agentScoped.has(row.name) ? h('span', { style: s.badgeSystem, title: t('agentScopedHint') }, t('agentScoped')) : null,
           row.replaced ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           row.blocked ? h('span', { style: s.badgeBlocked }, t('blockedOn')) : null,
         ]),
@@ -361,6 +364,13 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   const rows = rowsOf(phase)
   /** 本阶段有注入条目（= 被显式加进来过）的段名：拖回池时用来自动选「撤销注入」还是「屏蔽」。 */
   const injectedNames = injectedAt(cfg, phase).names
+  /** 只在 agent 作用域注册的段名（预览把它们并进来了，带 scope 标记）：行上标「会话级」。 */
+  const agentScoped = new Set<string>()
+  for (const view of Object.values(phases ?? {})) {
+    for (const section of view?.baseSections ?? []) {
+      if (section.scope === 'agent') agentScoped.add(section.name)
+    }
+  }
   const onCount = rows.filter((row) => !row.blocked).length
   const offCount = rows.length - onCount
   const rowVisible = (row: PartRow): boolean =>

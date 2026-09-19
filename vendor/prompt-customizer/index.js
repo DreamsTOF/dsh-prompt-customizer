@@ -259,8 +259,16 @@ export function apply(ctx, entry = {}) {
 
       // 本插件过滤前的原始输入（段 / 工具）—— 预过滤视图与 post 视图同源，
       // 让提示词 / 工具 / 预览三个 Tab 与运行时装配所见一致。
-      const baseSections = Array.isArray(assembled.sections) ? assembled.sections : []
+      const baseSections = Array.isArray(assembled.sections) ? [...assembled.sections] : []
       const baseTools = Array.isArray(assembled.tools) ? assembled.tools : []
+
+      // 预览额外并一层 **agent 作用域**的段（见 mergeAgentScopedSections 的说明）。
+      // 只并预览：真实装配本来就带着它们，运行时无需任何额外动作。
+      if (context?.promptCustomizerBase === true) {
+        mergeAgentScopedSections(ctx, baseSections, (section) => (
+          typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? '')
+        ))
+      }
 
       // 真实装配也要并进登记表（预览那次由 buildPreview 自己并）：有一批段只在
       // agent 作用域里注册（插件按 agent 动态 section()，如 subagent 工具的
@@ -300,6 +308,8 @@ export function apply(ctx, entry = {}) {
             text: typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? ''),
             blocked: denied.has(section.name),
             replaced: Object.hasOwn(replace, section.name),
+            // 'agent' = 只在该 agent 的装配里注册的段（预览 scope 的注册表没有它）。
+            ...section.scope !== undefined ? { scope: section.scope } : {},
           })),
           tools: baseTools.map((tool) => ({
             name: typeof tool.name === 'string' ? tool.name : String(tool.name),
@@ -356,6 +366,13 @@ export function apply(ctx, entry = {}) {
           // 内部已调用一次；动态段通常是纯函数，可接受）。
           text: typeof section.text === 'function' ? section.text(context) : section.text,
         }))
+        // 预览：把 agent 作用域的段也并进这份重建输入，否则预览的最终段列表里
+        // 没有它们，与真实会话的提示词对不上（见 mergeAgentScopedSections）。
+        if (context?.promptCustomizerBase === true) {
+          mergeAgentScopedSections(ctx, baseSections, (section) => (
+            typeof section.text === 'function' ? section.text(context) : section.text
+          ))
+        }
         const sections = applySectionPolicy(baseSections, cfg, status)
         const patched = { ...result, sections }
         // 预览的「产出 vs 模型所见」比对以强制覆盖后的最终段为准。
@@ -974,6 +991,32 @@ function agentScopedSections(ctx) {
     }
   } catch { /* 服务缺席 / 列表异常：清单少这一层名字，其它照常 */ }
   return out
+}
+
+/**
+ * 预览专用：把 agent 作用域的段并进段定义列表（去重，带 `scope: 'agent'` 标记）。
+ *
+ * 插件按 agent 动态 `section()` 的产物（subagent 的 `tool:subagent`、file-reference
+ * 的 `context:file-reference`…）不在预设 scope 的注册表里，预设 scope 的预览装配
+ * 自然看不到它们 —— 但**真实会话的装配一定有**（每个 agent 各注册一份）。不并进来，
+ * 面板就会出现「列表里根本没有这些段、对话里它们却默认在提示词里」的错位，而且
+ * 「中文提示词」开关只翻列表里出现的行，于是永远翻不到它们。
+ *
+ * 只对预览生效：真实装配本来就带着它们，运行时不需要任何额外动作。
+ *
+ * @param ctx - plugin context.
+ * @param baseSections - 段定义数组，原地追加。
+ * @param resolveText - 取该段的展示文本（两条装配路径的解析方式不同）。
+ * @returns 同一个数组（便于链式书写）。
+ */
+function mergeAgentScopedSections(ctx, baseSections, resolveText) {
+  const listed = new Set(baseSections.map((section) => String(section.name)))
+  for (const [name, section] of agentScopedSections(ctx)) {
+    if (listed.has(name)) continue
+    listed.add(name)
+    baseSections.push({ name, text: resolveText(section), scope: 'agent' })
+  }
+  return baseSections
 }
 
 /** 注册表的工具名清单（解析出的 scope 优先，回退全局层）。任何一步失败都返回

@@ -74,8 +74,11 @@ export interface Preview {
   /** 元素可能是对象，也可能是纯字符串工具名（宿主端两种形态都可能出现）。 */
   tools: Array<{ name: string; description: string } | string>
   /** 预过滤段视图：进入本插件过滤前的段原文 + 该阶段独立屏蔽 / 替换标记
-   *  （提示词 / 工具 / 预览三个 Tab 的统一数据源；被屏蔽项仍在此可反选）。 */
-  baseSections?: Array<{ name: string; text: string; blocked: boolean; replaced: boolean }>
+   *  （提示词 / 工具 / 预览三个 Tab 的统一数据源；被屏蔽项仍在此可反选）。
+   *  `scope: 'agent'` = 该段只在 agent 自己的作用域里注册（如 `tool:subagent`、
+   *  `context:file-reference`）：预设 scope 的注册表里没有它，但真实会话装配一定
+   *  有 —— 预览已把它并进来，UI 据此标「会话级」。 */
+  baseSections?: Array<{ name: string; text: string; blocked: boolean; replaced: boolean; scope?: 'agent' }>
   /** 预过滤工具视图：进入本插件过滤前的工具原文 + 该阶段隐藏标记。 */
   baseTools?: Array<{ name: string; description: string; hidden: boolean }>
 }

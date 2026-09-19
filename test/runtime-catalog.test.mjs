@@ -125,6 +125,28 @@ test('预览只并它自己看见的：预设 scope 里没有的段不会凭空�
   assert.deepEqual(body.sections.map((sec) => sec.name).sort(), ['core', 'persona'])
 })
 
+test('预览把 agent 作用域段并进列表（带 scope 标记），不再「列表里没有、对话里却有」', async () => {
+  const { ctx } = makeCtx()
+  apply(ctx, { dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'pc-preview-agent-')) })
+  // 预览装配：作用域是预设，注册表里没有 tool:subagent；但活着的 agent 有它。
+  const preview = await ctx.systemPrompt.assemble({
+    scope: 'preset:standard',
+    promptCustomizerBase: true,
+    promptCustomizerPhase: 'active',
+  })
+
+  const base = preview.promptCustomizerBaseView?.sections ?? []
+  const row = base.find((section) => section.name === RUNTIME_ONLY.name)
+  assert.ok(row, `预览的 baseSections 应含 agent 作用域段，实际：${base.map((s) => s.name).join(', ')}`)
+  assert.equal(row.scope, 'agent', 'agent 作用域段要带 scope 标记，UI 据此标「会话级」')
+  assert.equal(row.blocked, false, '默认没被屏蔽（真实会话里它默认就在提示词里）')
+  // post 视图（模型所见）也要有它 —— 否则预览文本与实际提示词对不上。
+  assert.ok(
+    preview.sections.some((section) => section.name === RUNTIME_ONLY.name),
+    '最终装配视图应含 agent 作用域段',
+  )
+})
+
 test('两条路径并存时同名只出现一次（并集去重）', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
