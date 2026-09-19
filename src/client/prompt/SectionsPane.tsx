@@ -15,14 +15,19 @@
  * 把行拖到头部某个阶段 Tab = 复制到那个阶段。点按路径照旧：池里每行三个小按钮
  * 也能加入对应阶段（运行时动态段加不进，会给出说明）。
  *
+ * 三态同步（syncAll，默认关）：三个阶段共用同一份「并集行集」—— 常驻期行序为
+ * 骨架，其余两态独有的段追加在尾部，同名段以原生那一阶段的行为准；增删 / 排序 /
+ * 勾选 / 文本编辑一律经 persistRows 一次写全三个阶段（inject + 三份屏蔽名单），
+ * 所以三态列表与文本恒等，不再逐阶段各写一份。
+ *
  * 全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
  * 覆盖同一份代码）。
  */
 import { createElement as h, useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
-import type { Config, Inventory, Phase, PhaseViewKey, Preview } from './types.ts'
+import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER } from './presets.ts'
-import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, mergedPhaseInjectEntries, phaseRows, reorderInsert, injectedAt } from '../../../vendor/prompt-customizer/sectionOps.mjs'
+import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, phaseRows, reorderInsert, injectedAt, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from '../../../vendor/prompt-customizer/sectionOps.mjs'
 import { acceptsDrop, beginDrag, dropOnPhase, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
 import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
@@ -54,7 +59,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   phases: PhaseViews | null
   /** 当前阶段（状态在 Panel 持有，头部阶段按钮统一切换）。 */
   phase: PhaseViewKey
-  /** 三态同步（默认关）：勾选后屏蔽 / 解除屏蔽与替换文本对三个阶段一起生效（只作用于同名段）。 */
+  /** 三态同步（默认关）：三个阶段共用同一份并集行集，增删 / 排序 / 勾选 / 文本编辑一次写全三态。 */
   syncAll?: boolean
   t: Translate
   /** 从池加入时的文本取值（缺省用池原文；Panel 在「中文提示词」开启时换成译本）。 */
@@ -75,7 +80,21 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   const scrollRef = useRef<HTMLDivElement | null>(null)
   useDragAutoScroll(scrollRef)
 
-  const rowsOf = (key: PhaseViewKey): PartRow[] => phaseRows(cfg, phases?.[key] ?? null, key)
+  // ── 三态同步（syncAll）：三态共用同一份并集行集 ────────────────────────
+  /** 该段是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」
+   *  还是「必须带正文」。null = 该阶段视图未就绪（镜像整段跳过，绝不把缺失的
+   *  阶段当空集写掉）。 */
+  const nativeIn = (key: PhaseViewKey, name: string): boolean | null => {
+    const view = phases?.[key]
+    if (view === undefined || view === null) return null
+    return (view.baseSections ?? []).some((sec) => sec.name === name)
+  }
+  /** 三阶段装配是否都就绪（缺一态就不做镜像）。 */
+  const mirrorReady = (): boolean => PART_ORDER.every((key) => nativeIn(key, '') !== null)
+  /** 并集行集：常驻期行序为骨架，其余两态独有的段追加在尾部（同名段以原生那阶段为准）。 */
+  const mirrorRows = (): PartRow[] => mirroredRows(cfg, phases, nativeIn)
+  const rowsOf = (key: PhaseViewKey): PartRow[] =>
+    syncAll === true ? mirrorRows() : phaseRows(cfg, phases?.[key] ?? null, key)
 
   // 屏蔽 / 恢复一个段（blockPatch 只动本阶段自己的名单）。写入严格落在当前
   // 编辑目标的草稿里 —— 预设之间互相独立：在 A 预设里的任何改动对 B 预设与
@@ -86,20 +105,45 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
       write(field as 'sections' | 'sectionsBootstrap' | 'sectionsCompaction', value)
     }
   }
-  const toggleBlocked = (key: PhaseViewKey, name: string): void => {
-    const blocked = !deniedNames(cfg, key).includes(name)
-    // 三态同步（可选）：一次写全三个阶段 —— 只作用于同名的这一段。
-    for (const k of syncAll ? PART_ORDER : [key]) applyBlock(k, name, blocked)
+
+  /** 三态同步落盘：并集行集一次写全三个阶段（inject + 三份屏蔽名单）—— 逐阶段
+   *  各写一次会互相覆盖（edit 对 inject 是整体替换），必须一次写全。 */
+  const persistMirror = (rows: PartRow[]): void => {
+    if (!mirrorReady()) {
+      setNotice(t('syncNotReady'))
+      return
+    }
+    write('inject', mirrorPhaseInjectEntries(cfg, rows, nativeIn))
+    const denied = mirroredDeniedLists(rows)
+    write('sections', denied.sections)
+    write('sectionsBootstrap', denied.sectionsBootstrap)
+    write('sectionsCompaction', denied.sectionsCompaction)
   }
 
   // 该阶段中某名字是否在该阶段的装配输入里（判断加入是「解除屏蔽」还是「凭空注入」）。
-  const inBaseOf = (key: PhaseViewKey, name: string): boolean =>
-    (phases?.[key]?.baseSections ?? []).some((sec) => sec.name === name)
+  const inBaseOf = (key: PhaseViewKey, name: string): boolean => nativeIn(key, name) === true
 
   // 持久化一个阶段的有序列表（写回 inject）：每行一条注入项、order 为连续整数；
   // 系统行空文本（仅 order 覆盖），custom 行保留文本；其它阶段的注入项原样保留。
   const persistPhase = (key: PhaseViewKey, rows: PartRow[]): void => {
     write('inject', phaseInjectEntries(cfg, key, rows))
+  }
+
+  /** 持久化一份有序行集：三态同步 = 一次写全三个阶段，否则只写当前阶段。 */
+  const persistRows = (key: PhaseViewKey, rows: PartRow[]): void => {
+    if (syncAll === true) persistMirror(rows)
+    else persistPhase(key, rows)
+  }
+
+  const toggleBlocked = (key: PhaseViewKey, name: string): void => {
+    if (syncAll === true) {
+      const rows = rowsOf(key)
+      const row = rows.find((item) => item.name === name)
+      if (row === undefined) return
+      persistMirror(rows.map((item) => (item.name === name ? { ...item, blocked: !item.blocked } : item)))
+      return
+    }
+    applyBlock(key, name, !deniedNames(cfg, key).includes(name))
   }
 
   // 上移/下移一格（数组交换后重排整个阶段）。
@@ -110,12 +154,16 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     const next = rows.slice()
     const [item] = next.splice(index, 1)
     next.splice(target, 0, item)
-    persistPhase(key, next)
+    persistRows(key, next)
   }
 
   // 从该阶段移除一个段：删掉它在本阶段的注入条目，以及跨阶段生效（always）的
   // 条目 —— 预设应用 / 导入产生的自定义段就是 always。随后解除该阶段屏蔽。
   const removeFromPart = (key: PhaseViewKey, name: string): void => {
+    if (syncAll === true) {
+      persistMirror(rowsOf(key).filter((row) => row.name !== name))
+      return
+    }
     const phaseOfItem = injectPhaseOf(key)
     const inject = (cfg.inject ?? []).filter((x) => {
       if (x.name !== name) return true
@@ -134,25 +182,15 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   }
   const commitReplace = (key: PhaseViewKey, row: PartRow): void => {
     const patchRow = (r: PartRow): PartRow => (r.name !== row.name ? r : { ...r, override: draft, text: draft })
-    if (syncAll) {
-      // 三态同步（可选）：替换文本一次写全三个阶段 —— 只改各阶段里同名的那
-      // 一行。edit 对 inject 是整体替换，必须把三个阶段叠进同一份列表一次写入。
-      const rowsByKey = {} as Record<PhaseViewKey, PartRow[]>
-      for (const k of PART_ORDER) {
-        const rows = rowsOf(k)
-        rowsByKey[k] = k === key || rows.some((r) => r.name === row.name) ? rows.map(patchRow) : rows
-      }
-      write('inject', mergedPhaseInjectEntries(cfg, rowsByKey))
-    } else {
-      persistPhase(key, rowsOf(key).map(patchRow))
-    }
+    // 三态同步：替换文本一次写全三个阶段（同名行 = 同一份文本）。
+    persistRows(key, rowsOf(key).map(patchRow))
     setEditing(null)
   }
   const restoreReplace = (key: PhaseViewKey, row: PartRow): void => {
     const next = rowsOf(key).map((r) =>
       r.name !== row.name ? r : { ...r, override: '', text: r.custom ? r.text : '' },
     )
-    persistPhase(key, next)
+    persistRows(key, next)
     // 遗留的全局替换条目（旧版 UI 的产物）：只在本部分还原时一并清除。
     if (!row.custom && Object.hasOwn(cfg.replace ?? {}, row.name)) {
       const rest = { ...(cfg.replace ?? {}) }
@@ -161,7 +199,12 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     }
   }
 
-  const addSection = (name: string, text: string, phase: Phase): void => {
+  const addSection = (name: string, text: string, phase: PhaseViewKey): void => {
+    if (syncAll === true) {
+      // 三态同步：新段一次建进三个阶段（并集行集尾部，带自撰正文）。
+      persistMirror([...rowsOf(phase), { name, text, replaced: false, custom: true, override: text, blocked: false }])
+      return
+    }
     const inject = (cfg.inject ?? []).slice()
     inject.push({ name, order: 120 + inject.length, text, phase, custom: true })
     write('inject', inject)
@@ -182,8 +225,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     setNotice(null)
     const rows = rowsOf(key)
     const existing = rows.find((row) => row.name === name)
+    // 三态同步下「加入」= 三态都出现且都开启（并集行集里重排到尾部 / 追加新行）。
     const next = existing !== undefined
-      ? [...rows.filter((row) => row.name !== name), existing]
+      ? [...rows.filter((row) => row.name !== name), syncAll === true ? { ...existing, blocked: false } : existing]
       : [...rows, {
           name,
           text: '',
@@ -192,20 +236,30 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
           override: body,
           blocked: false,
         }]
-    if (existing === undefined && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
+    if (syncAll !== true && existing === undefined && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
       applyBlock(key, name, false)
     }
-    persistPhase(key, next)
+    persistRows(key, next)
     if (copiedFrom !== undefined) setNotice(t('sectionCopied', { name, to: stageLabel(key), from: copiedFrom }))
   }
 
   // ── 拖拽落地（手势定义见 dnd.ts）────────────────────────────────────
   /** 从本阶段拿掉一段：注入进来的撤销注入，原生段则屏蔽掉（等价于取消勾选）。 */
   const removeFromPhase = (name: string): void => {
-    const row = rowsOf(phase).find((item) => item.name === name)
+    const rows = rowsOf(phase)
+    const row = rows.find((item) => item.name === name)
     if (row === undefined) return
-    if (row.custom || row.override !== '' || injectedNames.has(name)) removeFromPart(phase, name)
-    else applyBlock(phase, name, true)
+    if (syncAll === true) {
+      // 三态同步：原生段三态一起屏蔽；只靠注入存在的段三态一起撤销注入。
+      const native = PART_ORDER.some((key) => nativeIn(key, name) === true)
+      persistMirror(row.custom || !native
+        ? rows.filter((item) => item.name !== name)
+        : rows.map((item) => (item.name === name ? { ...item, blocked: true } : item)))
+    } else if (row.custom || row.override !== '' || injectedNames.has(name)) {
+      removeFromPart(phase, name)
+    } else {
+      applyBlock(phase, name, true)
+    }
     setNotice(t('sectionRemoved', { name, from: stageLabel(phase) }))
   }
 
@@ -221,7 +275,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     const pos = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
     if (payload.from === phase) {
       const next = reorderInsert(rowsOf(phase), payload.name, target.name, pos)
-      if (next !== null) { persistPhase(phase, next); setNotice(null) }
+      if (next !== null) { persistRows(phase, next); setNotice(null) }
       return
     }
     addFromPool(phase, payload.name, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
@@ -241,7 +295,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     const last = list[list.length - 1]
     if (last === undefined || last.name === payload.name) return
     const next = reorderInsert(list, payload.name, last.name, 'below')
-    if (next !== null) persistPhase(phase, next)
+    if (next !== null) persistRows(phase, next)
   }
 
   /** 池上投放：把行从本阶段拿掉（拖回「全部」的手势）。 */
@@ -260,6 +314,8 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   useEffect(() => {
     setPhaseDropHandler((key, payload) => {
       if (payload.kind !== 'section' || key === phase) return
+      // 三态同步：段已经在三个阶段里了，拖到别的阶段 Tab 不再复制（只有池里来的要加入）。
+      if (syncAll === true && payload.from !== 'pool') return
       addFromPool(key, payload.name, payload.text ?? '', stageLabel(phase))
     })
     return () => setPhaseDropHandler(null)
@@ -362,6 +418,8 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
 
   // 当前阶段的行 + 三态过滤。
   const rows = rowsOf(phase)
+  /** 三态同步下建不到其它阶段的动态段（行集里显示、装配里没有）：给出说明。 */
+  const mirrorSkipped = syncAll === true && mirrorReady() ? mirrorSkippedNames(rows, nativeIn) : []
   /** 本阶段有注入条目（= 被显式加进来过）的段名：拖回池时用来自动选「撤销注入」还是「屏蔽」。 */
   const injectedNames = injectedAt(cfg, phase).names
   /** 只在 agent 作用域注册的段名（预览把它们并进来了，带 scope 标记）：行上标「会话级」。 */
@@ -392,6 +450,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
       onDrop: dropOnList,
     }, [
       notice ? h('div', { style: s.noticeWarn }, notice) : null,
+      mirrorSkipped.length > 0
+        ? h('div', { style: s.noticeWarn }, t('syncSkippedDynamic', { names: mirrorSkipped.join('、') }))
+        : null,
       partNote(phase),
       rows.map((row, i) => renderRow(phase, row, i, rows.length)),
       rows.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,

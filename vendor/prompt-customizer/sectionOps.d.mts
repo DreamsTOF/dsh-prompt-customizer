@@ -36,6 +36,32 @@ export function mergedPhaseInjectEntries<T extends object>(
   cfg: unknown,
   rowsByKey: Record<PhaseKey, T[]>,
 ): Array<Record<string, unknown>>
+/** 三态同步的并集行集：常驻期行序为骨架，其余两态独有的段追加在尾部（同名段
+ *  优先取「原生存在」那一阶段的行）。`views` 里某阶段为 null = 该阶段不参与并集；
+ *  `nativeOf` 返回 null/undefined = 该阶段视图未就绪。 */
+export function mirroredRows(
+  cfg: unknown,
+  views: unknown,
+  nativeOf?: (key: PhaseKey, name: string) => boolean | null | undefined,
+): PhaseRow[]
+/** 三态同步持久化：把同一份并集行集镜像写入三个阶段（各阶段连续虚拟 order）。
+ *  nativeOf 返回 null/undefined = 该阶段视图未就绪，该阶段整段跳过。 */
+export function mirrorPhaseInjectEntries(
+  cfg: unknown,
+  rows: Array<Pick<PhaseRow, 'name' | 'text' | 'custom' | 'override'>>,
+  nativeOf?: (key: PhaseKey, name: string) => boolean | null | undefined,
+): Array<Record<string, unknown>>
+/** 镜像时在目标阶段建不出来的段名（动态段无正文，界面据此给出说明）。 */
+export function mirrorSkippedNames(
+  rows: Array<Pick<PhaseRow, 'name' | 'text' | 'custom' | 'override'>>,
+  nativeOf?: (key: PhaseKey, name: string) => boolean | null | undefined,
+): string[]
+/** 三态同步的屏蔽名单：三份名单统一为并集行集里的屏蔽名集合。 */
+export function mirroredDeniedLists(rows: Array<{ name: string; blocked: boolean }>): {
+  sections: string[]
+  sectionsBootstrap: string[]
+  sectionsCompaction: string[]
+}
 /** 提示词 Tab 一个阶段部分的行（含屏蔽行与注入行）。 */
 export interface PhaseRow {
   name: string

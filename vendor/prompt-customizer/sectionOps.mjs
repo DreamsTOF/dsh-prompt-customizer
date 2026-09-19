@@ -151,6 +151,107 @@ export function mergedPhaseInjectEntries(cfg, rowsByKey) {
 }
 
 /**
+ * 三态同步（并集镜像）的骨架顺序：常驻期在前 —— 并集行序以常驻期为准，其余
+ * 两态独有的段按各自顺序追加在尾部（与 PART_ORDER 的展示序不同，这里是数据序）。
+ */
+const MIRROR_KEYS = ['active', 'bootstrap', 'compaction']
+
+/** 镜像到某阶段时该行要写的正文（'' = 只覆盖 order，注册表原文不动）。
+ *  自定义段与带替换文本的行必须写正文（否则替换在该阶段不生效）；非原生段
+ *  必须写正文（否则服务端建不出来，见 applySectionPolicy 的幽灵段守卫）——
+ *  动态段（空文本 / 宿主回显的 `<动态生成>`）取不到正文，返回 '' 让调用方跳过。 */
+function mirrorText(row, native) {
+  if (row.custom === true) return row.override || (row.text ?? '')
+  if (row.override !== '') return row.override
+  if (native === true) return ''
+  const text = row.text ?? ''
+  return text === '' || text.startsWith('<') ? '' : text
+}
+
+/**
+ * 三态同步的并集行集：常驻期的行序为骨架，其余两态独有的段追加在尾部 ——
+ * 三态最终收敛到同一份名单，不屏蔽任何段。同名段只保留一行：优先取「该段原生
+ * 存在」的那个阶段的行（文本 / 身份 / 勾选以它为准），都非原生时取骨架序里
+ * 首次出现的那行 —— 这样原生阶段的文本不会被镜像写回冻结进配置。
+ * `views` 里某阶段为 null（装配未就绪）时该阶段不参与并集，绝不臆造行。
+ * `nativeOf(key, name)` 可选：判定该段是否在目标阶段的装配输入里。
+ */
+export function mirroredRows(cfg, views, nativeOf) {
+  const picked = new Map()
+  const order = []
+  for (const key of MIRROR_KEYS) {
+    for (const row of phaseRows(cfg, views?.[key] ?? null, key)) {
+      const native = nativeOf?.(key, row.name) === true
+      const cur = picked.get(row.name)
+      if (cur === undefined) {
+        picked.set(row.name, { row, native })
+        order.push(row.name)
+      } else if (cur.native !== true && native) {
+        picked.set(row.name, { row, native })
+      }
+    }
+  }
+  return order.map((name) => picked.get(name).row)
+}
+
+/**
+ * 三态同步持久化：把同一份并集行集镜像写入三个阶段（各阶段连续 order，条目
+ * 形状与 phaseInjectEntries 完全一致）。
+ *
+ * `nativeOf(key, name)` 判定该段是否已在目标阶段的**装配输入**（base 视图）里：
+ *  - 原生系统段且无替换文本 → 只写 order 覆盖，绝不把注册表原文冻结进配置；
+ *  - 自定义段 / 带替换文本的行 → 正文照写（三态同时生效）；
+ *  - 非原生段 → 必须带正文才能被服务端建出来；动态段（`<动态生成>`，取不到
+ *    正文）建不出来，只能跳过 —— 它留在自己原有的阶段里（mirrorSkippedNames
+ *    供界面提示）。
+ * 返回 null/undefined = 该阶段视图未就绪，整段跳过（绝不把缺失的阶段当空集写掉）。
+ * always 条目只保留名字仍在行集里的：删除一个自定义段 = 三态一起消失（always
+ * 条目会让它在三个阶段复活）。
+ */
+export function mirrorPhaseInjectEntries(cfg, rows, nativeOf) {
+  const names = new Set(rows.map((row) => row.name))
+  const always = (cfg.inject ?? []).filter((item) => (item.phase ?? 'always') === 'always' && names.has(item.name))
+  const entries = []
+  for (const key of MIRROR_KEYS) {
+    const phase = injectPhaseOf(key)
+    let order = 0
+    for (const row of rows) {
+      const native = nativeOf === undefined ? false : nativeOf(key, row.name)
+      if (native === null || native === undefined) continue
+      const text = mirrorText(row, native)
+      if (native !== true && text === '') continue
+      entries.push({ name: row.name, order: order++, text, phase, custom: row.custom === true })
+    }
+  }
+  return [...always, ...entries]
+}
+
+/**
+ * 镜像时在目标阶段建不出来的段名（动态段无正文）：界面据此给出说明 ——
+ * 行集里仍显示它，但另外两态的装配里不会有它。
+ */
+export function mirrorSkippedNames(rows, nativeOf) {
+  const skipped = new Set()
+  for (const key of MIRROR_KEYS) {
+    for (const row of rows) {
+      const native = nativeOf?.(key, row.name)
+      if (native === null || native === undefined || native === true) continue
+      if (mirrorText(row, false) === '') skipped.add(row.name)
+    }
+  }
+  return [...skipped]
+}
+
+/**
+ * 三态同步的屏蔽名单：三份名单统一为并集行集里的屏蔽名集合（行集包含三态全部
+ * 的行，含被屏蔽项，所以用户的屏蔽意图不会丢）。名字顺序按行集顺序，稳定可读。
+ */
+export function mirroredDeniedLists(rows) {
+  const blocked = rows.filter((row) => row.blocked === true).map((row) => row.name)
+  return { sections: blocked, sectionsBootstrap: [...blocked], sectionsCompaction: [...blocked] }
+}
+
+/**
  * 一个阶段部分的全部行（提示词 Tab 每行）：行集合 = 「真实进入该阶段装配的段」
  *（post 视图，与预览一致 —— 预设原生阶段插件裁剪掉的段不显示）∪「被屏蔽的段」
  *（屏蔽名单含未保存草稿，随时可反选）∪「配置里属于该阶段的自定义注入段」。

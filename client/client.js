@@ -1921,6 +1921,63 @@ function mergedPhaseInjectEntries(cfg, rowsByKey) {
   });
   return [...always, ...entries];
 }
+var MIRROR_KEYS = ["active", "bootstrap", "compaction"];
+function mirrorText(row, native) {
+  if (row.custom === true) return row.override || (row.text ?? "");
+  if (row.override !== "") return row.override;
+  if (native === true) return "";
+  const text = row.text ?? "";
+  return text === "" || text.startsWith("<") ? "" : text;
+}
+function mirroredRows(cfg, views, nativeOf) {
+  const picked = /* @__PURE__ */ new Map();
+  const order = [];
+  for (const key of MIRROR_KEYS) {
+    for (const row of phaseRows(cfg, views?.[key] ?? null, key)) {
+      const native = nativeOf?.(key, row.name) === true;
+      const cur = picked.get(row.name);
+      if (cur === void 0) {
+        picked.set(row.name, { row, native });
+        order.push(row.name);
+      } else if (cur.native !== true && native) {
+        picked.set(row.name, { row, native });
+      }
+    }
+  }
+  return order.map((name) => picked.get(name).row);
+}
+function mirrorPhaseInjectEntries(cfg, rows, nativeOf) {
+  const names = new Set(rows.map((row) => row.name));
+  const always = (cfg.inject ?? []).filter((item) => (item.phase ?? "always") === "always" && names.has(item.name));
+  const entries = [];
+  for (const key of MIRROR_KEYS) {
+    const phase = injectPhaseOf(key);
+    let order = 0;
+    for (const row of rows) {
+      const native = nativeOf === void 0 ? false : nativeOf(key, row.name);
+      if (native === null || native === void 0) continue;
+      const text = mirrorText(row, native);
+      if (native !== true && text === "") continue;
+      entries.push({ name: row.name, order: order++, text, phase, custom: row.custom === true });
+    }
+  }
+  return [...always, ...entries];
+}
+function mirrorSkippedNames(rows, nativeOf) {
+  const skipped = /* @__PURE__ */ new Set();
+  for (const key of MIRROR_KEYS) {
+    for (const row of rows) {
+      const native = nativeOf?.(key, row.name);
+      if (native === null || native === void 0 || native === true) continue;
+      if (mirrorText(row, false) === "") skipped.add(row.name);
+    }
+  }
+  return [...skipped];
+}
+function mirroredDeniedLists(rows) {
+  const blocked = rows.filter((row) => row.blocked === true).map((row) => row.name);
+  return { sections: blocked, sectionsBootstrap: [...blocked], sectionsCompaction: [...blocked] };
+}
 function phaseRows(cfg, view, key) {
   const replace = cfg.replace ?? {};
   const denied = new Set(deniedNames(cfg, key));
@@ -2273,20 +2330,48 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const [dropMark, setDropMark] = (0, import_react4.useState)(null);
   const scrollRef = (0, import_react4.useRef)(null);
   useDragAutoScroll(scrollRef);
-  const rowsOf = (key) => phaseRows(cfg, phases?.[key] ?? null, key);
+  const nativeIn = (key, name) => {
+    const view = phases?.[key];
+    if (view === void 0 || view === null) return null;
+    return (view.baseSections ?? []).some((sec) => sec.name === name);
+  };
+  const mirrorReady = () => PART_ORDER.every((key) => nativeIn(key, "") !== null);
+  const mirrorRows = () => mirroredRows(cfg, phases, nativeIn);
+  const rowsOf = (key) => syncAll === true ? mirrorRows() : phaseRows(cfg, phases?.[key] ?? null, key);
   const applyBlock = (key, name, blocked) => {
     const patch = blockPatch(cfg, key, name, blocked);
     for (const [field, value] of Object.entries(patch)) {
       write(field, value);
     }
   };
-  const toggleBlocked = (key, name) => {
-    const blocked = !deniedNames(cfg, key).includes(name);
-    for (const k of syncAll ? PART_ORDER : [key]) applyBlock(k, name, blocked);
+  const persistMirror = (rows2) => {
+    if (!mirrorReady()) {
+      setNotice(t("syncNotReady"));
+      return;
+    }
+    write("inject", mirrorPhaseInjectEntries(cfg, rows2, nativeIn));
+    const denied = mirroredDeniedLists(rows2);
+    write("sections", denied.sections);
+    write("sectionsBootstrap", denied.sectionsBootstrap);
+    write("sectionsCompaction", denied.sectionsCompaction);
   };
-  const inBaseOf = (key, name) => (phases?.[key]?.baseSections ?? []).some((sec) => sec.name === name);
+  const inBaseOf = (key, name) => nativeIn(key, name) === true;
   const persistPhase = (key, rows2) => {
     write("inject", phaseInjectEntries(cfg, key, rows2));
+  };
+  const persistRows = (key, rows2) => {
+    if (syncAll === true) persistMirror(rows2);
+    else persistPhase(key, rows2);
+  };
+  const toggleBlocked = (key, name) => {
+    if (syncAll === true) {
+      const rows2 = rowsOf(key);
+      const row = rows2.find((item) => item.name === name);
+      if (row === void 0) return;
+      persistMirror(rows2.map((item) => item.name === name ? { ...item, blocked: !item.blocked } : item));
+      return;
+    }
+    applyBlock(key, name, !deniedNames(cfg, key).includes(name));
   };
   const moveRow = (key, index, dir) => {
     const rows2 = rowsOf(key);
@@ -2295,9 +2380,13 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     const next = rows2.slice();
     const [item] = next.splice(index, 1);
     next.splice(target, 0, item);
-    persistPhase(key, next);
+    persistRows(key, next);
   };
   const removeFromPart = (key, name) => {
+    if (syncAll === true) {
+      persistMirror(rowsOf(key).filter((row) => row.name !== name));
+      return;
+    }
     const phaseOfItem = injectPhaseOf(key);
     const inject2 = (cfg.inject ?? []).filter((x) => {
       if (x.name !== name) return true;
@@ -2313,23 +2402,14 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   };
   const commitReplace = (key, row) => {
     const patchRow = (r) => r.name !== row.name ? r : { ...r, override: draft, text: draft };
-    if (syncAll) {
-      const rowsByKey = {};
-      for (const k of PART_ORDER) {
-        const rows2 = rowsOf(k);
-        rowsByKey[k] = k === key || rows2.some((r) => r.name === row.name) ? rows2.map(patchRow) : rows2;
-      }
-      write("inject", mergedPhaseInjectEntries(cfg, rowsByKey));
-    } else {
-      persistPhase(key, rowsOf(key).map(patchRow));
-    }
+    persistRows(key, rowsOf(key).map(patchRow));
     setEditing(null);
   };
   const restoreReplace = (key, row) => {
     const next = rowsOf(key).map(
       (r) => r.name !== row.name ? r : { ...r, override: "", text: r.custom ? r.text : "" }
     );
-    persistPhase(key, next);
+    persistRows(key, next);
     if (!row.custom && Object.hasOwn(cfg.replace ?? {}, row.name)) {
       const rest = { ...cfg.replace ?? {} };
       delete rest[row.name];
@@ -2337,6 +2417,10 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     }
   };
   const addSection = (name, text, phase2) => {
+    if (syncAll === true) {
+      persistMirror([...rowsOf(phase2), { name, text, replaced: false, custom: true, override: text, blocked: false }]);
+      return;
+    }
     const inject2 = (cfg.inject ?? []).slice();
     inject2.push({ name, order: 120 + inject2.length, text, phase: phase2, custom: true });
     write("inject", inject2);
@@ -2350,7 +2434,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     setNotice(null);
     const rows2 = rowsOf(key);
     const existing = rows2.find((row) => row.name === name);
-    const next = existing !== void 0 ? [...rows2.filter((row) => row.name !== name), existing] : [...rows2, {
+    const next = existing !== void 0 ? [...rows2.filter((row) => row.name !== name), syncAll === true ? { ...existing, blocked: false } : existing] : [...rows2, {
       name,
       text: "",
       replaced: Object.hasOwn(cfg.replace ?? {}, name),
@@ -2358,17 +2442,24 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       override: body,
       blocked: false
     }];
-    if (existing === void 0 && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
+    if (syncAll !== true && existing === void 0 && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
       applyBlock(key, name, false);
     }
-    persistPhase(key, next);
+    persistRows(key, next);
     if (copiedFrom !== void 0) setNotice(t("sectionCopied", { name, to: stageLabel(key), from: copiedFrom }));
   };
   const removeFromPhase = (name) => {
-    const row = rowsOf(phase).find((item) => item.name === name);
+    const rows2 = rowsOf(phase);
+    const row = rows2.find((item) => item.name === name);
     if (row === void 0) return;
-    if (row.custom || row.override !== "" || injectedNames.has(name)) removeFromPart(phase, name);
-    else applyBlock(phase, name, true);
+    if (syncAll === true) {
+      const native = PART_ORDER.some((key) => nativeIn(key, name) === true);
+      persistMirror(row.custom || !native ? rows2.filter((item) => item.name !== name) : rows2.map((item) => item.name === name ? { ...item, blocked: true } : item));
+    } else if (row.custom || row.override !== "" || injectedNames.has(name)) {
+      removeFromPart(phase, name);
+    } else {
+      applyBlock(phase, name, true);
+    }
     setNotice(t("sectionRemoved", { name, from: stageLabel(phase) }));
   };
   const dropOnRow = (event, target) => {
@@ -2383,7 +2474,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (payload.from === phase) {
       const next = reorderInsert(rowsOf(phase), payload.name, target.name, pos);
       if (next !== null) {
-        persistPhase(phase, next);
+        persistRows(phase, next);
         setNotice(null);
       }
       return;
@@ -2403,7 +2494,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     const last = list[list.length - 1];
     if (last === void 0 || last.name === payload.name) return;
     const next = reorderInsert(list, payload.name, last.name, "below");
-    if (next !== null) persistPhase(phase, next);
+    if (next !== null) persistRows(phase, next);
   };
   const dropOnPool = (event) => {
     const payload = payloadOf(event);
@@ -2417,6 +2508,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   (0, import_react4.useEffect)(() => {
     setPhaseDropHandler((key, payload) => {
       if (payload.kind !== "section" || key === phase) return;
+      if (syncAll === true && payload.from !== "pool") return;
       addFromPool(key, payload.name, payload.text ?? "", stageLabel(phase));
     });
     return () => setPhaseDropHandler(null);
@@ -2509,6 +2601,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     ]);
   };
   const rows = rowsOf(phase);
+  const mirrorSkipped = syncAll === true && mirrorReady() ? mirrorSkippedNames(rows, nativeIn) : [];
   const injectedNames = injectedAt(cfg, phase).names;
   const agentScoped = /* @__PURE__ */ new Set();
   for (const view of Object.values(phases ?? {})) {
@@ -2534,6 +2627,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       onDrop: dropOnList
     }, [
       notice ? (0, import_react4.createElement)("div", { style: s.noticeWarn }, notice) : null,
+      mirrorSkipped.length > 0 ? (0, import_react4.createElement)("div", { style: s.noticeWarn }, t("syncSkippedDynamic", { names: mirrorSkipped.join("\u3001") })) : null,
       partNote(phase),
       rows.map((row, i) => renderRow(phase, row, i, rows.length)),
       rows.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
@@ -3458,6 +3552,31 @@ function Panel({ t, onClose }) {
     edit("inject", zhOn ? zhRevertInjectEntries(view, phases, ZH_SECTIONS) : zhMergedInjectEntries(view, phases, ZH_SECTIONS));
     showFlash(zhOn ? t("zhReverted") : t("zhApplied"));
   };
+  const nativeIn = (key, name) => {
+    const view2 = phases?.[key];
+    if (view2 === void 0 || view2 === null) return null;
+    return (view2.baseSections ?? []).some((sec) => sec.name === name);
+  };
+  const toggleSyncAll = (on) => {
+    setSyncAll(on);
+    if (!on) return;
+    if (phases === null || VIEW_KEYS.some((key) => phases[key] === null)) {
+      showFlash(t("syncNotReady"), "err");
+      return;
+    }
+    const rows = mirroredRows(view, phases, nativeIn);
+    if (rows.length === 0) {
+      showFlash(t("syncNotReady"), "err");
+      return;
+    }
+    edit("inject", mirrorPhaseInjectEntries(view, rows, nativeIn));
+    const denied = mirroredDeniedLists(rows);
+    edit("sections", denied.sections);
+    edit("sectionsBootstrap", denied.sectionsBootstrap);
+    edit("sectionsCompaction", denied.sectionsCompaction);
+    const skipped = mirrorSkippedNames(rows, nativeIn);
+    showFlash(skipped.length > 0 ? `${t("syncApplied")} ${t("syncSkippedDynamic", { names: skipped.join("\u3001") })}` : t("syncApplied"));
+  };
   const resetAll = () => {
     fetch(CONFIG_RESET_URL, {
       method: "POST",
@@ -3592,7 +3711,7 @@ function Panel({ t, onClose }) {
           (0, import_react9.createElement)("input", {
             type: "checkbox",
             checked: syncAll,
-            onChange: (e) => setSyncAll(e.target.checked),
+            onChange: (e) => toggleSyncAll(e.target.checked),
             style: { margin: 0, cursor: "pointer" }
           }),
           t("syncAllPhases")
@@ -3736,7 +3855,10 @@ var DICT = {
     targetGlobal: "\u76EE\u6807\uFF1A\u5168\u5C40\u9ED8\u8BA4",
     targetHint: "\u9009\u62E9\u7F16\u8F91\u76EE\u6807 \u2014\u2014 \u9009\u4E2D\u67D0\u4E2A agent \u9884\u8BBE\u540E\uFF0C\u6539\u52A8\u53EA\u5BF9\u8BE5\u9884\u8BBE\u751F\u6548\uFF08\u5B57\u6BB5\u7EA7\u8986\u76D6\uFF09\u3002",
     syncAllPhases: "\u4E09\u6001\u540C\u6B65",
-    syncAllPhasesHint: "\u52FE\u9009\u540E\uFF0C\u5C4F\u853D / \u89E3\u9664\u5C4F\u853D\u3001\u66FF\u6362\u6587\u672C\uFF08\u63D0\u793A\u8BCD\uFF09\u4E0E\u62D6\u5165 / \u62D6\u51FA\uFF08\u5DE5\u5177\u7684\u52A0\u51CF\uFF09\u5BF9\u4E09\u4E2A\u9636\u6BB5\u4E00\u8D77\u751F\u6548\uFF0C\u53EA\u4F5C\u7528\u4E8E\u540C\u540D\u7684\u90A3\u4E00\u9879\uFF1B\u67D0\u9636\u6BB5\u6CA1\u6709\u7684\u540D\u5B57\u4FDD\u6301\u539F\u6837\u3002\u9ED8\u8BA4\u5173\u95ED\uFF1A\u4E09\u4E2A\u9636\u6BB5\u9700\u9010\u4E00\u5904\u7406\u3002",
+    syncAllPhasesHint: "\u52FE\u9009\u540E\u4E09\u4E2A\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\uFF08\u5E38\u9A7B\u671F\u4E3A\u9AA8\u67B6\uFF0C\u5176\u4F59\u4E24\u6001\u72EC\u6709\u7684\u6BB5\u8FFD\u52A0\u5728\u5C3E\u90E8\uFF0C\u540C\u540D\u6BB5\u4EE5\u539F\u751F\u90A3\u9636\u6BB5\u4E3A\u51C6\uFF09\uFF0C\u589E\u5220 / \u6392\u5E8F / \u52FE\u9009 / \u6587\u672C\u7F16\u8F91\u4E00\u6B21\u5199\u5168\u4E09\u4E2A\u9636\u6BB5\uFF1B\u52FE\u9009\u77AC\u95F4\u5373\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF08\u5199\u5165\u7F16\u8F91\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002\u5DE5\u5177\u680F\u7684\u9690\u85CF / \u663E\u793A\u4E0E\u52A0\u56DE\u540C\u6837\u5BF9\u4E09\u6001\u4E00\u8D77\u751F\u6548\u3002\u9ED8\u8BA4\u5173\u95ED\uFF1A\u4E09\u4E2A\u9636\u6BB5\u5404\u7BA1\u5404\u7684\u3002",
+    syncApplied: "\u5DF2\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF1A\u4E09\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\u4E0E\u6587\u672C\uFF08\u5199\u5165\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002",
+    syncNotReady: "\u4E09\u9636\u6BB5\u88C5\u914D\u672A\u5C31\u7EEA\uFF08\u6216\u4E3A\u7A7A\uFF09\uFF0C\u65E0\u6CD5\u6267\u884C\u4E09\u6001\u540C\u6B65 \u2014\u2014 \u8BF7\u70B9\u300C\u5237\u65B0\u300D\u91CD\u8BD5\u3002",
+    syncSkippedDynamic: "\u300C{names}\u300D\u662F\u8FD0\u884C\u65F6\u52A8\u6001\u6BB5\uFF0C\u65E0\u6CD5\u52A0\u5165\u5176\u5B83\u9636\u6BB5\uFF08\u5B83\u7684\u5185\u5BB9\u53EA\u6709\u88C5\u914D\u65F6\u624D\u77E5\u9053\uFF09\u3002",
     broken: "\u635F\u574F",
     brokenPreset: "\u8BE5 agent \u9884\u8BBE\u5F53\u524D\u65E0\u6CD5\u6302\u8F7D\uFF0C\u4ECD\u53EF\u7F16\u8F91\u5176\u5B9A\u5236\uFF08\u4FEE\u590D\u9884\u8BBE\u540E\u81EA\u52A8\u751F\u6548\uFF09\u3002",
     phaseBootstrap: "\u4EC5\u5F15\u5BFC\u9636\u6BB5",
@@ -3887,7 +4009,10 @@ var DICT = {
     targetGlobal: "Target: global default",
     targetHint: "Pick an edit target \u2014 changes apply only to the chosen agent preset (field-level override).",
     syncAllPhases: "Sync phases",
-    syncAllPhasesHint: "When checked, blocking / unblocking, text replacement (sections), and drag-in / drag-out (adding / removing tools) apply to the same-named item across all three phases at once; names a phase does not have are left untouched. Unchecked (default): handle each phase separately.",
+    syncAllPhasesHint: "When checked, the three phases share one section list (the resident period is the backbone; sections only the other two phases have are appended at the end, and a same-named row follows the phase where it natively exists), and add / remove / reorder / check / text edits are written to all three phases at once. Ticking the box immediately overwrites the other two phases with the resident-period content (written to the edit draft; press Save to apply). Tool hiding / showing and adding back also apply to all three phases. Unchecked (default): handle each phase separately.",
+    syncApplied: "The other two phases were overwritten from the resident period: all three phases now share one section list and text (written to the draft; press Save to apply).",
+    syncNotReady: "The three phase assemblies are not ready (or are empty); cannot sync phases \u2014 press Refresh and retry.",
+    syncSkippedDynamic: '"{names}" is a runtime-generated dynamic section and cannot be added to the other phases (its content is only known during assembly).',
     broken: "broken",
     brokenPreset: "This agent preset cannot mount right now; its customization is still editable and applies once fixed.",
     phaseBootstrap: "Bootstrap only",

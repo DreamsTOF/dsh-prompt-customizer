@@ -22,7 +22,7 @@ import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
 import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import { editView, type ConfigPatch } from './presets.ts'
-import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied } from '../../../vendor/prompt-customizer/sectionOps.mjs'
+import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from '../../../vendor/prompt-customizer/sectionOps.mjs'
 import { ZH_SECTIONS } from '../../../vendor/prompt-customizer/zh/index.mjs'
 import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
@@ -86,8 +86,9 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   const syncSeq = useRef(0)
   // 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级覆盖）。
   const [target, setTarget] = useState<string | undefined>(undefined)
-  // 三态同步（默认关）：勾选后提示词 / 工具两栏的屏蔽与解除屏蔽对三个阶段
-  // 一起生效（只作用于同名的那一项）。仅在提示词 / 工具两个模式显示。
+  // 三态同步（默认关）：勾选后提示词 / 工具两栏的三态一起生效 —— 提示词栏按
+  // 常驻期的并集行集覆写另外两态（增删 / 排序 / 勾选 / 文本一次写全三态），
+  // 工具栏的屏蔽与加回对三个阶段同时生效。仅在提示词 / 工具两个模式显示。
   const [syncAll, setSyncAll] = useState(false)
   // 右栏预览的子视图：提示词模式默认看提示词、工具模式默认看工具。
   const [previewSub, setPreviewSub] = useState<'prompt' | 'tools'>('prompt')
@@ -321,6 +322,40 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     showFlash(zhOn ? t('zhReverted') : t('zhApplied'))
   }
 
+  /** 该段是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」还是「必须带正文」。 */
+  const nativeIn = (key: PhaseViewKey, name: string): boolean | null => {
+    const view = phases?.[key]
+    if (view === undefined || view === null) return null
+    return (view.baseSections ?? []).some((sec) => sec.name === name)
+  }
+
+  // 「三态同步」开关（头部工具栏）：勾选瞬间即按常驻期的并集行集覆写另外两态
+  // （inject + 三份屏蔽名单写入编辑草稿，点「保存」生效）；之后提示词栏的任何
+  // 增删 / 排序 / 勾选 / 文本编辑都一次写全三个阶段（见 SectionsPane 的 persistMirror）。
+  // 三阶段装配未就绪（或为空）时拒绝执行 —— 缺一态会把该阶段当空集写掉。
+  const toggleSyncAll = (on: boolean): void => {
+    setSyncAll(on)
+    if (!on) return
+    if (phases === null || VIEW_KEYS.some((key) => phases[key] === null)) {
+      showFlash(t('syncNotReady'), 'err')
+      return
+    }
+    const rows = mirroredRows(view, phases, nativeIn)
+    if (rows.length === 0) {
+      showFlash(t('syncNotReady'), 'err')
+      return
+    }
+    edit('inject', mirrorPhaseInjectEntries(view, rows, nativeIn))
+    const denied = mirroredDeniedLists(rows)
+    edit('sections', denied.sections)
+    edit('sectionsBootstrap', denied.sectionsBootstrap)
+    edit('sectionsCompaction', denied.sectionsCompaction)
+    const skipped = mirrorSkippedNames(rows, nativeIn)
+    showFlash(skipped.length > 0
+      ? `${t('syncApplied')} ${t('syncSkippedDynamic', { names: skipped.join('、') })}`
+      : t('syncApplied'))
+  }
+
   // 恢复初始状态：服务端清空全部定制并关闭 forceSections（与不装插件等效）。
   // 二次确认由设置栏的调用点负责；成功后清草稿、重拉全部视图。
   const resetAll = (): void => {
@@ -496,7 +531,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
               h('input', {
                 type: 'checkbox',
                 checked: syncAll,
-                onChange: (e: { target: { checked: boolean } }) => setSyncAll(e.target.checked),
+                onChange: (e: { target: { checked: boolean } }) => toggleSyncAll(e.target.checked),
                 style: { margin: 0, cursor: 'pointer' },
               }),
               t('syncAllPhases'),
