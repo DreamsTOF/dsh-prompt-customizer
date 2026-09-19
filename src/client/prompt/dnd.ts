@@ -32,6 +32,18 @@ export interface DragPayload {
 /** 自定义 MIME：同页面内用它区分「本面板的拖拽」与外部拖入（如导入技能）。 */
 const MIME = 'application/x-dsh-prompt-part'
 
+/**
+ * 是不是本面板发起的拖拽 —— 原生事件版（drag-scroll 用）。
+ *
+ * 拖拽进行中 `dataTransfer.types` 可读（数据本身被保护，类型清单不保护），
+ * 所以捕获阶段的监听能靠它过滤：只给自己人的拖拽做贴边滚动，外来拖入不滚。
+ */
+export function isPanelDrag(event: DragEvent): boolean {
+  const types = event.dataTransfer?.types
+  if (types === undefined) return false
+  return Array.from(types).includes(MIME)
+}
+
 let current: DragPayload | null = null
 let phaseDrop: ((key: PhaseViewKey, payload: DragPayload) => void) | null = null
 

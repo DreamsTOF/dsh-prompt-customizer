@@ -18,12 +18,13 @@
  * 全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
  * 覆盖同一份代码）。
  */
-import { createElement as h, useEffect, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
+import { createElement as h, useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
 import type { Config, Inventory, Phase, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER } from './presets.ts'
 import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, mergedPhaseInjectEntries, phaseRows, reorderInsert, injectedAt } from '../../../vendor/prompt-customizer/sectionOps.mjs'
 import { acceptsDrop, beginDrag, dropOnPhase, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
+import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
 
 /** Panel 并行拉取的三阶段装配。 */
@@ -70,6 +71,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   // 拖拽：正在拖的行名，投放位置标记（`<行名>:above|below` / `list` / `pool`）。
   const [dragName, setDragName] = useState<string | null>(null)
   const [dropMark, setDropMark] = useState<string | null>(null)
+  // 列表滚动容器：拖到上下边缘时自动滚（长列表里手拖够不到视口外的位置）。
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  useDragAutoScroll(scrollRef)
 
   const rowsOf = (key: PhaseViewKey): PartRow[] => phaseRows(cfg, phases?.[key] ?? null, key)
 
@@ -366,6 +370,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
 
   return h('div', { style: s.colLeft }, [
     h('div', {
+      ref: scrollRef,
       style: { ...s.colScroll, ...(dropMark === 'list' ? s.dropZone : {}) },
       // 列表空白处 = 「本阶段末尾」的投放点（池里拖进来的段也从这里进）。
       onDragOver: (event: ReactDragEvent) => {

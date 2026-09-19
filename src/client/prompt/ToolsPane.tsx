@@ -14,11 +14,12 @@
  * 态一起带过去，源阶段不动）。点按路径照旧：池里每行三个小按钮也能加入对应
  * 阶段 —— 注册表里根本没有的（别的预设独有）加不进来，界面明确说明。
  */
-import { createElement as h, useEffect, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
+import { createElement as h, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
 import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER, withPhaseAdd, withPhaseExclude } from './presets.ts'
 import { acceptsDrop, beginDrag, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
+import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
 import type { TriState } from './SectionsPane.tsx'
 
@@ -44,6 +45,9 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   // 拖拽：正在拖的工具名，投放位置标记（行名 / `list` / `pool`）。
   const [dragName, setDragName] = useState<string | null>(null)
   const [dropMark, setDropMark] = useState<string | null>(null)
+  // 列表滚动容器：拖到上下边缘时自动滚（长列表里手拖够不到视口外的位置）。
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  useDragAutoScroll(scrollRef)
 
   // 某阶段自己的黑名单 / 加回名单（三份互不继承）。
   const excludeOf = (key: PhaseViewKey): string[] => {
@@ -269,6 +273,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
 
   return h('div', { style: s.colLeft }, [
     h('div', {
+      ref: scrollRef,
       style: { ...s.colScroll, ...(dropMark === 'list' ? s.dropZone : {}) },
       // 列表空白处投放：池里 / 别的阶段拖来的工具放进本阶段。
       onDragOver: (event: ReactDragEvent) => {

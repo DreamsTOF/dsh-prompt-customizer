@@ -676,11 +676,11 @@ module.exports = __toCommonJS(index_exports);
 init_skill_source();
 
 // src/client/skills/entry.tsx
-var import_react18 = require("react");
+var import_react19 = require("react");
 var import_client = require("react-dom/client");
 
 // src/client/skills/SkillsPanel.tsx
-var import_react15 = require("react");
+var import_react16 = require("react");
 var import_dsh_client_ui_primitives11 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/popover-shell.tsx
@@ -961,7 +961,7 @@ function PshBody({ children, className }) {
 }
 
 // src/client/prompt/Panel.tsx
-var import_react9 = require("react");
+var import_react10 = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/icons.tsx
@@ -2176,6 +2176,11 @@ function ensureStyles() {
 
 // src/client/prompt/dnd.ts
 var MIME = "application/x-dsh-prompt-part";
+function isPanelDrag(event) {
+  const types = event.dataTransfer?.types;
+  if (types === void 0) return false;
+  return Array.from(types).includes(MIME);
+}
 var current = null;
 var phaseDrop = null;
 function beginDrag(event, payload) {
@@ -2827,16 +2832,92 @@ var ZH_SECTIONS = {
 };
 
 // src/client/prompt/SectionsPane.tsx
+var import_react5 = require("react");
+
+// src/client/prompt/drag-scroll.ts
 var import_react4 = require("react");
+var EDGE = 56;
+var MAX_STEP = 18;
+function useDragAutoScroll(ref) {
+  (0, import_react4.useEffect)(() => {
+    const el = ref.current;
+    if (el === null) return void 0;
+    let frame = 0;
+    let step = 0;
+    let pendingY = null;
+    const stopScroll = () => {
+      step = 0;
+      pendingY = null;
+      if (frame !== 0) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    };
+    const stepFrame = () => {
+      frame = 0;
+      if (step === 0) return;
+      const before = el.scrollTop;
+      el.scrollTop += step;
+      if (el.scrollTop === before) {
+        step = 0;
+        return;
+      }
+      frame = requestAnimationFrame(stepFrame);
+    };
+    const measure = (clientY) => {
+      const rect = el.getBoundingClientRect();
+      const fromTop = clientY - rect.top;
+      const fromBottom = rect.bottom - clientY;
+      step = fromTop < EDGE ? -Math.ceil((EDGE - fromTop) / EDGE * MAX_STEP) : fromBottom < EDGE ? Math.ceil((EDGE - fromBottom) / EDGE * MAX_STEP) : 0;
+      if (step === 0) {
+        stopScroll();
+        return;
+      }
+      if (frame === 0) frame = requestAnimationFrame(stepFrame);
+    };
+    const onDragOver = (event) => {
+      if (!isPanelDrag(event)) {
+        stopScroll();
+        return;
+      }
+      pendingY = event.clientY;
+      measure(event.clientY);
+    };
+    const onDragLeave = (event) => {
+      const to = event.relatedTarget;
+      if (to !== null && el.contains(to)) return;
+      stopScroll();
+    };
+    const onEnd = () => stopScroll();
+    el.addEventListener("dragover", onDragOver, true);
+    el.addEventListener("dragleave", onDragLeave, true);
+    el.addEventListener("drop", onEnd, true);
+    window.addEventListener("dragend", onEnd);
+    window.addEventListener("dragstart", onEnd);
+    return () => {
+      stopScroll();
+      el.removeEventListener("dragover", onDragOver, true);
+      el.removeEventListener("dragleave", onDragLeave, true);
+      el.removeEventListener("drop", onEnd, true);
+      window.removeEventListener("dragend", onEnd);
+      window.removeEventListener("dragstart", onEnd);
+      pendingY = null;
+    };
+  }, [ref]);
+}
+
+// src/client/prompt/SectionsPane.tsx
 var editKey = (key, name) => `${key}:${name}`;
 function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) {
-  const [filter, setFilter] = (0, import_react4.useState)("all");
-  const [editing, setEditing] = (0, import_react4.useState)(null);
-  const [draft, setDraft] = (0, import_react4.useState)("");
-  const [addOpen, setAddOpen] = (0, import_react4.useState)(false);
-  const [notice, setNotice] = (0, import_react4.useState)(null);
-  const [dragName, setDragName] = (0, import_react4.useState)(null);
-  const [dropMark, setDropMark] = (0, import_react4.useState)(null);
+  const [filter, setFilter] = (0, import_react5.useState)("all");
+  const [editing, setEditing] = (0, import_react5.useState)(null);
+  const [draft, setDraft] = (0, import_react5.useState)("");
+  const [addOpen, setAddOpen] = (0, import_react5.useState)(false);
+  const [notice, setNotice] = (0, import_react5.useState)(null);
+  const [dragName, setDragName] = (0, import_react5.useState)(null);
+  const [dropMark, setDropMark] = (0, import_react5.useState)(null);
+  const scrollRef = (0, import_react5.useRef)(null);
+  useDragAutoScroll(scrollRef);
   const rowsOf = (key) => phaseRows(cfg, phases?.[key] ?? null, key);
   const applyBlock = (key, name, blocked) => {
     const patch = blockPatch(cfg, key, name, blocked);
@@ -2978,7 +3059,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (payload.from !== phase) return;
     removeFromPhase(payload.name);
   };
-  (0, import_react4.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     setPhaseDropHandler((key, payload) => {
       if (payload.kind !== "section" || key === phase) return;
       addFromPool(key, payload.name, payload.text ?? "", stageLabel(phase));
@@ -2991,11 +3072,11 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (view === void 0 || view === null) return null;
     if (cfg.forceSections !== false) return null;
     if (view.takenOverBy !== void 0) {
-      return (0, import_react4.createElement)("div", { style: s.noticeWarn }, t("sectionsTakenOver", { name: view.takenOverBy }));
+      return (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("sectionsTakenOver", { name: view.takenOverBy }));
     }
     const lost = view.lostSections;
     if (lost !== void 0) {
-      return (0, import_react4.createElement)("div", { style: s.noticeWarn }, t("sectionsLost", { emitted: lost.emitted, survived: lost.survived }));
+      return (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("sectionsLost", { emitted: lost.emitted, survived: lost.survived }));
     }
     return null;
   };
@@ -3003,7 +3084,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const renderRow = (key, row, index, total) => {
     if (!rowVisible(row)) return null;
     const mark = dropMark !== null && dropMark.startsWith(`${row.name}:`) ? dropMark.slice(row.name.length + 1) : null;
-    return (0, import_react4.createElement)("div", {
+    return (0, import_react5.createElement)("div", {
       key: row.name,
       style: {
         ...s.row,
@@ -3022,7 +3103,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       onDrop: (event) => dropOnRow(event, row)
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框 / 文本域的选择手势一起吃掉。
-      (0, import_react4.createElement)("span", {
+      (0, import_react5.createElement)("span", {
         draggable: true,
         title: t("drag"),
         style: s.dragHandle,
@@ -3036,37 +3117,37 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           finishDrag();
         }
       }, "\u283F"),
-      (0, import_react4.createElement)("input", {
+      (0, import_react5.createElement)("input", {
         type: "checkbox",
         checked: !row.blocked,
         onChange: () => toggleBlocked(key, row.name),
         title: row.blocked ? t("blockedOn") : t("blockedOff"),
         style: { margin: 0, cursor: "pointer", flex: "none" }
       }),
-      (0, import_react4.createElement)("div", { style: s.rowBody }, [
-        (0, import_react4.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react4.createElement)("span", { style: s.code }, row.name),
-          (0, import_react4.createElement)("span", { style: s.orderTag }, "#" + index),
-          (0, import_react4.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
-          row.replaced ? (0, import_react4.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
-          row.blocked ? (0, import_react4.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
+      (0, import_react5.createElement)("div", { style: s.rowBody }, [
+        (0, import_react5.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react5.createElement)("span", { style: s.code }, row.name),
+          (0, import_react5.createElement)("span", { style: s.orderTag }, "#" + index),
+          (0, import_react5.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
+          row.replaced ? (0, import_react5.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
+          row.blocked ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
         ]),
-        isEditing(key, row) ? (0, import_react4.createElement)("div", { style: s.editBox }, [
-          (0, import_react4.createElement)("textarea", { style: s.editInput, value: draft, onChange: (e) => setDraft(e.target.value), rows: 3 }),
-          (0, import_react4.createElement)("div", { style: s.injectRow }, [
-            (0, import_react4.createElement)("button", { style: s.mini, onClick: () => commitReplace(key, row) }, t("save")),
-            (0, import_react4.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
-            !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
+        isEditing(key, row) ? (0, import_react5.createElement)("div", { style: s.editBox }, [
+          (0, import_react5.createElement)("textarea", { style: s.editInput, value: draft, onChange: (e) => setDraft(e.target.value), rows: 3 }),
+          (0, import_react5.createElement)("div", { style: s.injectRow }, [
+            (0, import_react5.createElement)("button", { style: s.mini, onClick: () => commitReplace(key, row) }, t("save")),
+            (0, import_react5.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
+            !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
           ])
-        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.custom ? t("empty") : t("dynamic")))
+        ]) : (0, import_react5.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.custom ? t("empty") : t("dynamic")))
       ]),
-      (0, import_react4.createElement)("div", { style: s.arrowCol }, [
-        (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
-        (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t("moveDown") }, "\u2193")
+      (0, import_react5.createElement)("div", { style: s.arrowCol }, [
+        (0, import_react5.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
+        (0, import_react5.createElement)("button", { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t("moveDown") }, "\u2193")
       ]),
-      isEditing(key, row) ? null : (0, import_react4.createElement)("button", { style: s.mini, onClick: () => startReplace(key, row) }, t("replace")),
-      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
-      row.custom ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t("delete") }, t("delete")) : null
+      isEditing(key, row) ? null : (0, import_react5.createElement)("button", { style: s.mini, onClick: () => startReplace(key, row) }, t("replace")),
+      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
+      row.custom ? (0, import_react5.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t("delete") }, t("delete")) : null
     ]);
   };
   const rows = rowsOf(phase);
@@ -3075,8 +3156,9 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const offCount = rows.length - onCount;
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.blocked : row.blocked);
   const poolSections = inv?.sections ?? [];
-  return (0, import_react4.createElement)("div", { style: s.colLeft }, [
-    (0, import_react4.createElement)("div", {
+  return (0, import_react5.createElement)("div", { style: s.colLeft }, [
+    (0, import_react5.createElement)("div", {
+      ref: scrollRef,
       style: { ...s.colScroll, ...dropMark === "list" ? s.dropZone : {} },
       // 列表空白处 = 「本阶段末尾」的投放点（池里拖进来的段也从这里进）。
       onDragOver: (event) => {
@@ -3087,11 +3169,11 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       },
       onDrop: dropOnList
     }, [
-      notice ? (0, import_react4.createElement)("div", { style: s.noticeWarn }, notice) : null,
+      notice ? (0, import_react5.createElement)("div", { style: s.noticeWarn }, notice) : null,
       partNote(phase),
       rows.map((row, i) => renderRow(phase, row, i, rows.length)),
-      rows.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
-      addOpen ? (0, import_react4.createElement)(InjectForm, {
+      rows.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
+      addOpen ? (0, import_react5.createElement)(InjectForm, {
         onAdd: (name, text) => {
           addSection(name, text, injectPhaseOf(phase));
           setAddOpen(false);
@@ -3102,7 +3184,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       // 本系统全部提示词：跨预设累积的只读池（折叠区）。加入某个阶段靠拖拽：
       // 把行拖进上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段
       // （行上不再放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
-      (0, import_react4.createElement)("details", {
+      (0, import_react5.createElement)("details", {
         style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
         onDragOver: (event) => {
           if (!acceptsDrop(event, "section")) return;
@@ -3112,14 +3194,14 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
         },
         onDrop: dropOnPool
       }, [
-        (0, import_react4.createElement)(
+        (0, import_react5.createElement)(
           "summary",
           { style: { ...s.muted, cursor: "pointer" } },
           `${t("allSectionsTitle")} (${poolSections.length})`
         ),
-        (0, import_react4.createElement)("div", { style: { ...s.muted, marginBottom: 4 } }, t("sectionsFourHint")),
-        poolSections.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
-        poolSections.map((sec) => (0, import_react4.createElement)("div", {
+        (0, import_react5.createElement)("div", { style: { ...s.muted, marginBottom: 4 } }, t("sectionsFourHint")),
+        poolSections.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
+        poolSections.map((sec) => (0, import_react5.createElement)("div", {
           key: sec.name,
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
@@ -3127,15 +3209,15 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           onDragStart: (event) => beginDrag(event, { kind: "section", name: sec.name, from: "pool", text: sec.text ?? "" }),
           onDragEnd: finishDrag
         }, [
-          (0, import_react4.createElement)("div", { style: s.rowBody }, [
-            (0, import_react4.createElement)("div", { style: s.rowTitle }, (0, import_react4.createElement)("span", { style: s.code }, sec.name)),
-            (0, import_react4.createElement)("div", { style: s.preview }, String(sec.text ?? "").slice(0, 140) || t("dynamic"))
+          (0, import_react5.createElement)("div", { style: s.rowBody }, [
+            (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, sec.name)),
+            (0, import_react5.createElement)("div", { style: s.preview }, String(sec.text ?? "").slice(0, 140) || t("dynamic"))
           ])
         ]))
       ]),
       // 「+ 注入」入口放在滚动区末尾：新段通常追加在当前阶段列表尾部。
-      (0, import_react4.createElement)("div", { style: { ...s.injectRow, marginTop: 8 } }, [
-        (0, import_react4.createElement)(
+      (0, import_react5.createElement)("div", { style: { ...s.injectRow, marginTop: 8 } }, [
+        (0, import_react5.createElement)(
           "button",
           { style: s.mini, onClick: () => setAddOpen(!addOpen), title: t("injectNew") },
           addOpen ? `\xD7 ${t("clearInput")}` : `+ ${t("injectNew")}`
@@ -3143,19 +3225,19 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 / 已停用），只统计当前阶段。
-    (0, import_react4.createElement)("div", { style: s.colFoot }, [
-      (0, import_react4.createElement)("div", { style: s.seg }, [
-        (0, import_react4.createElement)(
+    (0, import_react5.createElement)("div", { style: s.colFoot }, [
+      (0, import_react5.createElement)("div", { style: s.seg }, [
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "all" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("all") },
           `${t("filterAll")} ${rows.length}`
         ),
-        (0, import_react4.createElement)(
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "on" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("on") },
           `${t("filterOn")} ${onCount}`
         ),
-        (0, import_react4.createElement)(
+        (0, import_react5.createElement)(
           "button",
           { style: filter === "off" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("off") },
           `${t("filterOff")} ${offCount}`
@@ -3165,28 +3247,30 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   ]);
 }
 function InjectForm({ onAdd, phaseLabel, t }) {
-  const [name, setName] = (0, import_react4.useState)("");
-  const [text, setText] = (0, import_react4.useState)("");
+  const [name, setName] = (0, import_react5.useState)("");
+  const [text, setText] = (0, import_react5.useState)("");
   const submit = () => {
     if (!name.trim()) return;
     onAdd(name.trim(), text);
     setName("");
     setText("");
   };
-  return (0, import_react4.createElement)("div", { style: s.injectRow }, [
-    (0, import_react4.createElement)("input", { style: { ...s.input, width: "30%" }, placeholder: t("name"), value: name, onChange: (e) => setName(e.target.value) }),
-    (0, import_react4.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: `${t("text")}\uFF08${phaseLabel}\uFF09`, value: text, onChange: (e) => setText(e.target.value) }),
-    (0, import_react4.createElement)("button", { style: s.mini, onClick: submit }, t("add"))
+  return (0, import_react5.createElement)("div", { style: s.injectRow }, [
+    (0, import_react5.createElement)("input", { style: { ...s.input, width: "30%" }, placeholder: t("name"), value: name, onChange: (e) => setName(e.target.value) }),
+    (0, import_react5.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: `${t("text")}\uFF08${phaseLabel}\uFF09`, value: text, onChange: (e) => setText(e.target.value) }),
+    (0, import_react5.createElement)("button", { style: s.mini, onClick: submit }, t("add"))
   ]);
 }
 
 // src/client/prompt/ToolsPane.tsx
-var import_react5 = require("react");
+var import_react6 = require("react");
 function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
-  const [filter, setFilter] = (0, import_react5.useState)("all");
-  const [notice, setNotice] = (0, import_react5.useState)(null);
-  const [dragName, setDragName] = (0, import_react5.useState)(null);
-  const [dropMark, setDropMark] = (0, import_react5.useState)(null);
+  const [filter, setFilter] = (0, import_react6.useState)("all");
+  const [notice, setNotice] = (0, import_react6.useState)(null);
+  const [dragName, setDragName] = (0, import_react6.useState)(null);
+  const [dropMark, setDropMark] = (0, import_react6.useState)(null);
+  const scrollRef = (0, import_react6.useRef)(null);
+  useDragAutoScroll(scrollRef);
   const excludeOf = (key) => {
     const tools = cfg.tools ?? {};
     const list = key === "bootstrap" ? tools.bootstrap?.exclude : key === "compaction" ? tools.compaction?.exclude : tools.exclude;
@@ -3304,7 +3388,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     setDropMark(null);
     if (payload.from === phase) removeFromPhase(phase, payload.name);
   };
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     setPhaseDropHandler((key, payload) => dropToolInto(key, payload));
     return () => setPhaseDropHandler(null);
   });
@@ -3315,7 +3399,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.hidden : row.hidden);
   const renderRow = (row) => {
     if (!rowVisible(row)) return null;
-    return (0, import_react5.createElement)("div", {
+    return (0, import_react6.createElement)("div", {
       key: row.name,
       style: {
         ...s.row,
@@ -3333,7 +3417,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       onDrop: dropOnPane
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框的手势一起吃掉。
-      (0, import_react5.createElement)("span", {
+      (0, import_react6.createElement)("span", {
         draggable: true,
         title: t("drag"),
         style: s.dragHandle,
@@ -3347,20 +3431,20 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           finishDrag();
         }
       }, "\u283F"),
-      (0, import_react5.createElement)("input", {
+      (0, import_react6.createElement)("input", {
         type: "checkbox",
         checked: !row.hidden,
         onChange: () => toggleHide(phase, row.name, row.hidden),
         title: row.hidden ? t("hiddenOn") : t("hiddenOff"),
         style: { margin: 0, cursor: "pointer", flex: "none" }
       }),
-      (0, import_react5.createElement)("div", { style: s.rowBody }, [
-        (0, import_react5.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react5.createElement)("span", { style: s.code }, row.name),
-          row.added ? (0, import_react5.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
-          row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
+      (0, import_react6.createElement)("div", { style: s.rowBody }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react6.createElement)("span", { style: s.code }, row.name),
+          row.added ? (0, import_react6.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
+          row.hidden ? (0, import_react6.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
         ]),
-        row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
+        row.description !== "" ? (0, import_react6.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
       ])
     ]);
   };
@@ -3368,8 +3452,9 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     name: tool.name,
     description: typeof tool === "string" ? "" : tool.description ?? ""
   }));
-  return (0, import_react5.createElement)("div", { style: s.colLeft }, [
-    (0, import_react5.createElement)("div", {
+  return (0, import_react6.createElement)("div", { style: s.colLeft }, [
+    (0, import_react6.createElement)("div", {
+      ref: scrollRef,
       style: { ...s.colScroll, ...dropMark === "list" ? s.dropZone : {} },
       // 列表空白处投放：池里 / 别的阶段拖来的工具放进本阶段。
       onDragOver: (event) => {
@@ -3380,14 +3465,14 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       },
       onDrop: dropOnPane
     }, [
-      (0, import_react5.createElement)("div", { style: s.muted }, t("toolsFourHint")),
-      notice ? (0, import_react5.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
+      (0, import_react6.createElement)("div", { style: s.muted }, t("toolsFourHint")),
+      notice ? (0, import_react6.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
-      rows.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
+      rows.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
       // 本系统全部工具：注册表的完整目录，只读池。加入某个阶段靠拖拽：把行拖进
       // 上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段（行上不再
       // 放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
-      (0, import_react5.createElement)("details", {
+      (0, import_react6.createElement)("details", {
         style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
         onDragOver: (event) => {
           if (!acceptsDrop(event, "tool")) return;
@@ -3397,13 +3482,13 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         },
         onDrop: dropOnPool
       }, [
-        (0, import_react5.createElement)(
+        (0, import_react6.createElement)(
           "summary",
           { style: { ...s.muted, cursor: "pointer" } },
           `${t("allToolsTitle")} (${allTools.length})`
         ),
-        allTools.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
-        allTools.map((tool) => (0, import_react5.createElement)("div", {
+        allTools.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
+        allTools.map((tool) => (0, import_react6.createElement)("div", {
           key: tool.name,
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
@@ -3411,27 +3496,27 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           onDragStart: (event) => beginDrag(event, { kind: "tool", name: tool.name, from: "pool" }),
           onDragEnd: finishDrag
         }, [
-          (0, import_react5.createElement)("div", { style: s.rowBody }, [
-            (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, tool.name)),
-            (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120))
+          (0, import_react6.createElement)("div", { style: s.rowBody }, [
+            (0, import_react6.createElement)("div", { style: s.rowTitle }, (0, import_react6.createElement)("span", { style: s.code }, tool.name)),
+            (0, import_react6.createElement)("div", { style: s.preview }, tool.description.slice(0, 120))
           ])
         ]))
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。
-    (0, import_react5.createElement)("div", { style: s.colFoot }, [
-      (0, import_react5.createElement)("div", { style: s.seg }, [
-        (0, import_react5.createElement)(
+    (0, import_react6.createElement)("div", { style: s.colFoot }, [
+      (0, import_react6.createElement)("div", { style: s.seg }, [
+        (0, import_react6.createElement)(
           "button",
           { style: filter === "all" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("all") },
           `${t("filterAll")} ${rows.length}`
         ),
-        (0, import_react5.createElement)(
+        (0, import_react6.createElement)(
           "button",
           { style: filter === "on" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("on") },
           `${t("filterOn")} ${onCount}`
         ),
-        (0, import_react5.createElement)(
+        (0, import_react6.createElement)(
           "button",
           { style: filter === "off" ? s.segBtnActive : s.segBtn, onClick: () => setFilter("off") },
           `${t("filterOff")} ${offCount}`
@@ -3442,7 +3527,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
 }
 
 // src/client/prompt/PresetsPane.tsx
-var import_react6 = require("react");
+var import_react7 = require("react");
 
 // src/client/prompt/preset-io.ts
 function isTauriEnv(win) {
@@ -3548,9 +3633,9 @@ async function importPresetFile(io) {
 
 // src/client/prompt/PresetsPane.tsx
 function useNotice() {
-  const [notice, setNotice] = (0, import_react6.useState)(null);
-  const noticeTimer = (0, import_react6.useRef)(null);
-  (0, import_react6.useEffect)(() => () => {
+  const [notice, setNotice] = (0, import_react7.useState)(null);
+  const noticeTimer = (0, import_react7.useRef)(null);
+  (0, import_react7.useEffect)(() => () => {
     if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
   }, []);
   const show = (kind, text) => {
@@ -3562,9 +3647,9 @@ function useNotice() {
 }
 function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist }) {
   const presets = cfg.presets ?? [];
-  const [name, setName] = (0, import_react6.useState)("");
+  const [name, setName] = (0, import_react7.useState)("");
   const { notice, show } = useNotice();
-  const fileRef = (0, import_react6.useRef)(null);
+  const fileRef = (0, import_react7.useRef)(null);
   const blockedNames = new Set(cfg.sections ?? []);
   const assemblyNames = /* @__PURE__ */ new Set();
   for (const key of PART_ORDER) {
@@ -3641,46 +3726,46 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     reader.onerror = () => show("error", t("importFail"));
     reader.readAsText(file);
   };
-  return (0, import_react6.createElement)("div", { style: s.colLeft }, [
-    (0, import_react6.createElement)("div", { style: s.colScroll }, [
-      notice ? (0, import_react6.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.error }, notice.text) : null,
-      (0, import_react6.createElement)("div", { style: s.groupHead }, t("libraryTitle")),
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("presetName"), value: name, onChange: (e) => setName(e.target.value) }),
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: saveCurrent }, t("save"))
+  return (0, import_react7.createElement)("div", { style: s.colLeft }, [
+    (0, import_react7.createElement)("div", { style: s.colScroll }, [
+      notice ? (0, import_react7.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.error }, notice.text) : null,
+      (0, import_react7.createElement)("div", { style: s.groupHead }, t("libraryTitle")),
+      (0, import_react7.createElement)("div", { style: s.injectBox }, [
+        (0, import_react7.createElement)("div", { style: s.injectRow }, [
+          (0, import_react7.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("presetName"), value: name, onChange: (e) => setName(e.target.value) }),
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: saveCurrent }, t("save"))
         ]),
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
+        (0, import_react7.createElement)("div", { style: s.injectRow }, [
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
             void importPreset();
           } }, t("import")),
-          (0, import_react6.createElement)("input", { ref: fileRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: onImportFile })
+          (0, import_react7.createElement)("input", { ref: fileRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: onImportFile })
         ])
       ]),
-      presets.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("empty")) : null,
+      presets.length === 0 ? (0, import_react7.createElement)("div", { style: s.muted }, t("empty")) : null,
       presets.map((preset) => {
         const active = cfg.activePreset === preset.id;
-        return (0, import_react6.createElement)("div", { key: preset.id, style: s.row }, [
-          (0, import_react6.createElement)("div", { style: s.rowBody }, [
-            (0, import_react6.createElement)("div", { style: s.rowTitle }, [
-              (0, import_react6.createElement)("span", { style: s.code }, preset.name),
-              active ? (0, import_react6.createElement)("span", { style: s.badgeOk }, t("active")) : null
+        return (0, import_react7.createElement)("div", { key: preset.id, style: s.row }, [
+          (0, import_react7.createElement)("div", { style: s.rowBody }, [
+            (0, import_react7.createElement)("div", { style: s.rowTitle }, [
+              (0, import_react7.createElement)("span", { style: s.code }, preset.name),
+              active ? (0, import_react7.createElement)("span", { style: s.badgeOk }, t("active")) : null
             ])
           ]),
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => applyPreset(preset) }, t("apply")),
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => applyPreset(preset) }, t("apply")),
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
             void exportPreset(preset);
           } }, t("export")),
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => deletePreset(preset.id) }, t("delete"))
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => deletePreset(preset.id) }, t("delete"))
         ]);
       })
     ])
   ]);
 }
 function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onReset, envBlocklist }) {
-  const [agentName, setAgentName] = (0, import_react6.useState)("");
-  const [creating, setCreating] = (0, import_react6.useState)(false);
-  const [blockInput, setBlockInput] = (0, import_react6.useState)("");
+  const [agentName, setAgentName] = (0, import_react7.useState)("");
+  const [creating, setCreating] = (0, import_react7.useState)(false);
+  const [blockInput, setBlockInput] = (0, import_react7.useState)("");
   const createAgentPreset = async () => {
     const trimmed = agentName.trim();
     if (trimmed.length === 0 || creating) return;
@@ -3697,31 +3782,31 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
     if (entry === "" || envBlocklist.includes(entry)) return;
     writeGlobal("envBlocklist", [...envBlocklist, entry]);
   };
-  return (0, import_react6.createElement)("div", { style: s.colRight }, [
-    (0, import_react6.createElement)("div", { style: s.colRightScroll }, [
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("saveAsPresetCard")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("saveAsPresetHint", { name: forkSource ?? t("forkSourceDefault") })),
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("agentPresetName"), value: agentName, onChange: (e) => setAgentName(e.target.value) }),
-          (0, import_react6.createElement)("button", { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => {
+  return (0, import_react7.createElement)("div", { style: s.colRight }, [
+    (0, import_react7.createElement)("div", { style: s.colRightScroll }, [
+      (0, import_react7.createElement)("div", { style: s.injectBox }, [
+        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("saveAsPresetCard")),
+        (0, import_react7.createElement)("div", { style: s.muted }, t("saveAsPresetHint", { name: forkSource ?? t("forkSourceDefault") })),
+        (0, import_react7.createElement)("div", { style: s.injectRow }, [
+          (0, import_react7.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("agentPresetName"), value: agentName, onChange: (e) => setAgentName(e.target.value) }),
+          (0, import_react7.createElement)("button", { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => {
             void createAgentPreset();
           } }, t("saveAsPreset"))
         ])
       ]),
-      (0, import_react6.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("forceTitle")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("forceHint")),
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("label", { style: s.switchWrap }, [
-            (0, import_react6.createElement)("input", {
+      (0, import_react7.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
+      (0, import_react7.createElement)("div", { style: s.injectBox }, [
+        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("forceTitle")),
+        (0, import_react7.createElement)("div", { style: s.muted }, t("forceHint")),
+        (0, import_react7.createElement)("div", { style: s.injectRow }, [
+          (0, import_react7.createElement)("label", { style: s.switchWrap }, [
+            (0, import_react7.createElement)("input", {
               type: "checkbox",
               checked: cfg.forceSections !== false,
               // forceSections 是全局字段，与 presets/activePreset 一样永远写顶层。
               onChange: (e) => writeGlobal("forceSections", e.target.checked)
             }),
-            (0, import_react6.createElement)(
+            (0, import_react7.createElement)(
               "span",
               { style: cfg.forceSections !== false ? s.badgeOk : s.badgeBlocked },
               cfg.forceSections !== false ? t("forceOn") : t("forceOff")
@@ -3729,37 +3814,37 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
           ])
         ])
       ]),
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("envBlockTitle")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("envBlockHint")),
-        (0, import_react6.createElement)("div", { style: { ...s.toolWrap, marginTop: 6 } }, envBlocklist.map((entry) => (0, import_react6.createElement)("span", {
+      (0, import_react7.createElement)("div", { style: s.injectBox }, [
+        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("envBlockTitle")),
+        (0, import_react7.createElement)("div", { style: s.muted }, t("envBlockHint")),
+        (0, import_react7.createElement)("div", { style: { ...s.toolWrap, marginTop: 6 } }, envBlocklist.map((entry) => (0, import_react7.createElement)("span", {
           key: entry,
           style: { ...s.toolChip, display: "inline-flex", alignItems: "center", gap: 4 }
         }, [
           entry,
-          (0, import_react6.createElement)("span", { style: { cursor: "pointer" }, title: t("delete"), onClick: () => removeBlockEntry(entry) }, "\xD7")
+          (0, import_react7.createElement)("span", { style: { cursor: "pointer" }, title: t("delete"), onClick: () => removeBlockEntry(entry) }, "\xD7")
         ]))),
-        envBlocklist.length === 0 ? (0, import_react6.createElement)("div", { style: s.muted }, t("envBlockEmpty")) : null,
-        (0, import_react6.createElement)("div", { style: { ...s.injectRow, marginTop: 6 } }, [
-          (0, import_react6.createElement)("input", {
+        envBlocklist.length === 0 ? (0, import_react7.createElement)("div", { style: s.muted }, t("envBlockEmpty")) : null,
+        (0, import_react7.createElement)("div", { style: { ...s.injectRow, marginTop: 6 } }, [
+          (0, import_react7.createElement)("input", {
             style: { ...s.input, flex: 1 },
             placeholder: t("envBlockAdd"),
             value: blockInput,
             onChange: (e) => setBlockInput(e.target.value)
           }),
-          (0, import_react6.createElement)("button", { style: s.mini, disabled: blockInput.trim() === "", onClick: addBlockEntry }, t("envBlockAddAction"))
+          (0, import_react7.createElement)("button", { style: s.mini, disabled: blockInput.trim() === "", onClick: addBlockEntry }, t("envBlockAddAction"))
         ]),
-        (0, import_react6.createElement)("details", { style: { marginTop: 6 } }, [
-          (0, import_react6.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("envVarsTitle")} (${inv?.variables?.length ?? 0})`),
-          (0, import_react6.createElement)("div", { style: { ...s.muted, marginTop: 4 } }, t("envVarsHint")),
-          (0, import_react6.createElement)("div", { style: { ...s.toolWrap, marginTop: 4 } }, (inv?.variables ?? []).map((varName) => (0, import_react6.createElement)("span", { key: varName, style: s.toolChip }, `{{${varName}}}`)))
+        (0, import_react7.createElement)("details", { style: { marginTop: 6 } }, [
+          (0, import_react7.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("envVarsTitle")} (${inv?.variables?.length ?? 0})`),
+          (0, import_react7.createElement)("div", { style: { ...s.muted, marginTop: 4 } }, t("envVarsHint")),
+          (0, import_react7.createElement)("div", { style: { ...s.toolWrap, marginTop: 4 } }, (inv?.variables ?? []).map((varName) => (0, import_react7.createElement)("span", { key: varName, style: s.toolChip }, `{{${varName}}}`)))
         ])
       ]),
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("resetTitle")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("resetHint")),
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => {
+      (0, import_react7.createElement)("div", { style: s.injectBox }, [
+        (0, import_react7.createElement)("div", { style: s.rowTitle }, t("resetTitle")),
+        (0, import_react7.createElement)("div", { style: s.muted }, t("resetHint")),
+        (0, import_react7.createElement)("div", { style: s.injectRow }, [
+          (0, import_react7.createElement)("button", { style: s.mini, onClick: () => {
             if (window.confirm(t("resetConfirm"))) onReset();
           } }, t("resetAction"))
         ])
@@ -3769,25 +3854,25 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
 }
 
 // src/client/prompt/PreviewPane.tsx
-var import_react8 = require("react");
+var import_react9 = require("react");
 
 // src/client/prompt/PreviewTools.tsx
-var import_react7 = require("react");
+var import_react8 = require("react");
 function norm(tool) {
   return typeof tool === "string" ? { name: tool, description: "" } : tool;
 }
 function PreviewTools({ tools, t }) {
-  if (tools.length === 0) return (0, import_react7.createElement)("div", { style: s.muted }, t("empty"));
-  return (0, import_react7.createElement)("div", { style: s.list }, [
-    (0, import_react7.createElement)("div", { style: s.rowTitle }, [
-      (0, import_react7.createElement)("span", { style: s.orderTag }, `${tools.length} ${t("previewToolCount")}`)
+  if (tools.length === 0) return (0, import_react8.createElement)("div", { style: s.muted }, t("empty"));
+  return (0, import_react8.createElement)("div", { style: s.list }, [
+    (0, import_react8.createElement)("div", { style: s.rowTitle }, [
+      (0, import_react8.createElement)("span", { style: s.orderTag }, `${tools.length} ${t("previewToolCount")}`)
     ]),
     tools.map((tool) => {
       const { name, description } = norm(tool);
-      return (0, import_react7.createElement)("div", { key: name, style: s.row }, [
-        (0, import_react7.createElement)("div", { style: s.rowBody }, [
-          (0, import_react7.createElement)("div", { style: s.rowTitle }, (0, import_react7.createElement)("span", { style: s.code }, name)),
-          (0, import_react7.createElement)("div", { style: s.preview }, String(description ?? "").slice(0, 140))
+      return (0, import_react8.createElement)("div", { key: name, style: s.row }, [
+        (0, import_react8.createElement)("div", { style: s.rowBody }, [
+          (0, import_react8.createElement)("div", { style: s.rowTitle }, (0, import_react8.createElement)("span", { style: s.code }, name)),
+          (0, import_react8.createElement)("div", { style: s.preview }, String(description ?? "").slice(0, 140))
         ])
       ]);
     })
@@ -3798,33 +3883,33 @@ function PreviewTools({ tools, t }) {
 function PreviewPane({ t, phases, phase, sub }) {
   const data = phases?.[phase] ?? null;
   const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
-  return (0, import_react8.createElement)("div", { style: s.colRight }, [
-    (0, import_react8.createElement)("div", { style: s.colRightScroll }, [
+  return (0, import_react9.createElement)("div", { style: s.colRight }, [
+    (0, import_react9.createElement)("div", { style: s.colRightScroll }, [
       // 该阶段的本插件段级产出没进最终提示词（整段接管或被下游丢弃）。
-      lossNote !== null ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
+      lossNote !== null ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
       // scope 挂载失败回退全局层时明确警示：这不是该预设的原生装配。
-      data !== null && data.scopeResolved === false ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
-      phases === null ? (0, import_react8.createElement)("div", { style: s.muted }, t("loading")) : null,
-      phases !== null && data === null ? (0, import_react8.createElement)("div", { style: s.error }, t("previewFail")) : null,
+      data !== null && data.scopeResolved === false ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
+      phases === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("loading")) : null,
+      phases !== null && data === null ? (0, import_react9.createElement)("div", { style: s.error }, t("previewFail")) : null,
       sub === "prompt" ? data ? [
-        (0, import_react8.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react8.createElement)("span", { style: s.muted }, t("previewHint")),
-          (0, import_react8.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
+        (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react9.createElement)("span", { style: s.muted }, t("previewHint")),
+          (0, import_react9.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
         ]),
-        (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty"))
+        (0, import_react9.createElement)("pre", { style: s.previewText }, data.text || t("empty"))
       ] : null : data ? [
         // 模型视角 vs 注册表视角的对照：预览按所选阶段运行全部装配规则
         //（含预设原生的阶段裁剪），某些预设（如 PTC / Code Mode）会把
         // 完整目录包装成单一工具，注册表原始目录仍列在工具子视图。
-        (0, import_react8.createElement)("div", { style: s.rowTitle }, [
-          (0, import_react8.createElement)("span", { style: s.muted }, t("previewToolsHint")),
-          (0, import_react8.createElement)(
+        (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+          (0, import_react9.createElement)("span", { style: s.muted }, t("previewToolsHint")),
+          (0, import_react9.createElement)(
             "span",
             { style: s.orderTag },
             `${data.tools.length} / ${data.registryTotal ?? "?"} ${t("previewToolsCount")}`
           )
         ]),
-        (0, import_react8.createElement)(PreviewTools, { tools: data.tools, t })
+        (0, import_react9.createElement)(PreviewTools, { tools: data.tools, t })
       ] : null
     ])
   ]);
@@ -3843,24 +3928,24 @@ var PREVIEW_URL = "/api/prompt-customizer/preview";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
 function Panel({ t, onClose }) {
-  const [cfg, setCfg] = (0, import_react9.useState)(null);
-  const [inv, setInv] = (0, import_react9.useState)(null);
-  const [phases, setPhases] = (0, import_react9.useState)(null);
-  const [agentPresets, setAgentPresets] = (0, import_react9.useState)([]);
-  const [mode, setMode] = (0, import_react9.useState)("sections");
-  const [error, setError] = (0, import_react9.useState)(null);
-  const [version, setVersion] = (0, import_react9.useState)(0);
-  const [phase, setPhase] = (0, import_react9.useState)("bootstrap");
-  const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
-  const syncSeq = (0, import_react9.useRef)(0);
-  const [target, setTarget] = (0, import_react9.useState)(void 0);
-  const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
-  const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
-  const [draft, setDraft] = (0, import_react9.useState)(null);
-  const [saving, setSaving] = (0, import_react9.useState)(false);
-  const [flash, setFlash] = (0, import_react9.useState)(null);
-  const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
-  const flashTimer = (0, import_react9.useRef)(null);
+  const [cfg, setCfg] = (0, import_react10.useState)(null);
+  const [inv, setInv] = (0, import_react10.useState)(null);
+  const [phases, setPhases] = (0, import_react10.useState)(null);
+  const [agentPresets, setAgentPresets] = (0, import_react10.useState)([]);
+  const [mode, setMode] = (0, import_react10.useState)("sections");
+  const [error, setError] = (0, import_react10.useState)(null);
+  const [version, setVersion] = (0, import_react10.useState)(0);
+  const [phase, setPhase] = (0, import_react10.useState)("bootstrap");
+  const [dropPhase, setDropPhase] = (0, import_react10.useState)(null);
+  const syncSeq = (0, import_react10.useRef)(0);
+  const [target, setTarget] = (0, import_react10.useState)(void 0);
+  const [syncAll, setSyncAll] = (0, import_react10.useState)(false);
+  const [previewSub, setPreviewSub] = (0, import_react10.useState)("prompt");
+  const [draft, setDraft] = (0, import_react10.useState)(null);
+  const [saving, setSaving] = (0, import_react10.useState)(false);
+  const [flash, setFlash] = (0, import_react10.useState)(null);
+  const [flashKind, setFlashKind] = (0, import_react10.useState)("ok");
+  const flashTimer = (0, import_react10.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
@@ -3868,7 +3953,7 @@ function Panel({ t, onClose }) {
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react9.useEffect)(load, []);
+  (0, import_react10.useEffect)(load, []);
   const refresh = () => {
     const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
@@ -3879,7 +3964,7 @@ function Panel({ t, onClose }) {
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     void refresh();
   }, [target, version]);
   const syncDraftPreview = () => {
@@ -3904,7 +3989,7 @@ function Panel({ t, onClose }) {
       setError(`${t("previewSyncFail")}\uFF1A${e instanceof Error ? e.message : String(e)}`);
     });
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     if (draft === null || !draft.dirty) return void 0;
     const timer = setTimeout(syncDraftPreview, 600);
     return () => {
@@ -3914,7 +3999,7 @@ function Panel({ t, onClose }) {
   const fetchPresets2 = () => {
     fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => setAgentPresets(Array.isArray(body?.presets) ? body.presets : [])).catch(() => setAgentPresets([]));
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     fetchPresets2();
   }, []);
   const showFlash = (text, kind = "ok") => {
@@ -3928,7 +4013,7 @@ function Panel({ t, onClose }) {
     setDraft(null);
   };
   if (cfg === null) {
-    return (0, import_react9.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
+    return (0, import_react10.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
   }
   const base = editView(cfg, target);
   const view = draft ? {
@@ -4065,14 +4150,14 @@ function Panel({ t, onClose }) {
       return false;
     });
   };
-  const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
+  const modeBtn = (key, label) => (0, import_react10.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
   const draftDirty = draft?.dirty === true;
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
     const customized = id === void 0 ? 0 : Object.keys(cfg?.overrides?.[id] ?? {}).length;
-    return (0, import_react9.createElement)("button", {
+    return (0, import_react10.createElement)("button", {
       key: id ?? "__global__",
       type: "button",
       className: css.catItem,
@@ -4080,43 +4165,43 @@ function Panel({ t, onClose }) {
       onClick: () => switchTarget(id),
       title: bad ? `${label} \u2014 ${t("broken")}` : id === void 0 ? t("targetHint") : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
     }, [
-      (0, import_react9.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
-      (0, import_react9.createElement)("span", { className: css.catLabel }, label),
-      bad ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
-      !bad && customized > 0 ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
+      (0, import_react10.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
+      (0, import_react10.createElement)("span", { className: css.catLabel }, label),
+      bad ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
+      !bad && customized > 0 ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
     ]);
   };
-  return (0, import_react9.createElement)("div", { style: s.pRoot }, [
+  return (0, import_react10.createElement)("div", { style: s.pRoot }, [
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
-    (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
-      (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
-        targetChip(void 0, t("targetAllTab"), (0, import_react9.createElement)(CatAllIcon, { size: 16 })),
-        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives2.IconAgentPresetOutline16, { size: 15 }), p.broken))
+    (0, import_react10.createElement)("div", { key: "targets", className: css.topbar }, [
+      (0, import_react10.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
+        targetChip(void 0, t("targetAllTab"), (0, import_react10.createElement)(CatAllIcon, { size: 16 })),
+        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react10.createElement)(import_dsh_client_ui_primitives2.IconAgentPresetOutline16, { size: 15 }), p.broken))
       ])
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
     // 阶段按钮合并放在三态同步选择框左侧：左栏列表与右栏预览跟着同一个
     // 阶段状态走，一处切换两边联动。仅在提示词 / 工具两个模式显示。
-    (0, import_react9.createElement)("div", { style: s.head }, [
-      (0, import_react9.createElement)("span", { style: s.headTitle }, [
-        (0, import_react9.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
-          (0, import_react9.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          (0, import_react9.createElement)("path", { d: "M14 2v6h6" }),
-          (0, import_react9.createElement)("path", { d: "M16 13H8" }),
-          (0, import_react9.createElement)("path", { d: "M16 17H8" }),
-          (0, import_react9.createElement)("path", { d: "M10 9H8" })
+    (0, import_react10.createElement)("div", { style: s.head }, [
+      (0, import_react10.createElement)("span", { style: s.headTitle }, [
+        (0, import_react10.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
+          (0, import_react10.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+          (0, import_react10.createElement)("path", { d: "M14 2v6h6" }),
+          (0, import_react10.createElement)("path", { d: "M16 13H8" }),
+          (0, import_react10.createElement)("path", { d: "M16 17H8" }),
+          (0, import_react10.createElement)("path", { d: "M10 9H8" })
         ]),
         t("nav")
       ]),
-      (0, import_react9.createElement)("div", { style: s.seg }, [
+      (0, import_react10.createElement)("div", { style: s.seg }, [
         modeBtn("sections", t("tabsSections")),
         modeBtn("tools", t("tabsTools")),
         modeBtn("presets", t("tabsPresets"))
       ]),
-      (0, import_react9.createElement)("div", { style: s.headActions }, [
-        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react9.createElement)("button", {
+      (0, import_react10.createElement)("div", { style: s.headActions }, [
+        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react10.createElement)("button", {
           key,
           style: dropPhase === key ? phase === key ? s.segBtnDropActive : s.segBtnDrop : phase === key ? s.segBtnActive : s.segBtn,
           onClick: () => setPhase(key),
@@ -4135,12 +4220,12 @@ function Panel({ t, onClose }) {
             dropOnPhase(key, payload);
           }
         }, stageLabel(key)))) : null,
-        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
-        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("label", {
+        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react10.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
+        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("syncAllPhasesHint")
         }, [
-          (0, import_react9.createElement)("input", {
+          (0, import_react10.createElement)("input", {
             type: "checkbox",
             checked: syncAll,
             onChange: (e) => setSyncAll(e.target.checked),
@@ -4148,11 +4233,11 @@ function Panel({ t, onClose }) {
           }),
           t("syncAllPhases")
         ]) : null,
-        mode === "sections" ? (0, import_react9.createElement)("label", {
+        mode === "sections" ? (0, import_react10.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("zhHint")
         }, [
-          (0, import_react9.createElement)("input", {
+          (0, import_react10.createElement)("input", {
             type: "checkbox",
             checked: zhOn,
             onChange: toggleZh,
@@ -4160,47 +4245,47 @@ function Panel({ t, onClose }) {
           }),
           t("zhSwitch")
         ]) : null,
-        (0, import_react9.createElement)("button", {
+        (0, import_react10.createElement)("button", {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
           disabled: !draft?.dirty || saving,
           onClick: save
         }, t("save")),
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
-        (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
+        (0, import_react10.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
-        onClose === void 0 ? null : (0, import_react9.createElement)(
+        onClose === void 0 ? null : (0, import_react10.createElement)(
           "button",
           { style: s.iconBtn, onClick: onClose, "aria-label": t("close"), title: t("close") },
-          (0, import_react9.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
-            (0, import_react9.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
+          (0, import_react10.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
+            (0, import_react10.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
           ])
         )
       ])
     ]),
     // ── 消息条（错误 / 闪示 / 目标异常警示） ──
-    (0, import_react9.createElement)("div", { style: { padding: "0 14px" } }, [
-      error ? (0, import_react9.createElement)("div", { style: s.error }, String(error)) : null,
-      flash ? (0, import_react9.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
-      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react9.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
-      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null
+    (0, import_react10.createElement)("div", { style: { padding: "0 14px" } }, [
+      error ? (0, import_react10.createElement)("div", { style: s.error }, String(error)) : null,
+      flash ? (0, import_react10.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
+      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react10.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
+      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
-    (0, import_react9.createElement)(
+    (0, import_react10.createElement)(
       "div",
       { key: "body", style: s.body },
       mode === "sections" ? [
-        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+        (0, import_react10.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
+        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
       ] : mode === "tools" ? [
-        (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases, phase, syncAll, t, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+        (0, import_react10.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases, phase, syncAll, t, write: edit }),
+        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
       ] : [
-        (0, import_react9.createElement)(PresetsPane, {
+        (0, import_react10.createElement)(PresetsPane, {
           key: "presets",
           cfg: view,
           inv,
@@ -4211,7 +4296,7 @@ function Panel({ t, onClose }) {
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
         }),
-        (0, import_react9.createElement)(SettingsPane, {
+        (0, import_react10.createElement)(SettingsPane, {
           key: "settings",
           cfg: view,
           inv,
@@ -5196,17 +5281,17 @@ function skillT(key, params) {
 }
 
 // src/client/skills/McpAddModal.tsx
-var import_react10 = require("react");
+var import_react11 = require("react");
 var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime6 = require("react/jsx-runtime");
 function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
-  const [format, setFormat] = (0, import_react10.useState)("json");
-  const [text, setText] = (0, import_react10.useState)("");
-  const [busy, setBusy] = (0, import_react10.useState)(null);
-  const [preview, setPreview] = (0, import_react10.useState)(null);
-  const [errors, setErrors] = (0, import_react10.useState)([]);
-  const [warnings, setWarnings] = (0, import_react10.useState)([]);
-  const [notice, setNotice] = (0, import_react10.useState)(null);
+  const [format, setFormat] = (0, import_react11.useState)("json");
+  const [text, setText] = (0, import_react11.useState)("");
+  const [busy, setBusy] = (0, import_react11.useState)(null);
+  const [preview, setPreview] = (0, import_react11.useState)(null);
+  const [errors, setErrors] = (0, import_react11.useState)([]);
+  const [warnings, setWarnings] = (0, import_react11.useState)([]);
+  const [notice, setNotice] = (0, import_react11.useState)(null);
   const target = presetId === void 0 ? "global" : "preset";
   const placeholder = format === "json" ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }' : 'mcpServers:\n  my-server:\n    command: npx\n    args: ["-y", "@scope/mcp-server"]';
   const empty = text.trim() === "";
@@ -5345,11 +5430,11 @@ function McpAddModal({ t, open, onClose, onAdded }) {
 }
 
 // src/client/skills/McpView.tsx
-var import_react13 = require("react");
+var import_react14 = require("react");
 var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/confirm-dialog.tsx
-var import_react11 = require("react");
+var import_react12 = require("react");
 var import_react_dom3 = require("react-dom");
 var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime7 = require("react/jsx-runtime");
@@ -5412,7 +5497,7 @@ function ConfirmDialog({
   ensureModalAnimStyles();
   ensureDialogStyles();
   const { closing, requestClose } = useModalClose(open, onClose);
-  (0, import_react11.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     if (!open) return void 0;
     const onKey = (event) => {
       if (event.key === "Escape") requestClose();
@@ -5457,7 +5542,7 @@ function ConfirmDialog({
 }
 
 // src/client/skills/mcp-live.ts
-var import_react12 = require("react");
+var import_react13 = require("react");
 var MCP_TOOL_WATCH_INTERVAL_MS = 2e3;
 var MCP_TOOL_WATCH_TIMEOUT_MS = 15e4;
 function mcpRegisteredToolCountOf(data, serverName) {
@@ -5472,7 +5557,7 @@ function isToolRegistrationPending(registered, listed) {
   return registered === 0 && listed > 0;
 }
 function useMcpLiveState() {
-  const [status, setStatus] = (0, import_react12.useState)({ state: "loading", data: null });
+  const [status, setStatus] = (0, import_react13.useState)({ state: "loading", data: null });
   const load = () => {
     setStatus((current2) => current2.state === "ready" ? current2 : { state: "loading", data: null });
     void fetch("/api/triad/mcp-status", { headers: { accept: "application/json" } }).then((response) => {
@@ -5486,7 +5571,7 @@ function useMcpLiveState() {
       setStatus({ state: "unavailable", data: null });
     });
   };
-  (0, import_react12.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     load();
   }, []);
   return [status, load];
@@ -5535,13 +5620,13 @@ ${description}`}`,
   }) });
 }
 function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn }) {
-  const [busy, setBusy] = (0, import_react13.useState)(null);
-  const [error, setError] = (0, import_react13.useState)(null);
-  const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
-  const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
-  const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
-  const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
-  const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
+  const [busy, setBusy] = (0, import_react14.useState)(null);
+  const [error, setError] = (0, import_react14.useState)(null);
+  const [globalOpen, setGlobalOpen] = (0, import_react14.useState)(true);
+  const [ownOpen, setOwnOpen] = (0, import_react14.useState)(true);
+  const [toolBusy, setToolBusy] = (0, import_react14.useState)(null);
+  const [removeReq, setRemoveReq] = (0, import_react14.useState)(null);
+  const [removeOwnReq, setRemoveOwnReq] = (0, import_react14.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
   const presets = ready?.presets ?? [];
@@ -5970,7 +6055,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
 }
 
 // src/client/skills/SkillCard.tsx
-var import_react14 = require("react");
+var import_react15 = require("react");
 var import_dsh_client_ui_primitives7 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/types.ts
@@ -5985,7 +6070,7 @@ var ALL_PRESETS = "*";
 // src/client/skills/SkillCard.tsx
 var import_jsx_runtime9 = require("react/jsx-runtime");
 function CategoryEditor({ value, onChange, label }) {
-  const [draft, setDraft] = (0, import_react14.useState)("");
+  const [draft, setDraft] = (0, import_react15.useState)("");
   const full = value.length >= MAX_BUNDLE_CATEGORIES;
   const add = (raw) => {
     const name = raw.trim().slice(0, 24);
@@ -6051,9 +6136,9 @@ function CategoryEditor({ value, onChange, label }) {
 function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLabel, index, onToggle, onView, onAssign, onRemove, onDelete }) {
   const files = Array.isArray(skill.files) ? skill.files : [];
   const description = skill.description ?? "";
-  const [copied, setCopied] = (0, import_react14.useState)(false);
-  const copiedTimer = (0, import_react14.useRef)(null);
-  (0, import_react14.useEffect)(() => () => {
+  const [copied, setCopied] = (0, import_react15.useState)(false);
+  const copiedTimer = (0, import_react15.useRef)(null);
+  (0, import_react15.useEffect)(() => () => {
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
   }, []);
   const flashCopied = () => {
@@ -7202,33 +7287,33 @@ function frontmatterName(text) {
 }
 function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter, onCardMouseLeave }) {
   ensureStyles();
-  const [state, setState] = (0, import_react15.useState)({ status: "loading" });
-  const [reload, setReload] = (0, import_react15.useState)(0);
-  const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
-  const [looseOpen, setLooseExpanded] = (0, import_react15.useState)(false);
-  const [viewer, setViewer] = (0, import_react15.useState)(null);
-  const [viewerFont, setViewerFont] = (0, import_react15.useState)(() => readViewerPrefs().font);
-  const [viewerFull, setViewerFull] = (0, import_react15.useState)(() => readViewerPrefs().full);
-  const [assignTarget, setAssignTarget] = (0, import_react15.useState)(null);
-  const [newBundleOpen, setNewBundleOpen] = (0, import_react15.useState)(false);
-  const [newBundleName, setNewBundleName] = (0, import_react15.useState)("");
-  const [newBundleCats, setNewBundleCats] = (0, import_react15.useState)([]);
-  const [creatingBundle, setCreatingBundle] = (0, import_react15.useState)(false);
-  const [renameTarget, setRenameTarget] = (0, import_react15.useState)(null);
-  const [renaming, setRenaming] = (0, import_react15.useState)(false);
-  const [renamedFlash, setRenamedFlash] = (0, import_react15.useState)(null);
-  const renamedTimer = (0, import_react15.useRef)(null);
-  const [confirm, setConfirm] = (0, import_react15.useState)(null);
-  const [confirming, setConfirming] = (0, import_react15.useState)(false);
-  const [install, setInstall] = (0, import_react15.useState)(null);
-  const [addOpen, setAddOpen] = (0, import_react15.useState)(false);
-  const [installName, setInstallName] = (0, import_react15.useState)("");
-  const [installDescription, setInstallDescription] = (0, import_react15.useState)("");
-  const [installBundleId, setInstallBundleId] = (0, import_react15.useState)(void 0);
-  const [installing, setInstalling] = (0, import_react15.useState)(false);
-  const [installError, setInstallError] = (0, import_react15.useState)(null);
-  const [toasts, setToasts] = (0, import_react15.useState)([]);
-  const toastTimers = (0, import_react15.useRef)([]);
+  const [state, setState] = (0, import_react16.useState)({ status: "loading" });
+  const [reload, setReload] = (0, import_react16.useState)(0);
+  const [expanded, setExpanded] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
+  const [looseOpen, setLooseExpanded] = (0, import_react16.useState)(false);
+  const [viewer, setViewer] = (0, import_react16.useState)(null);
+  const [viewerFont, setViewerFont] = (0, import_react16.useState)(() => readViewerPrefs().font);
+  const [viewerFull, setViewerFull] = (0, import_react16.useState)(() => readViewerPrefs().full);
+  const [assignTarget, setAssignTarget] = (0, import_react16.useState)(null);
+  const [newBundleOpen, setNewBundleOpen] = (0, import_react16.useState)(false);
+  const [newBundleName, setNewBundleName] = (0, import_react16.useState)("");
+  const [newBundleCats, setNewBundleCats] = (0, import_react16.useState)([]);
+  const [creatingBundle, setCreatingBundle] = (0, import_react16.useState)(false);
+  const [renameTarget, setRenameTarget] = (0, import_react16.useState)(null);
+  const [renaming, setRenaming] = (0, import_react16.useState)(false);
+  const [renamedFlash, setRenamedFlash] = (0, import_react16.useState)(null);
+  const renamedTimer = (0, import_react16.useRef)(null);
+  const [confirm, setConfirm] = (0, import_react16.useState)(null);
+  const [confirming, setConfirming] = (0, import_react16.useState)(false);
+  const [install, setInstall] = (0, import_react16.useState)(null);
+  const [addOpen, setAddOpen] = (0, import_react16.useState)(false);
+  const [installName, setInstallName] = (0, import_react16.useState)("");
+  const [installDescription, setInstallDescription] = (0, import_react16.useState)("");
+  const [installBundleId, setInstallBundleId] = (0, import_react16.useState)(void 0);
+  const [installing, setInstalling] = (0, import_react16.useState)(false);
+  const [installError, setInstallError] = (0, import_react16.useState)(null);
+  const [toasts, setToasts] = (0, import_react16.useState)([]);
+  const toastTimers = (0, import_react16.useRef)([]);
   const pushToast = (tone, text) => {
     const id = Date.now() + Math.random();
     setToasts((current2) => [...current2.slice(-2), { id, tone, text }]);
@@ -7240,8 +7325,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const failToast = (label, error) => {
     pushToast("err", skillT("opFailed", { label, message: error instanceof Error ? error.message : String(error) }));
   };
-  const [installMetaName, setInstallMetaName] = (0, import_react15.useState)(null);
-  (0, import_react15.useEffect)(() => {
+  const [installMetaName, setInstallMetaName] = (0, import_react16.useState)(null);
+  (0, import_react16.useEffect)(() => {
     if (install === null || install.archive === true) {
       setInstallMetaName(null);
       return void 0;
@@ -7262,36 +7347,36 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [install]);
-  const [dropActive, setDropActive] = (0, import_react15.useState)(false);
-  const fileInput = (0, import_react15.useRef)(null);
-  const [toggles, setToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
-  const [toggling, setToggling] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
-  const [presets, setPresets] = (0, import_react15.useState)([]);
-  const [overrides, setOverrides] = (0, import_react15.useState)({});
-  const [activePreset, setActivePreset] = (0, import_react15.useState)(ALL_PRESETS);
-  const [query, setQuery] = (0, import_react15.useState)("");
-  const [sourceFilter, setSourceFilter] = (0, import_react15.useState)("all");
-  const [sortAsc, setSortAsc] = (0, import_react15.useState)(true);
-  const [viewMode] = (0, import_react15.useState)("grid");
-  const [statusFilter, setStatusFilter] = (0, import_react15.useState)("all");
-  const [catFilter, setCatFilter] = (0, import_react15.useState)(null);
-  const [catTarget, setCatTarget] = (0, import_react15.useState)(null);
-  const [catDraft, setCatDraft] = (0, import_react15.useState)([]);
-  const [savingCats, setSavingCats] = (0, import_react15.useState)(false);
-  const [openMenu, setOpenMenu] = (0, import_react15.useState)(null);
-  const [health, setHealth] = (0, import_react15.useState)({ state: "loading" });
-  const [guideOpen, setGuideOpen] = (0, import_react15.useState)(false);
-  const [kind, setKind] = (0, import_react15.useState)("skill");
-  const [mcpScope, setMcpScope] = (0, import_react15.useState)("");
-  const [mcpQuery, setMcpQuery] = (0, import_react15.useState)("");
-  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react15.useState)("all");
+  const [dropActive, setDropActive] = (0, import_react16.useState)(false);
+  const fileInput = (0, import_react16.useRef)(null);
+  const [toggles, setToggles] = (0, import_react16.useState)({ skills: {}, bundles: {} });
+  const [toggling, setToggling] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
+  const [presets, setPresets] = (0, import_react16.useState)([]);
+  const [overrides, setOverrides] = (0, import_react16.useState)({});
+  const [activePreset, setActivePreset] = (0, import_react16.useState)(ALL_PRESETS);
+  const [query, setQuery] = (0, import_react16.useState)("");
+  const [sourceFilter, setSourceFilter] = (0, import_react16.useState)("all");
+  const [sortAsc, setSortAsc] = (0, import_react16.useState)(true);
+  const [viewMode] = (0, import_react16.useState)("grid");
+  const [statusFilter, setStatusFilter] = (0, import_react16.useState)("all");
+  const [catFilter, setCatFilter] = (0, import_react16.useState)(null);
+  const [catTarget, setCatTarget] = (0, import_react16.useState)(null);
+  const [catDraft, setCatDraft] = (0, import_react16.useState)([]);
+  const [savingCats, setSavingCats] = (0, import_react16.useState)(false);
+  const [openMenu, setOpenMenu] = (0, import_react16.useState)(null);
+  const [health, setHealth] = (0, import_react16.useState)({ state: "loading" });
+  const [guideOpen, setGuideOpen] = (0, import_react16.useState)(false);
+  const [kind, setKind] = (0, import_react16.useState)("skill");
+  const [mcpScope, setMcpScope] = (0, import_react16.useState)("");
+  const [mcpQuery, setMcpQuery] = (0, import_react16.useState)("");
+  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react16.useState)("all");
   const [mcpLive, mcpRefreshLive] = useMcpLiveState();
-  const [mcpAddOpen, setMcpAddOpen] = (0, import_react15.useState)(false);
-  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react15.useState)(false);
-  const mcpWatchTimer = (0, import_react15.useRef)(null);
-  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react15.useState)([]);
-  const mcpLiveRef = (0, import_react15.useRef)(mcpLive);
-  (0, import_react15.useEffect)(() => {
+  const [mcpAddOpen, setMcpAddOpen] = (0, import_react16.useState)(false);
+  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react16.useState)(false);
+  const mcpWatchTimer = (0, import_react16.useRef)(null);
+  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react16.useState)([]);
+  const mcpLiveRef = (0, import_react16.useRef)(mcpLive);
+  (0, import_react16.useEffect)(() => {
     mcpLiveRef.current = mcpLive;
   }, [mcpLive]);
   const stopMcpWatch = () => {
@@ -7357,7 +7442,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       }
     );
   };
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     const timer = window.setInterval(silentSync, 3e4);
     const onVis = () => {
       if (document.visibilityState === "visible") silentSync();
@@ -7390,7 +7475,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     );
   };
   const t = skillT;
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     let current2 = true;
     setState({ status: "loading" });
     void skillApi.list().then(
@@ -7431,13 +7516,13 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload]);
-  (0, import_react15.useEffect)(() => () => {
+  (0, import_react16.useEffect)(() => () => {
     if (renamedTimer.current !== null) window.clearTimeout(renamedTimer.current);
     if (mcpWatchTimer.current !== null) window.clearInterval(mcpWatchTimer.current);
     for (const timer of toastTimers.current) window.clearTimeout(timer);
   }, []);
-  const [guidePos, setGuidePos] = (0, import_react15.useState)(null);
-  (0, import_react15.useEffect)(() => {
+  const [guidePos, setGuidePos] = (0, import_react16.useState)(null);
+  (0, import_react16.useEffect)(() => {
     if (!guideOpen) return;
     const marker = document.querySelector("[data-skm-panel-marker]");
     const card = marker?.closest(".psh-card");
@@ -7539,7 +7624,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const toggleViewerFull = () => {
     setViewerFull((current2) => !current2);
   };
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     writeViewerPrefs({ font: viewerFont, full: viewerFull });
   }, [viewerFont, viewerFull]);
   const selectViewerFile = (filePath) => {
@@ -8252,8 +8337,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
 }
 
 // src/client/error-boundary.tsx
-var import_react16 = require("react");
-var ErrorBoundary = class extends import_react16.Component {
+var import_react17 = require("react");
+var ErrorBoundary = class extends import_react17.Component {
   constructor() {
     super(...arguments);
     __publicField(this, "state", { error: null });
@@ -8276,7 +8361,7 @@ var ErrorBoundary = class extends import_react16.Component {
 };
 
 // src/client/sidebar-nav.tsx
-var import_react17 = require("react");
+var import_react18 = require("react");
 var import_react_dom4 = require("react-dom");
 var import_jsx_runtime14 = require("react/jsx-runtime");
 var HOST_ID = "dsh-prompt-customizer-nav-host";
@@ -8347,8 +8432,8 @@ function ensureNavMount() {
   };
 }
 function useNavSlot(name) {
-  const [slot, setSlot] = (0, import_react17.useState)(null);
-  (0, import_react17.useEffect)(() => {
+  const [slot, setSlot] = (0, import_react18.useState)(null);
+  (0, import_react18.useEffect)(() => {
     let timer = 0;
     let tries = 0;
     const poll = () => {
@@ -8366,8 +8451,8 @@ function useNavSlot(name) {
   return slot;
 }
 function useRail() {
-  const [rail, setRail] = (0, import_react17.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
-  (0, import_react17.useEffect)(() => {
+  const [rail, setRail] = (0, import_react18.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
+  (0, import_react18.useEffect)(() => {
     const read = () => {
       setRail(document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
     };
@@ -8451,11 +8536,11 @@ function clickInSidebar(target) {
   return false;
 }
 function usePanelAutoClose(name, open, requestClose) {
-  (0, import_react17.useEffect)(() => {
+  (0, import_react18.useEffect)(() => {
     if (!open) return;
     window.dispatchEvent(new CustomEvent(PANEL_OPEN_EVENT, { detail: name }));
   }, [open, name]);
-  (0, import_react17.useEffect)(() => {
+  (0, import_react18.useEffect)(() => {
     if (!open) return void 0;
     const onSiblingOpen = (event) => {
       if (event.detail !== name) requestClose();
@@ -8491,8 +8576,8 @@ function anchorFromEvent(e) {
 function SkillsEntry() {
   ensureModalAnimStyles();
   ensureShellStyles();
-  const [open, setOpen] = (0, import_react18.useState)(false);
-  const [anchor, setAnchor] = (0, import_react18.useState)(null);
+  const [open, setOpen] = (0, import_react19.useState)(false);
+  const [anchor, setAnchor] = (0, import_react19.useState)(null);
   const { closing, requestClose } = useModalClose(open, () => {
     setOpen(false);
   });
