@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { apply } from '../lib/index.js'
+import { apply } from '../vendor/prompt-customizer/index.js'
 
 /** Minimal Cordis ctx：webServer + 已认证的 connection mock，其余服务缺席（可选获取）。 */
 function makeCtx() {

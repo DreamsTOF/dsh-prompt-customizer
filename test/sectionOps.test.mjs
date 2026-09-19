@@ -19,7 +19,7 @@ import {
   zhMergedInjectEntries,
   zhRevertInjectEntries,
   zhApplied,
-} from '../lib/sectionOps.mjs'
+} from '../vendor/prompt-customizer/sectionOps.mjs'
 
 test('阶段 → 名单写回目标 / 注入阶段 映射', () => {
   assert.equal(sectionListOf('bootstrap'), 'bootstrap')

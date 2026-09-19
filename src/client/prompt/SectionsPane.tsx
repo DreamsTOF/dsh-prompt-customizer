@@ -4,24 +4,26 @@
  * 顶部三个阶段 Tab（引导期 / 常驻期 / 压缩受控期，恒定全部可选），与右栏
  * 预览的阶段按钮**联动**：两边切的是同一个阶段，编辑哪个阶段就看哪个阶段的
  * 装配。每个阶段列出该阶段装配里的段：勾选框 = 该阶段是否注入模型（勾上 =
- * 启用），被停用的行半透明原位保留、随时可勾回。行内：↑/↓ 重排、编辑（按
- * 阶段替换文本）、还原、删除（仅自定义段）；「+ 注入」展开注入新段表单。
+ * 启用），被停用的行半透明原位保留、随时可勾回。行内：抓手拖动排序 / ↑↓ 重排、
+ * 编辑（按阶段替换文本）、还原、删除（仅自定义段）；「+ 注入」展开注入新段表单。
  *
  * 底部固定条：三态过滤（全部 / 已启用 / 已停用）——像宿主能力管理页一样按
  * 勾选状态筛选当前阶段的列表。
  *
- * 「本系统全部提示词」只读池收在列表末尾的折叠区（不分阶段）：每行三个小
- * 按钮把该段加入对应阶段（替代旧版的拖拽搬移；运行时动态段加不进，会给出
- * 说明）。
+ * 拖拽（见 dnd.ts）：行抓手上下拖 = 在本阶段排序；把行拖回末尾的「本系统全部
+ * 提示词」池 = 从本阶段移除；把池里的段拖进列表 = 加入本阶段（带池里原文）；
+ * 把行拖到头部某个阶段 Tab = 复制到那个阶段。点按路径照旧：池里每行三个小按钮
+ * 也能加入对应阶段（运行时动态段加不进，会给出说明）。
  *
  * 全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
  * 覆盖同一份代码）。
  */
-import { createElement as h, useState, type ChangeEvent, type ReactElement } from 'react'
+import { createElement as h, useEffect, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
 import type { Config, Inventory, Phase, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER } from './presets.ts'
-import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, mergedPhaseInjectEntries, phaseRows } from '../../lib/sectionOps.mjs'
+import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, mergedPhaseInjectEntries, phaseRows, reorderInsert, injectedAt } from '../../../vendor/prompt-customizer/sectionOps.mjs'
+import { acceptsDrop, beginDrag, dropOnPhase, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
 import { s } from './styles.ts'
 
 /** Panel 并行拉取的三阶段装配。 */
@@ -45,7 +47,7 @@ export type TriState = 'all' | 'on' | 'off'
 /** 编辑态的键：段名之外还要带阶段，否则三个部分里同名的行会同时展开编辑器。 */
 const editKey = (key: PhaseViewKey, name: string): string => `${key}:${name}`
 
-export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
+export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
@@ -54,6 +56,8 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   /** 三态同步（默认关）：勾选后屏蔽 / 解除屏蔽与替换文本对三个阶段一起生效（只作用于同名段）。 */
   syncAll?: boolean
   t: Translate
+  /** 从池加入时的文本取值（缺省用池原文；Panel 在「中文提示词」开启时换成译本）。 */
+  poolText?: (name: string, fallback: string) => string
   write: (field: 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools', value: unknown) => void
 }): ReactElement {
   const [filter, setFilter] = useState<TriState>('all')
@@ -63,6 +67,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   const [addOpen, setAddOpen] = useState(false)
   // 面板内短提示（例如：动态段加不进某个阶段时说明原因）。
   const [notice, setNotice] = useState<string | null>(null)
+  // 拖拽：正在拖的行名，投放位置标记（`<行名>:above|below` / `list` / `pool`）。
+  const [dragName, setDragName] = useState<string | null>(null)
+  const [dropMark, setDropMark] = useState<string | null>(null)
 
   const rowsOf = (key: PhaseViewKey): PartRow[] => phaseRows(cfg, phases?.[key] ?? null, key)
 
@@ -156,14 +163,18 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     write('inject', inject)
   }
 
-  // 从「全部」池把一个段加入某阶段（替代旧版拖拽：池 → 阶段）。该阶段已有的
+  // 从「全部」池把一个段加入某阶段（拖动或点按池里的小按钮）。该阶段已有的
   // 段只是移到末尾；新段带上池里的原文（注入条目带文本，服务端才会把它真正
-  // 建出来）。动态段没有可带的原文，给出说明。
-  const addFromPool = (key: PhaseViewKey, name: string, text: string): void => {
+  // 建出来）。动态段没有可带的原文，给出说明。`copiedFrom` 非空 = 从别的阶段
+  // 复制过来的，给一条「已复制」反馈。
+  const addFromPool = (key: PhaseViewKey, name: string, text: string, copiedFrom?: string): void => {
     if (text === '' || text.startsWith('<')) {
       setNotice(t('sectionDynamicNoAdd', { name }))
       return
     }
+    // 「中文提示词」开启时，池里的段优先用译本文本 —— 一键把没进过定制面板的
+    // 段（如 agent 作用域注册的 tool:subagent）接管成中文。
+    const body = poolText === undefined ? text : poolText(name, text)
     setNotice(null)
     const rows = rowsOf(key)
     const existing = rows.find((row) => row.name === name)
@@ -174,14 +185,81 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
           text: '',
           replaced: Object.hasOwn(cfg.replace ?? {}, name),
           custom: false,
-          override: text,
+          override: body,
           blocked: false,
         }]
     if (existing === undefined && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
       applyBlock(key, name, false)
     }
     persistPhase(key, next)
+    if (copiedFrom !== undefined) setNotice(t('sectionCopied', { name, to: stageLabel(key), from: copiedFrom }))
   }
+
+  // ── 拖拽落地（手势定义见 dnd.ts）────────────────────────────────────
+  /** 从本阶段拿掉一段：注入进来的撤销注入，原生段则屏蔽掉（等价于取消勾选）。 */
+  const removeFromPhase = (name: string): void => {
+    const row = rowsOf(phase).find((item) => item.name === name)
+    if (row === undefined) return
+    if (row.custom || row.override !== '' || injectedNames.has(name)) removeFromPart(phase, name)
+    else applyBlock(phase, name, true)
+    setNotice(t('sectionRemoved', { name, from: stageLabel(phase) }))
+  }
+
+  /** 行上投放：同阶段 = 排序；别的阶段 / 池里来的 = 复制进本阶段（源不动）。 */
+  const dropOnRow = (event: ReactDragEvent, target: PartRow): void => {
+    const payload = payloadOf(event)
+    if (payload === null || payload.kind !== 'section') return
+    event.preventDefault()
+    event.stopPropagation()
+    setDropMark(null)
+    if (payload.name === target.name) return
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const pos = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
+    if (payload.from === phase) {
+      const next = reorderInsert(rowsOf(phase), payload.name, target.name, pos)
+      if (next !== null) { persistPhase(phase, next); setNotice(null) }
+      return
+    }
+    addFromPool(phase, payload.name, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
+  }
+
+  /** 列表空白处投放：追加到本阶段末尾；池里拖来的 = 加入本阶段。 */
+  const dropOnList = (event: ReactDragEvent): void => {
+    const payload = payloadOf(event)
+    if (payload === null || payload.kind !== 'section') return
+    event.preventDefault()
+    setDropMark(null)
+    if (payload.from !== phase) {
+      addFromPool(phase, payload.name, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
+      return
+    }
+    const list = rowsOf(phase)
+    const last = list[list.length - 1]
+    if (last === undefined || last.name === payload.name) return
+    const next = reorderInsert(list, payload.name, last.name, 'below')
+    if (next !== null) persistPhase(phase, next)
+  }
+
+  /** 池上投放：把行从本阶段拿掉（拖回「全部」的手势）。 */
+  const dropOnPool = (event: ReactDragEvent): void => {
+    const payload = payloadOf(event)
+    if (payload === null || payload.kind !== 'section') return
+    event.preventDefault()
+    event.stopPropagation()
+    setDropMark(null)
+    if (payload.from !== phase) return
+    removeFromPhase(payload.name)
+  }
+
+  // 头部阶段 Tab 上的投放：复制到那个阶段（换 Tab / 换模式时旧列表卸载、
+  // 新列表注册 —— 任何时刻只有一个处理者）。
+  useEffect(() => {
+    setPhaseDropHandler((key, payload) => {
+      if (payload.kind !== 'section' || key === phase) return
+      addFromPool(key, payload.name, payload.text ?? '', stageLabel(phase))
+    })
+    return () => setPhaseDropHandler(null)
+  })
 
   const stageLabel = (key: PhaseViewKey): string =>
     key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
@@ -205,10 +283,36 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
 
   const renderRow = (key: PhaseViewKey, row: PartRow, index: number, total: number): ReactElement | null => {
     if (!rowVisible(row)) return null
+    const mark = dropMark !== null && dropMark.startsWith(`${row.name}:`) ? dropMark.slice(row.name.length + 1) : null
     return h('div', {
       key: row.name,
-      style: { ...s.row, ...(row.blocked ? s.rowBlocked : {}) },
+      style: {
+        ...s.row,
+        ...(row.blocked ? s.rowBlocked : {}),
+        ...(mark === 'above' ? s.dropAbove : {}),
+        ...(mark === 'below' ? s.dropBelow : {}),
+        ...(dragName === row.name ? s.dragging : {}),
+      },
+      onDragOver: (event: ReactDragEvent) => {
+        if (!acceptsDrop(event, 'section')) return
+        event.preventDefault()
+        event.stopPropagation()
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+        setDropMark(`${row.name}:${event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'}`)
+      },
+      onDrop: (event: ReactDragEvent) => dropOnRow(event, row),
     }, [
+      // 拖拽抓手：整行 draggable 会把勾选框 / 文本域的选择手势一起吃掉。
+      h('span', {
+        draggable: true,
+        title: t('drag'),
+        style: s.dragHandle,
+        onDragStart: (event: ReactDragEvent) => {
+          setDragName(row.name)
+          beginDrag(event, { kind: 'section', name: row.name, from: key, text: row.override || row.text })
+        },
+        onDragEnd: () => { setDragName(null); setDropMark(null); finishDrag() },
+      }, '⠿'),
       h('input', {
         type: 'checkbox',
         checked: !row.blocked,
@@ -251,6 +355,8 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
 
   // 当前阶段的行 + 三态过滤。
   const rows = rowsOf(phase)
+  /** 本阶段有注入条目（= 被显式加进来过）的段名：拖回池时用来自动选「撤销注入」还是「屏蔽」。 */
+  const injectedNames = injectedAt(cfg, phase).names
   const onCount = rows.filter((row) => !row.blocked).length
   const offCount = rows.length - onCount
   const rowVisible = (row: PartRow): boolean =>
@@ -259,7 +365,17 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   const poolSections = inv?.sections ?? []
 
   return h('div', { style: s.colLeft }, [
-    h('div', { style: s.colScroll }, [
+    h('div', {
+      style: { ...s.colScroll, ...(dropMark === 'list' ? s.dropZone : {}) },
+      // 列表空白处 = 「本阶段末尾」的投放点（池里拖进来的段也从这里进）。
+      onDragOver: (event: ReactDragEvent) => {
+        const payload = payloadOf(event)
+        if (payload === null || payload.kind !== 'section' || payload.from === phase) return
+        event.preventDefault()
+        setDropMark('list')
+      },
+      onDrop: dropOnList,
+    }, [
       notice ? h('div', { style: s.noticeWarn }, notice) : null,
       partNote(phase),
       rows.map((row, i) => renderRow(phase, row, i, rows.length)),
@@ -271,23 +387,35 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
             t,
           })
         : null,
-      // 本系统全部提示词：跨预设累积的只读池（折叠区），每行可加入三个阶段。
-      h('details', { style: s.injectBox }, [
+      // 本系统全部提示词：跨预设累积的只读池（折叠区）。加入某个阶段靠拖拽：
+      // 把行拖进上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段
+      // （行上不再放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
+      h('details', {
+        style: { ...s.injectBox, ...(dropMark === 'pool' ? s.dropZoneActive : {}) },
+        onDragOver: (event: ReactDragEvent) => {
+          if (!acceptsDrop(event, 'section')) return
+          event.preventDefault()
+          event.stopPropagation()
+          setDropMark('pool')
+        },
+        onDrop: dropOnPool,
+      }, [
         h('summary', { style: { ...s.muted, cursor: 'pointer' } },
           `${t('allSectionsTitle')} (${poolSections.length})`),
         h('div', { style: { ...s.muted, marginBottom: 4 } }, t('sectionsFourHint')),
         poolSections.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,
-        poolSections.map((sec) => h('div', { key: sec.name, style: { ...s.row, opacity: 0.92 } }, [
+        poolSections.map((sec) => h('div', {
+          key: sec.name,
+          style: { ...s.row, opacity: 0.92 },
+          draggable: true,
+          title: t('drag'),
+          onDragStart: (event: ReactDragEvent) => beginDrag(event, { kind: 'section', name: sec.name, from: 'pool', text: sec.text ?? '' }),
+          onDragEnd: finishDrag,
+        }, [
           h('div', { style: s.rowBody }, [
             h('div', { style: s.rowTitle }, h('span', { style: s.code }, sec.name)),
             h('div', { style: s.preview }, String(sec.text ?? '').slice(0, 140) || t('dynamic')),
           ]),
-          ...PART_ORDER.map((key) => h('button', {
-            key,
-            style: s.arrow,
-            title: t('poolAddTitle', { phase: stageLabel(key) }),
-            onClick: () => addFromPool(key, sec.name, sec.text ?? ''),
-          }, t(key === 'bootstrap' ? 'phaseShortGuide' : key === 'active' ? 'phaseShortResident' : 'phaseShortControlled'))),
         ])),
       ]),
       // 「+ 注入」入口放在滚动区末尾：新段通常追加在当前阶段列表尾部。

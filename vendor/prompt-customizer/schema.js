@@ -1,4 +1,4 @@
-import Schema from '@deepseek-ai/schemastery'
+import Schema from './schemastery.mjs'
 import { DEFAULT_ENV_BLOCKLIST } from './vars.js'
 
 /** 本插件的设置命名空间（小写 kebab-case）。 */

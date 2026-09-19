@@ -12,13 +12,18 @@
  * /preview?phase=…。编辑只改内存草稿，由「保存」按钮经 /config/apply 一次
  * 写盘（写错的配置不点保存就不会进文件）。
  */
-import { createElement as h, useEffect, useRef, useState, type ReactElement } from 'react'
+import { createElement as h, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
+import { IconAgentPresetOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+// 预设 chips 行直接复用能力面板（SKILL / MCP）的类名：三处「Agent 预设」几何一致。
+import { CatAllIcon } from '../skills/icons.js'
+import { css } from '../skills/styles.js'
+import { payloadOf, dropOnPhase } from './dnd.ts'
 import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
 import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import { editView, type ConfigPatch } from './presets.ts'
-import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied } from '../../lib/sectionOps.mjs'
-import { ZH_SECTIONS } from '../../lib/zh/index.mjs'
+import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied } from '../../../vendor/prompt-customizer/sectionOps.mjs'
+import { ZH_SECTIONS } from '../../../vendor/prompt-customizer/zh/index.mjs'
 import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
@@ -62,7 +67,7 @@ interface EditDraft {
   dirty: boolean
 }
 
-export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): ReactElement {
+export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): ReactElement {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [inv, setInv] = useState<Inventory | null>(null)
   // 三阶段预览装配：模型视角的唯一数据源（加载中为 null）。
@@ -74,6 +79,8 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
   const [version, setVersion] = useState(0)
   // 三阶段视图：左栏列表与右栏预览共用；左右两栏的阶段 Tab 联动切换同一份。
   const [phase, setPhase] = useState<PhaseViewKey>('bootstrap')
+  // 拖拽悬停中的阶段 Tab：高亮提示「松手 = 复制到该阶段」（处理由挂载中的列表负责）。
+  const [dropPhase, setDropPhase] = useState<PhaseViewKey | null>(null)
   // 草稿预览的同步序号：每次发起同步 +1，过期响应（已保存 / 再次编辑后）
   // 直接丢弃，绝不覆盖新数据。
   const syncSeq = useRef(0)
@@ -296,6 +303,15 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
   // 草稿（edit），与手动编辑同一条保存路径。状态从配置探测（zhApplied）。
   // 三阶段装配未就绪时拒绝执行（否则会把对应阶段的注入条目当作空集写掉）。
   const zhOn = zhApplied(view, ZH_SECTIONS)
+  // 「中文提示词」开启时，从池里加入的段优先用译本文本：没进过面板的段（如
+  // agent 作用域注册的 tool:subagent / context:file-reference）也能一键接管
+  // 成中文。译本缺席或函数译本返回空 = 保持池里原文。
+  const poolText = (name: string, fallback: string): string => {
+    if (!zhOn) return fallback
+    const entry = (ZH_SECTIONS as Record<string, unknown>)[name]
+    const zh = typeof entry === 'function' ? (entry as (source: string) => unknown)(fallback) : entry
+    return typeof zh === 'string' && zh !== '' ? zh : fallback
+  }
   const toggleZh = (): void => {
     if (phases === null || phases.bootstrap === null || phases.active === null || phases.compaction === null) {
       showFlash(t('zhNotReady'), 'err')
@@ -388,19 +404,45 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
     key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
   const draftDirty = draft?.dirty === true
 
-  const targetTab = (id: string | undefined, label: string, broken?: string): ReactElement =>
-    h('button', {
+  /**
+   * 编辑目标 chip：与 SKILL / MCP 顶栏的预设 chips 用同一套类名（几何、配色、
+   * 悬停与选中态完全对齐）。尾部数字 = 该预设已定制的字段数（有则橙色），
+   * 与 MCP 的「数字 + 橙色 = 有单独设置」同一读法；失效预设置换成「失效」标记。
+   */
+  const targetChip = (id: string | undefined, label: string, icon: ReactElement, broken?: string): ReactElement => {
+    const active = target === id
+    const bad = broken !== undefined && broken !== ''
+    const customized = id === undefined ? 0 : Object.keys(cfg?.overrides?.[id] ?? {}).length
+    return h('button', {
       key: id ?? '__global__',
-      style: target === id ? s.targetTabActive : s.targetTab,
+      type: 'button',
+      className: css.catItem,
+      'data-active': active || undefined,
       onClick: () => switchTarget(id),
-      title: broken !== undefined && broken !== '' ? `${label} — ${t('broken')}` : id === undefined ? t('targetHint') : label,
+      title: bad
+        ? `${label} — ${t('broken')}`
+        : id === undefined
+          ? t('targetHint')
+          : customized > 0 ? `${label} · ${t('targetCustomized', { n: customized })}` : label,
     }, [
-      label,
-      broken !== undefined && broken !== '' ? h('span', { style: s.badgeBlocked }, t('broken')) : null,
+      h('span', { className: css.catIcon, 'data-active': active || undefined }, icon),
+      h('span', { className: css.catLabel }, label),
+      bad ? h('span', { className: css.catCount, 'data-warn': true }, t('broken')) : null,
+      !bad && customized > 0 ? h('span', { className: css.catCount, 'data-warn': true }, String(customized)) : null,
     ])
+  }
 
   return h('div', { style: s.pRoot }, [
-    // ── 头部：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
+    // ── 第一行：agent 预设（编辑目标）──
+    // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
+    // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
+    h('div', { key: 'targets', className: css.topbar }, [
+      h('div', { className: css.chipRow, role: 'group', 'aria-label': t('targetLabel') }, [
+        targetChip(undefined, t('targetAllTab'), h(CatAllIcon, { size: 16 })),
+        ...agentPresets.map((p) => targetChip(p.id, p.name, h(IconAgentPresetOutline16, { size: 15 }), p.broken)),
+      ]),
+    ]),
+    // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
     // 阶段按钮合并放在三态同步选择框左侧：左栏列表与右栏预览跟着同一个
     // 阶段状态走，一处切换两边联动。仅在提示词 / 工具两个模式显示。
     h('div', { style: s.head }, [
@@ -423,8 +465,24 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
         mode === 'sections' || mode === 'tools'
           ? h('div', { style: s.seg }, VIEW_KEYS.map((key) => h('button', {
               key,
-              style: phase === key ? s.segBtnActive : s.segBtn,
+              style: dropPhase === key
+                ? (phase === key ? s.segBtnDropActive : s.segBtnDrop)
+                : phase === key ? s.segBtnActive : s.segBtn,
               onClick: () => setPhase(key),
+              // 拖到阶段 Tab = 把行复制到那个阶段（段 / 工具各按自己的语义落地）。
+              onDragOver: (event: ReactDragEvent) => {
+                if (payloadOf(event) === null) return
+                event.preventDefault()
+                setDropPhase(key)
+              },
+              onDragLeave: () => setDropPhase((current) => (current === key ? null : current)),
+              onDrop: (event: ReactDragEvent) => {
+                const payload = payloadOf(event)
+                setDropPhase(null)
+                if (payload === null) return
+                event.preventDefault()
+                dropOnPhase(key, payload)
+              },
             }, stageLabel(key))))
           : null,
         draftDirty && (mode === 'sections' || mode === 'tools')
@@ -466,17 +524,11 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
         h('button', { style: s.saveBtn, onClick: () => { void refresh().then(() => syncDraftPreview()) } }, t('refresh')),
-        h('button', { style: s.iconBtn, onClick: onClose, 'aria-label': t('close'), title: t('close') },
+        // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
+        onClose === undefined ? null : h('button', { style: s.iconBtn, onClick: onClose, 'aria-label': t('close'), title: t('close') },
           h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' }, [
             h('path', { d: 'M4 4l8 8M12 4l-8 8', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' }),
           ])),
-      ]),
-    ]),
-    // ── 第二行：agent 预设 Tab（编辑目标） ──
-    h('div', { style: s.subhead }, [
-      h('div', { style: s.targetRow }, [
-        targetTab(undefined, t('targetAllTab')),
-        ...agentPresets.map((p) => targetTab(p.id, p.name, p.broken)),
       ]),
     ]),
     // ── 消息条（错误 / 闪示 / 目标异常警示） ──
@@ -496,7 +548,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose: () => void }): Re
     h('div', { key: 'body', style: s.body },
       mode === 'sections'
         ? [
-            h(SectionsPane, { key: 'sections', cfg: view, inv, phases, phase, syncAll, t, write: edit }),
+            h(SectionsPane, { key: 'sections', cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
             h(PreviewPane, { key: 'preview', t, phases, phase, sub: previewSub }),
           ]
         : mode === 'tools'

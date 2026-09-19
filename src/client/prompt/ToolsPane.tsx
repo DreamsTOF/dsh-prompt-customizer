@@ -8,14 +8,17 @@
  * 底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏），只统计当前
  * 阶段。
  *
- * 「本系统全部工具」只读池收在折叠区（不分阶段）：每行三个小按钮把该工具
- * 加入对应阶段（替代旧版拖拽）——被该阶段默认裁掉、但注册表里仍有的会写进
- * add 名单加回；注册表里根本没有的（别的预设独有）加不进来，界面明确说明。
+ * 拖拽（见 dnd.ts）：把「本系统全部工具」里的行拖进上面的列表 = 让该工具在本
+ * 阶段出现（写进 add 名单加回，或从黑名单里放出来）；把行拖回池 = 从本阶段拿
+ * 掉（撤销加回 / 进黑名单）；把行拖到头部某个阶段 Tab = 复制到那个阶段（隐藏
+ * 态一起带过去，源阶段不动）。点按路径照旧：池里每行三个小按钮也能加入对应
+ * 阶段 —— 注册表里根本没有的（别的预设独有）加不进来，界面明确说明。
  */
-import { createElement as h, useState, type ReactElement } from 'react'
+import { createElement as h, useEffect, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
 import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
 import type { Translate } from './locales.ts'
 import { PART_ORDER, withPhaseAdd, withPhaseExclude } from './presets.ts'
+import { acceptsDrop, beginDrag, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
 import { s } from './styles.ts'
 import type { TriState } from './SectionsPane.tsx'
 
@@ -38,6 +41,9 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
 }): ReactElement {
   const [filter, setFilter] = useState<TriState>('all')
   const [notice, setNotice] = useState<Notice | null>(null)
+  // 拖拽：正在拖的工具名，投放位置标记（行名 / `list` / `pool`）。
+  const [dragName, setDragName] = useState<string | null>(null)
+  const [dropMark, setDropMark] = useState<string | null>(null)
 
   // 某阶段自己的黑名单 / 加回名单（三份互不继承）。
   const excludeOf = (key: PhaseViewKey): string[] => {
@@ -150,6 +156,54 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     setNotice({ kind: 'ok', text: isInCatalog(key, name) ? t('toolShown', { name, to: stageLabel(key) }) : t('toolAdded', { name, phase: stageLabel(key) }) })
   }
 
+  // ── 拖拽落地（手势定义见 dnd.ts）────────────────────────────────────
+  /** 从某阶段拿掉一个工具（拖回「全部」的手势）：已加回的撤销加回（回到该阶段
+   *  原生状态），原生工具则进该阶段黑名单（= 该阶段隐藏）。 */
+  const removeFromPhase = (key: PhaseViewKey, name: string): void => {
+    let exclude = excludeOf(key)
+    let add = addOf(key)
+    if (add.includes(name)) add = add.filter((item) => item !== name)
+    else if (!exclude.includes(name)) exclude = [...exclude, name]
+    writeLists(key, exclude, add)
+    setNotice({ kind: 'ok', text: t('toolRemovedFromPhase', { name, from: stageLabel(key) }) })
+  }
+
+  /** 一次「放进目标阶段」的落地：池里来的 = 加回 / 显示；别的阶段来的 = 复制
+   *  （隐藏态一起带过去，源阶段不动）；同阶段 = 什么都不做。 */
+  const dropToolInto = (key: PhaseViewKey, payload: DragPayload): void => {
+    if (payload.kind !== 'tool' || payload.from === key) return
+    if (payload.from === 'pool') { addFromPool(key, payload.name); return }
+    addToPhase(key, payload.name, payload.hidden === true)
+    setNotice({ kind: 'ok', text: t('toolCopied', { name: payload.name, to: stageLabel(key), from: stageLabel(payload.from) }) })
+  }
+
+  /** 行 / 列表上的投放：把手里的工具放进本阶段（池来的加回、别的阶段来的复制）。 */
+  const dropOnPane = (event: ReactDragEvent): void => {
+    const payload = payloadOf(event)
+    if (payload === null || payload.kind !== 'tool') return
+    event.preventDefault()
+    event.stopPropagation()
+    setDropMark(null)
+    dropToolInto(phase, payload)
+  }
+
+  /** 池上的投放：把行从本阶段拿掉。 */
+  const dropOnPool = (event: ReactDragEvent): void => {
+    const payload = payloadOf(event)
+    if (payload === null || payload.kind !== 'tool') return
+    event.preventDefault()
+    event.stopPropagation()
+    setDropMark(null)
+    if (payload.from === phase) removeFromPhase(phase, payload.name)
+  }
+
+  // 头部阶段 Tab 上的投放：复制到那个阶段（换 Tab / 换模式时旧列表卸载、新
+  // 列表注册 —— 任何时刻只有一个处理者）。
+  useEffect(() => {
+    setPhaseDropHandler((key, payload) => dropToolInto(key, payload))
+    return () => setPhaseDropHandler(null)
+  })
+
   const stageLabel = (key: PhaseViewKey): string =>
     key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
 
@@ -164,9 +218,32 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     if (!rowVisible(row)) return null
     return h('div', {
       key: row.name,
-      style: { ...s.row, ...(row.hidden ? s.rowBlocked : {}) },
+      style: {
+        ...s.row,
+        ...(row.hidden ? s.rowBlocked : {}),
+        ...(dropMark === row.name ? s.dropZoneActive : {}),
+        ...(dragName === row.name ? s.dragging : {}),
+      },
       title: row.description.slice(0, 120),
+      onDragOver: (event: ReactDragEvent) => {
+        if (!acceptsDrop(event, 'tool')) return
+        event.preventDefault()
+        event.stopPropagation()
+        setDropMark(row.name)
+      },
+      onDrop: dropOnPane,
     }, [
+      // 拖拽抓手：整行 draggable 会把勾选框的手势一起吃掉。
+      h('span', {
+        draggable: true,
+        title: t('drag'),
+        style: s.dragHandle,
+        onDragStart: (event: ReactDragEvent) => {
+          setDragName(row.name)
+          beginDrag(event, { kind: 'tool', name: row.name, from: phase, hidden: row.hidden })
+        },
+        onDragEnd: () => { setDragName(null); setDropMark(null); finishDrag() },
+      }, '⠿'),
       h('input', {
         type: 'checkbox',
         checked: !row.hidden,
@@ -191,27 +268,49 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   }))
 
   return h('div', { style: s.colLeft }, [
-    h('div', { style: s.colScroll }, [
+    h('div', {
+      style: { ...s.colScroll, ...(dropMark === 'list' ? s.dropZone : {}) },
+      // 列表空白处投放：池里 / 别的阶段拖来的工具放进本阶段。
+      onDragOver: (event: ReactDragEvent) => {
+        const payload = payloadOf(event)
+        if (payload === null || payload.kind !== 'tool' || payload.from === phase) return
+        event.preventDefault()
+        setDropMark('list')
+      },
+      onDrop: dropOnPane,
+    }, [
       h('div', { style: s.muted }, t('toolsFourHint')),
       notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
       rows.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,
-      // 本系统全部工具：注册表的完整目录，只读池（每行可加入三个阶段）。
-      h('details', { style: s.injectBox }, [
+      // 本系统全部工具：注册表的完整目录，只读池。加入某个阶段靠拖拽：把行拖进
+      // 上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段（行上不再
+      // 放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
+      h('details', {
+        style: { ...s.injectBox, ...(dropMark === 'pool' ? s.dropZoneActive : {}) },
+        onDragOver: (event: ReactDragEvent) => {
+          if (!acceptsDrop(event, 'tool')) return
+          event.preventDefault()
+          event.stopPropagation()
+          setDropMark('pool')
+        },
+        onDrop: dropOnPool,
+      }, [
         h('summary', { style: { ...s.muted, cursor: 'pointer' } },
           `${t('allToolsTitle')} (${allTools.length})`),
         allTools.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,
-        allTools.map((tool) => h('div', { key: tool.name, style: { ...s.row, opacity: 0.92 } }, [
+        allTools.map((tool) => h('div', {
+          key: tool.name,
+          style: { ...s.row, opacity: 0.92 },
+          draggable: true,
+          title: t('dragHint'),
+          onDragStart: (event: ReactDragEvent) => beginDrag(event, { kind: 'tool', name: tool.name, from: 'pool' }),
+          onDragEnd: finishDrag,
+        }, [
           h('div', { style: s.rowBody }, [
             h('div', { style: s.rowTitle }, h('span', { style: s.code }, tool.name)),
             h('div', { style: s.preview }, tool.description.slice(0, 120)),
           ]),
-          ...PART_ORDER.map((key) => h('button', {
-            key,
-            style: s.arrow,
-            title: t('poolAddTitle', { phase: stageLabel(key) }),
-            onClick: () => addFromPool(key, tool.name),
-          }, t(key === 'bootstrap' ? 'phaseShortGuide' : key === 'active' ? 'phaseShortResident' : 'phaseShortControlled'))),
         ])),
       ]),
     ]),

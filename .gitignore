@@ -9,7 +9,7 @@ node_modules/
 # bundle means source installs work in one shot (a missing bundle silently keeps
 # the browser half out of the host boot graph). Rebuild (`npm run build`) before
 # committing any client-source change.
-client/client.js.map
+*.js.map
 
 # Copied client bundle inside lib (build artifact, not source)
 lib/client.js

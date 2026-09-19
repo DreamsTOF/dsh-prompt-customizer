@@ -1,10 +1,22 @@
 {
   "name": "dsh-prompt-customizer",
-  "description": "System-prompt & tool customizer for DeepSeek Harness with a standalone sidebar panel: block / replace / inject prompt sections by name, and hide tools from the model catalog. Config lives in the plugin's own ~/.dsh/prompt-customizer/config.yaml (auto-migrated once from the legacy settings.yaml section).",
-  "version": "0.5.1",
+  "version": "0.6.0",
+  "description": "DeepSeek Harness 的三合一能力台：提示词定制（按名称屏蔽 / 替换 / 注入 / 排序，按会话阶段与 agent 预设分层）+ 技能集合管理（导入 / 分组 / 开关）+ MCP Server 接入（分层遮蔽与工具级启停）。纯插件注入，不动官方源码。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "system-prompt",
+    "prompt-engineering",
+    "skills",
+    "mcp",
+    "tool-filter",
+    "cordis",
+    "plugin",
+    "agent"
+  ],
   "type": "module",
-  "private": false,
-  "main": "lib/index.js",
+  "main": "./lib/index.js",
   "author": "DreamsTOF",
   "license": "MIT",
   "homepage": "https://github.com/DreamsTOF/dsh-prompt-customizer#readme",
@@ -15,40 +27,48 @@
   "bugs": {
     "url": "https://github.com/DreamsTOF/dsh-prompt-customizer/issues"
   },
-  "keywords": [
-    "deepseek",
-    "harness",
-    "dsh",
-    "system-prompt",
-    "prompt-engineering",
-    "tool-filter",
-    "cordis",
-    "plugin",
-    "agent"
-  ],
-  "scripts": {
-    "typecheck": "tsc -p tsconfig.client.json --noEmit",
-    "build": "tsdown",
-    "test": "node --test",
-    "check": "npm run typecheck && npm run build && npm run test",
-    "prepack": "npm run build"
-  },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./client/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
+  "comment:files": "只发运行时需要的部分：lib / client 是构建产物（vendor 的叶子模块与依赖在构建时已内联），scripts 供已安装位置自检；src / vendor / test 只用于重新构建与开发。",
+  "files": [
+    "lib",
+    "client",
+    "scripts",
+    "build.mjs",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
+      "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-locale"
-      ],
-      "platform": "web"
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-tool"
+      ]
     }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test",
+    "smoke": "node scripts/smoke-host.mjs && node scripts/smoke-client.mjs",
+    "check": "npm run build && npm test && npm run smoke",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
@@ -58,25 +78,17 @@
     "react-dom": "^18.2.0"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.0",
-    "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "js-yaml": "^4.1.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
+    "esbuild": "^0.25.12",
     "react": "^18.3.1",
     "react-dom": "~18.3.1",
-    "tsdown": "^0.22.14",
     "typescript": "^5.6.0"
   },
-  "files": [
-    "lib",
-    "client",
-    "src",
-    "cordis.patch.yml"
-  ],
   "publishConfig": {
     "access": "public"
   }

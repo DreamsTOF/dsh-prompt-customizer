@@ -25,11 +25,13 @@ test('client bundle registers through __ModuleLoader__ and exports apply', () =>
       load: (entry) => { registrations.push(entry) },
     },
   }
-  // bundle 的 require 只允许应答宿主模块表里的四个外部依赖；其余一律视为
-  // 误打包（应内联的依赖不会出现在 require 里）。
+  // bundle 的 require 只允许应答宿主模块表里的外部依赖：react 四件套 +
+  // `@deepseek-ai/*` 客户端包（宿主 shell 自己加载过，模块表里一定有）。
+  // 其余一律视为误打包（应内联的依赖不会出现在 require 里）。
   const allowed = new Set(['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'])
+  const platform = (name) => allowed.has(name) || name.startsWith('@deepseek-ai/')
   const require = (name) => {
-    assert.ok(allowed.has(name), `bundle require 了模块表之外的名字: ${name}`)
+    assert.ok(platform(name), `bundle require 了模块表之外的名字: ${name}`)
     // 最小 react 形状：ErrorBoundary extends Component 在模块顶层执行，
     // stub 必须给出可继承的类；其余导出用万能函数占位。
     return new Proxy({}, {
@@ -44,7 +46,7 @@ test('client bundle registers through __ModuleLoader__ and exports apply', () =>
   assert.equal(registrations.length, 1, '必须且只能注册一个 __ModuleLoader__ 入口')
   assert.equal(registrations[0].id, 'dsh-prompt-customizer')
   const mod = registrations[0].factory(require)
-  assert.equal(mod.name, 'prompt-customizer')
-  assert.deepEqual(mod.inject, ['locale'])
+  // 三合一入口：技能面板 + slash 技能源 + 提示词 tab，共用的客户端服务。
+  assert.deepEqual(mod.inject, ['slots', 'locale', 'inputTriggers', 'sessions'])
   assert.equal(typeof mod.apply, 'function')
 })

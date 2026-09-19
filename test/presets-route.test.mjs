@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
-import { apply } from '../lib/index.js'
+import { apply } from '../vendor/prompt-customizer/index.js'
 
 // 宿主 authoring API 的错误类型（按 constructor.name 判定状态码，这里同构复刻）。
 class PresetExistsError extends Error {}

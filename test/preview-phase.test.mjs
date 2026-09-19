@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createPhaseProjection, presetOfSession, statusOf, PHASE_PROJECTION_KEY } from '../lib/promotion.js'
+import { createPhaseProjection, presetOfSession, statusOf, PHASE_PROJECTION_KEY } from '../vendor/prompt-customizer/promotion.js'
 
 // ── 阶段投影：会话阶段（bootstrap / active）的折叠语义与读取回落 ──────────────
 //

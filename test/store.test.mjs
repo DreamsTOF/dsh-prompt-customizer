@@ -4,9 +4,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse, stringify as yamlStringify } from 'yaml'
-import { createConfigStore, readLegacySection } from '../lib/store.js'
-import { Config } from '../lib/schema.js'
-import { apply } from '../lib/index.js'
+import { createConfigStore, readLegacySection } from '../vendor/prompt-customizer/store.js'
+import { Config } from '../vendor/prompt-customizer/schema.js'
+import { apply } from '../vendor/prompt-customizer/index.js'
 
 function tmpdir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))

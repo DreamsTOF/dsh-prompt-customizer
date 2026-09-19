@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Config } from '../lib/schema.js'
+import { Config } from '../vendor/prompt-customizer/schema.js'
 
 test('accepts a valid config and preserves known fields', () => {
   const value = Config({

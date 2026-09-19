@@ -9,9 +9,9 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addImportedPresets, applyPresetData, buildPresetData, mergeSections } from '../src/client/presets.ts'
-import { decodePresetExport, encodePresetExport } from '../src/client/preset-io.ts'
-import type { Config, Inventory } from '../src/client/types.ts'
+import { addImportedPresets, applyPresetData, buildPresetData, mergeSections } from '../src/client/prompt/presets.ts'
+import { decodePresetExport, encodePresetExport } from '../src/client/prompt/preset-io.ts'
+import type { Config, Inventory } from '../src/client/prompt/types.ts'
 
 const invOf = (names: string[]): Inventory => ({
   sections: names.map((name, i) => ({ name, order: i, text: `T:${name}`, active: true, replaced: false })),

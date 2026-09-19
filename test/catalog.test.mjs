@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
-import { createCatalog, mergeSighting } from '../lib/catalog.js'
+import { createCatalog, mergeSighting } from '../vendor/prompt-customizer/catalog.js'
 
 function tmpdir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))

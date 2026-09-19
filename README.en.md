@@ -95,6 +95,16 @@ Two things that bite:
 - **`always` injections are present in all three phases**, and each phase has its own ordering space — which is why this plugin emits phase entries _after_ the `always` group: the assembly applies inject records in array order and the last write wins, so the phase order is what survives.
 - **A phase view is "what this state resolves to", not "what the session has been".** Native preset phase rules (zero-tool bootstrap, warmup, …) are in play at the same moment and may still change the result after other plugins — see [Known limitations](#known-limitations).
 
+## What's in the box
+
+One sidebar entry — **capability panel** — with three top-level tabs:
+
+- **SKILL** — skill bundles (grouping, categories, import from ZIP/folder, rename/delete), per-skill and per-bundle toggles on a global layer plus a per-agent-preset layer, skill-root health, and a `/` slash source that feeds skills into a session.
+- **MCP** — paste-to-add MCP servers (JSON / native `mcpServers` YAML / `mcp-client` line), per-preset server rows, layered masking (global row + per-preset own/inherit ledgers, with a global veto), per-server and per-tool enable/disable, and a recommended-server catalog.
+- **Prompt** — everything documented below.
+
+> The Chinese README is the primary one and covers the SKILL / MCP tabs in more detail（见「功能特性 → 技能集合管理 / MCP Server 接入」）。
+
 ## UI
 
 ![Prompt tab: four tabs, edit-target selector, section rows](docs/images/prompt-sections.png)
@@ -114,7 +124,7 @@ Two things that bite:
 - **Block** — remove a section by name. A blocked row does not disappear: it stays draggable and editable and can be restored at any time. Blocking only means "not injected into the model".
 - **Replace** — edit a section's text; the editor is pre-filled with the text currently in effect (dynamically generated sections are resolved first so you see real content).
 - **Inject** — every phase part has its own name + text box to add a brand-new section, badged `manual` and deletable.
-- **Reorder** — drag a whole row (an insert line appears above/below the target row) or use ↑/↓. Order is stored as a contiguous 0-based virtual index, so there are never duplicate or fractional orders and no number to type by hand.
+- **Reorder** — drag the handle at the row's left edge (an insert line shows where it will land) or use ↑/↓. Order is stored as a contiguous 0-based virtual index, so there are never duplicate or fractional orders and no number to type by hand. Dragging a row out onto _All system sections_ removes it from the current phase (an injected section is un-injected, a native one becomes blocked); dropping it on a phase button in the header copies it into that phase.
 - **Independent per phase** — bootstrap blocks go to `sectionsBootstrap`, compaction blocks to `sectionsCompaction`, resident blocks to `sections`; each phase has its own ordering space, so "5 sections during bootstrap, everything when resident" is expressible.
 
 ### Tool catalog
@@ -151,7 +161,15 @@ The cost of strict rendering: referencing an unregistered name (such as a key th
 
 ### Cross-preset registry pool
 
-_All system sections_ / _All system tools_ do not follow the edit target: they are a **union across presets that only ever grows** (same name — last seen wins; new name — appended), filled in as you browse presets and stored in the derived cache `catalog.yaml`, which rebuilds itself if deleted.
+_All system sections_ / _All system tools_ do not follow the edit target: they are a **union across presets that only ever grows** (same name — last seen wins; new name — appended), stored in the derived cache `catalog.yaml`, which rebuilds itself if deleted.
+
+The pool is filled from three sources, and **the first two hold the moment the panel opens**:
+
+- **the current scope's registry** (the preset you are editing);
+- **sections registered in the agent scope**: several plugins register their section per agent (`tool:subagent`, `context:file-reference`, …). Those live in neither the global layer nor any preset scope — they only exist in a real session assembly. They hold for *every* agent and belong to no particular mode, so the inventory merges the live agents' scopes on request: they are listed as soon as you open the panel, with no session round needed;
+- **presets you have browsed**: sections and tools registered only inside one preset (`tools:ptc-only`, `raw-html-v2:vcp`, …) join as you switch edit targets. That part grows on demand — mounting every preset tree eagerly takes tens of seconds each, which is not worth doing on every panel open.
+
+A real session assembly also feeds the registry, as the fallback for when no agent is alive.
 
 ## How it works
 

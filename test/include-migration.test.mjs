@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse, stringify } from 'yaml'
-import { apply } from '../lib/index.js'
+import { apply } from '../vendor/prompt-customizer/index.js'
 
 /** 起一次插件。第二参传 { dir } 时复用已有目录且不重写文件（幂等测试要用）。 */
 function boot(config, { dir } = {}) {

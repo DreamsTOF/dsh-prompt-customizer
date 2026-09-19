@@ -1,9 +1,14 @@
 /**
  * error-boundary — 把「面板渲染崩溃」关进笼子。
  *
- * 侧边栏入口是 createRoot 挂出来的独立 React 根，React 18 对渲染期异常的
- * 默认处理是卸载整个根——面板里一个组件抛错，导航行按钮会跟着一起消失。
- * 因此面板单独包一层：崩了只收起面板，导航按钮照常留着，真实错误打到控制台。
+ * 为什么必须要有：侧边栏入口是 `createRoot` 挂出来的独立 React 根，React 18
+ * 对渲染期异常的默认处理是**卸载整个根**——面板里一个组件抛错，导航行按钮
+ * 会跟着一起消失，而且不留痕迹（宿主 DOM 还在、只是空了，看起来就像「槽位
+ * 没了」）。`ctx.effect` 外的 `safe()` 只能包住同步的 apply()，拦不到渲染期
+ * 异常。
+ *
+ * 因此每个弹层面板都要单独包一层：崩了只收起那一个面板，导航按钮照常留着，
+ * 同时把真实错误和组件栈打到控制台，便于定位。
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'
@@ -12,7 +17,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 export interface ErrorBoundaryProps {
   /** 出错时打在日志里的名字。 */
   label: string
-  /** 崩溃后的替代内容（面板场景传 null，只收面板）。 */
+  /** 崩溃后的替代内容（导航行场景传 null，只收面板）。 */
   fallback?: ReactNode
   /** 捕获到错误时的回调（用于顺手把面板关掉）。 */
   onError?: (error: Error) => void

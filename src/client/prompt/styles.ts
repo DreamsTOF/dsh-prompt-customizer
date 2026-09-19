@@ -9,13 +9,14 @@ export const s = (() => {
     seg: { ...flex, gap: 2, padding: 2, border: '1px solid rgba(128,128,128,.28)', borderRadius: 8 },
     segBtn: { padding: '3px 12px', border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'inherit', opacity: 0.72, fontSize: 13, whiteSpace: 'nowrap' },
     segBtnActive: { padding: '3px 12px', border: 'none', borderRadius: 6, background: 'rgba(88,166,255,.22)', cursor: 'pointer', color: 'inherit', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' },
+    // 拖拽悬停在阶段按钮上（松手 = 复制到该阶段）。
+    segBtnDrop: { padding: '3px 12px', border: 'none', borderRadius: 6, background: 'rgba(88,166,255,.16)', outline: '2px dashed rgba(88,166,255,.85)', outlineOffset: 1, cursor: 'pointer', color: 'inherit', fontSize: 13, whiteSpace: 'nowrap' },
+    segBtnDropActive: { padding: '3px 12px', border: 'none', borderRadius: 6, background: 'rgba(88,166,255,.3)', outline: '2px dashed rgba(88,166,255,.9)', outlineOffset: 1, cursor: 'pointer', color: 'inherit', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' },
     grow: { flex: 1, minWidth: 0 },
     headActions: { ...flex, gap: 6, marginLeft: 'auto' },
     iconBtn: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: 'none', borderRadius: 8, background: 'transparent', cursor: 'pointer', color: 'inherit', opacity: 0.75 },
-    subhead: { ...flex, gap: 8, padding: '8px 14px', flexWrap: 'wrap', borderBottom: '1px solid rgba(128,128,128,.14)' },
-    targetRow: { ...flex, gap: 4, overflowX: 'auto', maxWidth: '100%', scrollbarWidth: 'thin' },
-    targetTab: { ...flex, gap: 6, padding: '4px 12px', border: '1px solid rgba(128,128,128,.28)', borderRadius: 999, background: 'transparent', cursor: 'pointer', color: 'inherit', opacity: 0.78, fontSize: 12, whiteSpace: 'nowrap' },
-    targetTabActive: { ...flex, gap: 6, padding: '4px 12px', border: '1px solid rgba(88,166,255,.65)', borderRadius: 999, background: 'rgba(88,166,255,.18)', cursor: 'pointer', color: 'inherit', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' },
+    // 预设（编辑目标）行改用能力面板顶栏的 chips 类名（见 Panel.tsx 的 css.topbar / css.catItem），
+    // 这里不再保留自绘的 subhead / targetRow / targetTab 样式。
     body: { flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch' },
     colLeft: { width: 420, flex: 'none', display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid rgba(128,128,128,.18)', boxSizing: 'border-box' },
     colScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 12px' },
@@ -44,6 +45,13 @@ export const s = (() => {
     arrowCol: { display: 'flex', flexDirection: 'column', gap: 2 },
     arrow: { padding: '0 6px', border: '1px solid rgba(128,128,128,.3)', borderRadius: 4, background: 'transparent', cursor: 'pointer', color: 'inherit', fontSize: 11, lineHeight: 1.4, opacity: 0.8 },
     rowBlocked: { opacity: 0.55 },
+    // ── 拖拽（见 dnd.ts）：抓手 / 拖动中的行 / 行上的插入位置 / 整块投放区 ──
+    dragHandle: { flex: 'none', cursor: 'grab', color: 'rgba(128,128,128,.85)', fontSize: 13, lineHeight: 1, userSelect: 'none', padding: '0 2px' },
+    dragging: { opacity: 0.5 },
+    dropAbove: { boxShadow: 'inset 0 2px 0 0 #58a6ff' },
+    dropBelow: { boxShadow: 'inset 0 -2px 0 0 #58a6ff' },
+    dropZone: { outline: '2px dashed rgba(88,166,255,.55)', outlineOffset: -3, borderRadius: 8 },
+    dropZoneActive: { outline: '2px dashed rgba(88,166,255,.9)', outlineOffset: -3, borderRadius: 8, background: 'rgba(88,166,255,.06)' },
     injectBox: { marginTop: 10, padding: '8px', border: '1px dashed rgba(128,128,128,.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 },
     injectRow: { ...flex, gap: 6 },
     editBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },

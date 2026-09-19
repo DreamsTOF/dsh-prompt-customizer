@@ -28,14 +28,14 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Config as HostSchema } from '../lib/schema.js'
+import { Config as HostSchema } from '../vendor/prompt-customizer/schema.js'
 import {
   DEFAULT_ENV_BLOCKLIST,
   envVarName,
   isBlockedEnvKey,
   listVariableNames,
   registerVariables,
-} from '../lib/vars.js'
+} from '../vendor/prompt-customizer/vars.js'
 import {
   addImportedPresets,
   applyPresetData,
@@ -47,7 +47,7 @@ import {
   removeSection,
   toggleTool,
   type Section,
-} from '../src/client/presets.ts'
+} from '../src/client/prompt/presets.ts'
 import {
   decodePresetExport,
   encodePresetExport,
@@ -63,8 +63,8 @@ import {
   type FileReaderLike,
   type PresetIoEnv,
   type TauriInvoke,
-} from '../src/client/preset-io.ts'
-import type { Config, Inventory, Preset } from '../src/client/types.ts'
+} from '../src/client/prompt/preset-io.ts'
+import type { Config, Inventory, Preset } from '../src/client/prompt/types.ts'
 
 // ── 可复现伪随机 ─────────────────────────────────────────────────────────────
 function mulberry32(seed: number): () => number {

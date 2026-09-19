@@ -1,9 +1,12 @@
 # dsh-prompt-customizer bundle patch: inserts the dual-face plugin row into
 # the web profile roster. Applied as a profile bundle layer (the
 # `dsh.bundle.patch` manifest field). The node half (exports ".") runs in the
-# host process (settings namespace, prompt/tool filtering, inventory route);
-# the `dsh.client` declaration in package.json loads the browser half
-# (exports "./client", served at /plugins/prompt-customizer/client.js).
+# host process: prompt filtering (block / replace / inject / ordering, inventory
+# & preview routes), skill bundle management + toggles + health, and MCP status /
+# presets / masking / tool-level enable-disable. The `dsh.client` declaration in
+# package.json loads the browser half (exports "./client", served at
+# /plugins/prompt-customizer/client.js): the capability panel (SKILL / MCP /
+# 提示词 tabs) plus the `/` skill source.
 - insert:
     - id: prompt-customizer
       name: 'dsh-prompt-customizer'

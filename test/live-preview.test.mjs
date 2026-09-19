@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { apply } from '../lib/index.js'
+import { apply } from '../vendor/prompt-customizer/index.js'
 
 /** 注册表里的两段原始段（forceSections 包装从这份重建 sections）。 */
 const REGISTRY = [

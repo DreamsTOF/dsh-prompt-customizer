@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applySectionPolicy, pickSectionsForStatus } from '../lib/effective.js'
+import { applySectionPolicy, pickSectionsForStatus } from '../vendor/prompt-customizer/effective.js'
 
 /** 注册表风格输入：{ name, text, order }，顺序已按 order 排好。 */
 function rawSections(entries) {

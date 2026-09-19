@@ -15,7 +15,24 @@
  * 时，读取端回落到「已晋级」——与清单读取的静态视图一致，绝不阻断装配。
  */
 
-import { z } from 'zod'
+// HACK: 上游用 zod 声明 stateSchema；宿主（session-projection/src/index.ts）
+// 只调 `stateSchema.parse(value)`，而 zod 会把 540KB 全量内联进宿主产物。
+// 天花板：非标准 schema 对象，只实现 parse。升级路径：DSH 若改用
+// schemastery 专用接口（`schema(source)` 可调用形态 / 属性访问），
+// 此处需换成 vendored schemastery 或恢复 zod 依赖。
+/** 阶段投影 state 的校验：纯 JSON `{ boundary: int, promoted: bool }`。 */
+const phaseStateSchema = {
+  parse(value) {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new TypeError('prompt-customizer/phase state 必须是对象')
+    }
+    const { boundary, promoted } = value
+    if (!Number.isInteger(boundary) || typeof promoted !== 'boolean') {
+      throw new TypeError('prompt-customizer/phase state 必须是 { boundary: int, promoted: bool }')
+    }
+    return { boundary, promoted }
+  },
+}
 
 /** 默认的晋级信号事件。 */
 const DEFAULT_PROMOTE_EVENTS = ['tool/call', 'assistant/message']
@@ -38,7 +55,7 @@ export function createPhaseProjection(promoteEvents = DEFAULT_PROMOTE_EVENTS) {
   const promote = new Set(promoteEvents)
   return {
     key: PHASE_PROJECTION_KEY,
-    stateSchema: z.object({ boundary: z.number().int(), promoted: z.boolean() }),
+    stateSchema: phaseStateSchema,
     init: () => ({ boundary: -1, promoted: false }),
     apply: (state, event) => {
       const seq = event.seq ?? 0 // 没有 seq 的事件视为边界之后
