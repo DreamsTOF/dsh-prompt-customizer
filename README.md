@@ -255,13 +255,15 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 
 ### 版本要求
 
-当前版本对齐 **DSH 0.1.7-rc.1**（`peerDependencies` 为 `^0.1.7-rc.1`）：0.1.7 把
-ui-primitives 的图标导出从 `IconXxxOutline16/14/20` 改名为
-`IconXxxOutlineRegular/Medium`（尺寸改由 `size` 属性给），同一份客户端 bundle
-无法同时适配两代宿主，因此本版本不再支持 0.1.7 之前的主机（旧宿主会按 DSH 的
-插件兼容性策略拒绝加载，而不是半静默地坏掉）。需要旧版的请用 0.6.x。
+当前版本（0.8.0）对齐 **DSH 0.2.0-rc.2**（`peerDependencies` 为 `^0.2.0-rc.2`）。
+0.1.7 起的图标代际（`IconXxxOutlineRegular/Medium`，尺寸由 `size` 属性给）在
+0.2.0 沿用，本插件的宿主接触面（`system-prompt` 装配 waterfall、`agentPresets`、
+`configEditor`、`tools.restrict/schemas`、`webServer.register`、客户端模块加载缝）
+在 0.1.7-rc.1 → 0.2.0-rc.2 走廊内均无破坏性变更，故客户端 bundle 与 0.7.x 同代。
+不支持 0.1.7 之前的主机（旧宿主会按 DSH 的插件兼容性策略拒绝加载，而不是半静默
+地坏掉）。需要旧版的请用 0.6.x。
 
-预设专属 MCP Server 的存储位置在 0.1.7 也随之改变：预设不再是磁盘上的组合
+预设专属 MCP Server 的存储位置自 0.1.7 起：预设不再是磁盘上的组合
 文件，而是声明式插件行（`name: '@deepseek-ai/dsh-agent-preset'`），专属 Server
 写在它的 `config.plugins` 里；本插件经 DSH 的 `configEditor` 把改动写回 profile
 的 `cordis.patch.yml`（首次改动会整份覆盖该预设行的 plugins，此后该预设不再跟随
