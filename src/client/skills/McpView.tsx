@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import {
-  IconAgentPresetOutline16, IconArchiveOutline20, IconChevronDownOutline14, IconTrashOutline16, Modal, Tooltip,
+  IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ConfirmDialog } from '../confirm-dialog'
 import { LockGlyph } from './icons.js'
@@ -297,10 +297,10 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                 aria-expanded={globalOpen}
                 onClick={() => { setGlobalOpen((value) => !value) }}
               >
-                <span className={css.bundleIcon} aria-hidden="true"><IconArchiveOutline20 size={16} /></span>
+                <span className={css.bundleIcon} aria-hidden="true"><IconArchiveOutlineRegular size={16} /></span>
                 <span className={css.bundleName}>{scope === '' ? t('mcpListTitle') : t('mcpPresetGlobalSection')}</span>
                 <span className={css.bundleCount}>{shownGlobals.length}</span>
-                <IconChevronDownOutline14 className={css.chevron} size={13} aria-hidden="true" />
+                <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
               </button>
             </header>
             {globalOpen && (<>
@@ -409,7 +409,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                             disabled={busy !== null}
                             onClick={() => { setRemoveReq(server.serverName) }}
                           >
-                            <IconTrashOutline16 size={13} aria-hidden="true" />{t('mcpRemove')}
+                            <IconTrashOutlineRegular size={13} aria-hidden="true" />{t('mcpRemove')}
                           </button>
                         ) : null}
                       </div>
@@ -431,10 +431,10 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                   aria-expanded={ownOpen}
                   onClick={() => { setOwnOpen((value) => !value) }}
                 >
-                  <span className={css.bundleIcon} aria-hidden="true"><IconAgentPresetOutline16 size={16} /></span>
+                  <span className={css.bundleIcon} aria-hidden="true"><IconAgentPresetOutlineRegular size={16} /></span>
                   <span className={css.bundleName}>{t('mcpPresetOwnSection')}</span>
                   <span className={css.bundleCount}>{shownOwn.length}</span>
-                  <IconChevronDownOutline14 className={css.chevron} size={13} aria-hidden="true" />
+                  <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
                 </button>
               </header>
               {ownOpen && (<>
@@ -519,7 +519,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                           disabled={busy !== null}
                           onClick={() => { setRemoveOwnReq(row.serverName) }}
                         >
-                          <IconTrashOutline16 size={13} aria-hidden="true" />{t('mcpRemove')}
+                          <IconTrashOutlineRegular size={13} aria-hidden="true" />{t('mcpRemove')}
                         </button>
                       </div>
                     </section>

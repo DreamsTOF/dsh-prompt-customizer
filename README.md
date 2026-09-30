@@ -137,7 +137,7 @@
 ### MCP Server 接入（MCP tab）
 
 - **一键接入**：粘贴 JSON / DSH 原生 YAML（`mcpServers` 形态）/ `mcp-client` 行片段，面板先给待写入预览，再写进预设组合或 profile patch —— **写前备份**，重名 server 跳过，非法 serverName / 非布尔 `enabled` 直接拒绝。
-- **预设专属 Server 行**：直接在面板里新增 / 删除某个 agent 预设自带的 Server 行（写进该预设的组合文件，既有注释与行保留）。
+- **预设专属 Server 行**：直接在面板里新增 / 删除某个 agent 预设自带的 Server 行（写进该预设声明行的 `config.plugins`，经 DSH 的 `configEditor` 落盘 profile patch）。
 - **分层遮蔽**：全局行 + 预设层两本账（预设层分「继承全局」与「自带」两侧，各记各的账）；预设自带的同名 Server 优先于继承条目；全局关闭 = 一票否决，预设层不能反开（返回 409 并给出说明）。
 - **工具级启停**：按最长匹配把工具归到所属 Server（`my` 与 `my_server` 各自成组），可整台 Server 关掉，也可只关其中几个工具；装配过滤、状态路由、原生目录三处同源。
 - **推荐清单**：`/api/mcp-recommended` 给出常见 MCP Server 的配置模板，照抄即可接入。
@@ -253,6 +253,20 @@ dsh plugin --profile web add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
+### 版本要求
+
+当前版本对齐 **DSH 0.1.7-rc.1**（`peerDependencies` 为 `^0.1.7-rc.1`）：0.1.7 把
+ui-primitives 的图标导出从 `IconXxxOutline16/14/20` 改名为
+`IconXxxOutlineRegular/Medium`（尺寸改由 `size` 属性给），同一份客户端 bundle
+无法同时适配两代宿主，因此本版本不再支持 0.1.7 之前的主机（旧宿主会按 DSH 的
+插件兼容性策略拒绝加载，而不是半静默地坏掉）。需要旧版的请用 0.6.x。
+
+预设专属 MCP Server 的存储位置在 0.1.7 也随之改变：预设不再是磁盘上的组合
+文件，而是声明式插件行（`name: '@deepseek-ai/dsh-agent-preset'`），专属 Server
+写在它的 `config.plugins` 里；本插件经 DSH 的 `configEditor` 把改动写回 profile
+的 `cordis.patch.yml`（首次改动会整份覆盖该预设行的 plugins，此后该预设不再跟随
+DSH 升级更新 —— 与 DSH 自带编辑器同一语义，面板上有提示）。
+
 安装后打开 dsh Web UI，侧边栏浏览区上方就是 **提示词** 入口（点击打开覆盖主区的「提示词管理」面板）。
 
 ## 使用说明
@@ -291,7 +305,7 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 - `~/.dsh/prompt-customizer/config.yaml` —— 唯一权威配置。首次启动时若该文件不存在而旧版 `settings.yaml` 里有对应段落，会自动迁移一次（主文档原样保留，可回滚）。手工编辑即时生效，无需重启。
 - `~/.dsh/prompt-customizer/catalog.yaml` —— 跨预设的段 / 工具累积登记表，纯派生缓存，删掉会随浏览重建。
 - 技能侧：技能根目录下的 `.bundles.json`（技能包账本，记规范名与目录名两套写法）与技能开关账本（全局层 + 各预设层）。
-- MCP 侧：`$DSH_HOME` 下本插件目录里的 `preset-masks.json`（分层遮蔽账本）与 `tool-disable.json`（工具级启停账本）；预设自带 Server 行直接写在该 agent 预设的组合文件里（写前备份）。
+- MCP 侧：`$DSH_HOME` 下本插件目录里的 `preset-masks.json`（分层遮蔽账本）与 `tool-disable.json`（工具级启停账本）；预设自带 Server 行写在该 agent 预设声明行的 `config.plugins` 里，由 DSH 的 `configEditor` 原子写回 profile 的 `cordis.patch.yml`（全局 Server 仍由本插件直接编辑该 patch，写前备份）。
 
 ## 已知限制
 

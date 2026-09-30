@@ -6,8 +6,10 @@
  *   - 预设遮蔽账本（preset-masks.json）写入与镜像；
  *   - agent 作用域三层补丁（tools.restrict / 同名空 section / 资源 stub）；
  *   - deny 计算排除「预设自带 serverName」（自带覆盖优先于遮蔽）；
- *   - 预设专属 mcp-client 行的插入/删除（文本级，保留注释）；
- *   - 官方预设（无用户文件）写入拒绝（409）。
+ *   - 预设专属 mcp-client 行：从预设声明行的 config.plugins 读取、经
+ *     configEditor.edit 写回（0.1.7 声明式预设模型）；
+ *   - 行不可寻址（id 不唯一）时拒绝写入（409）；
+ *   - 前缀匹配的全局 profile patch 路径（`- insert:` 块）不变。
  *
  * Usage: node scripts/test-mcp-layering.mjs
  */
@@ -22,37 +24,14 @@ const sandbox = mkdtempSync(join(tmpdir(), "dsh-prompt-customizer-mcp-"))
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents")
 process.env.DSH_HOME = join(sandbox, "dsh")
 
-const presetRoot = join(process.env.DSH_HOME, ".agent-presets")
-const codePresetDir = join(presetRoot, "code")
-mkdirSync(codePresetDir, { recursive: true })
-const codeComposition = join(codePresetDir, "agent.cordis.yml")
-writeFileSync(codeComposition, [
-  "# 我的 code 预设",
-  "- id: persona",
-  "  name: '@deepseek-ai/dsh-persona'",
-  "  config:",
-  "    prefix: code agent",
-  "",
-].join("\n"))
-
-const maskFile = join(process.env.DSH_HOME, "mcp", "dsh-prompt-customizer", "preset-masks.json")
-
-/* 随 DSH 安装的"默认预设"：与用户预设同等可读写（path 来自 agentPresets.list()）。 */
-const minimalComposition = join(sandbox, "install-presets", "minimal", "agent.cordis.yml")
-mkdirSync(join(sandbox, "install-presets", "minimal"), { recursive: true })
-writeFileSync(minimalComposition, [
-  "# shipped minimal preset",
-  "- id: tool-fs",
-  "  name: '@deepseek-ai/dsh-tool-fs'",
-  "",
-].join("\n"))
-
-/* 全局 profile patch（全局添加 MCP 的写入目标）。 */
+/* 全局 profile patch（全局 MCP 的写入目标）。 */
 const patchFile = join(process.env.DSH_HOME, "profiles", "web", "cordis.patch.yml")
 mkdirSync(join(process.env.DSH_HOME, "profiles", "web"), { recursive: true })
 writeFileSync(patchFile, ["# my patch layer", "- id: some-plugin", "  disabled: true", ""].join("\n"))
 
-/* ── 断言小工具 ─────────────────────────────────────────────────────── */
+const maskFile = join(process.env.DSH_HOME, "mcp", "dsh-prompt-customizer", "preset-masks.json")
+
+/* ── 断言小工具 ──────────────────────────────────────────────────────── */
 let failed = 0
 function check(label, condition) {
   if (condition) {
@@ -63,10 +42,10 @@ function check(label, condition) {
   }
 }
 
-/** 安装器是异步的（预设组合读取）：等一轮微任务 + 定时器再断言。 */
+/** 安装器是异步的（预设声明读取）：等一轮微任务 + 定时器再断言。 */
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
 
-/* ── 假的宿主面 ─────────────────────────────────────────────────────── */
+/* ── 假的宿主面 ──────────────────────────────────────────────────────── */
 const routes = new Map()
 const restrictCalls = []
 const sections = []
@@ -109,6 +88,67 @@ const agent = {
   },
 }
 
+/**
+ * 预设声明行（0.1.7 模型）：行的 options.config 就是该预设的声明，plugins 里
+ * 放子行。写入直接改这份数据 —— 与 configEditor.edit() 给的 current 同源。
+ */
+const presetRows = new Map()
+presetRows.set("code", {
+  options: {
+    id: "preset-code",
+    name: "@deepseek-ai/dsh-agent-preset",
+    config: {
+      id: "code",
+      order: 2,
+      plugins: [
+        { id: "persona", name: "@deepseek-ai/dsh-persona", config: { prefix: "code agent" } },
+      ],
+    },
+  },
+})
+presetRows.set("minimal", {
+  options: {
+    id: "preset-minimal",
+    name: "@deepseek-ai/dsh-agent-preset",
+    config: {
+      id: "minimal",
+      order: 1,
+      plugins: [
+        { id: "tool-fs", name: "@deepseek-ai/dsh-tool-fs" },
+        { id: "dup", name: "@deepseek-ai/dsh-tool-fs" },
+      ],
+    },
+  },
+})
+/* 行 id 不唯一 → configEditor 不把它列进可寻址行（只读）。 */
+presetRows.set("ambiguous", {
+  options: {
+    id: "preset-ambiguous",
+    name: "@deepseek-ai/dsh-agent-preset",
+    config: { id: "ambiguous", plugins: [] },
+  },
+})
+
+/** 已写入 profile patch 的预设覆盖（presetId → config）。 */
+const overrides = new Map()
+let editCalls = 0
+
+const configEditor = {
+  entries: () => [...presetRows.values()].filter((entry) => entry.options.id !== "preset-ambiguous"),
+  configuration: () => [...presetRows.values()].map((entry) => ({
+    entry,
+    inherited: {},
+    override: overrides.get(entry.options.config.id) ?? {},
+  })),
+  edit: async (entry, change) => {
+    editCalls += 1
+    const current = structuredClone(entry.options.config)
+    const next = change(current, {})
+    entry.options.config = next
+    overrides.set(next.id, next)
+  },
+}
+
 const ctx = {
   logger: { info: () => {}, warn: () => {}, debug: () => {} },
   webServer: { register: (route) => { routes.set(route.path, route.handler); return () => {} } },
@@ -117,17 +157,28 @@ const ctx = {
   effect: (fn) => { fn?.(); return () => {} },
   settings: { get: () => ({ providers: {} }), register: () => () => {} },
   credentials: {}, sessions: {}, sessionPersistence: {}, llm: {},
+  // loader 视图含全部行（含 configEditor 不列出的不可寻址行）—— 与真实组合一致：
+  // 这种行读得到、写不了，路由据此回 409 而不是 404。
+  loader: { entries: () => [...presetRows.values()] },
   get: (name) => {
     if (name === "agentPresets") {
       return {
         list: async () => [
-          { id: "code", trust: "user", path: codeComposition },
-          { id: "minimal", trust: "system", path: minimalComposition },
+          { id: "code", name: "Code" },
+          { id: "minimal", name: "Minimal" },
+          { id: "ambiguous" },
         ],
         composedPreset: (agentCtx) => agentCtx?.presetId,
+        readDocument: async (presetId) => {
+          if (presetId === "ghost") throw new Error(`Unknown agent preset: ${presetId}`)
+          const plugins = presetRows.get(presetId)?.options.config.plugins ?? []
+          const content = plugins.map((row) => `- id: ${row.id}\n  name: ${row.name}\n`).join("")
+          return { agentPreset: presetId, content }
+        },
       }
     }
     if (name === "agents") return { list: () => [agent] }
+    if (name === "configEditor") return configEditor
     return undefined
   },
 }
@@ -136,7 +187,7 @@ const mod = await import(pathToFileURL(join(process.cwd(), "lib/index.js")).href
 await mod.apply(ctx, {})
 await settle()
 
-/* ── HTTP 小工具 ────────────────────────────────────────────────────── */
+/* ── HTTP 小工具 ─────────────────────────────────────────────────────── */
 function fakeReq(method, url, body) {
   const req = new EventEmitter()
   req.method = method
@@ -181,8 +232,10 @@ async function callOn(routePath, method, url, body) {
 }
 const callMask = (method, url, body) => callOn("/api/triad/mcp-masks", method, url, body)
 const callPreset = (method, url, body) => callOn("/api/triad/mcp-presets", method, url, body)
+const callStatus = (method, url) => callOn("/api/triad/mcp-status", method, url)
+const pluginsOf = presetId => presetRows.get(presetId).options.config.plugins
 
-/* ── 1. 遮蔽：账本写入 + 三层补丁 ───────────────────────────────────── */
+/* ── 1. 遮蔽：账本写入 + 三层补丁 ────────────────────────────────────── */
 await callMask("PUT", "/api/triad/mcp-masks/code/github", { enabled: false })
 await settle()
 const ledger = JSON.parse(readFileSync(maskFile, "utf8"))
@@ -200,18 +253,17 @@ let stubError = ""
 try { await resourceStubs[0].provider.request() } catch (error) { stubError = String(error?.message ?? error) }
 check("资源 stub 读取报「已对本预设禁用」", stubError.includes("disabled for agent preset"))
 
-/* ── 2. 自带 serverName 覆盖优先于遮蔽 ─────────────────────────────── */
-writeFileSync(codeComposition, [
-  "- id: persona",
-  "  name: '@deepseek-ai/dsh-persona'",
-  "- id: mcp-neo",
-  "  name: '@deepseek-ai/dsh-mcp-client'",
-  "  config:",
-  "    serverName: neo",
-  "    transport: streamable-http",
-  "    url: \"http://127.0.0.1:9/mcp\"",
-  "",
-].join("\n"))
+/* ── 2. 自带 serverName 覆盖优先于遮蔽 ──────────────────────────────── */
+pluginsOf("code").push({
+  id: "mcp-neo",
+  name: "@deepseek-ai/dsh-mcp-client",
+  config: { serverName: "neo", transport: "streamable-http", url: "http://127.0.0.1:9/mcp" },
+})
+const statusBefore = await callStatus("GET", "/api/triad/mcp-status")
+check("状态路由从声明行读到预设自带 server",
+  (statusBefore.json?.presetServers?.code ?? []).some(row => row.serverName === "neo"))
+check("未定制过的预设标记为随安装（system）",
+  statusBefore.json?.presets?.find(row => row.id === "minimal")?.trust === "system")
 restrictCalls.length = 0
 sections.length = 0
 resourceStubs.length = 0
@@ -223,17 +275,21 @@ check("自带 serverName 不进入 deny（自带覆盖优先于遮蔽）",
 check("全局视图无该 server 工具时不注册遮蔽补丁（deny 空 → 三处皆无）",
   restrictCalls.length === 0 && sections.length === 0 && resourceStubs.length === 0)
 
-/* ── 3. 预设专属行：插入 / 删除 / 官方预设只读 ─────────────────────── */
+/* ── 3. 预设专属行：读取 / 插入 / 删除 ──────────────────────────────── */
 const added = await callPreset("POST", "/api/triad/mcp-presets/code/servers", {
   serverName: "docs", transport: "stdio", command: "npx", args: ["-y", "@scope/mcp-docs"],
 })
 check("新增预设专属行返回 200", added.status === 200 && added.json?.ok === true)
-const afterInsert = readFileSync(codeComposition, "utf8")
-check("行已写入预设组合（id / name / transport）", afterInsert.includes("- id: mcp-docs")
-  && afterInsert.includes("'@deepseek-ai/dsh-mcp-client'")
-  && afterInsert.includes("transport: stdio"))
-check("既有注释与行保留", afterInsert.includes("- id: mcp-neo") && afterInsert.includes("- id: persona"))
-check("写前备份存在", readFileSync(`${codeComposition}.bak-last-mcp`, "utf8").includes("- id: mcp-neo"))
+const inserted = pluginsOf("code").find(row => row.name === "@deepseek-ai/dsh-mcp-client" && row.config.serverName === "docs")
+check("行已写进声明行 config.plugins（id / name / transport）", inserted !== undefined
+  && inserted.id === "mcp-docs" && inserted.config.transport === "stdio"
+  && inserted.config.serverName === "docs")
+check("写入走 configEditor.edit", editCalls === 1)
+check("既有声明行保留（persona / mcp-neo）",
+  pluginsOf("code").some(row => row.id === "persona") && pluginsOf("code").some(row => row.id === "mcp-neo"))
+const statusAfter = await callStatus("GET", "/api/triad/mcp-status")
+check("写过的预设标记为用户定制（user）",
+  statusAfter.json?.presets?.find(row => row.id === "code")?.trust === "user")
 
 const dup = await callPreset("POST", "/api/triad/mcp-presets/code/servers", {
   serverName: "docs", transport: "stdio", command: "npx",
@@ -242,18 +298,26 @@ check("重复 serverName 被拒", dup.status === 400 && String(dup.json?.error).
 
 const removed = await callPreset("DELETE", "/api/triad/mcp-presets/code/servers/docs")
 check("删除预设专属行返回 200", removed.status === 200 && removed.json?.ok === true)
-check("行已从组合移除", !readFileSync(codeComposition, "utf8").includes("mcp-docs"))
+check("行已从声明行移除", !pluginsOf("code").some(row => row.config?.serverName === "docs"))
+check("删除保留其它行", pluginsOf("code").length === 2)
 
 const shipped = await callPreset("POST", "/api/triad/mcp-presets/minimal/servers", {
   serverName: "x", transport: "stdio", command: "npx",
 })
-check("随安装的默认预设（path 来自 list）同样可写", shipped.status === 200 && shipped.json?.ok === true)
-check("写入落在安装目录的预设文件里", readFileSync(minimalComposition, "utf8").includes("serverName: x"))
+check("随安装的默认预设同样可写", shipped.status === 200 && shipped.json?.ok === true)
+check("写入落在该预设声明行的 plugins",
+  pluginsOf("minimal").some(row => row.config?.serverName === "x"))
+
+const locked = await callPreset("POST", "/api/triad/mcp-presets/ambiguous/servers", {
+  serverName: "z", transport: "stdio", command: "npx",
+})
+check("行 id 不唯一（不可寻址）时拒绝写入 409",
+  locked.status === 409 && locked.json?.error === "preset-not-editable")
 
 const missing = await callPreset("POST", "/api/triad/mcp-presets/nope/servers", { serverName: "y", transport: "stdio", command: "npx" })
-check("名单外的预设返回 404", missing.status === 404 && missing.json?.error === 'preset-not-found')
+check("名单外的预设返回 404", missing.status === 404 && missing.json?.error === "preset-not-found")
 
-/* ── 3b. 粘贴添加：JSON / YAML 校验与写入 ──────────────────────────── */
+/* ── 3b. 粘贴添加：JSON / YAML 校验与写入 ───────────────────────────── */
 const previewRoute = "/api/triad/mcp-preview"
 const preview = (body) => callOn(previewRoute, "POST", previewRoute, body)
 
@@ -309,6 +373,11 @@ check("粘贴写入预设：多 server 一次写入", pasted.status === 200 && (
 const pastedAgain = await callPreset("POST", "/api/triad/mcp-presets/code/servers", { format: "json", text: jsonPaste })
 check("重复粘贴：已存在的 serverName 跳过", pastedAgain.status === 200
   && (pastedAgain.json?.added ?? []).length === 0 && (pastedAgain.json?.skipped ?? []).length === 2)
+const presetEnv = await callPreset("POST", "/api/triad/mcp-presets/code/servers", { format: "yaml", text: yamlPaste })
+check("预设粘贴：${VAR} 占位在行数据里是 !!js 包装", presetEnv.status === 200
+  && pluginsOf("code").some(row => row.config?.serverName === "gamma"
+    && typeof row.config?.env?.TOKEN?.__jsExpr === "string"
+    && row.config.env.TOKEN.__jsExpr.includes("process.env.MY_TOKEN")))
 
 const globalAdd = await callOn("/api/triad/mcp-config", "POST", "/api/triad/mcp-config", { action: "add", format: "yaml", text: yamlPaste })
 check("全局粘贴写入 profile patch", globalAdd.status === 200 && (globalAdd.json?.added ?? []).includes("gamma"))

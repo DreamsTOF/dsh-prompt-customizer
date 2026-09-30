@@ -45,6 +45,7 @@ import { join } from 'node:path'
 import { URL } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
+import { presetTrustOf } from './mcp-presets.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -511,7 +512,12 @@ function installMask(ctx: PluginContext, agent: any): any {
   })
 }
 
-/** 当前 preset 名单(设置页据此列圆球;服务缺失时返回空数组)。 */
+/** 当前 preset 名单(设置页据此列圆球;服务缺失时返回空数组)。
+ *
+ * `trust` 不再是 0.1.7 之前 list() 给的字段（那时它是随安装/用户根的标记），
+ * 改为按 profile patch 是否已覆盖该预设行推导：已覆盖（本地定制过）= user，
+ * 仍由随安装的 bundle 声明 = system。
+ */
 export async function readPresetRoster(ctx: PluginContext): Promise<Array<Record<string, unknown>>> {
   const presets = ctx.get?.('agentPresets')
   if (presets?.list === undefined) return []
@@ -521,7 +527,7 @@ export async function readPresetRoster(ctx: PluginContext): Promise<Array<Record
     return (Array.isArray(rows) ? rows : [])
       .map((row: any) => ({
         id: String(row?.id ?? ''),
-        trust: row?.trust === 'system' ? 'system' : 'user',
+        trust: presetTrustOf(ctx, String(row?.id ?? '')),
         isDefault: row?.id === defaultId,
         ...typeof row?.name === 'string' ? { name: row.name } : {},
         ...typeof row?.description === 'string' ? { description: row.description } : {},

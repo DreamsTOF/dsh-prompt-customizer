@@ -3661,7 +3661,7 @@ function Panel({ t, onClose }) {
     (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
       (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
         targetChip(void 0, t("targetAllTab"), (0, import_react9.createElement)(CatAllIcon, { size: 16 })),
-        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutline16, { size: 15 }), p.broken))
+        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
       ])
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
@@ -4324,12 +4324,12 @@ function GuidePanel({ t, onClose, left, top, height }) {
           /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guidePanelHead, children: [
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guidePanelLogo, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GuideArtIconSmall, {}) }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guidePanelTitle, children: t("guidePanelTitle") }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: css.guidePanelClose, "aria-label": t("guideClose"), onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconCloseOutline16, { size: 14, "aria-hidden": "true" }) })
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: css.guidePanelClose, "aria-label": t("guideClose"), onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconCloseOutlineRegular, { size: 14, "aria-hidden": "true" }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guidePanelBody, children: [
             /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: css.guideSec, children: [
               /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideSecHead, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideSecIcon, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconSkillOutline16, { size: 14, "aria-hidden": "true" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideSecIcon, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconSkillOutlineRegular, { size: 14, "aria-hidden": "true" }) }),
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideSecTitle, children: t("guideWhat") })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: css.guideWhatDesc, children: t("guideWhatDesc") }),
@@ -4343,7 +4343,7 @@ function GuidePanel({ t, onClose, left, top, height }) {
               /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideStepBody, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: css.guideStepTitleRow, children: [
                   /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: css.guideStepTitle, children: title }),
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconChevronRightOutline14, { className: css.guideStepArrow, size: 12, "aria-hidden": "true" })
+                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives2.IconChevronRightOutlineRegular, { className: css.guideStepArrow, size: 12, "aria-hidden": "true" })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: css.guideStepDesc, children: desc })
               ] })
@@ -4646,20 +4646,20 @@ var SKILL_ZH = {
   mcpPresetMaskState: "\u7EE7\u627F\u5168\u5C40\uFF08\u672A\u906E\u853D\uFF09",
   mcpPresetMaskHint: "\u5173\u6389\u5F00\u5173 = \u5BF9\u8BE5\u9884\u8BBE\u906E\u853D\uFF1A\u5DE5\u5177\u3001\u670D\u52A1\u5668\u6307\u4EE4\u4E0E\u8D44\u6E90\u8BFB\u53D6\u90FD\u9690\u85CF\uFF1B\u5168\u5C40\u8FDE\u63A5\u4FDD\u7559\uFF08\u8981\u300C\u4E0D\u8FDE\u63A5\u300D\u8BF7\u6539\u7528\u300C\u4E13\u5C5E Server\u300D\uFF09\u3002",
   mcpPresetCovered: "\u5DF2\u88AB\u672C\u9884\u8BBE\u540C\u540D Server \u8986\u76D6",
-  mcpPresetOwnHint: "\u4E13\u5C5E Server \u5199\u8FDB\u8BE5\u9884\u8BBE\u7684\u7EC4\u5408\u6587\u4EF6\uFF1A\u72EC\u7ACB\u8FDE\u63A5\uFF0C\u4EC5\u8BE5\u9884\u8BBE\u4E0E\u5176\u5B50\u4EE3\u7406\u53EF\u89C1\u3002",
+  mcpPresetOwnHint: "\u4E13\u5C5E Server \u5199\u8FDB\u8BE5\u9884\u8BBE\u58F0\u660E\u884C\u7684 plugins\uFF1A\u72EC\u7ACB\u8FDE\u63A5\uFF0C\u4EC5\u8BE5\u9884\u8BBE\u4E0E\u5176\u5B50\u4EE3\u7406\u53EF\u89C1\u3002",
   mcpAddServerGlobal: "\u6DFB\u52A0 MCP Server\uFF08\u5168\u5C40\uFF09",
   mcpAddGlobalHint: "\u5168\u5C40 Server \u5BF9\u6240\u6709\u9884\u8BBE\u751F\u6548\uFF1B\u53EA\u60F3\u7ED9\u5F53\u524D\u9884\u8BBE\u7528\uFF0C\u8BF7\u70B9\u5DE6\u4FA7\u7684\u300C\u6DFB\u52A0\u4E13\u5C5E Server\u300D\u3002",
   mcpOwnRemoveConfirmTitle: "\u79FB\u9664\u8BE5\u9884\u8BBE\u4E13\u5C5E Server\uFF1F",
-  mcpOwnRemoveConfirmMsg: "\u5C06\u4ECE\u300C{name}\u300D\u7684\u7EC4\u5408\u6587\u4EF6\u91CC\u5220\u6389\u8FD9\u4E00\u884C mcp-client \u6761\u76EE\uFF08\u6539\u524D\u81EA\u52A8\u5907\u4EFD\uFF09\uFF0C\u5BF9\u8BE5\u9884\u8BBE\u7684\u65B0\u4F1A\u8BDD\u751F\u6548\uFF1B\u5168\u5C40\u7684\u540C\u540D Server \u4E0D\u53D7\u5F71\u54CD\u3002",
+  mcpOwnRemoveConfirmMsg: "\u5C06\u4ECE\u300C{name}\u300D\u7684\u58F0\u660E\u884C\u91CC\u5220\u6389\u8FD9\u4E00\u6761 mcp-client \u6761\u76EE\uFF08\u7531 DSH \u539F\u5B50\u5199\u56DE profile \u914D\u7F6E\uFF09\uFF0C\u5BF9\u8BE5\u9884\u8BBE\u7684\u65B0\u4F1A\u8BDD\u751F\u6548\uFF1B\u5168\u5C40\u7684\u540C\u540D Server \u4E0D\u53D7\u5F71\u54CD\u3002",
   // 同名覆盖：预设自带同名 Server 时的遮蔽开关与提示
   mcpPresetCoveredSwitchHint: "\u906E\u853D\u5168\u5C40\u8FD9\u4E00\u6761\u3002\u8BE5\u9884\u8BBE\u81EA\u5E26\u540C\u540D Server\uFF0C\u5DE5\u5177\u4ECD\u7531\u5B83\u63D0\u4F9B \u2014\u2014 \u8981\u4E00\u8D77\u5173\u6389\u8BF7\u79FB\u9664\u4E0B\u65B9\u300C\u8BE5\u9884\u8BBE\u4E13\u5C5E Server\u300D\u3002",
   mcpPresetCoveredMasked: "\u5DF2\u906E\u853D\u5168\u5C40\u8FD9\u4E00\u6761 \xB7 \u5DE5\u5177\u4ECD\u7531\u8BE5\u9884\u8BBE\u540C\u540D Server \u63D0\u4F9B",
   mcpPresetShadowGlobalTag: "\u540C\u540D\u5168\u5C40",
   mcpPresetShadowGlobalTip: "\u5168\u5C40\u4E5F\u6709\u4E00\u53F0\u540C\u540D Server\u3002\u672C\u9884\u8BBE\u7528\u81EA\u5E26\u7684\u8FD9\u53F0\uFF0C\u4E24\u8FB9\u7684\u5DE5\u5177\u5F00\u5173\u5404\u8BB0\u5404\u7684\u8D26\uFF08\u4E92\u4E0D\u5F71\u54CD\uFF09\u3002",
   mcpPresetOwnEmpty: "\u8BE5\u9884\u8BBE\u8FD8\u6CA1\u6709\u4E13\u5C5E Server",
-  mcpPresetStorageHint: "\u8BE5\u9884\u8BBE\u968F DSH \u5B89\u88C5\u76EE\u5F55\u5B58\u653E\uFF1A\u4E00\u6837\u53EF\u8BFB\u5199\uFF1B\u5347\u7EA7 DSH \u53EF\u80FD\u8986\u76D6\u5B83\u3002",
+  mcpPresetStorageHint: "\u8BE5\u9884\u8BBE\u7531\u968F\u5B89\u88C5\u7684 bundle \u58F0\u660E\uFF1A\u5199\u5165\u4F1A\u5728 profile \u5C42\u6574\u4EFD\u8986\u76D6\u5B83\u7684 plugins\uFF0C\u6B64\u540E\u8BE5\u9884\u8BBE\u4E0D\u518D\u8DDF\u968F DSH \u5347\u7EA7\u53D8\u5316\u3002",
   mcpPresetAddOwn: "\u6DFB\u52A0\u4E13\u5C5E Server",
-  mcpPresetNewSession: "\u9884\u8BBE\u6587\u4EF6\u6539\u52A8\u5BF9\u65B0\u4F1A\u8BDD\u751F\u6548",
+  mcpPresetNewSession: "\u9884\u8BBE\u6539\u52A8\uFF08\u70ED\u91CD\u8F7D\uFF09\u5BF9\u65B0\u4F1A\u8BDD\u751F\u6548",
   mcpPresetFailed: "\u64CD\u4F5C\u5931\u8D25\uFF1A{message}",
   // MCP 页（与技能页同构）：统计卡 / 提示行 / 工具条
   mcpStatManaged: "\u7BA1\u7406\u7684 Server",
@@ -5293,10 +5293,10 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               setGlobalOpen((value) => !value);
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconArchiveOutline20, { size: 16 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconArchiveOutlineRegular, { size: 16 }) }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: scope === "" ? t("mcpListTitle") : t("mcpPresetGlobalSection") }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownGlobals.length }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
             ]
           }
         ) }),
@@ -5385,7 +5385,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       setRemoveReq(server.serverName);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutlineRegular, { size: 13, "aria-hidden": "true" }),
                       t("mcpRemove")
                     ]
                   }
@@ -5406,10 +5406,10 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               setOwnOpen((value) => !value);
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconAgentPresetOutline16, { size: 16 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconAgentPresetOutlineRegular, { size: 16 }) }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: t("mcpPresetOwnSection") }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownOwn.length }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
             ]
           }
         ) }),
@@ -5486,7 +5486,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       setRemoveOwnReq(row.serverName);
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutline16, { size: 13, "aria-hidden": "true" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconTrashOutlineRegular, { size: 13, "aria-hidden": "true" }),
                       t("mcpRemove")
                     ]
                   }
@@ -5595,7 +5595,7 @@ function CategoryEditor({ value, onChange, label }) {
           onClick: () => {
             onChange(value.filter((item) => item !== name));
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutline16, { size: 11, "aria-hidden": "true" })
+          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutlineRegular, { size: 11, "aria-hidden": "true" })
         }
       )
     ] }, name)) }),
@@ -5757,7 +5757,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onRemove?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconCloseOutlineRegular, { size: 14, "aria-hidden": "true" })
               }
             ) }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("assignToBundle"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
@@ -5769,7 +5769,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onAssign?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconPlusOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconPlusOutlineRegular, { size: 14, "aria-hidden": "true" })
               }
             ) }),
             /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("deleteSkillBtn"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
@@ -5782,7 +5782,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 onClick: () => {
                   onDelete?.(skill);
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconTrashOutline16, { size: 14, "aria-hidden": "true" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconTrashOutlineRegular, { size: 14, "aria-hidden": "true" })
               }
             ) })
           ] })
@@ -6071,7 +6071,7 @@ function SkillsView({
       state.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.failure, children: [
         /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { role: "alert", children: t("error") }),
         /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_dsh_client_ui_primitives8.Button, { variant: "outline", onClick: refresh, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconRefreshOutline14, {}),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconRefreshOutlineRegular, { size: 14 }),
           " ",
           t("retry")
         ] })
@@ -6124,7 +6124,7 @@ function SkillsView({
                           },
                           cat
                         )) }),
-                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
                       ]
                     }
                   ),
@@ -6162,12 +6162,12 @@ function SkillsView({
                       },
                       portal: true,
                       items: [
-                        { id: "enable", label: t("enableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCheckOutline16, { size: 14 }) },
-                        { id: "disable", label: t("disableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCloseOutline16, { size: 14 }) },
+                        { id: "enable", label: t("enableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCheckOutlineRegular, { size: 14 }) },
+                        { id: "disable", label: t("disableBundle"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconCloseOutlineRegular, { size: 14 }) },
                         { type: "separator", id: "gap" },
-                        { id: "rename", label: t("rename"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEditOutline16, { size: 14 }) },
+                        { id: "rename", label: t("rename"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEditOutlineRegular, { size: 14 }) },
                         { id: "cat", label: t("bundleCatEdit"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(TagIcon, {}) },
-                        { id: "delete", label: t("delete"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconTrashOutline16, { size: 14 }), danger: true }
+                        { id: "delete", label: t("delete"), icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconTrashOutlineRegular, { size: 14 }), danger: true }
                       ],
                       anchor: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                         "button",
@@ -6181,7 +6181,7 @@ function SkillsView({
                             event.stopPropagation();
                             setOpenMenu(openMenu === `bundle:${bundle.id}` ? null : `bundle:${bundle.id}`);
                           },
-                          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEllipsisOutline16, { size: 15, "aria-hidden": "true" })
+                          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconEllipsisOutlineRegular, { size: 15, "aria-hidden": "true" })
                         }
                       )
                     }
@@ -6267,10 +6267,10 @@ function SkillsView({
                     setLooseExpanded((value) => !value);
                   },
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconArchiveOutline20, { size: 16 }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconArchiveOutlineRegular, { size: 16 }) }),
                     /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleName, children: t("looseTitle") }),
                     /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleCount, children: t("skillsCount", { n: visibleLooseAll.length }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutline14, { className: css.chevron, size: 13, "aria-hidden": "true" })
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_dsh_client_ui_primitives8.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
                   ]
                 }
               )
@@ -6410,7 +6410,7 @@ function SkillTopBar({
                   setActivePreset(preset.id);
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catIcon, "data-active": activePreset === preset.id || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutline16, { size: 15 }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catIcon, "data-active": activePreset === preset.id || void 0, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutlineRegular, { size: 15 }) }),
                   /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.catLabel, children: preset.name ?? preset.id }),
                   /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "span",
@@ -6498,7 +6498,7 @@ function SkillTopBar({
                 children: [
                   t("sortLabel"),
                   /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SortDirIcon, { dir: sortAsc ? "asc" : "desc", size: 12 }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutline14, { size: 11, "aria-hidden": "true" })
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutlineRegular, { size: 11, "aria-hidden": "true" })
                 ]
               }
             ),
@@ -6579,7 +6579,7 @@ function SkillTopBar({
               style: { height: 34, alignSelf: "center" },
               onClick: onRefresh,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconRefreshOutline14, { size: 14, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconRefreshOutlineRegular, { size: 14, "aria-hidden": "true" }),
                 t("refresh")
               ]
             }
@@ -6593,7 +6593,7 @@ function SkillTopBar({
               "aria-expanded": newBundleOpen || void 0,
               onClick: onNewBundle,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutlineRegular, { size: 14, "aria-hidden": "true" }),
                 t("newBundle")
               ]
             }
@@ -6662,7 +6662,7 @@ function McpTopBar({
       label: preset.name ?? preset.id,
       count: visibleCount(preset.id),
       overrides: maskedOf(preset.id).size,
-      icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutline16, { size: 15 })
+      icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutlineRegular, { size: 15 })
     }))
   ];
   const conn = live.state === "ready" ? { tone: "ok", label: t("mcpConnOk"), title: t("mcpConnTip", { n: globals.length }) } : live.state === "loading" ? { tone: "pending", label: t("statChecking"), title: "" } : { tone: "warn", label: t("mcpConnDown"), title: t("mcpLiveUnavailable") };
@@ -6753,7 +6753,7 @@ function McpTopBar({
           style: { width: "auto", marginTop: 0, height: 34, fontSize: 12 },
           onClick: onAddOwn,
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 14, "aria-hidden": "true" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutlineRegular, { size: 14, "aria-hidden": "true" }),
             t("mcpPresetAddOwn")
           ]
         }
@@ -6768,7 +6768,7 @@ function McpTopBar({
           title: scope === "" ? void 0 : t("mcpAddGlobalHint"),
           onClick: onAddCustom,
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutline16, { size: 15, "aria-hidden": "true" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconPlusOutlineRegular, { size: 15, "aria-hidden": "true" }),
             scope === "" ? t("mcpAddServer") : t("mcpAddServerGlobal")
           ]
         }
@@ -7822,12 +7822,12 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   void doAssign(assignTarget, bundle.id);
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconFolderOpenOutline16, { size: 16 }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconFolderOpenOutlineRegular, { size: 16 }) }),
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: css.assignCardBody, children: [
                     /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardName, children: bundle.name }),
                     /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignCardDesc, children: t("skillsCount", { n: bundle.skillCount }) })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignGo, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconChevronDownOutline14, { size: 14 }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.assignGo, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.IconChevronDownOutlineRegular, { size: 14 }) })
                 ]
               }
             ) }, bundle.id)) })

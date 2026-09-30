@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
-  IconCloseOutline16, IconPlusOutline16, IconTrashOutline16, Tooltip,
+  IconCloseOutlineRegular, IconPlusOutlineRegular, IconTrashOutlineRegular, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CheckIcon, CopyIcon } from './icons.js'
 import { skillT } from './locales.js'
@@ -49,7 +49,7 @@ export function CategoryEditor({ value, onChange, label }: {
                 aria-label={skillT('bundleCatRemove', { name })}
                 onClick={() => { onChange(value.filter((item) => item !== name)) }}
               >
-                <IconCloseOutline16 size={11} aria-hidden="true" />
+                <IconCloseOutlineRegular size={11} aria-hidden="true" />
               </button>
             </li>
           ))}
@@ -206,14 +206,14 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
             <Tooltip label={skillT('removeSkill')} side="bottom" delayMs={500}>
               <button type="button" className={css.skillFootIcon} aria-label={skillT('removeSkill')}
                 title={skillT('removeSkill')} onClick={() => { onRemove?.(skill) }}>
-                <IconCloseOutline16 size={14} aria-hidden="true" />
+                <IconCloseOutlineRegular size={14} aria-hidden="true" />
               </button>
             </Tooltip>
           ) : (
             <Tooltip label={skillT('assignToBundle')} side="bottom" delayMs={500}>
               <button type="button" className={css.skillFootIcon} aria-label={skillT('assignToBundle')}
                 title={skillT('assignToBundle')} onClick={() => { onAssign?.(skill) }}>
-                <IconPlusOutline16 size={14} aria-hidden="true" />
+                <IconPlusOutlineRegular size={14} aria-hidden="true" />
               </button>
             </Tooltip>
           )}
@@ -221,7 +221,7 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
             <button type="button" className={`${css.skillFootIcon} ${css.skillFootIconDanger}`}
               aria-label={skillT('deleteSkillBtn')} title={skillT('deleteSkillBtn')}
               onClick={() => { onDelete?.(skill) }}>
-              <IconTrashOutline16 size={14} aria-hidden="true" />
+              <IconTrashOutlineRegular size={14} aria-hidden="true" />
             </button>
           </Tooltip>
         </div>

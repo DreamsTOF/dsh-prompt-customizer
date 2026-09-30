@@ -1,15 +1,15 @@
 /**
- * dsh-prompt-customizer — MCP 单工具级启停回归测试（两层账本 + 按「行」记账）。
+ * dsh-prompt-customizer — MCP 工具级禁用（全局层 / 预设层 / 自带行分账）回归测试。
  *
  * 直接跑构建产物 lib/index.js：DSH_HOME / DSH_AGENTS_HOME 指到临时目录，
- * 不碰用户真实账本与预设。覆盖：
- *   - 账本三层条目（全局行 / 预设层 inherit / 预设层 own）的写入、清除与响应字段；
- *   - 同名彻底独立：全局行、预设自带行各记一份账，谁也不牵连谁；
- *   - 生效口径「由哪条行提供工具，就只应用那条行的条目」（自带覆盖全局）；
- *   - 装配过滤按 agent 预设生效；restrict deny 排除预设自带（scope-local）名字；
- *   - 名单缓存 known：没有活动 agent 时也能列出/整台开关预设自带的工具；
- *   - serverName 最长匹配（`my` / `my_server`）；脏账本归一化与 v2 升级；
- *   - 同名覆盖时遮蔽开关（mask）仍可用。
+ * 不碰用户真实预设、技能与账本。0.1.7 起预设是声明式插件行（config.plugins），
+ * 因此「自带行」直接写在假预设行的 plugins 里；写路径经假 configEditor.edit()
+ * 回写同一份数据。覆盖：
+ *   - 脏账本（v2）归一化与 own + inherit 两侧升级；
+ *   - serverName 最长匹配、装配过滤（system-prompt/assemble waterfall）；
+ *   - agent 作用域 deny：全局行 ∪ 本预设 inherit，排除预设自带（作用域内名字）；
+ *   - 同名彻底独立：自带行存在时全局层/ inherit 条目的分账语义；
+ *   - 名单缓存（无活动 agent 时仍能列全并整台开关）。
  *
  * Usage: node scripts/test-mcp-tool-disable.mjs
  */
@@ -24,25 +24,19 @@ const sandbox = mkdtempSync(join(tmpdir(), "dsh-prompt-customizer-tool-"))
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents")
 process.env.DSH_HOME = join(sandbox, "dsh")
 
-/* 用户预设 code：自带两台 MCP —— web（与全局同名）与 ownonly（全局没有）。 */
-const presetDir = join(process.env.DSH_HOME, ".agent-presets", "code")
-mkdirSync(presetDir, { recursive: true })
-writeFileSync(join(presetDir, "agent.cordis.yml"), [
-  "# 我的 code 预设",
-  "- id: mcp-web",
-  "  name: '@deepseek-ai/dsh-mcp-client'",
-  "  config:",
-  "    serverName: web",
-  "    transport: stdio",
-  "    command: npx",
-  "- id: mcp-ownonly",
-  "  name: '@deepseek-ai/dsh-mcp-client'",
-  "  config:",
-  "    serverName: ownonly",
-  "    transport: stdio",
-  "    command: npx",
-  "",
-].join("\n"))
+/**
+ * 预设声明行：code 自带两台 MCP —— web（与全局同名）与 ownonly（全局没有）。
+ * 行的 options.config.plugins 就是该预设的子行清单。
+ */
+const presetRows = new Map()
+const presetRow = (id, order, plugins) => ({
+  options: { id: `preset-${id}`, name: "@deepseek-ai/dsh-agent-preset", config: { id, order, plugins } },
+})
+presetRows.set("code", presetRow("code", 2, [
+  { id: "mcp-web", name: "@deepseek-ai/dsh-mcp-client", config: { serverName: "web", transport: "stdio", command: "npx" } },
+  { id: "mcp-ownonly", name: "@deepseek-ai/dsh-mcp-client", config: { serverName: "ownonly", transport: "stdio", command: "npx" } },
+]))
+presetRows.set("minimal", presetRow("minimal", 1, []))
 
 /* 脏账本（v2 形状）：全局层 github、预设层 code/my_server（v2 数组 → 应升级成
  * own + inherit 两侧）；其余名字非法，该被丢弃。 */
@@ -99,6 +93,9 @@ const agentServices = {
 const codeAgent = { id: "agent-1", presetId: "code", ctx: { presetId: "code", get: (name) => agentServices[name], inject: () => () => {} } }
 let liveAgents = [codeAgent]
 
+const overrides = new Map()
+let editCalls = 0
+
 const ctx = {
   logger: { info: () => {}, warn: () => {}, debug: () => {} },
   webServer: { register: (route) => { routes.set(route.path, route.handler); return () => {} } },
@@ -114,17 +111,39 @@ const ctx = {
   effect: (fn) => { fn?.(); return () => {} },
   settings: { get: () => ({ providers: {} }), register: () => () => {} },
   credentials: {}, sessions: {}, sessionPersistence: {}, llm: {},
+  loader: { entries: () => [...presetRows.values()] },
   get: (name) => {
     if (name === "agentPresets") {
       return {
         list: async () => [
-          { id: "code", trust: "user", path: join(presetDir, "agent.cordis.yml") },
-          { id: "minimal", trust: "user", path: join(sandbox, "install-presets", "minimal", "agent.cordis.yml") },
+          { id: "code", name: "Code" },
+          { id: "minimal", name: "Minimal" },
         ],
         composedPreset: (agentCtx) => agentCtx?.presetId,
+        readDocument: async (presetId) => ({
+          agentPreset: presetId,
+          content: (presetRows.get(presetId)?.options.config.plugins ?? [])
+            .map(row => `- id: ${row.id}\n  name: ${row.name}\n`).join(""),
+        }),
       }
     }
     if (name === "agents") return { list: () => liveAgents }
+    if (name === "configEditor") {
+      return {
+        entries: () => [...presetRows.values()],
+        configuration: () => [...presetRows.values()].map(entry => ({
+          entry,
+          inherited: {},
+          override: overrides.get(entry.options.config.id) ?? {},
+        })),
+        edit: async (entry, change) => {
+          editCalls += 1
+          const next = change(structuredClone(entry.options.config), {})
+          entry.options.config = next
+          overrides.set(next.id, next)
+        },
+      }
+    }
     return undefined
   },
 }
@@ -169,6 +188,9 @@ const callStatus = () => callOn("/api/triad/mcp-status", "GET", "/api/triad/mcp-
 const readLedger = () => JSON.parse(readFileSync(ledgerFile, "utf8"))
 /** 预设层某条行的禁用名。 */
 const entryOf = (presetId, serverName, owner) => readLedger().presets?.[presetId]?.[serverName]?.[owner] ?? []
+const ownServersOf = presetId => (presetRows.get(presetId)?.options.config.plugins ?? [])
+  .filter(row => row.name === "@deepseek-ai/dsh-mcp-client")
+  .map(row => row.config.serverName)
 
 /** 跑一遍装配 waterfall（presetId 缺省 = 无预设，只应用全局行）。 */
 async function assembleTools(names, presetId) {
@@ -200,6 +222,9 @@ const upgradedEntry = upgradedNow.json?.toolDisabledByPreset?.code?.my_server
 check("v2 预设层数组升级为 own + inherit 两侧",
   Array.isArray(upgradedEntry?.own) && upgradedEntry.own.includes("mcp__my_server__deep")
   && Array.isArray(upgradedEntry?.inherit) && upgradedEntry.inherit.includes("mcp__my_server__deep"))
+check("预设自带行从声明行读到（web / ownonly）",
+  ownServersOf("code").join(",") === "web,ownonly"
+  && (upgradedNow.json?.presetServers?.code ?? []).length === 2)
 
 /* ── 2. 预设层只对所属预设生效 ─────────────────────────────────────── */
 check("v2 升级条目对 code 生效（my_server）",
@@ -300,6 +325,8 @@ const statusNoAgent = await callStatus()
 const webRow = (statusNoAgent.json?.presetServers?.code ?? []).find(row => row.serverName === "web")
 check("无活动 agent 时预设自带 Server 仍列出工具（缓存）",
   Array.isArray(webRow?.tools) && webRow.tools.some(tool => tool.name === "mcp__web__fetch"))
+check("声明行读取不依赖活动 agent（行数 = 2）",
+  (statusNoAgent.json?.presetServers?.code ?? []).length === 2)
 const wholeOff = await callTools("PUT", "/api/triad/mcp-tools/ownonly", { enabled: false, preset: "code", source: "own" })
 check("无活动 agent 时也能整台关闭（tools 省略走缓存）",
   wholeOff.status === 200 && Array.isArray(wholeOff.json?.tools) && wholeOff.json.tools.includes("mcp__ownonly__sync"))
@@ -318,8 +345,11 @@ await callOn("/api/triad/mcp-masks", "PUT", "/api/triad/mcp-masks/code/web", { e
 await callTools("PUT", "/api/triad/mcp-tools/web", { enabled: false, tools: ["mcp__web__fetch"], preset: "code", source: "inherit" })
 check("自带行在时 inherit 条目仍不生效（工具可见）",
   visible((await assembleTools(ALL, "code")).names, "mcp__web__fetch") === true)
+const editBefore = editCalls
 const delOwn = await callOn("/api/triad/mcp-presets", "DELETE", "/api/triad/mcp-presets/code/servers/web")
 check("移除预设自带行：200", delOwn.status === 200 && delOwn.json?.ok === true)
+check("移除走 configEditor.edit 且只动声明行",
+  editCalls === editBefore + 1 && ownServersOf("code").join(",") === "ownonly")
 await callStatus()
 check("撤掉自带行后 inherit 接管：工具不可见（全局行这条'不要'的账开始生效）",
   visible((await assembleTools(ALL, "code")).names, "mcp__web__fetch") === false)
@@ -350,6 +380,7 @@ const readdOwn = await callOn("/api/triad/mcp-presets", "POST", "/api/triad/mcp-
   text: JSON.stringify({ mcpServers: { web: { command: "npx", args: ["-y", "web-mcp"] } } }),
 })
 check("重新加回预设自带 web 行：200", readdOwn.status === 200 && readdOwn.json?.ok === true)
+check("加回的行落在声明行 plugins 里", ownServersOf("code").includes("web"))
 await callOn("/api/triad/mcp-masks", "PUT", "/api/triad/mcp-masks/code/web", { enabled: false })
 await settle()
 check("遮蔽被同名自带行覆盖的 server：工具仍可见（自带那台在提供）",
@@ -378,7 +409,8 @@ check("两层账本清空后无残留",
   Object.keys(emptyLedger.disabled ?? {}).length === 0
   && Object.values(emptyLedger.presets ?? {}).every(table => Object.keys(table).length === 0))
 check("清空后装配目录完整", (await assembleTools(ALL, "code")).names.length === ALL.length)
-check("名单缓存保留（下次打开面板仍能列出工具名）", (emptyLedger.known?.web ?? []).includes("mcp__web__fetch"))
+check("名单缓存保留（下次打开面板仍能列出工具名）",
+  (emptyLedger.known?.web ?? []).includes("mcp__web__fetch"))
 
 rmSync(sandbox, { recursive: true, force: true })
 if (failed > 0) {

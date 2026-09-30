@@ -6,7 +6,7 @@
  */
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from 'react'
 import {
-  IconAgentPresetOutline16, IconChevronDownOutline14, IconPlusOutline16, IconRefreshOutline14,
+  IconAgentPresetOutlineRegular, IconChevronDownOutlineRegular, IconPlusOutlineRegular, IconRefreshOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CatAllIcon, CloudUpIcon, SearchIcon, SortDirIcon } from './icons.js'
 import type { LiveMcpStatus } from './mcp-live.js'
@@ -121,7 +121,7 @@ export function SkillTopBar({
                   data-active={activePreset === preset.id || undefined}
                   onClick={() => { setActivePreset(preset.id) }}
                 >
-                  <span className={css.catIcon} data-active={activePreset === preset.id || undefined}><IconAgentPresetOutline16 size={15} /></span>
+                  <span className={css.catIcon} data-active={activePreset === preset.id || undefined}><IconAgentPresetOutlineRegular size={15} /></span>
                   <span className={css.catLabel}>{preset.name ?? preset.id}</span>
                   <span className={css.catCount} data-warn={overrideCount > 0 || undefined}
                     title={t('presetCountTip', { n: enabledCountFor(preset.id), total: totalSkills })
@@ -190,7 +190,7 @@ export function SkillTopBar({
               >
                 {t('sortLabel')}
                 <SortDirIcon dir={sortAsc ? 'asc' : 'desc'} size={12} />
-                <IconChevronDownOutline14 size={11} aria-hidden="true" />
+                <IconChevronDownOutlineRegular size={11} aria-hidden="true" />
               </button>
               {openMenu === 'sort' && (
                 <>
@@ -239,7 +239,7 @@ export function SkillTopBar({
               style={{ height: 34, alignSelf: 'center' }}
               onClick={onRefresh}
             >
-              <IconRefreshOutline14 size={14} aria-hidden="true" />
+              <IconRefreshOutlineRegular size={14} aria-hidden="true" />
               {t('refresh')}
             </button>
             <button
@@ -249,7 +249,7 @@ export function SkillTopBar({
               aria-expanded={newBundleOpen || undefined}
               onClick={onNewBundle}
             >
-              <IconPlusOutline16 size={14} aria-hidden="true" />
+              <IconPlusOutlineRegular size={14} aria-hidden="true" />
               {t('newBundle')}
             </button>
             <button
@@ -317,7 +317,7 @@ export function McpTopBar({
       label: preset.name ?? preset.id,
       count: visibleCount(preset.id),
       overrides: maskedOf(preset.id).size,
-      icon: <IconAgentPresetOutline16 size={15} />,
+      icon: <IconAgentPresetOutlineRegular size={15} />,
     })),
   ]
   /** 连接状态（替代原「连接状态」统计卡）：指示实时状态接口能否读到注册表。 */
@@ -405,7 +405,7 @@ export function McpTopBar({
             style={{ width: 'auto', marginTop: 0, height: 34, fontSize: 12 }}
             onClick={onAddOwn}
           >
-            <IconPlusOutline16 size={14} aria-hidden="true" />
+            <IconPlusOutlineRegular size={14} aria-hidden="true" />
             {t('mcpPresetAddOwn')}
           </button>
         )}
@@ -417,7 +417,7 @@ export function McpTopBar({
           title={scope === '' ? undefined : t('mcpAddGlobalHint')}
           onClick={onAddCustom}
         >
-          <IconPlusOutline16 size={15} aria-hidden="true" />
+          <IconPlusOutlineRegular size={15} aria-hidden="true" />
           {/* 预设范围下写明这一条是全局的：只想给当前预设用请走左侧的「添加专属 Server」。 */}
           {scope === '' ? t('mcpAddServer') : t('mcpAddServerGlobal')}
         </button>
@@ -454,7 +454,7 @@ export function PresetBall({ id, label, active, dot, title, onSelect }: {
       onClick={onSelect}
     >
       <span className={css.presetBall} data-dot={dot ? 'true' : undefined}>
-        {id === ALL_PRESETS ? <IconAgentPresetOutline16 size={18} aria-hidden="true" /> : ballInitial(label)}
+        {id === ALL_PRESETS ? <IconAgentPresetOutlineRegular size={18} aria-hidden="true" /> : ballInitial(label)}
       </span>
       <span className={css.presetBallLabel}>{label}</span>
     </button>

@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react'
 import {
-  Button, IconChevronDownOutline14, IconFolderOpenOutline16, Modal,
+  Button, IconChevronDownOutlineRegular, IconFolderOpenOutlineRegular, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PshBody, PopoverShell, type PopoverAnchor } from '../popover-shell'
 import { PromptView } from '../prompt/PromptView'
@@ -1122,12 +1122,12 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
                     style={{ '--skm-i': index } as CSSProperties}
                     onClick={() => { void doAssign(assignTarget, bundle.id) }}
                   >
-                    <span className={css.assignCardIcon} aria-hidden="true"><IconFolderOpenOutline16 size={16} /></span>
+                    <span className={css.assignCardIcon} aria-hidden="true"><IconFolderOpenOutlineRegular size={16} /></span>
                     <span className={css.assignCardBody}>
                       <span className={css.assignCardName}>{bundle.name}</span>
                       <span className={css.assignCardDesc}>{t('skillsCount', { n: bundle.skillCount })}</span>
                     </span>
-                    <span className={css.assignGo} aria-hidden="true"><IconChevronDownOutline14 size={14} /></span>
+                    <span className={css.assignGo} aria-hidden="true"><IconChevronDownOutlineRegular size={14} /></span>
                   </button>
                 </li>
               ))}

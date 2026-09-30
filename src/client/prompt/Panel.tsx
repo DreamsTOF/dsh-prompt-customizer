@@ -13,7 +13,7 @@
  * 写盘（写错的配置不点保存就不会进文件）。
  */
 import { createElement as h, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
-import { IconAgentPresetOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconAgentPresetOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 // 预设 chips 行直接复用能力面板（SKILL / MCP）的类名：三处「Agent 预设」几何一致。
 import { CatAllIcon } from '../skills/icons.js'
 import { css } from '../skills/styles.js'
@@ -474,7 +474,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     h('div', { key: 'targets', className: css.topbar }, [
       h('div', { className: css.chipRow, role: 'group', 'aria-label': t('targetLabel') }, [
         targetChip(undefined, t('targetAllTab'), h(CatAllIcon, { size: 16 })),
-        ...agentPresets.map((p) => targetChip(p.id, p.name, h(IconAgentPresetOutline16, { size: 15 }), p.broken)),
+        ...agentPresets.map((p) => targetChip(p.id, p.name, h(IconAgentPresetOutlineRegular, { size: 15 }), p.broken)),
       ]),
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──

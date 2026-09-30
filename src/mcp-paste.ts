@@ -345,12 +345,21 @@ const PLAIN_SCALAR = /^[A-Za-z0-9_][A-Za-z0-9_.@:/+~-]*$/
 const YAML_AMBIGUOUS = /^(?:true|false|null|yes|no|on|off|~)$/i
 const NUMERIC_LIKE = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
 
+/** 含 `${VAR}` 占位 → `!!js` 模板表达式；纯字符串返回 undefined。
+ *
+ * 预设层写入（mcp-presets）也要这份转换：数据模型里没有 YAML 文本，
+ * 占位必须直接给出 `{ __jsExpr }` 包装，两条路径共用同一份转义。 */
+export function envTemplateOf(value: string): JsExpr | undefined {
+  ENV_REF.lastIndex = 0
+  return ENV_REF.test(value) ? { __js: toJsTemplate(value) } : undefined
+}
+
 /** 标量 → YAML 标量文本：JsExpr 原样 `!!js`；含 ${VAR} 的字符串 → `!!js` 模板；其余按需加引号。 */
 function yamlScalarOf(value: unknown): string {
   if (isJsExpr(value)) return `!!js ${value.__js}`
   if (typeof value === 'string') {
-    ENV_REF.lastIndex = 0
-    if (ENV_REF.test(value)) return `!!js '${toJsTemplate(value).replace(/'/g, "''")}'`
+    const template = envTemplateOf(value)
+    if (template !== undefined) return `!!js '${template.__js.replace(/'/g, "''")}'`
     if (PLAIN_SCALAR.test(value) && !YAML_AMBIGUOUS.test(value) && !NUMERIC_LIKE.test(value)) return value
     return JSON.stringify(value)
   }

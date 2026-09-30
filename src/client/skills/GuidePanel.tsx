@@ -3,7 +3,7 @@
  */
 import { createPortal } from 'react-dom'
 import {
-  IconChevronRightOutline14, IconCloseOutline16, IconSkillOutline16,
+  IconChevronRightOutlineRegular, IconCloseOutlineRegular, IconSkillOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ArrowRightIcon, CheckIcon, GuideArtIcon, GuideArtIconSmall } from './icons.js'
 import { css } from './styles.js'
@@ -68,7 +68,7 @@ export function GuidePanel({ t, onClose, left, top, height }: {
         <span className={css.guidePanelLogo}><GuideArtIconSmall /></span>
         <span className={css.guidePanelTitle}>{t('guidePanelTitle')}</span>
         <button type="button" className={css.guidePanelClose} aria-label={t('guideClose')} onClick={onClose}>
-          <IconCloseOutline16 size={14} aria-hidden="true" />
+          <IconCloseOutlineRegular size={14} aria-hidden="true" />
         </button>
       </div>
 
@@ -76,7 +76,7 @@ export function GuidePanel({ t, onClose, left, top, height }: {
         {/* 什么是 Skill */}
         <section className={css.guideSec}>
           <div className={css.guideSecHead}>
-            <span className={css.guideSecIcon}><IconSkillOutline16 size={14} aria-hidden="true" /></span>
+            <span className={css.guideSecIcon}><IconSkillOutlineRegular size={14} aria-hidden="true" /></span>
             <span className={css.guideSecTitle}>{t('guideWhat')}</span>
           </div>
           <p className={css.guideWhatDesc}>{t('guideWhatDesc')}</p>
@@ -98,7 +98,7 @@ export function GuidePanel({ t, onClose, left, top, height }: {
               <div className={css.guideStepBody}>
                 <div className={css.guideStepTitleRow}>
                   <span className={css.guideStepTitle}>{title}</span>
-                  <IconChevronRightOutline14 className={css.guideStepArrow} size={12} aria-hidden="true" />
+                  <IconChevronRightOutlineRegular className={css.guideStepArrow} size={12} aria-hidden="true" />
                 </div>
                 <p className={css.guideStepDesc}>{desc}</p>
               </div>

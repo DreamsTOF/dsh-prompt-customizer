@@ -6,8 +6,8 @@
  */
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import {
-  Button, IconArchiveOutline20, IconCheckOutline16, IconChevronDownOutline14, IconCloseOutline16,
-  IconEditOutline16, IconEllipsisOutline16, IconRefreshOutline14, IconTrashOutline16, Menu,
+  Button, IconArchiveOutlineRegular, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconCloseOutlineRegular,
+  IconEditOutlineRegular, IconEllipsisOutlineRegular, IconRefreshOutlineRegular, IconTrashOutlineRegular, Menu,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { modalStaggerClass } from '../modal-animation'
 import { CloudUpIcon, FolderBlueIcon, TagIcon } from './icons.js'
@@ -99,7 +99,7 @@ export function SkillsView({
             {state.status === 'error' ? (
               <div className={css.failure}>
                 <p role="alert">{t('error')}</p>
-                <Button variant="outline" onClick={refresh}><IconRefreshOutline14 /> {t('retry')}</Button>
+                <Button variant="outline" onClick={refresh}><IconRefreshOutlineRegular size={14} /> {t('retry')}</Button>
               </div>
             ) : null}
 
@@ -159,7 +159,7 @@ export function SkillsView({
                                 ))}
                               </span>
                             )}
-                            <IconChevronDownOutline14 className={css.chevron} size={13} aria-hidden="true" />
+                            <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
                           </button>
                           {/* 技能包一键开关：整包启用/禁用 */}
                           <span className={css.bundleToggle}>
@@ -193,12 +193,12 @@ export function SkillsView({
                               }}
                               portal
                               items={[
-                                { id: 'enable', label: t('enableBundle'), icon: <IconCheckOutline16 size={14} /> },
-                                { id: 'disable', label: t('disableBundle'), icon: <IconCloseOutline16 size={14} /> },
+                                { id: 'enable', label: t('enableBundle'), icon: <IconCheckOutlineRegular size={14} /> },
+                                { id: 'disable', label: t('disableBundle'), icon: <IconCloseOutlineRegular size={14} /> },
                                 { type: 'separator', id: 'gap' },
-                                { id: 'rename', label: t('rename'), icon: <IconEditOutline16 size={14} /> },
+                                { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular size={14} /> },
                                 { id: 'cat', label: t('bundleCatEdit'), icon: <TagIcon /> },
-                                { id: 'delete', label: t('delete'), icon: <IconTrashOutline16 size={14} />, danger: true },
+                                { id: 'delete', label: t('delete'), icon: <IconTrashOutlineRegular size={14} />, danger: true },
                               ]}
                               anchor={(
                                 <button
@@ -212,7 +212,7 @@ export function SkillsView({
                                     setOpenMenu(openMenu === `bundle:${bundle.id}` ? null : `bundle:${bundle.id}`)
                                   }}
                                 >
-                                  <IconEllipsisOutline16 size={15} aria-hidden="true" />
+                                  <IconEllipsisOutlineRegular size={15} aria-hidden="true" />
                                 </button>
                               )}
                             />
@@ -284,10 +284,10 @@ export function SkillsView({
                           aria-expanded={looseOpen}
                           onClick={() => { setLooseExpanded((value) => !value) }}
                         >
-                          <span className={css.bundleIcon} aria-hidden="true"><IconArchiveOutline20 size={16} /></span>
+                          <span className={css.bundleIcon} aria-hidden="true"><IconArchiveOutlineRegular size={16} /></span>
                           <span className={css.bundleName}>{t('looseTitle')}</span>
                           <span className={css.bundleCount}>{t('skillsCount', { n: visibleLooseAll.length })}</span>
-                          <IconChevronDownOutline14 className={css.chevron} size={13} aria-hidden="true" />
+                          <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
                         </button>
                       </header>
                       {looseOpen && (

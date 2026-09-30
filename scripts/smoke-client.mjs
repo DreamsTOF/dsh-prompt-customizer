@@ -4,20 +4,117 @@
  * Executes `lib/client.js` under a stubbed DSH client environment and asserts:
  *   1. it registers exactly one `__ModuleLoader__` entry with the right id
  *   2. the factory exports `apply` (function) and `inject` (array)
- *   3. `apply(ctx)` mounts the capability modules (skills panel + slash source)
+ *   3. every member the bundle reads off `@deepseek-ai/dsh-client-ui-primitives`
+ *      exists in the DSH build installed here — the stub Proxy below cannot see
+ *      an upstream rename, and a missing named export is a runtime crash inside
+ *      the panel rather than a build error (how the 0.1.7 icon rename slipped
+ *      through: 13 renamed icons, zero build/test failures, dead panel)
+ *   4. `apply(ctx)` mounts the capability modules (skills panel + prompt locale)
  *      without throwing
  *
  * Usage: node scripts/smoke-client.mjs
  */
 
-import { readFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const CLIENT = resolve(ROOT, 'client/client.js')
+
+/** The one DSH client module the bundle requires at runtime. */
+const PRIMITIVES = '@deepseek-ai/dsh-client-ui-primitives'
+/** Bare name + scope, for filesystem joins (`PRIMITIVES` keeps the specifier). */
+const PRIMITIVES_NAME = 'dsh-client-ui-primitives'
+const SCOPE = '@deepseek-ai'
+
+/**
+ * Translate one PATH entry into a Windows-usable absolute prefix.
+ *
+ * A git-bash/MSYS `PATH` reaches Node in POSIX form (`/c/nvm4w/nodejs`), which
+ * `node:path` on win32 would turn into `\c\nvm4w\nodejs` and never find; the
+ * `dsh` CLI's own install root is what carries the client packages.
+ */
+function nativePrefix(entry) {
+  const trimmed = entry.trim().replace(/^"|"$/g, '')
+  if (process.platform !== 'win32') return trimmed
+  const msys = /^\/([A-Za-z])\/(.*)$/.exec(trimmed)
+  if (msys !== null) return `${msys[1].toUpperCase()}:/${msys[2]}`
+  return trimmed
+}
+
+/** Candidate directories that may hold the installed primitives package. */
+function primitivesCandidates() {
+  const home = process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh')
+  const candidates = []
+  /**
+   * One install root: the globally installed `dsh` CLI keeps its DSH packages
+   * (client ones included) in its own nested `node_modules`, so probe there
+   * first, then the plain hoisted form.
+   */
+  const pushRoot = (root) => {
+    if (root === undefined || root.trim() === '') return
+    candidates.push(join(root, 'node_modules', SCOPE, 'dsh', 'node_modules', SCOPE, PRIMITIVES_NAME))
+    candidates.push(join(root, 'node_modules', SCOPE, PRIMITIVES_NAME))
+  }
+  // The running Node's own root carries the globally installed dsh.
+  pushRoot(dirname(process.execPath))
+  const pathValue = process.env.PATH ?? process.env.Path ?? ''
+  for (const entry of pathValue.split(process.platform === 'win32' ? ';' : ':')) pushRoot(nativePrefix(entry))
+  // A profile-launched host hoists DSH packages one level above the profile.
+  pushRoot(join(home, 'profiles'))
+  return candidates
+}
+
+/** Locate the installed primitives package, or undefined when absent. */
+function findPrimitives() {
+  for (const dir of primitivesCandidates()) {
+    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'lib', 'index.js'))) return dir
+  }
+  return undefined
+}
+
+/** Exported names of the installed primitives build (`export { ... }` block). */
+function exportedNamesOf(dir) {
+  const code = readFileSync(join(dir, 'lib', 'index.js'), 'utf8')
+  const names = new Set()
+  for (const block of code.matchAll(/export\s*\{([^}]*)\}/g)) {
+    for (const part of block[1].split(',')) {
+      const clean = part.trim().split(/\s+as\s+/).pop()?.trim()
+      if (clean !== undefined && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(clean)) names.add(clean)
+    }
+  }
+  return names
+}
+
+/**
+ * Members the built bundle reads off the primitives module, scanned statically.
+ *
+ * Static rather than runtime on purpose: esbuild emits `(0, import_x.IconFoo)`
+ * at each JSX *use site*, so a component that never renders in this stub
+ * environment would never touch the property — the icon rename that motivated
+ * this check lived exactly there. The bundle is CJS with one `require` binding
+ * per source file, so binding name + member accesses cover every read.
+ */
+function bundlePrimitivesMembers(file) {
+  const code = readFileSync(file, 'utf8')
+  const members = new Set()
+  const spec = PRIMITIVES.replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&')
+  for (const binding of code.matchAll(new RegExp(`(?:var|const|let)\\s+([A-Za-z0-9_$]+)\\s*=\\s*require\\("${spec}"\\)`, 'g'))) {
+    const name = binding[1]
+    for (const hit of code.matchAll(new RegExp(`${name}\\.([A-Za-z_$][A-Za-z0-9_$]*)`, 'g'))) members.add(hit[1])
+  }
+  return members
+}
+
+const primitivesDir = findPrimitives()
+const primitivesExports = primitivesDir === undefined ? undefined : exportedNamesOf(primitivesDir)
+const primitivesMembersRead = bundlePrimitivesMembers(CLIENT)
+const primitivesMembersMissing = new Set(
+  [...primitivesMembersRead].filter(name => primitivesExports !== undefined && !primitivesExports.has(name)),
+)
 
 /** Stand-in for any React component export. */
 function stubComponent(name) {
@@ -133,6 +230,9 @@ const MODULES = {
   },
   'react-dom': { createPortal: (node) => node },
   'react-dom/client': { createRoot: () => ({ render: () => {}, unmount: () => {} }) },
+  // A stub component for any member: the export check above compares the
+  // bundle's static reads with the installed build, so a rename is reported
+  // there rather than turning into a confusing throw inside apply().
   '@deepseek-ai/dsh-client-ui-primitives': new Proxy({}, {
     get: (_t, prop) => (typeof prop === 'string' ? stubComponent(prop) : undefined),
     has: () => true,
@@ -262,6 +362,20 @@ if (namespaces.includes('skill')) fail('registered the kernel-owned locale names
 else pass('no duplicate "skill" locale namespace (kernel owns it)')
 if (namespaces.includes('prompt-customizer')) pass('prompt locale namespace registered ("prompt-customizer")')
 else fail('prompt locale namespace "prompt-customizer" was not registered')
+
+// ── the platform surface the bundle actually reads must exist in this DSH ──
+if (primitivesExports === undefined) {
+  console.log('skip  installed DSH client packages not found — export check skipped')
+} else {
+  pass(`primitives export check ran against ${primitivesDir} (${primitivesExports.size} exports)`)
+  if (primitivesMembersRead.size === 0) fail('bundle read no primitives exports — the platform stub was bypassed')
+  else pass(`bundle reads ${primitivesMembersRead.size} primitives members`)
+  if (primitivesMembersMissing.size > 0) {
+    fail(`primitives members missing from this DSH build: ${[...primitivesMembersMissing].sort().join(', ')}`)
+  } else {
+    pass('every primitives member the bundle reads exists in this DSH build')
+  }
+}
 
 console.log(`\n${process.exitCode ? 'SMOKE FAILED' : 'SMOKE PASSED'} — ${CLIENT}`)
 // Explicit exit: stubbed modules may hold listeners/timers that keep node alive.
