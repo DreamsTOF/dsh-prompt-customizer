@@ -1,0 +1,9 @@
+- id: headless-runner
+  disabled: true
+- id: headless-startup
+  disabled: true
+- insert:
+    - id: pc-rc2-test-composition
+      name: 'cordis:include'
+      config:
+        path: !!js process.env.PC_COMPOSITION_URL

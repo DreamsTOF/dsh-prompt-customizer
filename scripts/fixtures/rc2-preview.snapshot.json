@@ -1,0 +1,35 @@
+{
+  "requests": 2,
+  "modes": [
+    {
+      "mode": "standard", "count": 85,
+      "sections": [
+        { "name": "harness:identity", "text": "You are an AI agent powered by DeepSeek Harness." },
+        { "name": "deployment:persona-prefix", "text": "MODE standard {{model}}" },
+        { "name": "fixture:first", "text": "FIRST standard" },
+        { "name": "fixture:second", "text": "SECOND standard" },
+        { "name": "deployment:persona-suffix", "text": "CWD {{cwd}}" }
+      ],
+      "contexts": [{ "name": "fixture:policy", "text": "POLICY standard" }],
+      "diagnostics": [
+        { "name": "deployment:persona-prefix", "variable": "model", "kind": "session-variable" },
+        { "name": "deployment:persona-suffix", "variable": "cwd", "kind": "session-variable" }
+      ]
+    },
+    {
+      "mode": "alternate", "count": 3,
+      "sections": [
+        { "name": "harness:identity", "text": "You are an AI agent powered by DeepSeek Harness." },
+        { "name": "deployment:persona-prefix", "text": "MODE alternate {{model}}" },
+        { "name": "fixture:second", "text": "SECOND alternate" },
+        { "name": "fixture:first", "text": "FIRST alternate" },
+        { "name": "deployment:persona-suffix", "text": "CWD {{cwd}}" }
+      ],
+      "contexts": [{ "name": "fixture:policy", "text": "POLICY alternate" }],
+      "diagnostics": [
+        { "name": "deployment:persona-prefix", "variable": "model", "kind": "session-variable" },
+        { "name": "deployment:persona-suffix", "variable": "cwd", "kind": "session-variable" }
+      ]
+    }
+  ]
+}

@@ -1,11 +1,12 @@
 /**
- * 字段级 override 合并（方案 A）+ 阶段过滤（方案 C）。
+ * 预设 override 生效视图 + 阶段过滤。
  *
- * 合并语义：override 中**存在的字段整体接管**全局默认；空缺的字段回落
- * 全局。replace / inject / tools 沿用「非空才接管」（空对象 / 空列表视同
- * 未设置）；三份段屏蔽名单（sections / sectionsBootstrap / sectionsCompaction）
- * 例外 —— **空数组 = 显式接管为空**（用户在该预设下解除全部屏蔽，绝不能
- * 回落全局把屏蔽「复活」；客户端 editView 的 `??` 语义与此一致）。
+ * 0.9.0 起全局层停用：提示词必须按具体 agent 预设修改，生效配置就是该预设
+ * override 里**存在的字段**（空缺 = 无定制 = 官方默认）。replace / inject /
+ * tools 沿用「非空才生效」（空对象 / 空列表视同未设置）；三份段屏蔽名单
+ * （sections / sectionsBootstrap / sectionsCompaction）例外 —— **空数组 =
+ * 显式接管为空**（用户在该预设下解除全部屏蔽；客户端 editView 的 `??`
+ * 语义与此一致）。
  */
 
 /** 非空数组才视为有效覆盖值（inject 用；屏蔽名单不适用，见上）。 */
@@ -26,18 +27,22 @@ function hasTools(tools) {
 }
 
 /**
- * 字段级合并出一份生效配置。replace / inject / tools 看非空；三份段屏蔽
- * 名单看「字段是否存在」（空数组 = 显式接管为空，不回落全局）。
+ * 一份预设 override 的生效配置视图：override 中存在的字段整体生效；空缺的
+ * 字段 = 空值（无定制），**不再回落全局层** —— 0.9.0 起全局层停用（提示词
+ * 必须按具体 agent 预设修改），config.yaml 顶层的提示词字段只是停用前留下
+ * 的历史数据，运行时一律不读。replace / inject / tools 沿用「非空才生效」
+ * （空对象 / 空列表视同未设置）；三份段屏蔽名单（sections /
+ * sectionsBootstrap / sectionsCompaction）例外 —— **空数组 = 显式接管为空**
+ * （用户在该预设下解除全部屏蔽；与客户端 editView 的 `??` 语义一致）。
  */
-export function mergeConfig(globalCfg, ovr) {
-  const g = globalCfg ?? {}
+export function effectiveConfig(ovr) {
   return {
-    sections: Array.isArray(ovr?.sections) ? ovr.sections : (g.sections ?? []),
-    sectionsBootstrap: Array.isArray(ovr?.sectionsBootstrap) ? ovr.sectionsBootstrap : (g.sectionsBootstrap ?? []),
-    sectionsCompaction: Array.isArray(ovr?.sectionsCompaction) ? ovr.sectionsCompaction : (g.sectionsCompaction ?? []),
-    replace: hasDict(ovr?.replace) ? ovr.replace : (g.replace ?? {}),
-    inject: hasList(ovr?.inject) ? ovr.inject : (g.inject ?? []),
-    tools: hasTools(ovr?.tools) ? ovr.tools : (g.tools ?? {}),
+    sections: Array.isArray(ovr?.sections) ? ovr.sections : [],
+    sectionsBootstrap: Array.isArray(ovr?.sectionsBootstrap) ? ovr.sectionsBootstrap : [],
+    sectionsCompaction: Array.isArray(ovr?.sectionsCompaction) ? ovr.sectionsCompaction : [],
+    replace: hasDict(ovr?.replace) ? ovr.replace : {},
+    inject: hasList(ovr?.inject) ? ovr.inject : [],
+    tools: hasTools(ovr?.tools) ? ovr.tools : {},
   }
 }
 

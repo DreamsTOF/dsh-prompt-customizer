@@ -319,93 +319,6 @@ function PshBody({ children, className }) {
 var import_react9 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
-// src/client/skills/icons.tsx
-var import_jsx_runtime2 = require("react/jsx-runtime");
-function catStroke() {
-  return { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
-}
-function CatAllIcon({ size = 16 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "4", y: "4", width: "16", height: "16", rx: "4.5", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M9.2 9.2h5.6v5.6H9.2Z", fill: "#FFFFFF", opacity: ".92" })
-  ] });
-}
-function LockGlyph({ size = 10 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), strokeWidth: 2, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "5", y: "10.5", width: "14", height: "9", rx: "2.4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M8.2 10.5V8.4a3.8 3.8 0 0 1 7.6 0v2.1" })
-  ] });
-}
-function CloudUpIcon({ size = 18 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M17.7 9.5A5.2 5.2 0 0 0 7.6 8.2 4 4 0 0 0 6.5 16h10.9a3.8 3.8 0 0 0 .5-7.6Z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 17.5v-5M9.6 14.6 12 12.2l2.4 2.4" })
-  ] });
-}
-function SortDirIcon({ dir, size = 12 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: dir === "asc" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 19V5M5.8 10.8 12 4.6l6.2 6.2" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 5v14M5.8 13.2 12 19.4l6.2-6.2" }) });
-}
-function FolderBlueIcon({ size = 17 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M3.5 7.2a2.2 2.2 0 0 1 2.2-2.2h4l2 2.1h6.6a2.2 2.2 0 0 1 2.2 2.2v7.5a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2Z", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M3.5 9.5h17v1.6a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2Z", fill: "#FFFFFF", opacity: ".25" })
-  ] });
-}
-function ArrowRightIcon({ size = 13 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M5 12h14M13 6l6 6-6 6" }) });
-}
-function GuideArtIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "150", height: "86", viewBox: "0 0 150 86", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("defs", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("linearGradient", { id: "skm-guide-book", x1: "0", y1: "0", x2: "0", y2: "1", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "0", stopColor: "#9DB7F7" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "1", stopColor: "#6E8FF0" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("linearGradient", { id: "skm-guide-page", x1: "0", y1: "0", x2: "1", y2: "1", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "0", stopColor: "#FFFFFF" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "1", stopColor: "#D9E4FF" })
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M96 34 L141 52 L120 66 L78 50 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M84 32 L50 52 L28 44 L64 26 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M64 26 L96 34 L78 50 L50 52 Z", fill: "url(#skm-guide-book)", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M50 52 L28 44 L30 56 L52 66 Z", fill: "#B7C9F5", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M78 50 L120 66 L118 78 L76 62 Z", fill: "#A9BEF1", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "73", cy: "44", r: "9", fill: "#FFFFFF", opacity: ".85" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "73", cy: "44", r: "5.5", fill: "#6E8FF0" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M118 10c.6 2.6 1.6 3.6 4.2 4.2-2.6.6-3.6 1.6-4.2 4.2-.6-2.6-1.6-3.6-4.2-4.2 2.6-.6 3.6-1.6 4.2-4.2Z", fill: "#BCCFFF" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M126 26c.4 1.7 1 2.3 2.7 2.7-1.7.4-2.3 1-2.7 2.7-.4-1.7-1-2.3-2.7-2.7 1.7-.4 2.3-1 2.7-2.7Z", fill: "#C9D9FF" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "111", cy: "24", r: "2", fill: "#C9D9FF" })
-  ] });
-}
-function GuideArtIconSmall() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "1.5", y: "2", width: "13", height: "12", rx: "2.5", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M4.5 5h7M4.5 8h7M4.5 11h4.5", stroke: "#FFFFFF", strokeWidth: "1.3", strokeLinecap: "round" })
-  ] });
-}
-function CopyIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
-  ] });
-}
-function CheckIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("polyline", { points: "20 6 9 17 4 12" }) });
-}
-function SearchIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
-  ] });
-}
-function TagIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("line", { x1: "7", y1: "7", x2: "7.01", y2: "7" })
-  ] });
-}
-
 // src/client/skills/styles.ts
 var css = {
   entry: "skm-entry",
@@ -1803,16 +1716,16 @@ function editView(cfg, target) {
   if (!target) return cfg;
   const ovr = cfg.overrides?.[target] ?? {};
   return {
-    sections: ovr.sections ?? cfg.sections,
-    sectionsBootstrap: ovr.sectionsBootstrap ?? cfg.sectionsBootstrap,
-    sectionsCompaction: ovr.sectionsCompaction ?? cfg.sectionsCompaction,
-    replace: ovr.replace ?? cfg.replace,
-    inject: ovr.inject ?? cfg.inject,
+    sections: ovr.sections ?? [],
+    sectionsBootstrap: ovr.sectionsBootstrap ?? [],
+    sectionsCompaction: ovr.sectionsCompaction ?? [],
+    replace: ovr.replace ?? {},
+    inject: ovr.inject ?? [],
     tools: {
-      exclude: ovr.tools?.exclude ?? cfg.tools?.exclude,
-      add: ovr.tools?.add ?? cfg.tools?.add,
-      bootstrap: ovr.tools?.bootstrap ?? cfg.tools?.bootstrap,
-      compaction: ovr.tools?.compaction ?? cfg.tools?.compaction
+      exclude: ovr.tools?.exclude ?? [],
+      add: ovr.tools?.add ?? [],
+      bootstrap: ovr.tools?.bootstrap,
+      compaction: ovr.tools?.compaction
     },
     presets: cfg.presets,
     activePreset: cfg.activePreset
@@ -3349,12 +3262,21 @@ function PreviewPane({ t, phases, phase, sub }) {
       data !== null && data.scopeResolved === false ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
       phases === null ? (0, import_react8.createElement)("div", { style: s.muted }, t("loading")) : null,
       phases !== null && data === null ? (0, import_react8.createElement)("div", { style: s.error }, t("previewFail")) : null,
+      data ? (0, import_react8.createElement)("div", { style: s.muted }, t("previewPreset")) : null,
+      data?.diagnostics?.length ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("previewUnresolved", {
+        names: [...new Set(data.diagnostics.map((item) => `{{${item.variable}}}`))].join(", ")
+      })) : null,
       sub === "prompt" ? data ? [
         (0, import_react8.createElement)("div", { style: s.rowTitle }, [
           (0, import_react8.createElement)("span", { style: s.muted }, t("previewHint")),
           (0, import_react8.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
         ]),
-        (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty"))
+        (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty")),
+        (0, import_react8.createElement)("div", { style: s.rowTitle }, t("runtimeContexts")),
+        ...(data.contexts ?? []).map((context) => (0, import_react8.createElement)("div", { key: context.name }, [
+          (0, import_react8.createElement)("div", { style: s.muted }, context.name),
+          (0, import_react8.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
+        ]))
       ] : null : data ? [
         // 模型视角 vs 注册表视角的对照：预览按所选阶段运行全部装配规则
         //（含预设原生的阶段裁剪），某些预设（如 PTC / Code Mode）会把
@@ -3396,6 +3318,7 @@ function Panel({ t, onClose }) {
   const [phase, setPhase] = (0, import_react9.useState)("bootstrap");
   const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
   const syncSeq = (0, import_react9.useRef)(0);
+  const refreshSeq = (0, import_react9.useRef)(0);
   const [target, setTarget] = (0, import_react9.useState)(void 0);
   const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
   const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
@@ -3413,14 +3336,33 @@ function Panel({ t, onClose }) {
   };
   (0, import_react9.useEffect)(load, []);
   const refresh = () => {
+    const seq = ++refreshSeq.current;
     const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
-    const grab = (phase2) => fetch(PREVIEW_URL + params(phase2)).then((r) => r.json()).then((body) => body?.ok === false ? null : body).catch(() => null);
-    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL).then((r) => r.json())]).then(([boot, comp, act, inventoryData]) => {
+    const failures = [];
+    const grab = (phase2) => fetch(PREVIEW_URL + params(phase2)).then((r) => r.json()).then((body) => {
+      if (body.ok === false) throw new Error(body.error ?? t("previewFail"));
+      return body;
+    }).catch((error2) => {
+      failures.push(`${phase2}: ${String(error2 instanceof Error ? error2.message : error2)}`);
+      return null;
+    });
+    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
+      if (body.ok === false) throw new Error(body.error ?? "inventory failed");
+      return body;
+    }).catch((error2) => {
+      failures.push(String(error2 instanceof Error ? error2.message : error2));
+      return null;
+    })]).then(([boot, comp, act, inventoryData]) => {
+      if (seq !== refreshSeq.current) return;
       setPhases({ bootstrap: boot, compaction: comp, active: act });
       setInv(inventoryData);
-      setError(null);
-    }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+      setError(failures.length ? failures.join("\n") : null);
+    }).catch((e) => {
+      if (seq !== refreshSeq.current) return;
+      setPhases({ bootstrap: null, compaction: null, active: null });
+      setError(String(e instanceof Error ? e.message : e));
+    });
   };
   (0, import_react9.useEffect)(() => {
     void refresh();
@@ -3434,7 +3376,8 @@ function Panel({ t, onClose }) {
     }
     if (Object.keys(patch).length === 0) return;
     const seq = ++syncSeq.current;
-    fetch(PREVIEW_URL, {
+    const scopeQs = target !== void 0 ? `?scope=${encodeURIComponent(target)}` : "";
+    fetch(PREVIEW_URL + scopeQs, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ target, patch, phase })
@@ -3460,6 +3403,13 @@ function Panel({ t, onClose }) {
   (0, import_react9.useEffect)(() => {
     fetchPresets();
   }, []);
+  (0, import_react9.useEffect)(() => {
+    setTarget((current2) => {
+      if (current2 !== void 0) return current2;
+      const first = agentPresets.find((p) => !p.broken) ?? agentPresets[0];
+      return first?.id;
+    });
+  }, [agentPresets]);
   const showFlash = (text, kind = "ok") => {
     if (flashTimer.current !== null) clearTimeout(flashTimer.current);
     setFlash(text);
@@ -3639,14 +3589,14 @@ function Panel({ t, onClose }) {
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
-    const customized = id === void 0 ? 0 : Object.keys(cfg?.overrides?.[id] ?? {}).length;
+    const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length;
     return (0, import_react9.createElement)("button", {
-      key: id ?? "__global__",
+      key: id,
       type: "button",
       className: css.catItem,
       "data-active": active || void 0,
       onClick: () => switchTarget(id),
-      title: bad ? `${label} \u2014 ${t("broken")}` : id === void 0 ? t("targetHint") : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
+      title: bad ? `${label} \u2014 ${t("broken")}` : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
     }, [
       (0, import_react9.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
       (0, import_react9.createElement)("span", { className: css.catLabel }, label),
@@ -3658,9 +3608,9 @@ function Panel({ t, onClose }) {
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
+    // 0.9.0 起「全部 Agent」入口移除：提示词必须按具体预设修改，无全局目标。
     (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
       (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
-        targetChip(void 0, t("targetAllTab"), (0, import_react9.createElement)(CatAllIcon, { size: 16 })),
         ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
       ])
     ]),
@@ -3799,6 +3749,9 @@ function Panel({ t, onClose }) {
 var DICT = {
   zh: {
     nav: "\u63D0\u793A\u8BCD\u5B9A\u5236",
+    previewPreset: "\u6765\u6E90\uFF1A\u5F53\u524D\u6A21\u5F0F\u9884\u8BBE\u3002\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u53CA\u987A\u5E8F\u6309\u6B64\u9884\u8BBE\u72EC\u7ACB\u88C5\u914D\uFF0C\u4E0D\u5339\u914D\u6216\u66F4\u6539\u5DF2\u6709\u5BF9\u8BDD\u3002",
+    previewUnresolved: "\u4F1A\u8BDD\u53D8\u91CF {names} \u5C1A\u672A\u7ED1\u5B9A\uFF0C\u4FDD\u7559\u6A21\u677F\u5F15\u7528\uFF1B\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u4ECD\u53EF\u67E5\u770B\u548C\u7F16\u8F91\u3002",
+    runtimeContexts: "\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\uFF08user-role \u5FEB\u7167\uFF0C\u53EA\u8BFB\uFF0C\u4E0D\u5C5E\u4E8E system \u63D0\u793A\u8BCD\u6BB5\uFF09",
     loading: "\u52A0\u8F7D\u4E2D\u2026",
     unavailable: "\u5F53\u524D\u73AF\u5883\u672A\u542F\u7528\u672C\u547D\u540D\u7A7A\u95F4\u3002",
     tabsSections: "\u63D0\u793A\u8BCD",
@@ -3853,7 +3806,7 @@ var DICT = {
     ioFailed: "\u5BFC\u5165/\u5BFC\u51FA\u5931\u8D25",
     importInvalid: "\u65E0\u6548\u7684\u914D\u7F6E\u6587\u4EF6",
     targetGlobal: "\u76EE\u6807\uFF1A\u5168\u5C40\u9ED8\u8BA4",
-    targetHint: "\u9009\u62E9\u7F16\u8F91\u76EE\u6807 \u2014\u2014 \u9009\u4E2D\u67D0\u4E2A agent \u9884\u8BBE\u540E\uFF0C\u6539\u52A8\u53EA\u5BF9\u8BE5\u9884\u8BBE\u751F\u6548\uFF08\u5B57\u6BB5\u7EA7\u8986\u76D6\uFF09\u3002",
+    targetHint: "\u9009\u62E9\u8981\u5B9A\u5236\u7684 agent \u9884\u8BBE \u2014\u2014 \u63D0\u793A\u8BCD\u5FC5\u987B\u6309\u5177\u4F53\u9884\u8BBE\u4FEE\u6539\uFF1A\u672A\u5B9A\u5236\u7684\u5B57\u6BB5 = \u5B98\u65B9\u9ED8\u8BA4\uFF0C\u6539\u52A8\u53EA\u5BF9\u8BE5\u9884\u8BBE\u751F\u6548\uFF080.9.0 \u8D77\u300C\u5168\u90E8 Agent\u300D\u5168\u5C40\u5C42\u5DF2\u505C\u7528\uFF09\u3002",
     syncAllPhases: "\u4E09\u6001\u540C\u6B65",
     syncAllPhasesHint: "\u52FE\u9009\u540E\u4E09\u4E2A\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\uFF08\u5E38\u9A7B\u671F\u4E3A\u9AA8\u67B6\uFF0C\u5176\u4F59\u4E24\u6001\u72EC\u6709\u7684\u6BB5\u8FFD\u52A0\u5728\u5C3E\u90E8\uFF0C\u540C\u540D\u6BB5\u4EE5\u539F\u751F\u90A3\u9636\u6BB5\u4E3A\u51C6\uFF09\uFF0C\u589E\u5220 / \u6392\u5E8F / \u52FE\u9009 / \u6587\u672C\u7F16\u8F91\u4E00\u6B21\u5199\u5168\u4E09\u4E2A\u9636\u6BB5\uFF1B\u52FE\u9009\u77AC\u95F4\u5373\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF08\u5199\u5165\u7F16\u8F91\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002\u5DE5\u5177\u680F\u7684\u9690\u85CF / \u663E\u793A\u4E0E\u52A0\u56DE\u540C\u6837\u5BF9\u4E09\u6001\u4E00\u8D77\u751F\u6548\u3002\u9ED8\u8BA4\u5173\u95ED\uFF1A\u4E09\u4E2A\u9636\u6BB5\u5404\u7BA1\u5404\u7684\u3002",
     syncApplied: "\u5DF2\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF1A\u4E09\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\u4E0E\u6587\u672C\uFF08\u5199\u5165\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002",
@@ -3941,7 +3894,6 @@ var DICT = {
     filterAll: "\u5168\u90E8",
     filterOn: "\u5DF2\u542F\u7528",
     filterOff: "\u5DF2\u505C\u7528",
-    targetAllTab: "\u5168\u90E8 Agent",
     targetLabel: "\u7F16\u8F91\u76EE\u6807\uFF08Agent \u9884\u8BBE\uFF09",
     targetCustomized: "\u8BE5\u9884\u8BBE {n} \u9879\u5B9A\u5236",
     agentScoped: "\u4F1A\u8BDD\u7EA7",
@@ -3953,6 +3905,9 @@ var DICT = {
   },
   en: {
     nav: "Prompt Customizer",
+    previewPreset: "Source: selected mode preset. Sections, tools and ordering are assembled independently; existing conversations are neither matched nor changed.",
+    previewUnresolved: "Session variables {names} are not bound and remain template references. Sections and tools are still available for editing.",
+    runtimeContexts: "Runtime context (read-only user-role snapshot, separate from system sections)",
     loading: "Loading\u2026",
     unavailable: "Namespace unavailable in this environment.",
     tabsSections: "Sections",
@@ -4007,7 +3962,7 @@ var DICT = {
     ioFailed: "Import/export failed",
     importInvalid: "Invalid preset file",
     targetGlobal: "Target: global default",
-    targetHint: "Pick an edit target \u2014 changes apply only to the chosen agent preset (field-level override).",
+    targetHint: "Pick an agent preset to customize \u2014 prompts are edited per preset: untouched fields stay official defaults, and changes apply only to that preset (the \u201CAll agents\u201D global layer is retired since 0.9.0).",
     syncAllPhases: "Sync phases",
     syncAllPhasesHint: "When checked, the three phases share one section list (the resident period is the backbone; sections only the other two phases have are appended at the end, and a same-named row follows the phase where it natively exists), and add / remove / reorder / check / text edits are written to all three phases at once. Ticking the box immediately overwrites the other two phases with the resident-period content (written to the edit draft; press Save to apply). Tool hiding / showing and adding back also apply to all three phases. Unchecked (default): handle each phase separately.",
     syncApplied: "The other two phases were overwritten from the resident period: all three phases now share one section list and text (written to the draft; press Save to apply).",
@@ -4095,7 +4050,6 @@ var DICT = {
     filterAll: "All",
     filterOn: "Enabled",
     filterOff: "Disabled",
-    targetAllTab: "All agents",
     targetLabel: "Edit target (agent preset)",
     targetCustomized: "{n} overridden field(s)",
     agentScoped: "session-level",
@@ -4143,9 +4097,9 @@ function applyPrompt(ctx) {
 }
 
 // src/client/prompt/PromptView.tsx
-var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 function PromptView() {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Panel, { t: promptT() }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT() }) });
 }
 
 // src/client/skills/api.ts
@@ -4271,6 +4225,95 @@ function fileToBase64(file) {
 // src/client/skills/GuidePanel.tsx
 var import_react_dom2 = require("react-dom");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
+
+// src/client/skills/icons.tsx
+var import_jsx_runtime3 = require("react/jsx-runtime");
+function catStroke() {
+  return { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+}
+function CatAllIcon({ size = 16 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "4", y: "4", width: "16", height: "16", rx: "4.5", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M9.2 9.2h5.6v5.6H9.2Z", fill: "#FFFFFF", opacity: ".92" })
+  ] });
+}
+function LockGlyph({ size = 10 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), strokeWidth: 2, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "5", y: "10.5", width: "14", height: "9", rx: "2.4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M8.2 10.5V8.4a3.8 3.8 0 0 1 7.6 0v2.1" })
+  ] });
+}
+function CloudUpIcon({ size = 18 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M17.7 9.5A5.2 5.2 0 0 0 7.6 8.2 4 4 0 0 0 6.5 16h10.9a3.8 3.8 0 0 0 .5-7.6Z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 17.5v-5M9.6 14.6 12 12.2l2.4 2.4" })
+  ] });
+}
+function SortDirIcon({ dir, size = 12 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: dir === "asc" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 19V5M5.8 10.8 12 4.6l6.2 6.2" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 5v14M5.8 13.2 12 19.4l6.2-6.2" }) });
+}
+function FolderBlueIcon({ size = 17 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M3.5 7.2a2.2 2.2 0 0 1 2.2-2.2h4l2 2.1h6.6a2.2 2.2 0 0 1 2.2 2.2v7.5a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2Z", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M3.5 9.5h17v1.6a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2Z", fill: "#FFFFFF", opacity: ".25" })
+  ] });
+}
+function ArrowRightIcon({ size = 13 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { viewBox: "0 0 24 24", width: size, height: size, "aria-hidden": "true", ...catStroke(), children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 12h14M13 6l6 6-6 6" }) });
+}
+function GuideArtIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "150", height: "86", viewBox: "0 0 150 86", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("defs", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("linearGradient", { id: "skm-guide-book", x1: "0", y1: "0", x2: "0", y2: "1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "0", stopColor: "#9DB7F7" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "1", stopColor: "#6E8FF0" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("linearGradient", { id: "skm-guide-page", x1: "0", y1: "0", x2: "1", y2: "1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "0", stopColor: "#FFFFFF" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("stop", { offset: "1", stopColor: "#D9E4FF" })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M96 34 L141 52 L120 66 L78 50 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M84 32 L50 52 L28 44 L64 26 Z", fill: "url(#skm-guide-page)", stroke: "#C7D6F7", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M64 26 L96 34 L78 50 L50 52 Z", fill: "url(#skm-guide-book)", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M50 52 L28 44 L30 56 L52 66 Z", fill: "#B7C9F5", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M78 50 L120 66 L118 78 L76 62 Z", fill: "#A9BEF1", stroke: "var(--dsw-alias-state-business-primary,#5b82e5)", strokeWidth: "1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "73", cy: "44", r: "9", fill: "#FFFFFF", opacity: ".85" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "73", cy: "44", r: "5.5", fill: "#6E8FF0" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M118 10c.6 2.6 1.6 3.6 4.2 4.2-2.6.6-3.6 1.6-4.2 4.2-.6-2.6-1.6-3.6-4.2-4.2 2.6-.6 3.6-1.6 4.2-4.2Z", fill: "#BCCFFF" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M126 26c.4 1.7 1 2.3 2.7 2.7-1.7.4-2.3 1-2.7 2.7-.4-1.7-1-2.3-2.7-2.7 1.7-.4 2.3-1 2.7-2.7Z", fill: "#C9D9FF" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "111", cy: "24", r: "2", fill: "#C9D9FF" })
+  ] });
+}
+function GuideArtIconSmall() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "1.5", y: "2", width: "13", height: "12", rx: "2.5", fill: "var(--dsw-alias-state-business-primary,#3d6be5)" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M4.5 5h7M4.5 8h7M4.5 11h4.5", stroke: "#FFFFFF", strokeWidth: "1.3", strokeLinecap: "round" })
+  ] });
+}
+function CopyIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
+  ] });
+}
+function CheckIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("polyline", { points: "20 6 9 17 4 12" }) });
+}
+function SearchIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+  ] });
+}
+function TagIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "7", y1: "7", x2: "7.01", y2: "7" })
+  ] });
+}
+
+// src/client/skills/GuidePanel.tsx
 var import_jsx_runtime4 = require("react/jsx-runtime");
 function CapIcon({ kind, size = 17 }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", "aria-hidden": true };

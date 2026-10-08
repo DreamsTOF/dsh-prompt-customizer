@@ -1,7 +1,7 @@
 /**
  * /api/prompt-customizer/config/apply 批量保存路由的行为测试：
- * 全局补丁写顶层、预设补丁写 overrides[id]、全空补丁连带删除空 override、
- * 白名单外字段被忽略、非法 body 拒绝。
+ * 0.9.0 起无目标（全局层）补丁一律 400、预设补丁写 overrides[id]、
+ * 全空补丁连带删除空 override、白名单外字段被忽略、非法 body 拒绝。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -52,16 +52,16 @@ async function call(handler, body) {
 
 const APPLY = '/api/prompt-customizer/config/apply'
 
-test('global patch writes top-level fields', async () => {
+test('global patch (no target) is rejected with 400 — prompts are per-preset since 0.9.0', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], {
     patch: { sections: ['a'], tools: { exclude: ['t'] } },
   })
-  assert.equal(res.status, 200)
-  assert.equal(res.body.ok, true)
-  assert.deepEqual(res.body.config.sections, ['a'])
-  assert.deepEqual(res.body.config.tools.exclude, ['t'])
+  assert.equal(res.status, 400)
+  assert.equal(res.body.ok, false)
+  // 全局层停用：无目标写盘不得落盘。
+  assert.equal(res.body.config, undefined)
 })
 
 test('targeted patch writes overrides[id] only', async () => {
@@ -96,6 +96,7 @@ test('fields outside the whitelist are ignored', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], {
+    target: 'whoami',
     patch: { presets: [{ id: 'x', name: 'x', data: {} }], activePreset: 'x' },
   })
   assert.equal(res.body.ok, true)

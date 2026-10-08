@@ -13,33 +13,18 @@
  *   `GET /api/prompt-customizer/config` 与 `POST /config/set|/config/unset`
  *   （单字段读写）、`POST /config/apply`（批量保存，UI 统一保存按钮的写盘通道）。
  *
- * 定制按作用域生效：顶层字段是全局默认；`overrides` 按 agent 预设 id 提供
- * 字段级覆盖（非空字段整体接管，空缺回落全局）。注入段支持 `phase`
- * （always/bootstrap/active），工具过滤支持未晋级阶段的 bootstrap 目录与
- * 压缩后未晋级阶段的 compaction 目录（三态：compaction > bootstrap > 静态）——
- * 晋级由 durable 会话事件推导（compaction 复位，subagent 恒已晋级）。
- *
- * 客户端对 bootstrap / compaction / active 三套名义装配各拉取一次
- * `/preview?phase=…`，三个阶段部分**恒定全部显示**（预设没有某个阶段时，
- * 该部分只是空的）—— 不同 agent 预设的「agent 周期」不同（standard 三态同形，
- * minimal 一个形态，router / warmup 两个，anchored 家族三个），但那是各阶段
- * 内容是否相同的问题，不构成把阶段藏起来的理由。
- *
- * 另一面：若该 scope 有以 `complete: true` 注册的段（persona 整段接管），宿主
- * 会在装配瀑布流**之后**把 sections 强制还原成那一条段（见 dsh-system-prompt
- * 的 assemble 契约），本插件的段级屏蔽 / 替换 / 注入 / 排序对其完全不生效
- * （工具过滤不受影响）。`forceSections`（默认开）为此提供终极手段：包装宿主
- * 的 assemble，在方法边界用注册表原始段重建 sections —— 预设插件的阶段裁段
- * （实测 liangshen / warmupbetter 等 preset 过滤器全部 prepend: true）与
- * complete 整段接管都无法再改写结果。关闭时预览过滤器会探测并把段名作为
- * `takenOverBy` 透出，让提示词 / 预览两个 Tab 就这件事说同一句话。
+ * 定制仅使用 `overrides[agentPreset]`，三个阶段各有独立规则。预览只读取
+ * 选中模式的 rc.2 作用域租约，结束即释放；从不匹配或切换已有对话。
+ * 系统段与 user-role contexts 分开返回，跨预设累计池不作为选中预设的输入。
+ * forceSections 在 assemble 返回边界恢复已经求值的段策略，避免 complete
+ * 还原和动态 provider 重复执行；关闭时尊重宿主的 complete 接管行为。
  */
 
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Config, NS } from './schema.js'
-import { mergeConfig, pickToolsFilter, pickSectionsForStatus, applyToolFilter, applySectionPolicy } from './effective.js'
+import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applyToolFilter, applySectionPolicy } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore, readLegacySection } from './store.js'
 import { createCatalog } from './catalog.js'
@@ -197,8 +182,10 @@ export function apply(ctx, entry = {}) {
     }
   }
 
-  // 3) 装配目标解析（瀑布流与 assemble 强制覆盖共用）：生效配置 = 显式预览
-  //    提示 > 会话所属 agent 预设（字段级覆盖）> 全局默认。预览 hint 优先于
+  // 3) 装配目标解析（瀑布流与 assemble 强制覆盖共用）：生效配置 = 会话所属
+  //    agent 预设的 override（0.9.0 起无全局基底 —— 提示词必须按具体预设修改，
+  //    未定制的预设 = 无定制 = 官方原样；config.yaml 顶层的提示词字段是停用前
+  //    的历史数据，运行时不读）。预览 hint 优先于
   //    会话事件推导的阶段，让同一份配置能渲染 bootstrap / compaction / active
   //    三种阶段视图。boundary 语义与阶段投影 statusOf 一致（-1 = 从未压缩）。
   //    预览装配可携带 promptCustomizerPatch（UI 未保存草稿）：只在内存里叠加
@@ -216,7 +203,7 @@ export function apply(ctx, entry = {}) {
     const id = typeof context?.promptCustomizerPreset === 'string'
       ? context.promptCustomizerPreset
       : presetOfSession(ctx.get('sessionProjections'), context?.agent?.session)
-    const cfg = mergeConfig(base, base.overrides?.[id])
+    const cfg = effectiveConfig(base.overrides?.[id])
     const phaseHint = typeof context?.promptCustomizerPhase === 'string'
       ? context.promptCustomizerPhase
       : undefined
@@ -230,6 +217,7 @@ export function apply(ctx, entry = {}) {
   // 装配瀑布流：实时应用字段级 override、屏蔽 / 替换 / 注入 / 阶段化工具过滤。
   ctx.on('system-prompt/assemble', async (assembly, context, next) => {
     // 下游错误原样传播；只有本过滤器自身的逻辑被兜底。
+    const registeredSections = Array.isArray(assembly.sections) ? assembly.sections.map(section => ({ ...section })) : []
     const assembled = await next()
     try {
       const { raw, cfg, status } = resolveTarget(context)
@@ -237,61 +225,17 @@ export function apply(ctx, entry = {}) {
       const replace = cfg.replace ?? {}
       const te = pickToolsFilter(cfg.tools, status)
 
-      // 预览专用的预过滤视图（提示词 / 工具 / 预览三个 Tab 的统一数据源）：
-      // 记录进入本过滤规则的段 / 工具原文，并附上该阶段专属的屏蔽 / 隐藏标记，
-      // 让 UI 能正确回显「每阶段独立名单」和工具的逐项隐藏（隐藏后仍在列表）。
-      // 运行时装配不带该 hint，零额外开销。
-      const baseView = context?.promptCustomizerBase === true
-        ? {
-            sections: Array.isArray(assembled.sections) ? assembled.sections.map((section) => ({
-              name: section.name,
-              text: typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? ''),
-              blocked: denied.has(section.name),
-              replaced: Object.hasOwn(replace, section.name),
-            })) : [],
-            tools: Array.isArray(assembled.tools) ? assembled.tools.map((tool) => ({
-              name: typeof tool.name === 'string' ? tool.name : String(tool.name),
-              description: typeof tool.description === 'string' ? tool.description : '',
-              hidden: (te.exclude ?? []).includes(tool.name),
-            })) : [],
-          }
-        : undefined
-
-      // 本插件过滤前的原始输入（段 / 工具）—— 预过滤视图与 post 视图同源，
-      // 让提示词 / 工具 / 预览三个 Tab 与运行时装配所见一致。
-      const baseSections = Array.isArray(assembled.sections) ? [...assembled.sections] : []
+      // 使用宿主已求值的输入；forceSections 不重新调用动态 provider。
+      const baseSections = raw?.forceSections === false
+        ? (Array.isArray(assembled.sections) ? assembled.sections : [])
+        : [...registeredSections, ...(assembled.sections ?? []).filter(section => !registeredSections.some(item => item.name === section.name))]
       const baseTools = Array.isArray(assembled.tools) ? assembled.tools : []
-
-      // 预览额外并一层 **agent 作用域**的段（见 mergeAgentScopedSections 的说明）。
-      // 只并预览：真实装配本来就带着它们，运行时无需任何额外动作。
-      if (context?.promptCustomizerBase === true) {
-        mergeAgentScopedSections(ctx, baseSections, (section) => (
-          typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? '')
-        ))
-      }
-
-      // 真实装配也要并进登记表（预览那次由 buildPreview 自己并）：有一批段只在
-      // agent 作用域里注册（插件按 agent 动态 section()，如 subagent 工具的
-      // `tool:subagent`、file-reference 的 `context:file-reference`），预设
-      // scope 的清单 / 预览根本看不见它们 —— 不并进来的话，这些段会一路原文
-      // 进最终提示词，而面板列不出、也就接管不了（屏蔽 / 替换 / 排序 / 汉化）。
-      // 只并「名字 + 文本」：屏蔽与替换标记永远在响应时按生效配置现算。
-      if (catalog !== undefined && context?.promptCustomizerBase !== true) {
-        try {
-          catalog.observe({
-            sections: baseSections.map((section) => ({
-              name: String(section.name),
-              text: typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? ''),
-            })),
-            tools: baseTools.map((tool) => ({
-              name: typeof tool.name === 'string' ? tool.name : String(tool.name),
-              description: typeof tool.description === 'string' ? tool.description : '',
-            })),
-          })
-        } catch (error) {
-          // 登记表只是清单来源，绝不让它拖垮装配。
-          warnOnce(`prompt-customizer: 运行时段 / 工具并进登记表失败（仅影响清单）：${String((error && error.message) || error)}`)
-        }
+      const baseView = context?.promptCustomizerBase === true
+      if (catalog !== undefined && !baseView) {
+        catalog.observe({
+          sections: baseSections.map(section => ({ name: section.name, text: section.text })),
+          tools: baseTools.map(tool => ({ name: tool.name, description: tool.description })),
+        })
       }
 
       // 段级策略（屏蔽 / 替换 / 注入 / 排序）由 effective.applySectionPolicy
@@ -300,12 +244,13 @@ export function apply(ctx, entry = {}) {
 
       const tools = appendAddedTools(ctx, context?.scope, applyToolFilter(baseTools, te), te.add, te.exclude)
 
-      const result = { ...assembled, sections, tools }
+      const result = { ...assembled, sections, tools, promptCustomizerSections: sections }
       if (baseView) {
         result.promptCustomizerBaseView = {
           sections: baseSections.map((section) => ({
             name: section.name,
-            text: typeof section.text === 'function' ? '<动态生成>' : String(section.text ?? ''),
+            text: String(section.text ?? ''),
+            ...section.interpolate !== undefined ? { interpolate: section.interpolate } : {},
             blocked: denied.has(section.name),
             replaced: Object.hasOwn(replace, section.name),
             // 'agent' = 只在该 agent 的装配里注册的段（预览 scope 的注册表没有它）。
@@ -334,50 +279,24 @@ export function apply(ctx, entry = {}) {
     }
   })
 
-  // 4) 强制覆盖（forceSections，默认开）：包装宿主 systemPrompt.assemble。
-  //    预设插件的 prepend 军备竞赛（实测 liangshen / warmupbetter 等 preset 的
-  //    assemble 过滤器全部 `prepend: true`，standing mount 后注册永远排在本插件
-  //    前面）与宿主的 complete 整段接管（瀑布流之后还原 sections）都无法用瀑布流
-  //    位次对抗；唯一确定性的手段是在方法边界重建 sections —— 从注册表
-  //    layers.merge() 取原始段定义（全局 + scope 链遮蔽后，scope = agent 时沿
-  //    链解析到 standing 预设层），套用本插件的屏蔽 / 替换 / 注入 / 排序，
-  //    tools / contexts / variables 保持宿主与预设行为。
-  //    ponytail: 依赖宿主未承诺的 service 方法与 layers 公开字段；宿主升级可能
-  //    静默失效 —— 失效时本包装不生效、瀑布流过滤仍在，可设 forceSections: false
-  //    退回旧行为，预览的 takenOverBy / lostSections 探测仍可作运行时自检。
+  // rc.2 restores complete sections after the waterfall. Restore the evaluated
+  // policy without invoking dynamic providers twice or reading private layers.
   const sp = ctx.get('systemPrompt')
   if (sp && typeof sp.assemble === 'function') {
     // 只在首个 apply() 记一次原始方法；插件 HMR 重载重跑 apply() 时用新闭包
     // 重新包装，但永远包在原始方法之上，避免层层套娃。
     const pristine = sp[PATCHED]?.orig ?? sp.assemble.bind(sp)
     sp[PATCHED] = { orig: pristine }
-    sp.assemble = async (context = {}) => {
+    const wrapped = async (context = {}) => {
       // 变量先于装配同步：宿主在 pristine 内部解析 {{name}}，注册必须发生在前。
       syncVariables()
       const result = await pristine(context)
       if (read()?.forceSections === false) return result
       try {
-        const { cfg, status } = resolveTarget(context)
-        const defs = [...sp.layers.merge(context?.scope, (layer) => layer.sections).values()]
-          .sort((a, b) => a.order - b.order)
-        const baseSections = defs.map((section) => ({
-          name: section.name,
-          // 与宿主一致：动态段文本调用生成函数（可能被调用两次 —— 宿主装配
-          // 内部已调用一次；动态段通常是纯函数，可接受）。
-          text: typeof section.text === 'function' ? section.text(context) : section.text,
-        }))
-        // 预览：把 agent 作用域的段也并进这份重建输入，否则预览的最终段列表里
-        // 没有它们，与真实会话的提示词对不上（见 mergeAgentScopedSections）。
-        if (context?.promptCustomizerBase === true) {
-          mergeAgentScopedSections(ctx, baseSections, (section) => (
-            typeof section.text === 'function' ? section.text(context) : section.text
-          ))
-        }
-        const sections = applySectionPolicy(baseSections, cfg, status)
+        const sections = result.promptCustomizerSections ?? result.sections
         const patched = { ...result, sections }
-        // 预览的「产出 vs 模型所见」比对以强制覆盖后的最终段为准。
         if (context?.promptCustomizerBase === true) {
-          patched.promptCustomizerEmitted = sections.map((section) => String(section.name))
+          patched.promptCustomizerEmitted = sections.map(section => String(section.name))
         }
         return patched
       } catch (error) {
@@ -389,6 +308,12 @@ export function apply(ctx, entry = {}) {
         return result
       }
     }
+    sp.assemble = wrapped
+    ctx.effect(() => () => {
+      if (sp.assemble === wrapped) sp.assemble = pristine
+      if (sp[PATCHED]?.orig === pristine) delete sp[PATCHED]
+      varsDispose?.()
+    }, 'prompt-customizer: assemble wrapper')
   }
 
   // 5) 共享 webserver 上的清单路由（web profile 里必有）。
@@ -437,15 +362,15 @@ export function apply(ctx, entry = {}) {
           // 宿主共享 webserver 的 req 是原始 IncomingMessage：没有 Express 的
           // query 属性，必须自行解析 URL 参数。
           const id = queryOf(req).get('scope') ?? undefined
-          // scope 挂载失败（如常驻挂载超时）会回退展示 standard / 全局层：
-          // scopeResolved 标记「请求的目标是否解析出了自己的 scope」，false 时
-          // UI 警示「清单并非该预设的原生目录」。
-          const resolved = id ? await resolveScopeFor(ctx, id) : await resolveStandardScope(ctx)
-          const scopeKey = resolved ?? (id ? await resolveStandardScope(ctx) : undefined)
-          const inventory = await buildInventory(ctx, read(), scopeKey, id, catalog)
-          // 变量清单随单：先同步注册（黑名单可能刚改过），再列出当前可用名字。
-          syncVariables()
-          writeJson(res, 200, { ...inventory, scopeResolved: resolved !== undefined, variables: listVariableNames(read().envBlocklist ?? []) })
+          const target = await acquireTarget(ctx, id)
+          try {
+            syncVariables()
+            const preview = await buildPreview(ctx, target.scopeKey, target.hintId, 'active', catalog, undefined, undefined)
+            const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, catalog, preview)
+            writeJson(res, 200, { ...inventory, scopeResolved: target.scopeResolved, variables: listVariableNames(read().envBlocklist ?? []) })
+          } finally {
+            await target.release()
+          }
         } catch (error) {
           writeJson(res, 500, {
             ok: false,
@@ -473,14 +398,17 @@ export function apply(ctx, entry = {}) {
           if (req.method === 'POST') {
             try { body = await readJsonBody(req) } catch { body = null }
           }
-          const { scopeKey, hintId, phase, scopeResolved } = await previewTarget(ctx, req, body)
-          const patch = body !== null && typeof body === 'object'
-            && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
-            ? body.patch
-            : undefined
-          const patchTarget = typeof body?.target === 'string' && body.target.length > 0 ? body.target : undefined
-          const preview = await buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchTarget)
-          writeJson(res, 200, { ...preview, scopeResolved, phase })
+          const target = await previewTarget(ctx, req, body)
+          try {
+            const patch = body !== null && typeof body === 'object'
+              && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
+              ? body.patch : undefined
+            const patchTarget = typeof body?.target === 'string' && body.target.length > 0 ? body.target : undefined
+            const preview = await buildPreview(ctx, target.scopeKey, target.hintId, target.phase, catalog, patch, patchTarget, target.agent)
+            writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved, phase: target.phase, source: target.source })
+          } finally {
+            await target.release()
+          }
         } catch (error) {
           writeJson(res, 500, {
             ok: false,
@@ -592,11 +520,20 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposeConfig, 'prompt-customizer: config route')
 
+    // 0.9.0 起六个提示词字段（sections/sectionsBootstrap/sectionsCompaction/
+    // replace/inject/tools）属于已停用的全局层，set/unset 直接 400 —— 提示词
+    // 定制必须走 /config/apply + target（写 overrides[id]）。历史数据保留在
+    // 文件里不动（停用但可回滚），只能手编 config.yaml 清理。
+    const GLOBAL_PROMPT_FIELDS = new Set(['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'])
     const withFieldWrite = (handler) => async (req, res) => {
       try {
         const body = await readJsonBody(req)
         if (typeof body?.field !== 'string' || body.field.length === 0) {
           writeJson(res, 400, { ok: false, error: 'field is required' })
+          return
+        }
+        if (GLOBAL_PROMPT_FIELDS.has(body.field)) {
+          writeJson(res, 400, { ok: false, error: `'${body.field}' is a global-layer prompt field, retired in 0.9.0 — customize per agent preset via /config/apply with target` })
           return
         }
         handler(body)
@@ -643,10 +580,11 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposeConfigReset, 'prompt-customizer: config reset route')
 
-    // 批量保存路由：UI「统一保存按钮」的唯一写盘通道。body { target?, patch }，
-    // patch 只认业务字段（含每阶段独立段名单），字段值为 null 表示删除（回退
-    // 默认/全局）。target 缺省写全局顶层；target 为 agent 预设 id 时写
-    // overrides[id]。叠加语义与 /preview 的草稿预览共用 overlayPatch（一份实现）。
+    // 批量保存路由：UI「统一保存按钮」的唯一写盘通道。body { target, patch }，
+    // patch 只认业务字段（含每阶段独立段名单），字段值为 null 表示删除。
+    // target 为 agent 预设 id，写 overrides[id]；0.9.0 起**必填** —— 提示词
+    // 必须按具体预设修改，无目标的写盘一律 400（全局层已停用）。
+    // 叠加语义与 /preview 的草稿预览共用 overlayPatch（一份实现）。
     const disposeConfigApply = register({
       kind: 'exact',
       path: '/api/prompt-customizer/config/apply',
@@ -659,6 +597,10 @@ export function apply(ctx, entry = {}) {
             return
           }
           const target = typeof body.target === 'string' && body.target.length > 0 ? body.target : undefined
+          if (target === undefined) {
+            writeJson(res, 400, { ok: false, error: 'target (agent preset id) is required — prompts must be customized per preset, the global layer is retired in 0.9.0' })
+            return
+          }
           store.writeSection(overlayPatch({ ...(store.raw() ?? {}) }, target, patch))
           writeJson(res, 200, { ok: true, config: read() })
         } catch (error) {
@@ -671,14 +613,6 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposeConfigApply, 'prompt-customizer: config apply route')
   }
-}
-
-/** 解析 `value`，但最多等待 `ms` 毫秒，超时回退到 `fallback`。 */
-function withTimeout(value, ms, fallback) {
-  return Promise.race([
-    Promise.resolve(value),
-    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ])
 }
 
 /** 配置补丁认得的业务字段（与 UI 编辑域一一对应；含每阶段独立名单）。 */
@@ -728,65 +662,32 @@ function copyErrorStatus(error) {
   return 500
 }
 
-/**
- * 存在 roster 时解析 `standard` agent 的常驻 scope key。
- *
- * `standingKeyFor` 会挂载整个 agent 预设（组装插件），可能很慢或依赖尚未
- * 就绪的服务 —— 只读的清单浏览绝不能被它挂住。若在短超时内没有结果，
- * 回退到全局层（scopeKey = undefined）。
- */
-async function resolveStandardScope(ctx) {
-  try {
-    const presets = ctx.get('agentPresets')
-    if (presets && typeof presets.standingKeyFor === 'function') {
-      return await withTimeout(presets.standingKeyFor('standard'), 1500, undefined)
-    }
-  } catch { /* 没有 roster —— 回退到全局层 */ }
-  return undefined
+/** Read the selected mode's current revision; never substitute a live conversation. */
+async function acquireTarget(ctx, id) {
+  const presets = ctx.get('agentPresets')
+  const requestedId = id ?? (typeof presets?.resolve === 'function' ? (await presets.resolve()).id : undefined)
+  if (typeof presets?.acquireScope === 'function') {
+    const lease = await presets.acquireScope(requestedId)
+    return { scopeKey: lease.key, hintId: requestedId, scopeResolved: true, source: 'preset', release: () => lease[Symbol.asyncDispose]() }
+  }
+  return { scopeKey: undefined, hintId: id, scopeResolved: false, source: 'preset', release: async () => {} }
 }
 
 /** 枚举当前生效的段与工具，并附上各自的屏蔽 / 隐藏标记。 */
-async function buildInventory(ctx, raw, scopeKey, presetId, catalog) {
-  // 生效配置：目标 agent 预设的字段级 override 优先于全局默认。
-  const cfg = mergeConfig(raw, raw.overrides?.[presetId])
+async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
+  // 生效配置：目标 agent 预设的 override（0.9.0 起无全局基底）。
+  const cfg = effectiveConfig(raw.overrides?.[presetId])
   const denied = new Set(cfg.sections ?? [])
   const replace = cfg.replace ?? {}
   const injectOrder = new Map((cfg.inject ?? []).map((item) => [item.name, item.order]))
   const te = pickToolsFilter(cfg.tools, { promoted: true, boundary: -1 }) // 清单无会话概念：恒展示静态（晋级后）视图
   const isHidden = (name) => (te.exclude ?? []).includes(name)
 
-  // 解析段的文本。动态段注册的是函数；用尽力而为的上下文调用它（与装配时
-  // 传入的形态一致），清单才能回显真实生成内容供替换编辑。函数抛错或返回
-  // 未决值时回退为占位标记。
-  const resolveText = (section) => {
-    if (typeof section.text === 'function') {
-      try {
-        const value = section.text({ scope: scopeKey })
-        // 异步动态段返回 thenable，无法同步回显。
-        if (value && typeof value.then === 'function') return '<动态生成>'
-        return String(value ?? '')
-      } catch { return '<动态生成>' }
-    }
-    return String(section.text ?? '')
-  }
-
-  const asEntry = (name, section) => ({
-    name,
-    order: injectOrder.has(name) ? injectOrder.get(name) : (typeof section.order === 'number' ? section.order : 0),
-    text: resolveText(section),
-  })
-  // 本次这个 scope 真正见到的段与工具：只带身份与内容，标记一律现算。
-  const seenSections = [...ctx.systemPrompt.layers.merge(scopeKey, (layer) => layer.sections).entries()]
-    .map(([name, section]) => asEntry(name, section))
-  const listedNames = new Set(seenSections.map((item) => item.name))
-  // 再并一层 agent 作用域的段（见 agentScopedSections 的说明）：它们是「每个
-  // agent 都成立」的段，不属于任何预设 scope —— 所以清单必须在最开始就把它们
-  // 列出来，而不是等某个模式跑过一轮真实会话才累积到。
-  for (const [name, section] of agentScopedSections(ctx)) {
-    if (listedNames.has(name)) continue
-    listedNames.add(name)
-    seenSections.push(asEntry(name, section))
-  }
+  const seenSections = (preview.baseSections ?? []).map((section, index) => ({
+    name: section.name,
+    order: injectOrder.get(section.name) ?? index,
+    text: section.text,
+  }))
   const seenTools = []
   // 从解析出的 scope 枚举工具；scope key 不可用时（如常驻挂载超时）回退到
   // 全局层，避免仅仅因为 agent 组装未就绪就返回空目录。
@@ -821,67 +722,16 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog) {
   return { sections, tools, config: cfg }
 }
 
-/**
- * 解析一个 agent 预设 id 的常驻 scope key（供无 agent 的只读路由使用）。
- * 显式点名某预设时给挂载留足时间（15s）：standingKeyFor 要组装整个预设
- * 插件树，慢挂载很常见，且挂载成功后 roster 常驻 memo，后续请求零开销。
- * 注意 roster 的 standingKeyFor 对未知 id 也会兜底返回 standard scope，
- * 因此先用 list() 确认 id 存在 —— 否则「预设不存在」会被误当成解析成功。
- */
-async function resolveScopeFor(ctx, id) {
-  if (!id) return undefined
-  try {
-    const presets = ctx.get('agentPresets')
-    if (presets && typeof presets.standingKeyFor === 'function') {
-      if (typeof presets.list === 'function') {
-        const list = await withTimeout(presets.list(), 15000, undefined)
-        if (Array.isArray(list) && !list.some((p) => p.id === id)) return undefined
-      }
-      return await withTimeout(presets.standingKeyFor(id), 15000, undefined)
-    }
-  } catch { /* 未知预设或挂载失败（如预设依赖缺失）—— 回退全局层 */ }
-  return undefined
-}
-
-/**
- * Resolve the scope key + preset hint a preview request targets. An explicit
- * `?scope=<id>` requests that agent preset's standing scope; otherwise fall
- * back to the `standard` agent (same default the inventory uses). Always
- * resolves within the same short timeout so a slow standing mount cannot hang
- * the request. The hint makes our own assemble filter apply that preset's
- * field-level override during the preview waterfall.
- *
- * 返回的 `scopeResolved` 表示「请求的目标是否解析出了自己的 scope」：显式
- * id 挂载失败时展示会回落 standard scope，但标记为 false，让 UI 明确警示
- * 「预览的不是该预设的原生装配」。
- */
+/** Resolve the selected mode without creating, selecting or modifying a conversation. */
 async function previewTarget(ctx, req, body = null) {
-  const id = queryOf(req).get('scope') ?? undefined
-  const resolved = id ? await resolveScopeFor(ctx, id) : await resolveStandardScope(ctx)
-  const scopeKey = resolved ?? (id ? await resolveStandardScope(ctx) : undefined)
-  // `?phase=`（或 POST body.phase）：bootstrap / compaction / active 三态预览；
-  // 其它值一律回退实际推导。
-  const rawPhase = (body !== null && typeof body === 'object' ? body.phase : undefined)
-    ?? queryOf(req).get('phase')
-    ?? undefined
-  const phase = rawPhase === 'bootstrap' || rawPhase === 'compaction' || rawPhase === 'active'
-    ? rawPhase
-    : undefined
-  return { scopeKey, hintId: id, phase, scopeResolved: resolved !== undefined }
+  const query = queryOf(req)
+  const target = await acquireTarget(ctx, query.get('scope') ?? undefined)
+  const rawPhase = body?.phase ?? query.get('phase')
+  const phase = ['bootstrap', 'compaction', 'active'].includes(rawPhase) ? rawPhase : undefined
+  return { ...target, phase }
 }
 
-/**
- * 渲染某个 scope 的最终系统提示词：跑完整的装配瀑布流（所有插件的过滤、
- * 包括我们自己的都会生效），再把幸存的段拼成文本。这就是模型实际看到的内容。
- *
- * 装配是**纯 scope 的诊断装配（不带 agent）**：宿主的不变量契约明确「诊断
- * 性装配不得携带 agent」—— agent-presets 的 roster 不变量见到未加入预设的
- * agent 就 fail（抛异常），旧版伪会话每次都触发它，让每次阶段预览都降级。
- * 当前 harness 的装配瀑布流里也没有读会话推导阶段的插件（阶段裁剪发生在
- * agent-loop 层，不在 assemble 钩子），三个阶段视图完全由我们自己的
- * promptCustomizerPhase hint 驱动。同时返回注册表原始目录总数 registryTotal，
- * 与模型可见目录形成对照（如 PTC / Code Mode 把全目录包装成单一 run_code）。
- */
+/** Assemble one leased mode revision; unresolved session variables stay in the template. */
 async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchTarget) {
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
@@ -900,11 +750,11 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
     hint.promptCustomizerPatch = patch
     hint.promptCustomizerTarget = patchTarget
   }
-  // 纯 scope 诊断装配（不带 agent，见上方函数注释）：让宿主 roster 不变量
-  // 按「诊断」放行，三个阶段视图由 promptCustomizerPhase hint 驱动。
+  // Mode preview has no conversation state; session variables remain template references.
   const assembled = await ctx.systemPrompt.assemble(hint)
+  const diagnostics = []
   const sections = Array.isArray(assembled.sections)
-    ? assembled.sections.map((section) => ({ name: section.name, text: String(section.text ?? '') }))
+    ? assembled.sections.map(section => ({ name: section.name, text: renderSection(section, assembled.variables ?? {}, diagnostics) }))
     : []
   // 预过滤视图（base）：与 post 视图来自同一次装配，三个 Tab 共用同一份数据。
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
@@ -930,7 +780,7 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
     : undefined
   return {
     ok: true,
-    scope: scopeKey,
+    contexts: (assembled.contexts ?? []).map(context => ({ name: context.name, text: renderSection(context, assembled.variables ?? {}, diagnostics) })),
     registryTotal,
     /** 该 scope 注册表的工具名清单：供界面区分「在本预设里、只是被该阶段裁掉」
      *  与「根本不属于本预设（无法加回）」。 */
@@ -942,7 +792,8 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
     /** 非空 = 本插件产出的段有若干被下游装配规则丢弃（计数，不含段名列表）。 */
     lostSections,
     sections,
-    text: renderPreviewText(assembled),
+    text: sections.map(section => section.text).filter(Boolean).join('\n\n'),
+    diagnostics,
     tools: Array.isArray(assembled.tools)
       ? assembled.tools.map((tool) => ({
           name: typeof tool.name === 'string' ? tool.name : String(tool.name),
@@ -955,68 +806,6 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
     baseSections: Array.isArray(baseView.sections) ? baseView.sections : [],
     baseTools: Array.isArray(baseView.tools) ? baseView.tools : [],
   }
-}
-
-/**
- * agent 作用域里注册的段：插件在 agent 自己的 scope 里动态 `section()` 的产物
- * （subagent 工具的 `tool:subagent`、file-reference 的 `context:file-reference`…）。
- *
- * 它们既不进全局层、也不进任何预设 scope，预设的清单与预览都看不见它们；但它们
- * 是「每个 agent 都成立」的段，不是某个模式独有的 —— 所以清单要在最开始就把它们
- * 并进池子，而不是等某个模式跑过一轮真实会话装配才累积到（`system-prompt/assemble`
- * 那条运行时累积是兜底，不是唯一入口）。
- *
- * `agent` 本身就是它那一层的 scope key（core/scope 的 `createScope(ctx, agent)`
- * 契约），所以不需要额外的 scope 工具：直接按 agent merge 一次即可，merge 走 scope
- * 父链，会话所属预设的那一层也一并解析到。
- *
- * 任何一步失败都返回空表：清单少几个名字只是列不全，绝不能让清单请求失败。
- *
- * @param ctx - plugin context.
- * @returns 名字 → 段定义（首个 agent 见到的版本胜）。
- */
-function agentScopedSections(ctx) {
-  const out = new Map()
-  try {
-    const sp = ctx.get('systemPrompt')
-    const agents = ctx.get('agents')
-    if (sp?.layers?.merge === undefined || typeof agents?.list !== 'function') return out
-    for (const agent of agents.list() ?? []) {
-      if (agent === null || typeof agent !== 'object') continue
-      try {
-        for (const [name, section] of sp.layers.merge(agent, (layer) => layer.sections).entries()) {
-          if (!out.has(name)) out.set(name, section)
-        }
-      } catch { /* 单个 agent 的层读不到就跳过（不影响其它 agent） */ }
-    }
-  } catch { /* 服务缺席 / 列表异常：清单少这一层名字，其它照常 */ }
-  return out
-}
-
-/**
- * 预览专用：把 agent 作用域的段并进段定义列表（去重，带 `scope: 'agent'` 标记）。
- *
- * 插件按 agent 动态 `section()` 的产物（subagent 的 `tool:subagent`、file-reference
- * 的 `context:file-reference`…）不在预设 scope 的注册表里，预设 scope 的预览装配
- * 自然看不到它们 —— 但**真实会话的装配一定有**（每个 agent 各注册一份）。不并进来，
- * 面板就会出现「列表里根本没有这些段、对话里它们却默认在提示词里」的错位，而且
- * 「中文提示词」开关只翻列表里出现的行，于是永远翻不到它们。
- *
- * 只对预览生效：真实装配本来就带着它们，运行时不需要任何额外动作。
- *
- * @param ctx - plugin context.
- * @param baseSections - 段定义数组，原地追加。
- * @param resolveText - 取该段的展示文本（两条装配路径的解析方式不同）。
- * @returns 同一个数组（便于链式书写）。
- */
-function mergeAgentScopedSections(ctx, baseSections, resolveText) {
-  const listed = new Set(baseSections.map((section) => String(section.name)))
-  for (const [name, section] of agentScopedSections(ctx)) {
-    if (listed.has(name)) continue
-    listed.add(name)
-    baseSections.push({ name, text: resolveText(section), scope: 'agent' })
-  }
-  return baseSections
 }
 
 /** 注册表的工具名清单（解析出的 scope 优先，回退全局层）。任何一步失败都返回
@@ -1074,12 +863,27 @@ function detectCompletePrompt(ctx, scopeKey) {
   return undefined
 }
 
-/** 把幸存的段拼成最终提示词文本（与 dsh 的 renderPrompt 行为一致）。 */
-function renderPreviewText(assembled) {
-  return (Array.isArray(assembled.sections) ? assembled.sections : [])
-    .map((section) => String(section.text ?? '').trim())
-    .filter((text) => text.length > 0)
-    .join('\n\n')
+/** Resolve known variables for display; retain session-dependent references with diagnostics. */
+function renderSection(section, variables, diagnostics = []) {
+  if (section.interpolate === false) return section.text
+  const text = String(section.text ?? '')
+  let result = '', last = 0
+  for (let open = text.indexOf('{{'); open >= 0; open = text.indexOf('{{', last)) {
+    const group = /^\{\{([^{}]*)\}\}/.exec(text.slice(open))
+    if (!group) {
+      if (text.indexOf('}}', open + 2) >= 0) throw new Error('Malformed prompt variable in ' + section.name)
+      result += text.slice(last, open + 2)
+      last = open + 2
+      continue
+    }
+    const name = group[1]
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new Error('Malformed prompt variable in ' + section.name)
+    const unresolved = !Object.hasOwn(variables, name) || variables[name] === undefined
+    if (unresolved) diagnostics.push({ name: section.name, variable: name, kind: 'session-variable' })
+    result += text.slice(last, open) + (unresolved ? group[0] : variables[name])
+    last = open + group[0].length
+  }
+  return result + text.slice(last)
 }
 
 function writeJson(res, status, body) {

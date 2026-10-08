@@ -9,7 +9,9 @@
  *   - 预设专属 mcp-client 行：从预设声明行的 config.plugins 读取、经
  *     configEditor.edit 写回（0.1.7 声明式预设模型）；
  *   - 行不可寻址（id 不唯一）时拒绝写入（409）；
- *   - 前缀匹配的全局 profile patch 路径（`- insert:` 块）不变。
+ *   - 前缀匹配的全局 profile patch 路径（`- insert:` 块）不变；
+ *   - patch 目标随宿主 profileContext 走（桌面 profile 不再误写 web），
+ *     无宿主面时按 DSH_DESKTOP_PROFILE 环境变量回落（0.8.1）。
  *
  * Usage: node scripts/test-mcp-layering.mjs
  */
@@ -391,6 +393,45 @@ const badName = await callMask("PUT", "/api/triad/mcp-masks/code/bad.name", { en
 check("非法 serverName 被拒", badName.status === 400)
 const badBody = await callMask("PUT", "/api/triad/mcp-masks/code/github", { enabled: "yes" })
 check("enabled 非布尔被拒", badBody.status === 400)
+
+/* ── 5. 桌面/自定义 profile：patch 目标随宿主 profileContext 走 ─────────
+ * 0.8.1 前 PROFILE_NAME 写死 'web'：桌面端（profile desktop）的状态与切换
+ * 会读写 web profile 的 cordis.patch.yml（真实 bug）。回归两件事：
+ * 主路径 ctx.profileContext（真实宿主注入形态）与 DSH_DESKTOP_PROFILE 回落。
+ * 在全套断言之后执行：重复 apply 会重挂路由（stub 的 Map.set 幂等覆盖），
+ * 但会给 stub agent 补一层 restrict 调用，别污染上面的计数。 */
+const desktopDir = join(process.env.DSH_HOME, "profiles", "desktop")
+const desktopPatch = join(desktopDir, "cordis.patch.yml")
+mkdirSync(desktopDir, { recursive: true })
+writeFileSync(desktopPatch, ["# desktop patch layer", ""].join("\n"))
+const ctxDesktop = {
+  ...ctx,
+  profileContext: { name: "desktop", dir: desktopDir, patchPath: desktopPatch },
+}
+await mod.apply(ctxDesktop, {})
+await settle()
+const desktopStatus = await callStatus("GET", "/api/triad/mcp-status")
+check("status.patchFile 随 profileContext 指向 desktop（profile=desktop）",
+  desktopStatus.json?.patchFile === desktopPatch && desktopStatus.json?.profile === "desktop")
+const desktopAdd = await callOn("/api/triad/mcp-config", "POST", "/api/triad/mcp-config",
+  { action: "add", format: "yaml", text: yamlPaste })
+check("桌面 profile：粘贴写入 desktop patch 而非 web",
+  desktopAdd.status === 200 && readFileSync(desktopPatch, "utf8").includes("serverName: gamma")
+    && !readFileSync(patchFile, "utf8").includes("# gamma-desktop-marker"))
+
+// 回落链：真实宿主面缺失（如桌面壳 v4 只传环境变量）时按 DSH_DESKTOP_PROFILE 推。
+const shellDir = join(process.env.DSH_HOME, "profiles", "desktop-shell")
+mkdirSync(shellDir, { recursive: true })
+process.env.DSH_DESKTOP_PROFILE = "desktop-shell"
+const ctxShell = { ...ctx }
+delete ctxShell.profileContext
+await mod.apply(ctxShell, {})
+await settle()
+const shellStatus = await callStatus("GET", "/api/triad/mcp-status")
+check("无 profileContext 时按 DSH_DESKTOP_PROFILE 回落",
+  shellStatus.json?.patchFile === join(shellDir, "cordis.patch.yml")
+    && shellStatus.json?.profile === "desktop-shell")
+delete process.env.DSH_DESKTOP_PROFILE
 
 rmSync(sandbox, { recursive: true, force: true })
 if (failed > 0) {

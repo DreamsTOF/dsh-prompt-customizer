@@ -61,7 +61,19 @@
 两件事贯穿整个设计：
 
 - **按会话阶段分层**：引导期（未晋级）/ 常驻期（晋级后）/ 压缩受控期（压缩后仍未晋级）各有**独立的屏蔽名单、独立的排序空间、独立的工具目录**。同一个预设可以做到首轮只给模型 1 个工具和几段提示词，晋级后放开全套。
-- **按 agent 预设分层**：顶部预设 Tab 选「全部 Agent」改的是默认值；选中某个 agent 预设后，改动只对该预设生效（字段级覆盖，未设置的字段继续回落全局）。
+- **按 agent 预设分层**：顶部预设 Tab 选中某个 agent 预设后，改动只对该预设生效；**0.9.0 起「全部 Agent」全局层停用**——提示词必须按具体预设修改，预设未定制的字段 = 官方默认（旧全局层数据保留在 config.yaml 里不再生效，可手编回滚）。
+
+## 0.9.2：按模式预设修正 rc.2 适配
+
+- 预设目录使用 `agentPresets.acquireScope()`，每次读取选中模式的当前修订；结束释放租约。不匹配已有对话，不创建伪 Agent，不切换对话的预设。
+- 顶部模式 Tab 决定提示词、工具和排序的编辑目标。同名提示词在不同模式下的正文分别来自各自作用域，不能拿另一个模式或旧会话替代。
+- 预设预览中的 `{{model}}`、`{{cwd}}` 等未绑定变量保留为模板引用，并显示非致命说明；目录和草稿编辑不因此失败。真正对话中的严格插值行为不变。
+- 独立展示 `contexts`（user-role 运行时快照、只读）。纯预设作用域无法得到依赖真实会话状态的贡献；这不允许把另一个对话的数据当成当前模式定义。
+- 三阶段模拟本插件的独立规则；已有对话的模式绑定不被编辑目标切换改变。此预览不是完整历史 LLM 请求回放。
+
+本地源码更新后执行 `npm run build`。链接安装无需复制；已启动宿主可能持有旧模块，保存工作后重启原来的 `dsh web` 并硬刷新，确认不再有「预览会话」，来源显示为「当前模式预设」。
+
+目标版本冷启动测试：设置 `PC_DSH_MANIFEST` 为已安装 **0.2.0-rc.2** 的 `package.json`，运行 `node scripts/test-rc2-runtime.mjs`。测试先在零对话状态查看两个模式的独立工具、正文、相反顺序和未绑定变量，再完成离线用户消息 → 工具 → 回复，并断言预览切换不改变对话模式。测试只使用临时 DSH_HOME，不使用真实模型凭据，不修改用户 profile。
 
 ## 会话阶段怎么流转
 
@@ -114,7 +126,7 @@
 
 下面两张图是**提示词 tab**（截图截于 0.6.0 之前：顶部预设行当时还是纯文字 Tab，功能一致；SKILL / MCP 两个 tab 的截图待补）。
 
-以下为**提示词 tab** 的细节 —— 侧边栏点 **能力 → 提示词** 打开独立面板。**第一行是 agent 预设 chips**：「全部 Agent」+ 各预设，每枚带图标、名称与该预设的定制项数（橙色数字 = 这个预设单独改过东西），点一下即切换编辑目标。**第二行是定制头部**：模式切换（提示词 / 工具 / 配置）+ 阶段 Tab（引导期 / 压缩受控期 / 常驻期，左右两栏联动）+ 三态同步与中文提示词开关 + 保存 / 刷新 / 关闭。
+以下为**提示词 tab** 的细节 —— 侧边栏点 **能力 → 提示词** 打开独立面板。**第一行是 agent 预设 chips**（0.9.0 起无「全部 Agent」），每枚带图标、名称与该预设的定制项数（橙色数字 = 这个预设单独改过东西），点一下即切换编辑目标，进入面板时默认选中第一个可用预设。**第二行是定制头部**：模式切换（提示词 / 工具 / 配置）+ 阶段 Tab（引导期 / 压缩受控期 / 常驻期，左右两栏联动）+ 三态同步与中文提示词开关 + 保存 / 刷新 / 关闭。
 
 **提示词模式**：左栏当前阶段的勾选列表（屏蔽 / 替换 / 注入 / 排序，底部三态过滤），右栏实时预览装配后的最终系统提示词：
 
@@ -214,7 +226,7 @@
     <td width="34%"><b>④ 装配瀑布流</b><br><code>system-prompt/assemble</code> 钩子按会话推导阶段，<br>解析出生效配置并过滤</td>
   </tr>
   <tr>
-    <td colspan="9" align="center"><b>④ 内部依次是</b>：<code>mergeConfig(全局, overrides[会话所属预设])</code> → 段：屏蔽 → 替换 → 注入 → 按 order 排序；工具：<code>pickToolsFilter</code>（压缩 &gt; 引导 &gt; 静态）→ <code>applyToolFilter</code></td>
+    <td colspan="9" align="center"><b>④ 内部依次是</b>：<code>effectiveConfig(overrides[会话所属预设])</code>（0.9.0 起无全局基底）→ 段：屏蔽 → 替换 → 注入 → 按 order 排序；工具：<code>pickToolsFilter</code>（压缩 &gt; 引导 &gt; 静态）→ <code>applyToolFilter</code></td>
   </tr>
   <tr>
     <td colspan="9" align="center">
@@ -255,7 +267,13 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 
 ### 版本要求
 
-当前版本（0.8.0）对齐 **DSH 0.2.0-rc.2**（`peerDependencies` 为 `^0.2.0-rc.2`）。
+当前版本（0.9.0）对齐 **DSH 0.2.0-rc.2**（`peerDependencies` 为 `^0.2.0-rc.2`）。
+
+**0.9.0 行为变更：全局层停用。** 提示词必须按具体 agent 预设修改——「全部 Agent」
+编辑入口移除，`/config/apply` 无 `target` 一律 400，`/config/set|unset` 拒绝六个
+提示词字段；运行时生效配置 = 该会话所属预设的 `overrides[id]`，未定制的字段 =
+官方默认。config.yaml 顶层的旧全局层数据**保留不再生效**（可手编回滚；0.8.x 及
+以前的行为请用 0.8.1）。
 0.1.7 起的图标代际（`IconXxxOutlineRegular/Medium`，尺寸由 `size` 属性给）在
 0.2.0 沿用，本插件的宿主接触面（`system-prompt` 装配 waterfall、`agentPresets`、
 `configEditor`、`tools.restrict/schemas`、`webServer.register`、客户端模块加载缝）
@@ -263,17 +281,39 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 不支持 0.1.7 之前的主机（旧宿主会按 DSH 的插件兼容性策略拒绝加载，而不是半静默
 地坏掉）。需要旧版的请用 0.6.x。
 
+0.8.1 起 MCP 全局 Server 的管理目标（`/api/triad/mcp-status` / `mcp-config` 读写
+的 `cordis.patch.yml`）随宿主 `profileContext` 解析——Web 端（profile `web`）与
+**桌面端**（profile `desktop`，默认端口 19387）各管各的 profile，不再写死 `web`。
+宿主面缺失时按 `DSH_DESKTOP_PROFILE` 环境变量回落（桌面壳 v4 形态），最后回落
+`web` 保持旧行为。注意桌面 profile 没有 `patchReload: live`：切换 / 粘贴 / 删除
+MCP Server 写盘成功后需**重启桌面端**才生效（Web 端热重载语义不变）。
+
 预设专属 MCP Server 的存储位置自 0.1.7 起：预设不再是磁盘上的组合
 文件，而是声明式插件行（`name: '@deepseek-ai/dsh-agent-preset'`），专属 Server
 写在它的 `config.plugins` 里；本插件经 DSH 的 `configEditor` 把改动写回 profile
 的 `cordis.patch.yml`（首次改动会整份覆盖该预设行的 plugins，此后该预设不再跟随
 DSH 升级更新 —— 与 DSH 自带编辑器同一语义，面板上有提示）。
 
+### 桌面端（DeepSeek Harness Desktop）
+
+桌面端是 Electron 壳包着同一套 dsh Web 应用，宿主 profile 固定为 `desktop`
+（默认端口 19387，与 Web 的 3080 互不相扰）。安装走同一条官方命令，只是 profile
+名不同：
+
+```bash
+dsh plugin --profile desktop add dsh-prompt-customizer
+```
+
+客户端 bundle、侧边栏「能力」入口、SKILL / MCP / 提示词三个 tab 在桌面端行为与
+Web 端一致（桌面端经 `dsh-app://` 协议转发请求并附带认证 cookie，插件全部使用
+相对路径请求，无需任何特判）。唯一语义差异是上文提到的：桌面 profile 不做
+`patchReload: live`，MCP 全局 Server 变更需要重启桌面端。
+
 安装后打开 dsh Web UI，侧边栏浏览区上方就是 **提示词** 入口（点击打开覆盖主区的「提示词管理」面板）。
 
 ## 使用说明
 
-侧边栏点 **能力**，在面板顶部选 **提示词** tab。第一行是 agent 预设 chips：「全部 Agent」改的是默认值，选中某个预设后改动只对该预设生效（字段级覆盖），chips 上的橙色数字告诉你它已经单独改了几项。第二行是定制头部：模式切换（提示词 / 工具 / 配置）、阶段 Tab（引导期 / 压缩受控期 / 常驻期 —— 左栏列表与右栏预览联动切换同一个阶段）、三态同步与中文提示词开关、保存 / 刷新 / 关闭。
+侧边栏点 **能力**，在面板顶部选 **提示词** tab。第一行是 agent 预设 chips（0.9.0 起「全部 Agent」已移除——提示词必须按具体预设修改），选中某个预设后改动只对该预设生效，预设未定制的字段 = 官方默认；chips 上的橙色数字告诉你它已经单独改了几项。第二行是定制头部：模式切换（提示词 / 工具 / 配置）、阶段 Tab（引导期 / 压缩受控期 / 常驻期 —— 左栏列表与右栏预览联动切换同一个阶段）、三态同步与中文提示词开关、保存 / 刷新 / 关闭。
 
 ### 提示词模式
 

@@ -92,15 +92,13 @@ async function inventoryOf(routes) {
   return JSON.parse(res.body)
 }
 
-test('面板一打开就列出 agent 作用域段（没跑过任何会话）', async () => {
+test('模式清单不把已有对话的专属段当作预设定义', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
-
   const body = await inventoryOf(routes)
-  const names = body.sections.map((sec) => sec.name)
-  assert.ok(names.includes(RUNTIME_ONLY.name), `清单应含 agent 作用域段，实际：${names.join(', ')}`)
-  assert.equal(body.sections.find((sec) => sec.name === RUNTIME_ONLY.name).text, RUNTIME_ONLY.text)
-  assert.ok(names.includes('persona') && names.includes('core'), '作用域内的常规段照旧在')
+  const names = body.sections.map(sec => sec.name)
+  assert.ok(!names.includes(RUNTIME_ONLY.name))
+  assert.ok(names.includes('persona') && names.includes('core'))
 })
 
 test('没有活着的 agent 时回落运行时累积：跑过一次真实装配就列出来', async () => {
@@ -125,26 +123,21 @@ test('预览只并它自己看见的：预设 scope 里没有的段不会凭空�
   assert.deepEqual(body.sections.map((sec) => sec.name).sort(), ['core', 'persona'])
 })
 
-test('预览把 agent 作用域段并进列表（带 scope 标记），不再「列表里没有、对话里却有」', async () => {
+test('真实 agent 预览列出会话级段，诊断预览不混入其它 agent', async () => {
   const { ctx } = makeCtx()
   apply(ctx, { dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'pc-preview-agent-')) })
-  // 预览装配：作用域是预设，注册表里没有 tool:subagent；但活着的 agent 有它。
-  const preview = await ctx.systemPrompt.assemble({
-    scope: 'preset:standard',
-    promptCustomizerBase: true,
-    promptCustomizerPhase: 'active',
+  const diagnostic = await ctx.systemPrompt.assemble({
+    scope: 'preset:standard', promptCustomizerBase: true, promptCustomizerPhase: 'active',
   })
-
-  const base = preview.promptCustomizerBaseView?.sections ?? []
-  const row = base.find((section) => section.name === RUNTIME_ONLY.name)
-  assert.ok(row, `预览的 baseSections 应含 agent 作用域段，实际：${base.map((s) => s.name).join(', ')}`)
-  assert.equal(row.scope, 'agent', 'agent 作用域段要带 scope 标记，UI 据此标「会话级」')
-  assert.equal(row.blocked, false, '默认没被屏蔽（真实会话里它默认就在提示词里）')
-  // post 视图（模型所见）也要有它 —— 否则预览文本与实际提示词对不上。
-  assert.ok(
-    preview.sections.some((section) => section.name === RUNTIME_ONLY.name),
-    '最终装配视图应含 agent 作用域段',
-  )
+  assert.ok(!diagnostic.sections.some(section => section.name === RUNTIME_ONLY.name))
+  const preview = await ctx.systemPrompt.assemble({
+    scope: AGENT, agent: AGENT, promptCustomizerBase: true, promptCustomizerPhase: 'active',
+  })
+  const row = preview.promptCustomizerBaseView.sections.find(section => section.name === RUNTIME_ONLY.name)
+  assert.ok(row)
+  assert.equal(row.text, RUNTIME_ONLY.text)
+  assert.equal(row.blocked, false)
+  assert.ok(preview.sections.some(section => section.name === RUNTIME_ONLY.name))
 })
 
 test('两条路径并存时同名只出现一次（并集去重）', async () => {

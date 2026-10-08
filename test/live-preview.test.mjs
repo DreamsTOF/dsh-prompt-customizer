@@ -87,9 +87,12 @@ test('waterfall filter applies in-memory draft patch (block via overlay)', async
   // 拿到包装后的 assemble（forceSections 开启时插件在方法边界重建 sections）。
   const handler = ctx.systemPrompt.assemble
   // 草稿补丁屏蔽 persona：叠加只发生在内存，磁盘配置从未写入。
+  // 0.9.0 起草稿必须带目标预设（target）+ 生效预设（preset）——全局层已停用。
   const result = await handler({
     scope: undefined,
     promptCustomizerPhase: 'active',
+    promptCustomizerPreset: 'std',
+    promptCustomizerTarget: 'std',
     promptCustomizerPatch: { sections: ['persona'] },
   })
   const names = result.sections.map((sec) => sec.name)
@@ -105,6 +108,34 @@ test('waterfall filter without patch keeps registry sections untouched', async (
   assert.deepEqual(names.sort(), ['core', 'persona'])
 })
 
+test('retired global layer: top-level prompt fields no longer affect assembly', async () => {
+  const { ctx, dataDir } = makeCtx()
+  // 0.9.0 前的全局层历史数据（停用但保留在 config.yaml）：顶层 sections 曾是
+  // 对全部 agent 生效的屏蔽名单 —— 现在运行时一律不读。
+  fs.writeFileSync(path.join(dataDir, 'config.yaml'), 'sections: [persona]\n')
+  apply(ctx, { dataDir })
+  const result = await ctx.systemPrompt.assemble({ promptCustomizerPhase: 'active' })
+  const names = result.sections.map((sec) => sec.name)
+  assert.deepEqual(names.sort(), ['core', 'persona'], '顶层（全局层）屏蔽名单不再生效')
+})
+
+test('preset override applies standalone: no global base underneath', async () => {
+  const { ctx, dataDir } = makeCtx()
+  // 全局层留有旧数据、预设层只屏蔽 core：生效 = 预设 override 本身，
+  // persona 不受全局旧数据影响（屏蔽名单空数组 = 显式接管为空）。
+  fs.writeFileSync(
+    path.join(dataDir, 'config.yaml'),
+    'sections: [persona]\noverrides:\n  std:\n    sections: []\n',
+  )
+  apply(ctx, { dataDir })
+  const result = await ctx.systemPrompt.assemble({
+    promptCustomizerPhase: 'active',
+    promptCustomizerPreset: 'std',
+  })
+  const names = result.sections.map((sec) => sec.name)
+  assert.deepEqual(names.sort(), ['core', 'persona'], '空屏蔽名单接管为空，全局旧数据不复活')
+})
+
 test('/preview POST carries draft patch into the assemble context', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
@@ -116,8 +147,9 @@ test('/preview POST carries draft patch into the assemble context', async () => 
     seenPatch = context?.promptCustomizerPatch
     return pristine(context)
   }
-  const { req, res } = makeReq('/api/prompt-customizer/preview', {
+  const { req, res } = makeReq('/api/prompt-customizer/preview?scope=std', {
     phase: 'active',
+    target: 'std',
     patch: { sections: ['persona'] },
   })
   await handler(req, res)

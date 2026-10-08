@@ -54,6 +54,10 @@ export interface OverrideData {
 /** 宿主路由返回的最终装配预览载荷。 */
 export interface Preview {
   ok: boolean
+  error?: string
+  source?: 'preset'
+  diagnostics?: Array<{ name: string; variable: string; kind: 'session-variable' }>
+  contexts?: Array<{ name: string; text: string }>
   scope?: unknown
   /** false = 预设 scope 未能挂载，预览回退到了全局层装配。 */
   scopeResolved?: boolean

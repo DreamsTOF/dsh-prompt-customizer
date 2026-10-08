@@ -45,6 +45,10 @@ export function PreviewPane({ t, phases, phase, sub }: {
       phases !== null && data === null
         ? h('div', { style: s.error }, t('previewFail'))
         : null,
+      data ? h('div', { style: s.muted }, t('previewPreset')) : null,
+      data?.diagnostics?.length ? h('div', { style: s.noticeWarn }, t('previewUnresolved', {
+        names: [...new Set(data.diagnostics.map(item => `{{${item.variable}}}`))].join(', '),
+      })) : null,
       sub === 'prompt'
         ? data
           ? [
@@ -53,6 +57,11 @@ export function PreviewPane({ t, phases, phase, sub }: {
                 h('span', { style: s.orderTag }, `${data.sections.length} ${t('previewSections')}`),
               ]),
               h('pre', { style: s.previewText }, data.text || t('empty')),
+              h('div', { style: s.rowTitle }, t('runtimeContexts')),
+              ...(data.contexts ?? []).map(context => h('div', { key: context.name }, [
+                h('div', { style: s.muted }, context.name),
+                h('pre', { style: s.previewText }, context.text || t('empty')),
+              ])),
             ]
           : null
         : data

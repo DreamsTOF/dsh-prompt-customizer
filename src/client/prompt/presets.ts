@@ -322,24 +322,25 @@ export function toggleTool(name: string, currentlyHidden: boolean, toolsCfg: Too
 // ── 按 agent 预设的覆盖编辑 ─────────────────────────────────────────────
 
 /**
- * 编辑目标的「显示视图」：全局目标返回原配置；agent 预设目标把该预设
- * override 的字段叠在全局值之上展示（空缺字段显示全局继承值）。`presets`
- * 与 `activePreset` 永远来自全局 —— 预设快照库本身不分作用域。
+ * 编辑目标的「显示视图」：0.9.0 起全局层停用（提示词必须按具体预设修改），
+ * 预设视图只显示该预设 override 自己的字段 —— 空缺字段 = 无定制 = 官方默认，
+ * **不再叠显示全局继承值**（运行时已不读它，显示了会误导）。`presets` 与
+ * `activePreset` 永远来自全局 —— 预设快照库本身不分作用域。
  */
 export function editView(cfg: Config, target: string | undefined): Config {
   if (!target) return cfg
   const ovr = cfg.overrides?.[target] ?? {}
   return {
-    sections: ovr.sections ?? cfg.sections,
-    sectionsBootstrap: ovr.sectionsBootstrap ?? cfg.sectionsBootstrap,
-    sectionsCompaction: ovr.sectionsCompaction ?? cfg.sectionsCompaction,
-    replace: ovr.replace ?? cfg.replace,
-    inject: ovr.inject ?? cfg.inject,
+    sections: ovr.sections ?? [],
+    sectionsBootstrap: ovr.sectionsBootstrap ?? [],
+    sectionsCompaction: ovr.sectionsCompaction ?? [],
+    replace: ovr.replace ?? {},
+    inject: ovr.inject ?? [],
     tools: {
-      exclude: ovr.tools?.exclude ?? cfg.tools?.exclude,
-      add: ovr.tools?.add ?? cfg.tools?.add,
-      bootstrap: ovr.tools?.bootstrap ?? cfg.tools?.bootstrap,
-      compaction: ovr.tools?.compaction ?? cfg.tools?.compaction,
+      exclude: ovr.tools?.exclude ?? [],
+      add: ovr.tools?.add ?? [],
+      bootstrap: ovr.tools?.bootstrap,
+      compaction: ovr.tools?.compaction,
     },
     presets: cfg.presets,
     activePreset: cfg.activePreset,

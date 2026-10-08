@@ -2,8 +2,10 @@
  * mcp-config — 真实 MCP Server 状态 + 启用/禁用/删除（host 半身）。
  *
  * GET  /api/triad/mcp-status  只读：注册工具（ctx.tools 中 mcp__*）∪ 配置文件
- *                             （~/.dsh/profiles/web/cordis.patch.yml 的
- *                             mcp-client 条目，含 disabled 标记）。
+ *                             （宿主活动 profile 的 cordis.patch.yml 的
+ *                             mcp-client 条目，含 disabled 标记；0.8.1 起随
+ *                             宿主 profileContext 走，桌面端即 desktop profile，
+ *                             旧行为回落见 fallbackProfileName）。
  *                             0.1.6 起附带预设维度：presets（预设名单）、
  *                             masks（预设遮蔽账本镜像）、presetServers
  *                             （各预设自带的 mcp-client 行）、每个 server 的
@@ -16,6 +18,8 @@
  *                             cordis.patch.yml.bak-last-toggle。web profile 为
  *                             patchReload: live，写完后 DSH 热重载配置：
  *                             禁用→工具立即注销，启用→重新注册，删除→条目消失。
+ *                             桌面 profile 没有 patchReload: live，写入后需
+ *                             重启桌面端才生效。
  */
 
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'node:fs'
@@ -41,7 +45,6 @@ import { readPresetRoster } from './skill-toggles.ts'
 const STATUS_ROUTE = '/api/triad/mcp-status'
 const CONFIG_ROUTE = '/api/triad/mcp-config'
 const MCP_CLIENT_NAME = `'@deepseek-ai/dsh-mcp-client'`
-const PROFILE_NAME = 'web'
 /** 备份文件名（固定名，覆盖式；保留最近一次切换前的版本）。 */
 const BACKUP_SUFFIX = '.bak-last-toggle'
 
@@ -50,9 +53,50 @@ function dshHome(): string {
   return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh')
 }
 
-/** 面板管理的补丁文件：默认 web profile 的 cordis.patch.yml。 */
+/**
+ * 活动 profile 的 cordis.patch.yml。
+ *
+ * 面板管理的补丁文件随宿主启动的 profile 走（web / desktop / 自定义名），
+ * 不能写死：applyMcpStatus 挂载时从宿主 `profileContext` 解析一次并缓存在
+ * 模块级（launch 注入的常量，进程内不变）。宿主面缺失时（单测 stub / 直挂）
+ * 回落 DSH_DESKTOP_PROFILE 环境变量（桌面壳 v4 传递实际 profile 名），
+ * 最后回落 'web' 保持 0.8.0 前的旧行为。
+ */
+let resolvedPatchPath: string | undefined
+let resolvedProfileName: string | undefined
+
+function fallbackProfileName(): string {
+  const fromEnv = process.env['DSH_DESKTOP_PROFILE']
+  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : 'web'
+}
+
+/** 面板管理的补丁文件：宿主活动 profile 的 cordis.patch.yml（未挂载时按回落链推算）。 */
 function patchFilePath(): string {
-  return join(dshHome(), 'profiles', PROFILE_NAME, 'cordis.patch.yml')
+  return resolvedPatchPath ?? join(dshHome(), 'profiles', fallbackProfileName(), 'cordis.patch.yml')
+}
+
+/** 挂载时从宿主读一次活动 profile（patchPath 精确到文件，dir/name 仅诊断用）。 */
+function resolveActiveProfile(ctx: Context): void {
+  const anyCtx = ctx as unknown as {
+    profileContext?: { patchPath?: unknown; dir?: unknown; name?: unknown }
+    get?: (name: string) => unknown
+  }
+  const profileContext = anyCtx.profileContext
+    ?? (typeof anyCtx.get === 'function' ? anyCtx.get('profileContext') as any : undefined)
+  const patchPath = profileContext?.patchPath
+  if (typeof patchPath === 'string' && patchPath.trim() !== '') {
+    resolvedPatchPath = patchPath
+    resolvedProfileName = typeof profileContext?.name === 'string' ? profileContext.name : undefined
+    return
+  }
+  const dir = profileContext?.dir
+  if (typeof dir === 'string' && dir.trim() !== '') {
+    resolvedPatchPath = join(dir, 'cordis.patch.yml')
+    resolvedProfileName = typeof profileContext?.name === 'string' ? profileContext.name : undefined
+    return
+  }
+  resolvedPatchPath = undefined
+  resolvedProfileName = fallbackProfileName()
 }
 
 interface PatchMcpEntry {
@@ -291,6 +335,8 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
     serverCount: servers.length,
     toolCount: servers.reduce((sum, server) => sum + (server.toolCount as number), 0),
     patchFile: path,
+    // 面板管理的 profile 名（诊断用：桌面端应显示 desktop，而不是 web）。
+    profile: resolvedProfileName ?? fallbackProfileName(),
     servers,
     presets,
     masks: ledger.presets,
@@ -469,6 +515,7 @@ function startWatchdog(): () => void {
 
 /** 注册 GET /api/triad/mcp-status 与 POST /api/triad/mcp-config。 */
 export function applyMcpStatus(ctx: Context): void {
+  resolveActiveProfile(ctx)
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: STATUS_ROUTE,

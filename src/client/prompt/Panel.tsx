@@ -15,7 +15,6 @@
 import { createElement as h, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
 import { IconAgentPresetOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 // 预设 chips 行直接复用能力面板（SKILL / MCP）的类名：三处「Agent 预设」几何一致。
-import { CatAllIcon } from '../skills/icons.js'
 import { css } from '../skills/styles.js'
 import { payloadOf, dropOnPhase } from './dnd.ts'
 import { DICT, type Translate } from './locales.ts'
@@ -84,7 +83,9 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 草稿预览的同步序号：每次发起同步 +1，过期响应（已保存 / 再次编辑后）
   // 直接丢弃，绝不覆盖新数据。
   const syncSeq = useRef(0)
-  // 编辑目标：undefined = 全局默认；字符串 = agent 预设 id（字段级覆盖）。
+  const refreshSeq = useRef(0)
+  // 编辑目标：agent 预设 id。0.9.0 起「全部 Agent」入口已移除 —— 提示词必须
+  // 按具体预设修改；列表到达后默认选中第一个可用预设（见下方 effect）。
   const [target, setTarget] = useState<string | undefined>(undefined)
   // 三态同步（默认关）：勾选后提示词 / 工具两栏的三态一起生效 —— 提示词栏按
   // 常驻期的并集行集覆写另外两态（增删 / 排序 / 勾选 / 文本一次写全三态），
@@ -114,26 +115,42 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
 
   // 返回 Promise：手动刷新后可以链上草稿补同步（见「刷新」按钮）。
   const refresh = (): Promise<void> => {
+    const seq = ++refreshSeq.current
     const qs = target ? `?scope=${encodeURIComponent(target)}` : ''
-    // 三阶段预览并行拉取：左栏列表与右栏预览全部以这套装配结果为唯一数据源
-    // —— 静态清单只是注册表视角（不含伪 agent 阶段裁剪、pre-step 注入等
-    // 运行时规则），与它保持一致才是"所见即模型所见"。
+    // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。
     const params = (phase: string): string =>
       `${qs}${qs ? '&' : '?'}phase=${phase}&t=${Date.now()}`
+    const failures: string[] = []
     const grab = (phase: string): Promise<Preview | null> =>
       fetch(PREVIEW_URL + params(phase))
         .then((r) => r.json())
-        .then((body: Preview) => (body?.ok === false ? null : body))
-        .catch(() => null)
-    // 「本系统全部提示词/工具」池是全局注册表，永不随编辑目标切换 ——
-    // 清单请求不带 scope，三阶段预览仍带 scope（作为该预设的真实装配）。
-    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL).then((r) => r.json())])
+        .then((body: Preview) => {
+          if (body.ok === false) throw new Error(body.error ?? t('previewFail'))
+          return body
+        })
+        .catch((error: unknown) => {
+          failures.push(`${phase}: ${String(error instanceof Error ? error.message : error)}`)
+          return null
+        })
+    // 清单带 scope：当前模式的同名正文优先，其它历史条目只作为池子参考。
+    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
+      if (body.ok === false) throw new Error(body.error ?? 'inventory failed')
+      return body
+    }).catch((error: unknown) => {
+      failures.push(String(error instanceof Error ? error.message : error))
+      return null
+    })])
       .then(([boot, comp, act, inventoryData]) => {
+        if (seq !== refreshSeq.current) return
         setPhases({ bootstrap: boot, compaction: comp, active: act })
         setInv(inventoryData as Inventory)
-        setError(null)
+        setError(failures.length ? failures.join('\n') : null)
       })
-      .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
+      .catch((e: unknown) => {
+        if (seq !== refreshSeq.current) return
+        setPhases({ bootstrap: null, compaction: null, active: null })
+        setError(String(e instanceof Error ? e.message : e))
+      })
   }
   // 挂载时与切换编辑目标后：清单与三阶段预览切到对应 scope。
   // version 入依赖：保存/写配置成功后 +1，驱动重新拉取（否则一直显示保存前的装配）。
@@ -151,7 +168,10 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     }
     if (Object.keys(patch).length === 0) return
     const seq = ++syncSeq.current
-    fetch(PREVIEW_URL, {
+    // scope 走查询串（服务端 previewTarget 只认 query）：草稿补丁必须落在
+    // 当前编辑的预设上，否则生效视图为空、预览退回官方原样。
+    const scopeQs = target !== undefined ? `?scope=${encodeURIComponent(target)}` : ''
+    fetch(PREVIEW_URL + scopeQs, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ target, patch, phase }),
@@ -186,6 +206,16 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
       .catch(() => setAgentPresets([]))
   }
   useEffect(() => { fetchPresets() }, [])
+
+  // 默认编辑目标：预设名单异步到达后补选一次（首个可用预设，全失效则首个）。
+  // 只在尚未选择时生效 —— 用户此后切换 / 名单刷新都不覆盖当前选择。
+  useEffect(() => {
+    setTarget((current) => {
+      if (current !== undefined) return current
+      const first = agentPresets.find((p) => !p.broken) ?? agentPresets[0]
+      return first?.id
+    })
+  }, [agentPresets])
 
   // 保存成功/失败后的短促闪示消息（3 秒自动消失；err 用红色样式）。
   const showFlash = (text: string, kind: 'ok' | 'err' = 'ok'): void => {
@@ -240,9 +270,8 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   }
 
   // 两栏的写入：只改内存草稿，不落盘。草稿只记录被编辑的这一字段 —— 保存时
-  // 也只会提交编辑过的字段，未编辑字段继续回落全局 / 继承。target 缺省时写
-  // 全局顶层；预设目标由 /config/apply 写 overrides[id]（字段级接管语义在保存
-  // 时生效）。
+  // 也只会提交编辑过的字段。/config/apply 必带 target（agent 预设 id，0.9.0
+  // 起服务端拒绝无目标写盘），写 overrides[id]（字段级接管语义在保存时生效）。
   const edit = (field: EditField, value: unknown): void => {
     setDraft((d) => ({
       ...(d ?? { dirty: false }),
@@ -444,21 +473,19 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
    * 悬停与选中态完全对齐）。尾部数字 = 该预设已定制的字段数（有则橙色），
    * 与 MCP 的「数字 + 橙色 = 有单独设置」同一读法；失效预设置换成「失效」标记。
    */
-  const targetChip = (id: string | undefined, label: string, icon: ReactElement, broken?: string): ReactElement => {
+  const targetChip = (id: string, label: string, icon: ReactElement, broken?: string): ReactElement => {
     const active = target === id
     const bad = broken !== undefined && broken !== ''
-    const customized = id === undefined ? 0 : Object.keys(cfg?.overrides?.[id] ?? {}).length
+    const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length
     return h('button', {
-      key: id ?? '__global__',
+      key: id,
       type: 'button',
       className: css.catItem,
       'data-active': active || undefined,
       onClick: () => switchTarget(id),
       title: bad
         ? `${label} — ${t('broken')}`
-        : id === undefined
-          ? t('targetHint')
-          : customized > 0 ? `${label} · ${t('targetCustomized', { n: customized })}` : label,
+        : customized > 0 ? `${label} · ${t('targetCustomized', { n: customized })}` : label,
     }, [
       h('span', { className: css.catIcon, 'data-active': active || undefined }, icon),
       h('span', { className: css.catLabel }, label),
@@ -471,9 +498,9 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
+    // 0.9.0 起「全部 Agent」入口移除：提示词必须按具体预设修改，无全局目标。
     h('div', { key: 'targets', className: css.topbar }, [
       h('div', { className: css.chipRow, role: 'group', 'aria-label': t('targetLabel') }, [
-        targetChip(undefined, t('targetAllTab'), h(CatAllIcon, { size: 16 })),
         ...agentPresets.map((p) => targetChip(p.id, p.name, h(IconAgentPresetOutlineRegular, { size: 15 }), p.broken)),
       ]),
     ]),
