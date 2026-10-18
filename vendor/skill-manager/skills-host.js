@@ -59,13 +59,26 @@ function unzipArchive(buffer) {
   }
   return files;
 }
+// 根解析规则与内核 0.2.1-rc.2 的 resolveDshHome/resolveAgentsHome 对齐：
+// 空串/纯空白按未设置、支持 ~ 前缀展开。真源见 src/home-paths.ts。
+function resolveRoot(envName, fallback) {
+  const fromEnv = process.env[envName];
+  const selected = fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : fallback;
+  if (selected === "~") return homedir();
+  if (selected.startsWith("~/") || selected.startsWith("~\\")) return resolve(homedir(), selected.slice(2));
+  return resolve(selected);
+}
+function agentsHome() {
+  return resolveRoot("DSH_AGENTS_HOME", join(homedir(), ".agents"));
+}
+function dshHome() {
+  return resolveRoot("DSH_HOME", join(homedir(), ".dsh"));
+}
 function managedRoot() {
-  const agentsHome = process.env.DSH_AGENTS_HOME ?? join(homedir(), ".agents");
-  return join(agentsHome, "skills");
+  return join(agentsHome(), "skills");
 }
 function dshRoot() {
-  const dshHome = process.env.DSH_HOME ?? join(homedir(), ".dsh");
-  return join(dshHome, "skills");
+  return join(dshHome(), "skills");
 }
 function parseFrontmatter(raw) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
@@ -762,5 +775,8 @@ async function apply(ctx) {
 export {
   apply,
   inject,
-  name
+  name,
+  // 仅供 test/home-paths.test.mjs 做与 src/home-paths.ts 的等值断言。
+  managedRoot as __managedRoot,
+  dshRoot as __dshRoot
 };

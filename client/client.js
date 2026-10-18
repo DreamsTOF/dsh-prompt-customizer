@@ -3133,17 +3133,8 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     ])
   ]);
 }
-function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onReset, envBlocklist }) {
-  const [agentName, setAgentName] = (0, import_react6.useState)("");
-  const [creating, setCreating] = (0, import_react6.useState)(false);
+function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist }) {
   const [blockInput, setBlockInput] = (0, import_react6.useState)("");
-  const createAgentPreset = async () => {
-    const trimmed = agentName.trim();
-    if (trimmed.length === 0 || creating) return;
-    setCreating(true);
-    if (await saveAsPreset(trimmed)) setAgentName("");
-    setCreating(false);
-  };
   const removeBlockEntry = (entry) => {
     writeGlobal("envBlocklist", envBlocklist.filter((e) => e !== entry));
   };
@@ -3156,13 +3147,14 @@ function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onRe
   return (0, import_react6.createElement)("div", { style: s.colRight }, [
     (0, import_react6.createElement)("div", { style: s.colRightScroll }, [
       (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("saveAsPresetCard")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("saveAsPresetHint", { name: forkSource ?? t("forkSourceDefault") })),
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("exportPresetCard")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("exportPresetHint", { name: exportTarget ?? t("exportTargetDefault") })),
         (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("agentPresetName"), value: agentName, onChange: (e) => setAgentName(e.target.value) }),
-          (0, import_react6.createElement)("button", { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => {
-            void createAgentPreset();
-          } }, t("saveAsPreset"))
+          (0, import_react6.createElement)("button", {
+            style: s.mini,
+            disabled: exporting,
+            onClick: onExportPreset
+          }, exporting ? t("exportPresetRunning") : t("exportPreset"))
         ])
       ]),
       (0, import_react6.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
@@ -3303,7 +3295,8 @@ var CONFIG_SET_URL = "/api/prompt-customizer/config/set";
 var CONFIG_UNSET_URL = "/api/prompt-customizer/config/unset";
 var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
 var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
-var PRESETS_CREATE_URL = "/api/prompt-customizer/presets";
+var EXPORT_URL = "/api/prompt-customizer/export";
+var CATALOG_RESCAN_URL = "/api/prompt-customizer/catalog/rescan";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
@@ -3326,6 +3319,8 @@ function Panel({ t, onClose }) {
   const [saving, setSaving] = (0, import_react9.useState)(false);
   const [flash, setFlash] = (0, import_react9.useState)(null);
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
+  const [rescanning, setRescanning] = (0, import_react9.useState)(false);
+  const [exporting, setExporting] = (0, import_react9.useState)(false);
   const flashTimer = (0, import_react9.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
@@ -3415,6 +3410,30 @@ function Panel({ t, onClose }) {
     setFlash(text);
     setFlashKind(kind);
     flashTimer.current = setTimeout(() => setFlash(null), 3200);
+  };
+  const rescanCatalog = () => {
+    if (rescanning) return;
+    setRescanning(true);
+    showFlash(t("rescanCatalogRunning"), "ok");
+    fetch(CATALOG_RESCAN_URL, { method: "POST" }).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? t("rescanCatalogFail"));
+      const report = body.report ?? {};
+      const tools = report.tools ?? {};
+      const sections = report.sections ?? {};
+      if ((report.tools?.after ?? 0) === 0 && (report.sections?.after ?? 0) === 0) {
+        showFlash(t("rescanCatalogEmpty"), "err");
+        return;
+      }
+      showFlash(t("rescanCatalogOk", {
+        toolsBefore: tools.before ?? 0,
+        toolsAfter: tools.after ?? 0,
+        toolsRemoved: tools.removed ?? 0,
+        sectionsBefore: sections.before ?? 0,
+        sectionsAfter: sections.after ?? 0,
+        sectionsRemoved: sections.removed ?? 0
+      }), "ok");
+      void refresh();
+    }).catch((error2) => showFlash(`${t("rescanCatalogFail")}: ${String(error2 instanceof Error ? error2.message : error2)}`, "err")).finally(() => setRescanning(false));
   };
   const clearDraft = () => {
     syncSeq.current += 1;
@@ -3554,34 +3573,22 @@ function Panel({ t, onClose }) {
     clearDraft();
     setTarget(next);
   };
-  const saveAsPreset = (presetName) => {
-    const name = presetName.trim();
-    if (name.length === 0) return Promise.resolve(false);
-    return fetch(PRESETS_CREATE_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name,
-        from: target,
-        config: {
-          sections: view.sections ?? [],
-          sectionsBootstrap: view.sectionsBootstrap ?? [],
-          sectionsCompaction: view.sectionsCompaction ?? [],
-          replace: view.replace ?? {},
-          inject: view.inject ?? [],
-          tools: view.tools ?? {}
+  const exportCurrentPreset = () => {
+    if (exporting) return;
+    setExporting(true);
+    fetch(`${EXPORT_URL}?scope=${encodeURIComponent(target)}`).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? t("exportPresetFail"));
+      const filename = `prompt-customizer-${String(body.target ?? target)}.json`;
+      const text = JSON.stringify(body, null, 2);
+      const io = makeIoEnv();
+      void io.saveText(filename, text).then((outcome) => {
+        if (outcome.kind === "saved") showFlash(t("exportPresetOk", { name: filename }), "ok");
+        else if (outcome.kind === "unavailable") {
+          io.download(filename, text);
+          showFlash(t("exportPresetOk", { name: filename }), "ok");
         }
-      })
-    }).then((r) => r.json()).then((body) => {
-      if (body?.ok !== true) throw new Error(body?.error ?? t("saveAsPresetFail"));
-      load();
-      fetchPresets();
-      showFlash(t("saveAsPresetOk"), "ok");
-      return true;
-    }).catch((e) => {
-      showFlash(`${t("saveAsPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err");
-      return false;
-    });
+      });
+    }).catch((e) => showFlash(`${t("exportPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setExporting(false));
   };
   const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
@@ -3688,6 +3695,13 @@ function Panel({ t, onClose }) {
         (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
+        // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
+        (0, import_react9.createElement)("button", {
+          style: s.saveBtn,
+          disabled: rescanning,
+          title: t("rescanCatalogHint"),
+          onClick: rescanCatalog
+        }, rescanning ? t("rescanCatalogRunning") : t("rescanCatalog")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
         onClose === void 0 ? null : (0, import_react9.createElement)(
           "button",
@@ -3735,8 +3749,9 @@ function Panel({ t, onClose }) {
           inv,
           t,
           writeGlobal,
-          saveAsPreset,
-          forkSource: target ? agentPresets.find((p) => p.id === target)?.name ?? target : void 0,
+          onExportPreset: exportCurrentPreset,
+          exporting,
+          exportTarget: target ? agentPresets.find((p) => p.id === target)?.name ?? target : void 0,
           onReset: resetAll,
           envBlocklist: cfg.envBlocklist ?? []
         })
@@ -3788,12 +3803,19 @@ var DICT = {
     previewToolCount: "\u4E2A\u5DE5\u5177",
     savePreset: "\u4FDD\u5B58\u5F53\u524D\u914D\u7F6E",
     presetName: "\u914D\u7F6E\u540D\u79F0",
-    saveAsPresetCard: "\u5B58\u4E3A agent \u9884\u8BBE",
-    saveAsPresetHint: "\u6574\u4F53\u590D\u5236\u300C{name}\u300D\u8FD9\u4E2A\u9884\u8BBE\u7684\u7EC4\u6210\u4E3A\u65B0\u9884\u8BBE\uFF08\u7EC4\u6210\u6587\u4EF6\u4E0E\u4F34\u751F\u811A\u672C\u4E00\u5E76\u5E26\u8D70\uFF09\uFF0C\u518D\u628A\u5F53\u524D\u5B9A\u5236\u5199\u8FDB\u5B83\u7684\u8986\u76D6\u9879 \u2014\u2014 \u65B0\u9884\u8BBE\u51FA\u73B0\u5728\u9876\u90E8\u7F16\u8F91\u76EE\u6807\u91CC\u3002",
-    agentPresetName: "\u65B0\u9884\u8BBE\u540D",
-    forkSourceDefault: "\u9ED8\u8BA4\u9884\u8BBE",
-    saveAsPresetOk: "\u9884\u8BBE\u5DF2\u521B\u5EFA\uFF0C\u53EF\u5728\u9876\u90E8\u7684\u7F16\u8F91\u76EE\u6807\u9009\u62E9\u5668\u91CC\u9009\u5230\u5B83",
-    saveAsPresetFail: "\u4FDD\u5B58\u9884\u8BBE\u5931\u8D25",
+    exportPresetCard: "\u5BFC\u51FA\u5F53\u524D\u9884\u8BBE\u914D\u7F6E",
+    exportPresetHint: "\u628A\u300C{name}\u300D\u5728\u672C\u63D2\u4EF6\u91CC\u7684\u5168\u90E8\u5B9A\u5236\uFF08\u6BB5\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165\u3001\u4E09\u9636\u6BB5\u5DE5\u5177\u76EE\u5F55\u3001forceSections\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF09\u8FDE\u540C\u8BE5\u9884\u8BBE\u7684\u7EC4\u6210\u58F0\u660E\u5BFC\u51FA\u4E3A JSON\u3002\u53EA\u8BFB\u5BFC\u51FA\uFF0C\u4E0D\u6539\u52A8 DSH \u914D\u7F6E\uFF1B\u8981\u653E\u8FDB DSH \u8BF7\u81EA\u884C\u5E76\u5165 cordis \u914D\u7F6E\u3002",
+    exportPreset: "\u5BFC\u51FA",
+    exportPresetRunning: "\u5BFC\u51FA\u4E2D\u2026",
+    rescanCatalog: "\u91CD\u626B\u767B\u8BB0\u8868",
+    rescanCatalogHint: "\u9010\u4E2A\u6302\u8F7D\u5DF2\u58F0\u660E\u7684 agent \u9884\u8BBE\uFF0C\u8DD1\u4E00\u6B21\u88C5\u914D\uFF0C\u7528\u771F\u5B9E\u770B\u5230\u7684\u6BB5\u4E0E\u5DE5\u5177**\u6574\u4F53\u66FF\u6362**\u7D2F\u79EF\u767B\u8BB0\u8868 \u2014\u2014 \u5220\u6389\u90A3\u4E9B\u5DF2\u7ECF\u4E0D\u5B58\u5728\u3001\u5374\u8FD8\u7559\u5728\u5217\u8868\u91CC\u80FD\u88AB\u62D6\u52A8\u7684\u5386\u53F2\u6761\u76EE\u3002\u8017\u65F6\u53EF\u89C2\uFF08\u6BCF\u4E2A\u9884\u8BBE\u8981\u6302\u8F7D\u6574\u68F5\u63D2\u4EF6\u6811\uFF09\u3002",
+    rescanCatalogRunning: "\u6B63\u5728\u91CD\u626B\u6240\u6709 agent \u9884\u8BBE\u2026",
+    rescanCatalogOk: "\u91CD\u626B\u5B8C\u6210\uFF1A\u5DE5\u5177 {toolsBefore} \u2192 {toolsAfter}\uFF08\u6E05\u6389 {toolsRemoved}\uFF09\uFF0C\u6BB5 {sectionsBefore} \u2192 {sectionsAfter}\uFF08\u6E05\u6389 {sectionsRemoved}\uFF09",
+    rescanCatalogEmpty: "\u91CD\u626B\u6CA1\u6709\u6210\u529F\u4EFB\u4F55\u9884\u8BBE\uFF0C\u5DF2\u4FDD\u7559\u73B0\u6709\u767B\u8BB0\u8868\uFF08\u672A\u6E05\u7A7A\uFF09\u3002",
+    rescanCatalogFail: "\u91CD\u626B\u5931\u8D25",
+    exportTargetDefault: "\u9ED8\u8BA4\u9884\u8BBE",
+    exportPresetOk: "\u5DF2\u5BFC\u51FA {name}",
+    exportPresetFail: "\u5BFC\u51FA\u5931\u8D25",
     save: "\u4FDD\u5B58",
     importPreset: "\u5BFC\u5165\u914D\u7F6E",
     import: "\u5BFC\u5165",
@@ -3887,7 +3909,6 @@ var DICT = {
     phaseVisible: "\u9636\u6BB5\u53EF\u89C1",
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
-    saveAsPreset: "\u5B58\u4E3A\u9884\u8BBE",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
     navShort: "\u63D0\u793A\u8BCD",
     close: "\u5173\u95ED",
@@ -3944,12 +3965,13 @@ var DICT = {
     previewToolCount: "tools",
     savePreset: "Save current config",
     presetName: "Config name",
-    saveAsPresetCard: "Save as agent preset",
-    saveAsPresetHint: 'Copy the whole "{name}" preset into a new one (composition plus its companion scripts), then write the current customization into its override \u2014 the new preset shows up in the target selector above.',
-    agentPresetName: "New preset name",
-    forkSourceDefault: "the default preset",
-    saveAsPresetOk: "Preset created \u2014 pick it in the target selector above",
-    saveAsPresetFail: "Failed to save preset",
+    exportPresetCard: "Export this preset's configuration",
+    exportPresetHint: "Export everything this plugin customizes for '{name}' (section blocking / replacement / injection, per-phase tool catalogs, forceSections, env blocklist) plus that preset's composition declaration, as JSON. Read-only: it never touches your DSH configuration \u2014 merge it into your cordis config yourself.",
+    exportPreset: "Export",
+    exportPresetRunning: "Exporting\u2026",
+    exportTargetDefault: "the default preset",
+    exportPresetOk: "Exported {name}",
+    exportPresetFail: "Export failed",
     save: "Save",
     importPreset: "Import preset",
     import: "Import",
@@ -4043,7 +4065,6 @@ var DICT = {
     phaseVisible: "visible in phase",
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
-    saveAsPreset: "Save as preset",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
     navShort: "Prompts",
     close: "Close",
@@ -4057,7 +4078,13 @@ var DICT = {
     settingsTitle: "Global settings",
     libraryTitle: "Config snapshots",
     draftBadge: "Preview includes unsaved draft",
-    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)"
+    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)",
+    rescanCatalog: "Rescan registry",
+    rescanCatalogHint: "Mount every declared agent preset once, run one assembly, and replace the accumulated catalog with what is actually there \u2014 removing stale rows that no longer exist but can still be dragged. Slow: each preset mounts a whole plugin tree.",
+    rescanCatalogRunning: "Rescanning all agent presets\u2026",
+    rescanCatalogOk: "Rescan done: tools {toolsBefore} \u2192 {toolsAfter} ({toolsRemoved} removed), sections {sectionsBefore} \u2192 {sectionsAfter} ({sectionsRemoved} removed)",
+    rescanCatalogEmpty: "No preset scanned successfully \u2014 the existing catalog was kept (not cleared).",
+    rescanCatalogFail: "Rescan failed"
   }
 };
 

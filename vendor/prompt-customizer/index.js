@@ -23,6 +23,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { parse } from 'yaml'
 import { Config, NS } from './schema.js'
 import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applyToolFilter, applySectionPolicy } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
@@ -419,6 +420,73 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposePreview, 'prompt-customizer: preview route')
 
+    // 全量重扫：逐个挂载已声明的 agent 预设，跑一次装配，用真实并集**整体替换**
+    // 累积登记表。
+    //
+    // 必要性：catalog 是「只增不减」的累积缓存 —— 浏览过的名字永远留在池子里。
+    // 一旦某个预设被删除、某插件被卸载，它带来的段与工具仍会以可拖动条目的形式
+    // 留在面板上（实测 407 个工具里只剩约 100 个还在真实注册表里）。这是唯一能
+    // 真正缩小登记表、且按真实注册表对齐的入口。
+    //
+    // 代价：每个预设都要挂载整棵插件树（重的一棵树可达十几秒），所以只由用户
+    // 显式触发，不做自动预热。扫描期间逐个预设失败不影响其它预设：坏预设跳过
+    // 并把原因回给界面，剩下的照常并入。
+    const disposeRescan = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/catalog/rescan',
+      handler: async (req, res) => {
+        try {
+          if (req.method !== 'POST') {
+            writeJson(res, 405, { ok: false, error: 'POST only' })
+            return
+          }
+          const roster = ctx.get('agentPresets')
+          if (roster === undefined || typeof roster.acquireScope !== 'function') {
+            writeJson(res, 501, { ok: false, error: '宿主未提供 agent 预设作用域（agentPresets.acquireScope），无法重扫' })
+            return
+          }
+          const declared = await roster.list()
+          const sections = []
+          const tools = []
+          const skipped = []
+          const scanned = []
+          for (const preset of Array.isArray(declared) ? declared : []) {
+            const presetId = preset?.id
+            if (typeof presetId !== 'string' || presetId === '') continue
+            let lease
+            try {
+              lease = await roster.acquireScope(presetId)
+              // base 视图 = 进入本插件过滤前的真实段 / 工具原文，正是要留的并集。
+              const base = await collectScopeBase(ctx, lease.key, presetId)
+              sections.push(...base.sections)
+              tools.push(...base.tools)
+              scanned.push(presetId)
+            } catch (error) {
+              skipped.push({ preset: presetId, reason: String(error && error.message ? error.message : error) })
+            } finally {
+              if (lease !== undefined) {
+                try { await lease[Symbol.asyncDispose]() } catch { /* 释放失败不影响结果 */ }
+              }
+            }
+          }
+          if (scanned.length === 0) {
+            writeJson(res, 409, {
+              ok: false,
+              error: '没有任何预设扫描成功，保留现有登记表以免清空',
+              skipped,
+            })
+            return
+          }
+          // 多个预设会重复贡献同名条目：catalog.replace 内部按名字归一（后见到者赢）。
+          const report = catalog.replace({ sections, tools })
+          writeJson(res, 200, { ok: true, scanned, skipped, report, catalog: catalog.read() })
+        } catch (error) {
+          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeRescan, 'prompt-customizer: catalog rescan route')
+
     // agent 预设枚举路由：直接读 roster 的 list()（未 memo 化，运行中新增
     // 的预设立即可见），给 UI 的目标选择器与预览选择器供货。
     const disposePresets = register({
@@ -442,70 +510,68 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposePresets, 'prompt-customizer: agent-presets route')
 
-    // 存为 agent 预设：整体 fork 当前编辑目标的预设目录 —— 组成文件、preset.yml、
-    // 伴生 .mjs、技能目录一并带走（宿主 authoring API 负责复制并解引用符号链接，
-    // 副本自包含），再把提交来的配置写进本插件 overrides[新名]。于是新预设 =
-    // 来源预设的原样组成 + 我刚改好的定制，这才叫「保存的是我修改后的样子」。
-    // 我们不再自己生成骨架：骨架带着 persona complete: true，宿主会在水流之后把
-    // sections 还原成那一条段，段级定制在它上面根本不生效。
-    const disposePresetsCreate = register({
+    // 导出当前编辑目标的配置：`GET /api/prompt-customizer/export?scope=<id>`。
+    //
+    // 只读导出，不创建预设。宿主 `agentPresets` 没有 authoring API（只有
+    // list / read / select），而预设本身是 profile patch 里一行的声明式配置
+    // ——「帮用户造预设」需要猜 Loader 命名空间、重复行 id、把来源组成拍成
+    // 不再跟随升级的快照，代价远大于收益。导出把决定权交回用户：拿到的是本
+    // 插件对该目标的全部定制，可自行并入 cordis 配置。
+    //
+    // 内容 = overrides[scope]（本插件唯一的配置真源）+ 来源预设的组成声明（参考），
+    // 以及该预设的工具/段清单，便于人工核对。
+    const disposeExport = register({
       kind: 'exact',
-      path: '/api/prompt-customizer/presets',
+      path: '/api/prompt-customizer/export',
       handler: async (req, res) => {
         try {
-          const body = await readJsonBody(req)
-          const name = typeof body?.name === 'string' ? body.name.trim() : ''
-          if (!/^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)) {
-            writeJson(res, 400, { ok: false, error: '预设名只能包含中英文、数字、空格、下划线与连字符（≤64 字符），且不以标点开头' })
+          if (req.method !== 'GET') {
+            writeJson(res, 405, { ok: false, error: 'GET only' })
             return
           }
           const roster = ctx.get('agentPresets')
-          if (roster === undefined || typeof roster.copy !== 'function') {
-            writeJson(res, 501, { ok: false, error: '宿主未提供 agent 预设服务（dsh-agent-presets），无法创建预设' })
-            return
-          }
-          if (roster.authorable === false) {
-            writeJson(res, 400, { ok: false, error: '当前部署没有可写的用户预设根目录，无法创建预设' })
-            return
-          }
-          // from = 当前编辑目标；全局目标（未选预设）回落到 roster 默认预设。
-          const from = typeof body?.from === 'string' && body.from.length > 0 ? body.from : String(roster.defaultId ?? 'standard')
-          const displayName = typeof body?.displayName === 'string' && body.displayName.trim().length > 0 ? body.displayName.trim() : name
+          const requested = queryOf(req).get('scope') ?? undefined
+          const targetId = requested !== undefined && requested !== ''
+            ? requested
+            : String(roster?.defaultId ?? 'standard')
+          // 导出的是**用户写下的原文**：直接解析磁盘文件，不走 store 的解析
+          // 缓存 —— readResolved() 会补 schema 默认值（导出一堆用户没写过的
+          // 条目），raw() 的实例状态在长生命周期进程里也不可靠。
+          let raw = {}
           try {
-            await roster.copy(from, name, displayName)
-          } catch (error) {
-            // 先 fork 后写 override：名字被占 / 非法 / 来源不存在时配置里不留空壳。
-            writeJson(res, copyErrorStatus(error), {
-              ok: false,
-              error: String(error && error.message ? error.message : error),
-            })
-            return
+            const parsed = parse(fs.readFileSync(configFile, 'utf8'))
+            if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed
+          } catch { /* 文件缺失 / 坏 YAML：导出空定制，不报错 */ }
+          // 该目标的定制原文：没有定制时给空对象（UI 会提示「无定制可导出」）。
+          const overrides = raw?.overrides ?? {}
+          const customization = overrides[targetId] !== null && typeof overrides[targetId] === 'object'
+            ? overrides[targetId]
+            : {}
+          // 来源预设的组成声明（只读参考，不打包成可执行的预设）。
+          let composition
+          if (typeof roster?.readDocument === 'function') {
+            try {
+              const doc = await roster.readDocument(targetId)
+              if (typeof doc?.content === 'string') composition = doc.content
+            } catch { /* 读不到组成不算失败：导出主体是定制 */ }
           }
-          const config = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config : {}
-          // 落盘 overrides[name] = 提交来的配置（净化：去掉空列表 / 空对象，避免
-          // 生成空壳 override）；装配 / 预览 / Tab 全部走同一路径读它。
-          const base = { ...(store.raw() ?? {}) }
-          const overrides = { ...(base.overrides ?? {}) }
-          const clean = {}
-          for (const key of ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools']) {
-            const value = config[key]
-            if (value === undefined || value === null) continue
-            const empty = Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0
-            if (!empty) clean[key] = value
-          }
-          overrides[name] = clean
-          base.overrides = overrides
-          store.writeSection(base)
-          writeJson(res, 200, { ok: true, presetId: name, from, config: read() })
-        } catch (error) {
-          writeJson(res, 500, {
-            ok: false,
-            error: String(error && error.message ? error.message : error),
+          writeJson(res, 200, {
+            ok: true,
+            format: 'dsh-prompt-customizer/export@1',
+            target: targetId,
+            envBlocklist: Array.isArray(raw?.envBlocklist) ? raw.envBlocklist : [],
+            forceSections: raw?.forceSections !== false,
+            customization,
+            // 参考：该 agent 预设自己的组成（entry-list YAML），供人工比对。
+            composition,
           })
+        } catch (error) {
+          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
         }
       },
     })
-    ctx.effect(() => disposePresetsCreate, 'prompt-customizer: presets-create route')
+    ctx.effect(() => disposeExport, 'prompt-customizer: export route')
+
 
     // 配置读写路由（插件自有 config.yaml 的前端通道）：
     //  GET  /config        → { ok, config }（解析后含默认值）
@@ -648,20 +714,6 @@ function overlayPatch(raw, target, patch) {
   return base
 }
 
-/**
- * 宿主 authoring API（`agentPresets.copy`）抛错 → HTTP 状态码。
- *
- * 按错误类的名字判定而不是 import 宿主包：`@deepseek-ai/dsh-agent-presets` 是宿主
- * 依赖，本插件不声明它，子路径导出也不保证存在；名字对不上时退回 500，错误文本
- * 原样回给 UI，至少不吞信息。
- */
-function copyErrorStatus(error) {
-  const kind = String(error?.constructor?.name ?? '')
-  if (kind === 'PresetExistsError') return 409
-  if (kind === 'InvalidPresetIdError' || kind === 'PresetNotWritableError' || kind === 'UnknownPresetError') return 400
-  return 500
-}
-
 /** Read the selected mode's current revision; never substitute a live conversation. */
 async function acquireTarget(ctx, id) {
   const presets = ctx.get('agentPresets')
@@ -732,6 +784,26 @@ async function previewTarget(ctx, req, body = null) {
 }
 
 /** Assemble one leased mode revision; unresolved session variables stay in the template. */
+/**
+ * 只收集一个 scope 的**预过滤**段与工具原文，不碰累积登记表。
+ *
+ * 与 buildPreview 的区别：重扫需要「真实并集却不想在收集过程中又往池子里
+ * observe」——否则边扫边写会把上一轮的历史条目混进来，重扫就成了自证。
+ */
+async function collectScopeBase(ctx, scopeKey, presetId) {
+  const assembled = await ctx.systemPrompt.assemble({
+    scope: scopeKey,
+    promptCustomizerPreset: presetId,
+    promptCustomizerPhase: 'active',
+    promptCustomizerBase: true,
+  })
+  const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
+  return {
+    sections: (Array.isArray(baseView.sections) ? baseView.sections : []).map((sec) => ({ name: sec.name, text: sec.text })),
+    tools: (Array.isArray(baseView.tools) ? baseView.tools : []).map((tool) => ({ name: tool.name, description: tool.description })),
+  }
+}
+
 async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchTarget) {
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段

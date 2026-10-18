@@ -15,9 +15,9 @@
  */
 
 import { readdir, readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import { agentsHome, dshHome } from './home-paths.ts'
 
 const SKILL_FILE = 'SKILL.md'
 const BUNDLES_FILE = '.bundles.json'
@@ -25,13 +25,11 @@ const ROUTE_PATH = '/api/skill-health'
 
 /** skill-manager 同款根目录定义。 */
 function managedRoot(): string {
-  const agentsHome = process.env.DSH_AGENTS_HOME ?? join(homedir(), '.agents')
-  return join(agentsHome, 'skills')
+  return join(agentsHome(), 'skills')
 }
 
 function dshRoot(): string {
-  const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-  return join(dshHome, 'skills')
+  return join(dshHome(), 'skills')
 }
 
 /** skill-manager 同款 frontmatter 解析（naive line parser）。 */

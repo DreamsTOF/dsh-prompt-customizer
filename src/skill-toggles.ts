@@ -7,7 +7,8 @@
  *     改完文件后内核 watcher 自动重扫,无需重启。
  *
  *  2. **Agent 预设层**:同一个技能可以「对 standard 开、对 code 关」。
- *     账本存 `<agentsHome>/skills/.preset-skills.json`
+ *     账本存 `<agentsHome>/skills/.preset-skills.json`（agentsHome 解析规则见
+ *     `./home-paths.ts`，与内核 0.2.1-rc.2 的 resolveAgentsHome 一致）
  *     (`{ version: 1, presets: { <presetId>: { <skillName>: false } } }`;
  *     缺省 = 继承全局层,只有显式 false 才在该预设下关闭)。
  *
@@ -40,12 +41,12 @@
  */
 
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { URL } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { presetTrustOf } from './mcp-presets.ts'
+import { agentsHome, dshHome } from './home-paths.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -82,14 +83,12 @@ const MAX_PRESET_ENTRIES = 50
 
 /** The writable user-agents skill root (honors $DSH_AGENTS_HOME). */
 function managedRoot(): string {
-  const agentsHome = process.env.DSH_AGENTS_HOME ?? join(homedir(), '.agents')
-  return join(agentsHome, 'skills')
+  return join(agentsHome(), 'skills')
 }
 
 /** The user-dsh skill root (honors $DSH_HOME). */
 function dshRoot(): string {
-  const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-  return join(dshHome, 'skills')
+  return join(dshHome(), 'skills')
 }
 
 /** Serialized bundle ledger (mirrors skill-manager's shape). */

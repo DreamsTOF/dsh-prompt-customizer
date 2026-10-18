@@ -189,35 +189,24 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   ])
 }
 
-export function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSource, onReset, envBlocklist }: {
+export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist }: {
   cfg: Config
   inv: Inventory | null
   t: Translate
   /** 全局字段专用写通道（forceSections / envBlocklist，不经草稿）。 */
   writeGlobal: (field: string, value: unknown) => void
-  /** 存为 agent 预设：fork 当前编辑目标的预设目录并写入 overrides[新名]。 */
-  saveAsPreset: (name: string) => Promise<boolean>
-  /** fork 来源的显示名（当前编辑目标预设）；undefined = 全局目标，由服务端回落默认预设。 */
-  forkSource: string | undefined
+  /** 导出当前编辑目标的定制（只读；不创建预设）。 */
+  onExportPreset: () => void
+  /** 导出在途标记（禁用按钮）。 */
+  exporting: boolean
+  /** 导出目标的显示名（当前编辑目标预设）；undefined = 全局目标。 */
+  exportTarget: string | undefined
   /** 恢复初始状态：清空全部定制并关闭 forceSections（与不装插件等效）。 */
   onReset: () => void
   envBlocklist: string[]
 }): ReactElement {
-  // 「存为 agent 预设」的名字与在途标记（与服务端往返期间禁用按钮）。
-  const [agentName, setAgentName] = useState('')
-  const [creating, setCreating] = useState(false)
   // 黑名单「添加」输入框的暂存值。
   const [blockInput, setBlockInput] = useState('')
-
-  // 存为 agent 预设：成败由服务端返回，提示统一走面板顶部的消息条（Panel
-  // 的 flash），这里只在成功时清空输入框，避免同一条消息显示两遍。
-  const createAgentPreset = async (): Promise<void> => {
-    const trimmed = agentName.trim()
-    if (trimmed.length === 0 || creating) return
-    setCreating(true)
-    if (await saveAsPreset(trimmed)) setAgentName('')
-    setCreating(false)
-  }
 
   // 环境变量黑名单：全局字段，改动即写（与 forceSections 同一通道，不经草稿）。
   const removeBlockEntry = (entry: string): void => {
@@ -233,11 +222,14 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, saveAsPreset, forkSourc
   return h('div', { style: s.colRight }, [
     h('div', { style: s.colRightScroll }, [
       h('div', { style: s.injectBox }, [
-        h('div', { style: s.rowTitle }, t('saveAsPresetCard')),
-        h('div', { style: s.muted }, t('saveAsPresetHint', { name: forkSource ?? t('forkSourceDefault') })),
+        h('div', { style: s.rowTitle }, t('exportPresetCard')),
+        h('div', { style: s.muted }, t('exportPresetHint', { name: exportTarget ?? t('exportTargetDefault') })),
         h('div', { style: s.injectRow }, [
-          h('input', { style: { ...s.input, flex: 1 }, placeholder: t('agentPresetName'), value: agentName, onChange: (e: ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value) }),
-          h('button', { style: s.mini, disabled: creating || agentName.trim().length === 0, onClick: () => { void createAgentPreset() } }, t('saveAsPreset')),
+          h('button', {
+            style: s.mini,
+            disabled: exporting,
+            onClick: onExportPreset,
+          }, exporting ? t('exportPresetRunning') : t('exportPreset')),
         ]),
       ]),
       h('div', { style: s.groupHead }, t('settingsTitle')),

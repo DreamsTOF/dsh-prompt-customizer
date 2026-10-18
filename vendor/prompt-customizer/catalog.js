@@ -127,5 +127,38 @@ export function createCatalog({ dir, file, warn } = {}) {
 
     /** 测试 / 排查用：重新从磁盘读一次。 */
     reload() { state = load(); return state },
+
+    /**
+     * 用一次全量扫描的结果整体替换登记表（删除已不存在的条目）。
+     *
+     * 累积登记的语义是「只增不减」，代价是历史条目永远留在面板里：曾经注册过
+     * 407 个工具、现在只剩 100 个时，那 307 个仍可被拖动。这是唯一能真正缩小
+     * 登记表的入口 —— 由调用方先扫遍所有已声明预设拿到真实并集，再整体写入。
+     *
+     * 返回值给出增减计数，供界面报告「清掉了多少」。落盘失败只影响缓存持久性，
+     * 内存态照常替换（本次请求的结果仍然正确）。
+     */
+    replace({ sections = [], tools = [] } = {}) {
+      // 先重读磁盘：外部编辑 / 删除即时生效（与 observe 一致），否则「清掉了多少」
+      // 会按内存里的旧状态算，数字骗人。重扫可能耗时数十秒，期间文件也可能被改。
+      state = load()
+      const previous = state
+      // 多个预设会重复贡献同名条目：按名字归一，后见到者赢。
+      const nextSections = normalize(mergeSighting([], sections, (list) => list.length).list, 'sections')
+      const nextTools = normalize(mergeSighting([], tools).list, 'tools')
+      state = { sections: nextSections, tools: nextTools }
+      let written = true
+      try { store.writeSection(state) } catch (error) {
+        written = false
+        try { warn?.(`prompt-customizer: catalog.yaml 写入失败（本次仅内存替换）：${String(error && error.message ? error.message : error)}`) } catch { /* logger 缺席 */ }
+      }
+      const beforeTools = new Set(previous.tools.map((x) => x.name))
+      const beforeSections = new Set(previous.sections.map((x) => x.name))
+      return {
+        written,
+        sections: { before: beforeSections.size, after: nextSections.length, removed: [...beforeSections].filter((n) => !nextSections.some((x) => x.name === n)).length },
+        tools: { before: beforeTools.size, after: nextTools.length, removed: [...beforeTools].filter((n) => !nextTools.some((x) => x.name === n)).length },
+      }
+    },
   }
 }

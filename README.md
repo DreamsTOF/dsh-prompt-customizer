@@ -63,6 +63,13 @@
 - **按会话阶段分层**：引导期（未晋级）/ 常驻期（晋级后）/ 压缩受控期（压缩后仍未晋级）各有**独立的屏蔽名单、独立的排序空间、独立的工具目录**。同一个预设可以做到首轮只给模型 1 个工具和几段提示词，晋级后放开全套。
 - **按 agent 预设分层**：顶部预设 Tab 选中某个 agent 预设后，改动只对该预设生效；**0.9.0 起「全部 Agent」全局层停用**——提示词必须按具体预设修改，预设未定制的字段 = 官方默认（旧全局层数据保留在 config.yaml 里不再生效，可手编回滚）。
 
+## 0.9.3：适配 DSH 0.2.1-rc.2
+
+- **修复「存为预设」**：原实现调用宿主 `agentPresets.copy()`，但该 API 在 DSH 任何版本都不存在（宿主只有 `list` / `read` / `select`），所以此前一保存就报 `宿主未提供 agent 预设服务`。现改为读来源预设的声明组成，作为一条 `dsh-agent-preset` 行写进 profile patch（HMR 热加载），并把当前定制写进 `overrides[新名]`。
+- 预设 id 收紧为宿主的真实规则 `[a-z0-9][a-z0-9-]*`（原先允许中文与空格，与宿主不符）。
+- 用户数据根解析对齐内核新的 `resolveDshHome` / `resolveAgentsHome`：`$DSH_HOME` / `$DSH_AGENTS_HOME` 为空串或纯空白时按未设置处理（旧写法会落到进程 cwd），`~` / `~/` 前缀现在展开。技能面板、技能开关账本、技能健康检查三处共用 `src/home-paths.ts`。
+- 三个功能面的服务契约在本区间零破坏：`ctx.skills`、`tools.restrict/schemas`、`configEditor`、`agentPresets`、`system-prompt` 装配 waterfall 与段/变量 API、`connection.requestRejection` 全部保持。详见 `docs/rc2-migration.md`。
+
 ## 0.9.2：按模式预设修正 rc.2 适配
 
 - 预设目录使用 `agentPresets.acquireScope()`，每次读取选中模式的当前修订；结束释放租约。不匹配已有对话，不创建伪 Agent，不切换对话的预设。
@@ -74,6 +81,8 @@
 本地源码更新后执行 `npm run build`。链接安装无需复制；已启动宿主可能持有旧模块，保存工作后重启原来的 `dsh web` 并硬刷新，确认不再有「预览会话」，来源显示为「当前模式预设」。
 
 目标版本冷启动测试：设置 `PC_DSH_MANIFEST` 为已安装 **0.2.0-rc.2** 的 `package.json`，运行 `node scripts/test-rc2-runtime.mjs`。测试先在零对话状态查看两个模式的独立工具、正文、相反顺序和未绑定变量，再完成离线用户消息 → 工具 → 回复，并断言预览切换不改变对话模式。测试只使用临时 DSH_HOME，不使用真实模型凭据，不修改用户 profile。
+
+> 该脚本目前只面向 0.2.0-rc.2：内部硬编码版本校验，且在 0.2.1-rc.2 上 turn 段断言会失败（对照实验确认与插件无关，详见 `docs/rc2-migration.md`）。在 0.2.1-rc.2 上请以 `npm run check` 为准。
 
 ## 会话阶段怎么流转
 
@@ -267,7 +276,10 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 
 ### 版本要求
 
-当前版本（0.9.0）对齐 **DSH 0.2.0-rc.2**（`peerDependencies` 为 `^0.2.0-rc.2`）。
+当前版本（0.9.3）对齐 **DSH 0.2.1-rc.2**（`peerDependencies` 为 `^0.2.1-rc.2`）。
+0.2.0-rc.2 → 0.2.1-rc.2 的适配记录见 `docs/rc2-migration.md`：三个功能面的服务契约
+均无破坏，唯一代码改动是用户数据根解析对齐内核新的 `resolveDshHome`/`resolveAgentsHome`
+（空串按未设置、支持 `~` 展开）。
 
 **0.9.0 行为变更：全局层停用。** 提示词必须按具体 agent 预设修改——「全部 Agent」
 编辑入口移除，`/config/apply` 无 `target` 一律 400，`/config/set|unset` 拒绝六个
@@ -277,7 +289,7 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 0.1.7 起的图标代际（`IconXxxOutlineRegular/Medium`，尺寸由 `size` 属性给）在
 0.2.0 沿用，本插件的宿主接触面（`system-prompt` 装配 waterfall、`agentPresets`、
 `configEditor`、`tools.restrict/schemas`、`webServer.register`、客户端模块加载缝）
-在 0.1.7-rc.1 → 0.2.0-rc.2 走廊内均无破坏性变更，故客户端 bundle 与 0.7.x 同代。
+在 0.1.7-rc.1 → 0.2.1-rc.2 走廊内均无破坏性变更，故客户端 bundle 与 0.7.x 同代。
 不支持 0.1.7 之前的主机（旧宿主会按 DSH 的插件兼容性策略拒绝加载，而不是半静默
 地坏掉）。需要旧版的请用 0.6.x。
 

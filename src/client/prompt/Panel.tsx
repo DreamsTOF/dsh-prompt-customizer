@@ -27,6 +27,7 @@ import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
+import { makeIoEnv } from './preset-io.ts'
 
 const INVENTORY_URL = '/api/prompt-customizer/inventory'
 const AGENT_PRESETS_URL = '/api/prompt-customizer/agent-presets'
@@ -35,7 +36,8 @@ const CONFIG_SET_URL = '/api/prompt-customizer/config/set'
 const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
 const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
-const PRESETS_CREATE_URL = '/api/prompt-customizer/presets'
+const EXPORT_URL = '/api/prompt-customizer/export'
+const CATALOG_RESCAN_URL = '/api/prompt-customizer/catalog/rescan'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
 
 /** 三阶段预览装配（模型视角）：左栏列表与右栏预览的统一数据源。 */
@@ -99,6 +101,8 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
+  const [rescanning, setRescanning] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = (): void => {
@@ -223,6 +227,41 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     setFlash(text)
     setFlashKind(kind)
     flashTimer.current = setTimeout(() => setFlash(null), 3200)
+  }
+
+  // 全量重扫登记表：catalog 是「只增不减」的累积缓存，浏览过的名字永远留着。
+  // 这是唯一能按真实注册表对齐、把已不存在的条目清掉的入口（宿主端逐个挂载
+  // 预设跑一次装配），所以只由用户显式触发，并给出进行中状态。
+  // 状态 hook 声明在组件顶部（所有提前 return 之前）：放在这里会让 loading
+  // 那次渲染跳过它，两次渲染的 hook 数量不一致 → React #310。
+  const rescanCatalog = (): void => {
+    if (rescanning) return
+    setRescanning(true)
+    showFlash(t('rescanCatalogRunning'), 'ok')
+    fetch(CATALOG_RESCAN_URL, { method: 'POST' })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? t('rescanCatalogFail'))
+        const report = body.report ?? {}
+        const tools = report.tools ?? {}
+        const sections = report.sections ?? {}
+        if ((report.tools?.after ?? 0) === 0 && (report.sections?.after ?? 0) === 0) {
+          showFlash(t('rescanCatalogEmpty'), 'err')
+          return
+        }
+        showFlash(t('rescanCatalogOk', {
+          toolsBefore: tools.before ?? 0,
+          toolsAfter: tools.after ?? 0,
+          toolsRemoved: tools.removed ?? 0,
+          sectionsBefore: sections.before ?? 0,
+          sectionsAfter: sections.after ?? 0,
+          sectionsRemoved: sections.removed ?? 0,
+        }), 'ok')
+        // 登记表换了，清单与预览都要重拉。
+        void refresh()
+      })
+      .catch((error: unknown) => showFlash(`${t('rescanCatalogFail')}: ${String(error instanceof Error ? error.message : error)}`, 'err'))
+      .finally(() => setRescanning(false))
   }
 
   // 丢弃草稿：递增同步序号，作废在途的草稿预览响应（保存后 GET 会整体覆盖，
@@ -423,41 +462,36 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     setTarget(next)
   }
 
-  // 「存为预设」：把当前编辑内容（含未保存草稿）fork 成一个新的 agent 预设 ——
-  // 宿主 authoring API 整体复制来源预设目录（组成文件 / 伴生 .mjs / 技能目录），
-  // 同时把当前配置写进 overrides[name]。来源 = 当前编辑目标；全局目标由服务端
-  // 回落到 roster 默认预设。名字非法 / 同名由服务端报错。
-  const saveAsPreset = (presetName: string): Promise<boolean> => {
-    const name = presetName.trim()
-    if (name.length === 0) return Promise.resolve(false)
-    return fetch(PRESETS_CREATE_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        from: target,
-        config: {
-          sections: view.sections ?? [],
-          sectionsBootstrap: view.sectionsBootstrap ?? [],
-          sectionsCompaction: view.sectionsCompaction ?? [],
-          replace: view.replace ?? {},
-          inject: view.inject ?? [],
-          tools: view.tools ?? {},
-        },
-      }),
-    })
+  // 「导出当前预设配置」：只读导出该编辑目标的定制（overrides[target]）与
+  // 来源预设的组成声明，浏览器/桌面壳落盘为 JSON。
+  //
+  // 取代原「存为预设」：宿主 agentPresets 没有 authoring API（只有 list / read /
+  // select），预设是 profile patch 里一行的声明式配置；替用户造预设需要猜 Loader
+  // 命名空间、处理重复行 id、并把来源组成拍成不再跟随升级的快照。导出把决定权
+  // 交回用户，不再替宿主做它没暴露的事。
+  // 状态 hook 已声明在组件顶部（所有提前 return 之前），这里只保留动作。
+  const exportCurrentPreset = (): void => {
+    if (exporting) return
+    setExporting(true)
+    fetch(`${EXPORT_URL}?scope=${encodeURIComponent(target)}`)
       .then((r) => r.json())
       .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? t('saveAsPresetFail'))
-        load()
-        fetchPresets()
-        showFlash(t('saveAsPresetOk'), 'ok')
-        return true
+        if (body?.ok !== true) throw new Error(body?.error ?? t('exportPresetFail'))
+        const filename = `prompt-customizer-${String(body.target ?? target)}.json`
+        const text = JSON.stringify(body, null, 2)
+        // 复用 preset-io 的落盘门面：桌面壳走原生保存框，浏览器走下载链接。
+        const io = makeIoEnv()
+        void io.saveText(filename, text).then((outcome) => {
+          if (outcome.kind === 'saved') showFlash(t('exportPresetOk', { name: filename }), 'ok')
+          else if (outcome.kind === 'unavailable') {
+            io.download(filename, text)
+            showFlash(t('exportPresetOk', { name: filename }), 'ok')
+          }
+          // cancelled：用户主动取消，不提示。
+        })
       })
-      .catch((e: unknown) => {
-        showFlash(`${t('saveAsPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err')
-        return false
-      })
+      .catch((e: unknown) => showFlash(`${t('exportPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err'))
+      .finally(() => setExporting(false))
   }
 
   const modeBtn = (key: PanelMode, label: string): ReactElement =>
@@ -586,6 +620,13 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
         h('button', { style: s.saveBtn, onClick: () => { void refresh().then(() => syncDraftPreview()) } }, t('refresh')),
+        // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
+        h('button', {
+          style: s.saveBtn,
+          disabled: rescanning,
+          title: t('rescanCatalogHint'),
+          onClick: rescanCatalog,
+        }, rescanning ? t('rescanCatalogRunning') : t('rescanCatalog')),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
         onClose === undefined ? null : h('button', { style: s.iconBtn, onClick: onClose, 'aria-label': t('close'), title: t('close') },
           h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' }, [
@@ -636,8 +677,9 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
                 inv,
                 t,
                 writeGlobal,
-                saveAsPreset,
-                forkSource: target ? (agentPresets.find((p) => p.id === target)?.name ?? target) : undefined,
+                onExportPreset: exportCurrentPreset,
+                exporting,
+                exportTarget: target ? (agentPresets.find((p) => p.id === target)?.name ?? target) : undefined,
                 onReset: resetAll,
                 envBlocklist: cfg.envBlocklist ?? [],
               }),

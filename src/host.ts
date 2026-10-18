@@ -49,7 +49,7 @@ export const inject = [
   'tools',
 ]
 
-export async function apply(ctx: Context): Promise<void> {
+export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promise<void> {
   // ── 技能集合管理（vendor/skill-manager：/api/skill-manager/*）──────────
   try {
     await applySkillsHost(ctx)
@@ -147,7 +147,10 @@ export async function apply(ctx: Context): Promise<void> {
   try {
     ctx.inject(['systemPrompt'], (promptCtx: Context) => {
       try {
-        applyPromptHost(promptCtx)
+        // 把 entry 的 dataDir 原样传给 vendor 半身：它自己会回落到
+        // ~/.dsh/prompt-customizer，但那样的话无法隔离（测试 / 沙箱只能
+        // 覆盖同一个真实目录）。缺省时行为不变。
+        applyPromptHost(promptCtx, typeof entry?.dataDir === 'string' ? { dataDir: entry.dataDir } : {})
         promptCtx.logger?.info?.('[dsh-prompt-customizer] prompt customizer mounted')
       } catch (error) {
         promptCtx.logger?.warn?.(
