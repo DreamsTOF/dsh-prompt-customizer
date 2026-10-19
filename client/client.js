@@ -188,6 +188,15 @@ var SHEET2 = `
 .psh-card[data-mode='drawer'][data-anim='in']{animation:dsh-modal-drawer-in ${MODAL_ANIM_MS}ms cubic-bezier(.2,.8,.2,1)}
 .psh-card[data-mode='drawer'][data-anim='out']{animation:dsh-modal-drawer-out ${MODAL_ANIM_MS}ms cubic-bezier(.4,0,.2,1) both}
 .psh-card[data-mode='sheet']{left:12px !important;right:12px;bottom:12px;top:auto !important}
+/* Windows \u684C\u9762\u7248\uFF1ADSH \u5728 .frame::before \u94FA\u4E86\u4E00\u6761 --dsh-windows-titlebar-height
+   \u9AD8\u7684 -webkit-app-region:drag \u62D6\u62FD\u6761\u3002Electron \u7684 app-region \u662F\u51E0\u4F55 + \u6587\u6863\u987A\u5E8F
+   \u5408\u6210\u7684\uFF0C\u843D\u5728\u8BE5\u6761\u51E0\u4F55\u5185\u7684\u5143\u7D20\u6536\u4E0D\u5230\u9F20\u6807\u4E8B\u4EF6\uFF1BDSH \u53EA\u5728 darwin \u4E0A\u5199\u4E86
+   body > :not(#root){no-drag} \u7684\u653E\u884C\u89C4\u5219\uFF0CWindows \u6CA1\u6709\u7B49\u4EF7\u89C4\u5219\u3002
+   \u672C\u9762\u677F portal \u5230 body\u3001drawer \u4ECE top:0 \u8D77\uFF0C\u5934\u90E8\uFF08\u80FD\u529B\u7BA1\u7406 / SKILL / MCP /
+   \u63D0\u793A\u8BCD \u90A3\u4E00\u884C\uFF09\u6B63\u597D\u843D\u5728\u62D6\u62FD\u6761\u91CC \u2014\u2014 \u8868\u73B0\u4E3A\u70B9 tab \u5B8C\u5168\u6CA1\u53CD\u5E94\uFF08web \u7248\u65E0\u62D6\u62FD\u6761\uFF0C
+   \u6240\u4EE5\u770B\u4E0D\u51FA\u95EE\u9898\uFF09\u3002\u8BA9\u51FA\u8FD9\u6761\u9AD8\u5EA6\u5373\u53EF\uFF1Bweb \u7248\u6CA1\u6709\u8BE5\u53D8\u91CF\uFF0Ccalc \u7ED3\u679C\u4E3A 0\u3002 */
+[data-windows-titlebar] .psh-card{top:var(--dsh-windows-titlebar-height,0px)}
+[data-windows-titlebar] .psh-card[data-mode='drawer']{height:auto;bottom:0}
 /* \u5B9E\u5E95\u5361\u7247\uFF08solid \u6A21\u5F0F\uFF09\uFF1A\u73BB\u7483\u8D28\u611F\u5F00\u542F\u65F6\u4E5F\u4FDD\u6301\u4E0D\u900F\u660E\u8868\u9762\u3002
    \u4E24\u6761\u5FC5\u8981\u6761\u4EF6\u2014\u2014
    1) \u5E95\u8272\u5FC5\u987B\u7528 static token\uFF08bg-layer-* \u7B49 alias \u5728\u73BB\u7483\u6A21\u5F0F\u4E0B\u88AB
@@ -8150,9 +8159,10 @@ function SkillsEntry() {
   ensureShellStyles();
   const [open, setOpen] = (0, import_react18.useState)(false);
   const [anchor, setAnchor] = (0, import_react18.useState)(null);
-  const { closing, requestClose } = useModalClose(open, () => {
+  const onClose = (0, import_react18.useCallback)(() => {
     setOpen(false);
-  });
+  }, []);
+  const { closing, requestClose } = useModalClose(open, onClose);
   const rail = useRail();
   usePanelAutoClose("skills", open, requestClose);
   return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [

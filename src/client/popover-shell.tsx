@@ -58,6 +58,15 @@ const SHEET = `
 .psh-card[data-mode='drawer'][data-anim='in']{animation:dsh-modal-drawer-in ${MODAL_ANIM_MS}ms cubic-bezier(.2,.8,.2,1)}
 .psh-card[data-mode='drawer'][data-anim='out']{animation:dsh-modal-drawer-out ${MODAL_ANIM_MS}ms cubic-bezier(.4,0,.2,1) both}
 .psh-card[data-mode='sheet']{left:12px !important;right:12px;bottom:12px;top:auto !important}
+/* Windows 桌面版：DSH 在 .frame::before 铺了一条 --dsh-windows-titlebar-height
+   高的 -webkit-app-region:drag 拖拽条。Electron 的 app-region 是几何 + 文档顺序
+   合成的，落在该条几何内的元素收不到鼠标事件；DSH 只在 darwin 上写了
+   body > :not(#root){no-drag} 的放行规则，Windows 没有等价规则。
+   本面板 portal 到 body、drawer 从 top:0 起，头部（能力管理 / SKILL / MCP /
+   提示词 那一行）正好落在拖拽条里 —— 表现为点 tab 完全没反应（web 版无拖拽条，
+   所以看不出问题）。让出这条高度即可；web 版没有该变量，calc 结果为 0。 */
+[data-windows-titlebar] .psh-card{top:var(--dsh-windows-titlebar-height,0px)}
+[data-windows-titlebar] .psh-card[data-mode='drawer']{height:auto;bottom:0}
 /* 实底卡片（solid 模式）：玻璃质感开启时也保持不透明表面。
    两条必要条件——
    1) 底色必须用 static token（bg-layer-* 等 alias 在玻璃模式下被

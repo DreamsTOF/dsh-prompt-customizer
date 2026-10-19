@@ -4,7 +4,7 @@
  * 点击打开覆盖会话主区的面板（跟点会话一样占住主区，移动端回退底部 sheet），
  * 面板顶部 SKILL / MCP 双层顶层 tab。
  */
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { SkillsPanel } from './SkillsPanel'
@@ -24,7 +24,12 @@ function SkillsEntry(): JSX.Element {
   ensureShellStyles()
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null)
-  const { closing, requestClose } = useModalClose(open, () => { setOpen(false) })
+  // onClose 必须是稳定引用：useModalClose 的 requestClose 依赖它，而
+  // usePanelAutoClose 的捕获监听又依赖 requestClose —— 内联箭头会让这个
+  // document 级捕获监听每次渲染都拆装一遍，拆装间隙的点击会被漏掉
+  // （桌面版渲染更慢，表现为点 MCP / 提示词没反应）。
+  const onClose = useCallback(() => { setOpen(false) }, [])
+  const { closing, requestClose } = useModalClose(open, onClose)
   const rail = useRail()
   usePanelAutoClose('skills', open, requestClose)
   return (
