@@ -1,0 +1,23 @@
+{
+  "package": "@deepseek-ai/dsh-client-ui-primitives",
+  "comment": "客户端可以从宿主 ui-primitives 模块表里导入的名字白名单。新增名字前必须先确认宿主真的导出它（grep 打包产物或读 ui-primitives 的类型声明），然后把名字加进这里 —— 名字写错时 JSX 组件是 undefined，React 会抛 Element type is invalid，整个面板被 ErrorBoundary 摘掉（表现为「点 tab 闪退回对话界面」）。test/client-primitives.test.mjs 会强制这条纪律。",
+  "verified": [
+    "Button",
+    "IconAgentPresetOutlineRegular",
+    "IconArchiveOutlineRegular",
+    "IconCheckOutlineRegular",
+    "IconChevronDownOutlineRegular",
+    "IconChevronRightOutlineRegular",
+    "IconCloseOutlineRegular",
+    "IconEditOutlineRegular",
+    "IconEllipsisOutlineRegular",
+    "IconFolderOpenOutlineRegular",
+    "IconPlusOutlineRegular",
+    "IconRefreshOutlineRegular",
+    "IconSkillOutlineRegular",
+    "IconTrashOutlineRegular",
+    "Menu",
+    "Modal",
+    "Tooltip"
+  ]
+}

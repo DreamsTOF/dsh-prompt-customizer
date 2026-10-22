@@ -6,9 +6,13 @@
  * `~/.agents/mcps/`、`<ws>/.dsh/mcps/`、`<ws>/.agents/mcps/` 里放着的配置
  * 一直是死文件。本模块把它们接上：
  *
- *   - **全局层**  `<agentsHome>/mcps/**\/mcp.json`    —— 所有会话可见
- *   - **工作区层** `<ws>/.dsh/mcps/**\/mcp.json`     —— 仅该工作区会话可见
- *                 `<ws>/.agents/mcps/**\/mcp.json`
+ * 四个目录，优先级从高到低（同名 server 先出现者胜出；`.dsh` 优先于 `.agents`，
+ * 工作区优先于用户级 —— 与技能根同一套 rank 规则）：
+ *
+ *   1. `<工作区>/.dsh/mcps/**\/mcp.json`     仅该工作区会话可见
+ *   2. `<工作区>/.agents/mcps/**\/mcp.json`  仅该工作区会话可见
+ *   3. `<dshHome>/mcps/**\/mcp.json`         （`~/.dsh/mcps`）所有会话可见
+ *   4. `<agentsHome>/mcps/**\/mcp.json`      （`~/.agents/mcps`）所有会话可见
  *
  * 同一目录下根 `mcp.json` 先读、子目录后读（后写覆盖先写），按 serverName 去重。
  *
@@ -37,7 +41,7 @@ import { join, resolve } from 'node:path'
 import { watch, type FSWatcher } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { agentsHome } from './home-paths.ts'
+import { agentsHome, dshHome } from './home-paths.ts'
 import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
 import { parseMcpPaste, rowsToPatchYaml } from './mcp-paste.ts'
 import { workspaceDirs } from './skill-roots.ts'
@@ -71,6 +75,8 @@ export interface ScannedServer {
   transport: 'stdio' | 'streamable-http'
   /** 摘要：stdio 显示 command + args，http 显示 url。 */
   summary: string
+  /** 这条来自哪个 mcps 根目录（面板按目录分组展示）。 */
+  root: string
   /** 来源文件（面板展示「这条从哪来」）。 */
   file: string
 }
@@ -78,6 +84,11 @@ export interface ScannedServer {
 /** 一次扫描的结果。 */
 export interface ScanResult {
   servers: ScannedServer[]
+  /**
+   * 被更高优先级目录同名遮蔽的条目（`.dsh` 赢 `.agents`，工作区赢用户级）。
+   * 只上报，不挂载 —— 同一作用域里同名 server 只能有一个实例。
+   */
+  shadowed: Array<{ name: string; scope: McpScope; workspace?: string; file: string; keptFile: string }>
   /** 解析失败的文件与原因（面板提示用）。 */
   errors: Array<{ file: string; message: string }>
 }
@@ -102,9 +113,12 @@ export function scopedServerName(workspace: string, name: string): string {
   return `${name.slice(0, 23)}-${pathHash(workspace)}`
 }
 
-/** 全局层 mcps 根。 */
-export function globalMcpsDir(): string {
-  return join(agentsHome(), MCPS_DIR)
+/**
+ * 用户级 mcps 根（`.dsh` 先于 `.agents`：同名时 `~/.dsh/mcps` 胜出）。
+ * @returns 用户级 mcps 目录，顺序即优先级。
+ */
+export function userMcpsDirs(): string[] {
+  return [join(dshHome(), MCPS_DIR), join(agentsHome(), MCPS_DIR)]
 }
 
 /** 一个工作区的 mcps 根（`.dsh` 先于 `.agents`，与内核技能根同序）。 */
@@ -219,6 +233,7 @@ async function scanMcpsDir(
           : entry.name,
         transport,
         summary: summaryOf(entry.config),
+        root: dir,
         file,
       })
     }
@@ -227,20 +242,44 @@ async function scanMcpsDir(
 }
 
 /**
- * 扫描全局层 + 所有给定工作区层。
- * @param workspaces - 工作区根绝对路径列表（空数组表示只扫全局层）。
- * @returns 全部 server 与解析错误。
+ * 扫描四个目录（每个工作区 `.dsh/mcps` → `.agents/mcps`，再 `~/.dsh/mcps` →
+ * `~/.agents/mcps`），按优先级去重：同一作用域内同名 server 只保留先出现的那条，
+ * 被遮蔽的进 `shadowed` 如实上报。
+ * @param workspaces - 工作区根绝对路径列表（空数组表示只扫用户级两个目录）。
+ * @returns 保留的 server、被遮蔽的条目与解析错误。
  */
 export async function scanAll(workspaces: readonly string[]): Promise<ScanResult> {
   const errors: ScanResult['errors'] = []
-  const servers: ScannedServer[] = []
-  servers.push(...await scanMcpsDir(globalMcpsDir(), 'global', undefined, errors))
+  const shadowed: ScanResult['shadowed'] = []
+  /** 优先级顺序即扫描顺序：先扫到的先占名字。 */
+  const roots: Array<{ dir: string; scope: McpScope; workspace?: string }> = []
   for (const workspace of workspaces) {
-    for (const dir of workspaceMcpsDirs(workspace)) {
-      servers.push(...await scanMcpsDir(dir, 'workspace', workspace, errors))
+    for (const dir of workspaceMcpsDirs(workspace)) roots.push({ dir, scope: 'workspace', workspace })
+  }
+  for (const dir of userMcpsDirs()) roots.push({ dir, scope: 'global' })
+
+  const kept = new Map<string, ScannedServer>()
+  const servers: ScannedServer[] = []
+  for (const root of roots) {
+    for (const server of await scanMcpsDir(root.dir, root.scope, root.workspace, errors)) {
+      // 去重键带上工作区：不同工作区各配一台同名 server 是允许的（挂载名带哈希）。
+      const key = `${server.workspace ?? '<global>'}\u0000${server.name}`
+      const winner = kept.get(key)
+      if (winner !== undefined) {
+        shadowed.push({
+          name: server.name,
+          scope: server.scope,
+          ...server.workspace === undefined ? {} : { workspace: server.workspace },
+          file: server.file,
+          keptFile: winner.file,
+        })
+        continue
+      }
+      kept.set(key, server)
+      servers.push(server)
     }
   }
-  return { servers, errors }
+  return { servers, shadowed, errors }
 }
 
 /* ── 挂载状态 ────────────────────────────────────────────────────────────── */
@@ -262,12 +301,14 @@ interface SkippedRow {
   scope: McpScope
   workspace?: string
   /** 跳过原因（面板展示）。 */
-  reason: 'composition'
+  reason: 'composition' | 'lower-priority'
 }
 
 const mounted = new Map<string, MountedRow>()
 /** 本轮被跳过的 server（答案在组成里已有同名 mcp-client 行）。 */
 let skipped: SkippedRow[] = []
+/** 本轮被更高优先级目录同名遮蔽的条目（只上报）。 */
+let shadowed: ScanResult['shadowed'] = []
 /** 工作区根 → 当前扫描到的 server 列表（状态接口与可见性过滤读它）。 */
 const workspaceScan = new Map<string, ScannedServer[]>()
 /** 全局层当前扫描结果。 */
@@ -302,7 +343,9 @@ export function workspaceMcpStatus(): {
   mounted: ReturnType<typeof mountedRows>
   /** 与组合里既有 mcp-client 行同名、已让位不再重复挂载的那些。 */
   skipped: SkippedRow[]
-  dirs: { global: string; workspace: (root: string) => string[] }
+  /** 被更高优先级目录同名遮蔽（`.dsh` 赢 `.agents`，工作区赢用户级）。 */
+  shadowed: ScanResult['shadowed']
+  dirs: { user: string[]; workspace: (root: string) => string[] }
 } {
   return {
     global: globalScan,
@@ -310,7 +353,8 @@ export function workspaceMcpStatus(): {
     errors: scanErrors,
     mounted: mountedRows(),
     skipped: [...skipped],
-    dirs: { global: globalMcpsDir(), workspace: workspaceMcpsDirs },
+    shadowed: [...shadowed],
+    dirs: { user: userMcpsDirs(), workspace: workspaceMcpsDirs },
   }
 }
 
@@ -430,6 +474,7 @@ function messageOf(error: unknown): string {
 async function refresh(ctx: PluginContext, workspaces: readonly string[]): Promise<void> {
   const result = await scanAll(workspaces)
   scanErrors = result.errors
+  shadowed = result.shadowed
   globalScan = result.servers.filter((server) => server.scope === 'global')
   workspaceScan.clear()
   for (const workspace of workspaces) {
@@ -658,7 +703,7 @@ export function applyWorkspaceMcp(ctx: Context): void {
       const workspaces = await currentWorkspaces(self)
       if (disposed) return
       await refresh(self, workspaces)
-      await watchDirs(self, [globalMcpsDir(), ...workspaces.flatMap((workspace) => workspaceMcpsDirs(workspace))],
+      await watchDirs(self, [...workspaces.flatMap((workspace) => workspaceMcpsDirs(workspace)), ...userMcpsDirs()],
         () => { void currentWorkspaces(self) })
     }
     void boot().catch((error: unknown) => {

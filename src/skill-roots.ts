@@ -1,26 +1,27 @@
 /**
- * skill-roots — 技能根的单一来源（用户级 + 工作区级）。
+ * skill-roots — 技能根的单一来源（工作区级 + 用户级，共四个目录）。
  *
- * DSH 内核 `@deepseek-ai/dsh-skill-filesystem` 按 5 类根扫描技能
- * （`packages/skill/skill-filesystem/src/index.ts` 的 `roots()`）：
+ * 四个根，优先级从高到低（同名技能先出现者胜出；`.dsh` 目录优先于 `.agents`）：
  *
- *   100 project-dsh      `<projectRoot>/.dsh/skills`
- *   200 project-agents   `<projectRoot>/.agents/skills`
- *   300 custom           `Config.customSkillDirs`
- *   400 user-dsh         `<dshHome>/skills`
- *   500 user-agents      `<agentsHome>/skills`
+ *   1. `<工作区>/.dsh/skills`
+ *   2. `<工作区>/.agents/skills`
+ *   3. `<dshHome>/skills`      （`~/.dsh/skills`）
+ *   4. `<agentsHome>/skills`   （`~/.agents/skills`）
  *
- * 本插件此前面板只扫 400/500 两个用户级根，于是内核看得见、面板看不见的技能
- * （工作区里放的那些）无法归组、开关、查看文件。这里把 100/200 补齐，并保持
- * 与内核一致的先后顺序（工作区优先，同名时先出现的胜出）。
+ * 工作区在前、`.dsh` 在前，与内核 `@deepseek-ai/dsh-skill-filesystem` 的 rank
+ * 顺序一致（`project-dsh` 100 < `project-agents` 200 < `user-dsh` 400 <
+ * `user-agents` 500），这样面板显示与「模型实际能用的那份」是同一个赢家。
  *
  * 工作区 = 会话 cwd。面板是进程级单例，没有「当前会话」的概念，因此取
  * **所有活动 agent 的 cwd ∪ 启动 cwd** 的并集；没有活动 agent 时只剩启动 cwd。
  * 内核的项目根判定是「最近的含 .git 的祖先，没有则 cwd」，这里照抄该规则，
  * 否则 `<ws>/sub/dir` 会话会漏掉 `<ws>/.agents/skills`。
  *
+ * 四个根**始终都在列表里**（不按「目录是否存在」过滤）：这样用户把技能丢进
+ * `~/.dsh/skills` 或新建 `<ws>/.agents/skills` 时，下一次请求就能看到，不必重开会话。
+ *
  * 三个消费方（技能面板 / 技能健康 / 技能开关）共用 {@link currentSkillRoots}：
- * 宿主在挂载时算一次并写入，路由每次请求读同一份，避免三处各自推导出不同根集合。
+ * 宿主在挂载时算一次并写入，会话创建/切换时重算，路由每次请求读同一份。
  */
 
 import { readdir, stat } from 'node:fs/promises'
@@ -41,15 +42,15 @@ export interface SkillRoot {
 /** 运行时可选的宿主面（agent 名单 / 启动上下文）在类型上放宽。 */
 type PluginContext = any
 
-/** 用户级根：`<agentsHome>/skills`（可写）与 `<dshHome>/skills`（内核会跳过 .system）。 */
+/** 用户级两个根：`<dshHome>/skills` 优先于 `<agentsHome>/skills`（`.dsh` 胜）。 */
 export function userSkillRoots(): SkillRoot[] {
   return [
-    { path: join(agentsHome(), 'skills'), label: 'user-agents' },
     { path: join(dshHome(), 'skills'), label: 'user-dsh' },
+    { path: join(agentsHome(), 'skills'), label: 'user-agents' },
   ]
 }
 
-/** 单个工作区的两个技能根（顺序与内核 rank 一致：.dsh 先于 .agents）。 */
+/** 单个工作区的两个技能根（`.dsh` 先于 `.agents`，同名时 `.dsh` 胜）。 */
 export function workspaceSkillRoots(workspace: string): SkillRoot[] {
   return [
     { path: join(workspace, '.dsh', 'skills'), label: 'project-dsh', workspace },
@@ -120,30 +121,27 @@ export async function workspaceDirs(ctx: PluginContext): Promise<string[]> {
 }
 
 /**
- * 全部技能根：工作区级在前（每个工作区 `.dsh/skills` → `.agents/skills`），
- * 用户级在后。与内核 rank 顺序一致，同名技能先出现者胜出。
- * 只返回**存在且是目录**的根，避免面板出现空根。
+ * 全部技能根（四个目录 × 每个工作区）：工作区级在前（`.dsh/skills` → `.agents/skills`），
+ * 用户级在后（`<dshHome>/skills` → `<agentsHome>/skills`）。同名技能先出现者胜出。
+ *
+ * **不按「目录是否存在」过滤**：四个根始终在列表里，用户把技能丢进 `~/.dsh/skills`
+ * 或新建 `<ws>/.agents/skills` 后，下一次请求即可见，无需重开会话。
  * @param ctx - 宿主上下文。
- * @returns 现存技能根（去重）。
+ * @returns 技能根（已按路径去重，顺序即优先级）。
  */
 export async function resolveSkillRoots(ctx: PluginContext): Promise<SkillRoot[]> {
   const roots: SkillRoot[] = []
   for (const workspace of await workspaceDirs(ctx)) roots.push(...workspaceSkillRoots(workspace))
   roots.push(...userSkillRoots())
-  const existing: SkillRoot[] = []
   const seen = new Set<string>()
+  const unique: SkillRoot[] = []
   for (const root of roots) {
     const key = root.path.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    try {
-      if (!(await stat(root.path)).isDirectory()) continue
-    } catch {
-      continue
-    }
-    existing.push(root)
+    unique.push(root)
   }
-  return existing
+  return unique
 }
 
 /* ── 进程内共享的根集合（三个消费方读同一份） ───────────────────────────── */

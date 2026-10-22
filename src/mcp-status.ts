@@ -363,7 +363,10 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
       })),
       errors: workspace.errors,
       skipped: workspace.skipped,
-      dirs: { global: workspace.dirs.global },
+      // 被更高优先级目录同名遮蔽的条目（`.dsh` 赢 `.agents`，工作区赢用户级）。
+      shadowed: workspace.shadowed,
+      // 四个 mcps 根的路径（用户级两个直接给；工作区两个由面板按工作区拼）。
+      dirs: { user: workspace.dirs.user },
     },
     // 工具级禁用两层账本镜像（客户端按当前范围取状态）：
     // 有效禁用 = toolDisabled（全局层）∪ toolDisabledByPreset[当前预设]。

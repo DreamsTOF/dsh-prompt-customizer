@@ -144,14 +144,15 @@ export const SKILL_ZH: Record<string, string> = {
   mcpConnStatus: '连接状态', mcpConnOk: '已连接', mcpConnDown: '不可用', mcpConnTip: '实时读取到 {n} 个全局 MCP Server',
   mcpLiveConfigHint: '添加：编辑 cordis.patch.yml（或使用「添加 MCP Server」生成配置片段）',
   // mcps 目录来源（内核不读这些文件，本插件读出来挂载）
-  mcpDirsSection: 'mcps 目录（工作区 / 全局）',
-  mcpDirsHint: '内核只认 Cordis 组合里的 mcp-client 行，不读目录下的 mcp.json —— 这里列出本插件代读并挂载的那些：全局层所有会话可见，工作区层只在该工作区会话可见。',
+  mcpDirsSection: 'mcps 目录（四个目录）',
+  mcpDirsHint: '内核只认 Cordis 组合里的 mcp-client 行，不读目录下的 mcp.json —— 这里列出本插件代读并挂载的那些。四个目录按优先级：工作区 .dsh/mcps → 工作区 .agents/mcps → ~/.dsh/mcps → ~/.agents/mcps；同名时前面的胜出（.dsh 优先于 .agents，工作区优先于用户级）。工作区层只在该工作区的会话里可见。',
   mcpDirsGlobalTag: '全局',
   mcpDirsWorkspaceTag: '工作区',
   mcpDirsSubScope: '{n} 个 Server · {root}',
-  mcpDirsEmpty: '没有发现 mcps 目录里的配置。放到 {dir}/<任意名字>/mcp.json；工作区配置放 <工作区>/.agents/mcps/ 或 <工作区>/.dsh/mcps/。',
+  mcpDirsEmpty: '没有发现 mcps 目录里的配置。四个目录都认：<工作区>/.dsh/mcps/、<工作区>/.agents/mcps/、{dirs}，放成 <目录>/<任意名字>/mcp.json 即可。',
   mcpDirsErrors: '{n} 个配置文件解析失败（见下方明细）',
   mcpDirsSkipped: '{names} 与 cordis 组合里的同名 mcp-client 行重名：以组合为准，未重复挂载（同名 serverName 在同一作用域只能有一个实例）。',
+  mcpDirsShadowed: '同名遮蔽：{items}',
   mcpDirsFileHint: '来源：{file}',
   // 预设维度（0.1.6）：全局 / 预设专属 / 遮蔽
   mcpScopeTitle: 'Agent 预设范围',

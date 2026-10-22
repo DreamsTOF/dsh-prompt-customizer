@@ -1,6 +1,6 @@
 {
   "name": "dsh-prompt-customizer",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "DeepSeek Harness 的三合一能力台：提示词定制（按名称屏蔽 / 替换 / 注入 / 排序，按会话阶段与 agent 预设分层）+ 技能集合管理（导入 / 分组 / 开关）+ MCP Server 接入（分层遮蔽与工具级启停）。纯插件注入，不动官方源码。",
   "keywords": [
     "dsh",

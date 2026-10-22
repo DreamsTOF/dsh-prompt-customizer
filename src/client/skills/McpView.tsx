@@ -7,10 +7,10 @@
  */
 import { useState } from 'react'
 import {
-  IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconFolderOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
+  IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ConfirmDialog } from '../confirm-dialog'
-import { LockGlyph } from './icons.js'
+import { FolderBlueIcon, LockGlyph } from './icons.js'
 import { McpPasteAdd } from './McpAddModal.js'
 import {
   isToolRegistrationPending, type LiveMcpState, type LiveMcpStatus, type LiveMcpTool, type WorkspaceMcpServer,
@@ -262,20 +262,29 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
     || row.serverName.toLowerCase().includes(needle)
     || row.summary.toLowerCase().includes(needle))
 
-  /* mcps 目录来源（全局层 + 工作区层）：内核不读这些文件，由本插件代读并挂载。
-   * 这些 Server 也是真正的 mcp-client 行，工具级开关照常可用（按 serverName 记账）。 */
+  /* mcps 目录来源（四个目录）：内核不读这些文件，由本插件代读并挂载。
+   * 这些 Server 也是真正的 mcp-client 行，工具级开关照常可用（按 serverName 记账）。
+   * 按**根目录**分组展示，顺序即扫描优先级（工作区 .dsh → .agents → ~/.dsh → ~/.agents）。 */
   const wsMcp = ready?.workspaceServers
-  const wsGlobal = wsMcp?.global ?? []
-  const wsWorkspaceGroups = wsMcp?.workspaces ?? []
+  const wsAllServers: WorkspaceMcpServer[] = [
+    ...(wsMcp?.global ?? []),
+    ...(wsMcp?.workspaces ?? []).flatMap(group => group.servers),
+  ]
   const wsMatch = (server: { serverName: string; summary: string; tools?: LiveMcpTool[] }): boolean => needle === ''
     || server.serverName.toLowerCase().includes(needle)
     || server.summary.toLowerCase().includes(needle)
     || (server.tools ?? []).some(tool => tool.name.toLowerCase().includes(needle))
-  const wsGlobalShown = wsGlobal.filter(wsMatch)
-  const wsGroupsShown = wsWorkspaceGroups
+  const wsRootGroups: Array<{ root: string; servers: WorkspaceMcpServer[] }> = []
+  for (const server of wsAllServers) {
+    const key = server.root ?? server.file
+    const group = wsRootGroups.find(item => item.root === key)
+    if (group === undefined) wsRootGroups.push({ root: key, servers: [server] })
+    else group.servers.push(server)
+  }
+  const wsRootsShown = wsRootGroups
     .map(group => ({ root: group.root, servers: group.servers.filter(wsMatch) }))
     .filter(group => group.servers.length > 0)
-  const wsTotal = wsGlobal.length + wsWorkspaceGroups.reduce((sum, group) => sum + group.servers.length, 0)
+  const wsTotal = wsAllServers.length
 
   /**
    * mcps 目录来源的一张卡片。
@@ -497,7 +506,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                   aria-expanded={dirsOpen}
                   onClick={() => { setDirsOpen((value) => !value) }}
                 >
-                  <span className={css.bundleIcon} aria-hidden="true"><IconFolderOutlineRegular size={16} /></span>
+                  <span className={css.bundleIcon} aria-hidden="true"><FolderBlueIcon size={16} /></span>
                   <span className={css.bundleName}>{t('mcpDirsSection')}</span>
                   <span className={css.bundleCount}>{wsTotal}</span>
                   <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
@@ -510,6 +519,11 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                     names: (wsMcp.skipped ?? []).map(item => item.name).join('、'),
                   })}</p>
                 )}
+                {(wsMcp.shadowed ?? []).length > 0 && (
+                  <p className={css.mcpEmptyList}>{t('mcpDirsShadowed', {
+                    items: (wsMcp.shadowed ?? []).map(item => `${item.name}（${item.file} → 采用 ${item.keptFile}）`).join('；'),
+                  })}</p>
+                )}
                 {wsMcp.errors.length > 0 && (
                   <div className={css.mcpEmptyList} role="alert">
                     <div>{t('mcpDirsErrors', { n: wsMcp.errors.length })}</div>
@@ -519,21 +533,19 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                   </div>
                 )}
                 {wsTotal === 0 ? (
-                  <p className={css.mcpEmptyList}>{t('mcpDirsEmpty', { dir: wsMcp.dirs.global })}</p>
+                  <p className={css.mcpEmptyList}>{t('mcpDirsEmpty', { dirs: (wsMcp.dirs?.user ?? []).join('  ·  ') })}</p>
                 ) : (
                   <>
-                    {wsGlobalShown.length > 0 && (
-                      <div className={css.mcpRecGrid}>
-                        {wsGlobalShown.map(server => renderDirCard(server, t('mcpDirsGlobalTag')))}
-                      </div>
-                    )}
-                    {wsGroupsShown.map(group => (
+                    {wsRootsShown.map(group => (
                       <div key={group.root}>
                         <p className={css.mcpEmptyList}>
                           {t('mcpDirsSubScope', { n: group.servers.length, root: group.root })}
                         </p>
                         <div className={css.mcpRecGrid}>
-                          {group.servers.map(server => renderDirCard(server, t('mcpDirsWorkspaceTag')))}
+                          {group.servers.map(server => renderDirCard(
+                            server,
+                            server.scope === 'workspace' ? t('mcpDirsWorkspaceTag') : t('mcpDirsGlobalTag'),
+                          ))}
                         </div>
                       </div>
                     ))}

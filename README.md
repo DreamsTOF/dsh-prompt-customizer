@@ -63,6 +63,17 @@
 - **按会话阶段分层**：引导期（未晋级）/ 常驻期（晋级后）/ 压缩受控期（压缩后仍未晋级）各有**独立的屏蔽名单、独立的排序空间、独立的工具目录**。同一个预设可以做到首轮只给模型 1 个工具和几段提示词，晋级后放开全套。
 - **按 agent 预设分层**：顶部预设 Tab 选中某个 agent 预设后，改动只对该预设生效；**0.9.0 起「全部 Agent」全局层停用**——提示词必须按具体预设修改，预设未定制的字段 = 官方默认（旧全局层数据保留在 config.yaml 里不再生效，可手编回滚）。
 
+## 0.10.1：修复 MCP 页闪退 + 技能/MCP 统一为「四个目录、`.dsh` 优先」
+
+- **修复「点 MCP tab 闪退回对话界面」**：0.10.0 的 MCP 页新增分组时，图标随手写成 `IconFolderOutlineRegular`，而宿主 `@deepseek-ai/dsh-client-ui-primitives` 并未导出这个名字 —— 该 JSX 组件是 `undefined`，React 抛 `Element type is invalid`，MCP 页被 ErrorBoundary 摘掉（面板 fallback `null` + 自动关闭 = 闪退回对话界面）。改用宿主确实导出、或插件自绘的图标。
+- **补上静态护栏**，让「宿主没有这个图标」在提交前就失败：`test/client-primitives.test.mjs` 检查客户端从 ui-primitives 导入的每个名字都在 `test/fixtures/client-ui-primitives.json` 白名单里，并逐名核对宿主打包产物确实存在（标识符边界匹配，防止 `IconFolderOpenOutline` 蹭到 `IconFolderOpenOutlineRegular` 而误判）。
+- **补上真浏览器验证**：新增 `scripts/verify-panel-browser.mjs` —— 用真实 Chrome（CDP，无第三方依赖）打开 dsh Web UI，点「能力」→ MCP 页 → SKILL 页，断言没有未捕获异常、MCP 页真的渲染出来、四个目录里的条目都在 DOM 里，并截图留证。闪退这类问题只有真渲染才会暴露，单测全绿也拦不住。
+- **技能与 MCP 统一为四个目录**（`.dsh` 优先于 `.agents`，工作区优先于用户级）：
+  - 技能：`<工作区>/.dsh/skills` → `<工作区>/.agents/skills` → `~/.dsh/skills` → `~/.agents/skills`
+  - MCP：`<工作区>/.dsh/mcps` → `<工作区>/.agents/mcps` → `~/.dsh/mcps` → `~/.agents/mcps`
+  - 同名先出现者胜出：技能按名字去重（先出现的那份胜出）；MCP 同一作用域内同名只挂一台，被遮蔽的在面板里如实标出「同名遮蔽（来自哪个文件 → 采用了哪个文件）」。
+  - 技能根**不再按「目录是否存在」过滤**：四个根始终在列表里，新丢进去的技能下一次请求即可见，不必重开会话。
+
 ## 0.10.0：技能扫工作区级根 + mcps 目录接上
 
 - **技能面板补上工作区级技能根**：内核 `dsh-skill-filesystem` 扫 5 类根，本插件面板此前只认两个用户级根，于是 `<工作区>/.dsh/skills` 与 `<工作区>/.agents/skills` 里的技能内核看得见、面板看不见（无法归组 / 开关 / 查看文件）。现在面板、技能开关、技能健康三处共用同一份根集合，顺序与内核 rank 一致（工作区级先于用户级，同名先出现者胜出），项目根按内核规则取「最近的含 `.git` 的祖先，没有则会话 cwd」。
@@ -161,7 +172,7 @@
 - **导入**：拖入 / 选择 ZIP 或文件夹，自动剥掉顶层文件夹、落成 `<技能根>/<名称>/SKILL.md`，并立刻归组到目标技能包；重名给明确错误，不带路径分隔的名字一律拒绝（不越界读技能根外的文件）。
 - **开关（全局 / 预设两层）**：单个技能与整个技能包都能开关，预设层写自己那份账（规范名条目），只对该 agent 预设生效 —— 与「全局」层互不覆盖。
 - **技能健康**：`/api/skill-health` 给出技能根的可读性与成员一致性体检。
-- **扫描范围与内核一致**：读的是内核 `dsh-skill-filesystem` 的同一批根 —— 工作区级 `<工作区>/.dsh/skills`、`<工作区>/.agents/skills`（项目根 = 最近的含 `.git` 的祖先，没找到就用会话 cwd），以及用户级 `~/.agents/skills`、`~/.dsh/skills`；顺序即优先级（工作区级先于用户级，同名先出现者胜出）。面板按所有活动会话的 cwd ∪ 启动目录取并集，切工作区后自动重算。
+- **扫描范围（四个目录）**：`<工作区>/.dsh/skills` → `<工作区>/.agents/skills` → `~/.dsh/skills` → `~/.agents/skills`，顺序即优先级（工作区级先于用户级，`.dsh` 先于 `.agents`，同名先出现者胜出）。工作区按内核规则取「最近的含 `.git` 的祖先，没找到就用会话 cwd」；面板把所有活动会话的 cwd ∪ 启动目录取并集，切工作区后自动重算。四个根始终在列表里（不因目录暂不存在而隐藏）。
 - **与内核分工**：会话里的 `/` 技能源与技能工具行由 DSH 内核的 `@deepseek-ai/dsh-client-ui-skill` 负责，本插件不重复注册（重复注册会让内核 apply 抛错并拖垮整条客户端插件加载链）；本插件提供的是「能力」面板里的管理面（导入 / 归组 / 开关 / 体检）与它背后的宿主路由。
 
 ### MCP Server 接入（MCP tab）
@@ -171,9 +182,11 @@
 - **分层遮蔽**：全局行 + 预设层两本账（预设层分「继承全局」与「自带」两侧，各记各的账）；预设自带的同名 Server 优先于继承条目；全局关闭 = 一票否决，预设层不能反开（返回 409 并给出说明）。
 - **工具级启停**：按最长匹配把工具归到所属 Server（`my` 与 `my_server` 各自成组），可整台 Server 关掉，也可只关其中几个工具；装配过滤、状态路由、原生目录三处同源。
 - **推荐清单**：`/api/mcp-recommended` 给出常见 MCP Server 的配置模板，照抄即可接入。
-- **mcps 目录（内核不读，本插件补上）**：内核只认 Cordis 组合里的 `mcp-client` 行，没有「读某个目录下 `mcp.json`」的约定，所以下面这些位置放着的配置以前一直是死文件 —— 现在由插件读出来挂成真正的 mcp-client 行，面板 MCP 页单列一组：
-  - 全局层 `~/.agents/mcps/**/mcp.json`：所有会话可见；
-  - 工作区层 `<工作区>/.dsh/mcps/**/mcp.json` 与 `<工作区>/.agents/mcps/**/mcp.json`：只在该工作区的会话里可见（装配时按会话 cwd 过滤）。
+- **mcps 目录（四个目录，内核不读、本插件补上）**：内核只认 Cordis 组合里的 `mcp-client` 行，没有「读某个目录下 `mcp.json`」的约定，所以这些位置放着的配置以前一直是死文件 —— 现在由插件读出来挂成真正的 mcp-client 行，面板 MCP 页按根目录分组展示。优先级从高到低（同名时先出现者胜出）：
+  1. `<工作区>/.dsh/mcps/**/mcp.json` —— 只在该工作区的会话里可见
+  2. `<工作区>/.agents/mcps/**/mcp.json` —— 只在该工作区的会话里可见（装配时按会话 cwd 过滤）
+  3. `~/.dsh/mcps/**/mcp.json` —— 所有会话可见
+  4. `~/.agents/mcps/**/mcp.json` —— 所有会话可见
   - 同一目录下根 `mcp.json` 先读、子目录后读（同名后者覆盖）；配置里的 `${VAR}` 按进程环境展开，`cwd` 的相对值按该配置文件所在目录解析。
   - 工作区层的 serverName 会追加 8 位路径哈希（`codegraph-e5f6a7b8` 这种）：不同工作区可以各配一台同名但参数不同的 Server，互不挤占（同名 serverName 在同一作用域只能有一个实例）。
   - 与组合里既有的行同名时**以组合为准**：目录里那条不重复挂载，面板如实标出「已让位」，不会再出现重复注册导致的激活失败。
@@ -389,7 +402,7 @@ Web 端一致（桌面端经 `dsh-app://` 协议转发请求并附带认证 cook
 - **导出依赖宿主允许下载**。Web 回退走浏览器下载：若宿主 webview 静默丢弃下载，面板仍会提示「导出成功」而文件没有落地。导入（文件选择）不受影响。
 - **池子是「见过才知道」的并集**。当前 scope 与 agent 作用域的段当场就能列出来，但**只在别的预设里注册**的段 / 工具要等你切到那个编辑目标才进池（逐个挂载预设 tree 太慢，不做预热）。池子对「某个名字属于哪个阶段」没有权威信息 —— 加入阶段时按当前 Tab 落，之后可以随意拖动改位置。
 - **工具目录的扩充以注册表为天花板**，见前文「扩充的天花板是注册表」。
-- **技能根在工作区变化后的重算时机**：根集合在「插件挂载时」与「新会话创建时（`agent/created`）」各算一次，不是每次请求重算。会话运行中新建 `<工作区>/.agents/skills` 需要新开一个会话（或重启宿主）才会出现在面板。
+- **工作区根集合的重算时机**：根集合在「插件挂载时」与「新会话创建时（`agent/created`）」各算一次，不是每次请求重算。四个根本身一直在列表里，往已有根丢技能/`mcp.json` 下一次请求就能看到；只有**新出现的工作区**（换个目录开会话）才需要那次重算，若面板没跟上，新开一个会话或刷新即可。
 - **mcps 目录只读挂载**：面板不改写这些 `mcp.json`；要让某台 Server 成为持久全局配置，仍走「添加 MCP Server」（写 profile patch）。工作区层的 Server 工具名带 8 位路径哈希后缀（如 `mcp__codegraph-e5f6a7b8__*`），这是同名隔离的代价。
 
 ## 开发
@@ -403,6 +416,20 @@ npm run check   # typecheck + build + 全量单测
 
 - `lib/index.js` —— 宿主半身，ESM、自包含，只留 `node:*` 内建依赖；`@deepseek-ai/*` 一律走 `vendor/`（内置叶子模块）或构建期内联，`assertHostExternals()` 会在构建末尾把违规的裸导入直接判失败；
 - `client/client.js` —— 浏览器半身，`__ModuleLoader__` factory bundle；`react*` 与 `@deepseek-ai/*` 走宿主模块表，其余全部内联。
+
+浏览器半身改动别只靠单测（历史上「点 MCP tab 闪退」就是这么漏出去的：单测全绿，真渲染才炸）。两道针对性检查：
+
+```bash
+# 1) 静态护栏：从宿主 ui-primitives 导入的名字必须真实存在（防 undefined 组件）
+node --test test/client-primitives.test.mjs
+
+# 2) 真浏览器：起一个 dsh web，再用真实 Chrome 点一遍面板并截图
+dsh web --port 3099 --no-open          # 从输出里取出带 token 的 URL
+node scripts/verify-panel-browser.mjs --url "<带 token 的 URL>" \
+  --expect-skills <技能名,...> --expect-mcp <serverName,...> --out ./verify-shots
+```
+
+`--headless` 可切无头；脚本只用 Node 内建能力（`fetch` + `WebSocket` 驱动 CDP），不引第三方依赖。
 
 阶段性与可测的纯逻辑集中在 `vendor/prompt-customizer/`（提示词策略 / 清单登记表 / 阶段投影）与 `vendor/skill-manager/`：同一份纯函数既被两侧打包使用，也被 `node --test` 直接覆盖，测试即上线代码。`npm run check` = 构建 + 全量单测 + 两半 smoke。
 

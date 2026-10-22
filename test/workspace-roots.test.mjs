@@ -59,7 +59,13 @@ const fakeCtx = (cwd) => ({
   profileContext: { cwd },
 })
 
-test('skill-roots: 工作区级两个根排在用户级之前（与内核 rank 同序）', async () => {
+/** 在 `dir` 下写一个 mcp.json（serverName → 配置）。 */
+function writeMcp(dir, servers) {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'mcp.json'), JSON.stringify({ mcpServers: servers }, null, 2))
+}
+
+test('skill-roots: 四个目录按优先级排列（工作区先于用户级，.dsh 先于 .agents）', async () => {
   const box = sandbox()
   try {
     mkdirSync(join(box.workspace, '.agents', 'skills', 'ws-agents'), { recursive: true })
@@ -75,7 +81,7 @@ test('skill-roots: 工作区级两个根排在用户级之前（与内核 rank �
       const { resolveSkillRoots } = await import('../src/skill-roots.ts')
       const roots = await resolveSkillRoots(fakeCtx(box.workspace))
       const labels = roots.map((root) => root.label)
-      assert.deepEqual(labels, ['project-dsh', 'project-agents', 'user-agents', 'user-dsh'])
+      assert.deepEqual(labels, ['project-dsh', 'project-agents', 'user-dsh', 'user-agents'])
     })
   } finally {
     rmSync(box.root, { recursive: true, force: true })
@@ -101,13 +107,14 @@ test('skill-roots: 项目根按最近的 .git 祖先判定（子目录会话不�
   }
 })
 
-test('skill-roots: 不存在的根不进列表（面板不出现空根）', async () => {
+test('skill-roots: 四个根始终在列表里（目录不存在也保留，便于随时丢技能进去）', async () => {
   const box = sandbox()
   try {
     await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
       const { resolveSkillRoots } = await import('../src/skill-roots.ts')
       const roots = await resolveSkillRoots(fakeCtx(box.workspace))
-      assert.deepEqual(roots.map((root) => root.label), ['user-agents', 'user-dsh'])
+      assert.deepEqual(roots.map((root) => root.label),
+        ['project-dsh', 'project-agents', 'user-dsh', 'user-agents'])
     })
   } finally {
     rmSync(box.root, { recursive: true, force: true })
@@ -158,36 +165,67 @@ test('skills-host: 注入工作区根后 list 路由扫得到那些技能', asyn
   }
 })
 
-test('mcp-workspace: 全局层与工作区层都被扫描，工作区 serverName 带稳定后缀', async () => {
+test('mcp-workspace: 四个目录都被扫描，工作区 serverName 带稳定后缀', async () => {
   const box = sandbox()
   try {
-    const globalDir = join(box.agentsHome, 'mcps', 'code')
-    mkdirSync(globalDir, { recursive: true })
-    writeFileSync(join(globalDir, 'mcp.json'), JSON.stringify({
-      mcpServers: { shared: { url: 'https://example.test/mcp', headers: { Authorization: 'Bearer ${PROBE_TOKEN}' } } },
-    }))
-    const wsDir = join(box.workspace, '.agents', 'mcps', 'tool')
-    mkdirSync(wsDir, { recursive: true })
-    writeFileSync(join(wsDir, 'mcp.json'), JSON.stringify({
-      mcpServers: { local: { command: 'node', args: ['server.mjs'], cwd: '.' } },
-    }))
+    // 四个根各放一台：工作区 .dsh / .agents，用户级 ~/.dsh / ~/.agents。
+    writeMcp(join(box.workspace, '.dsh', 'mcps', 'a'), { wsDsh: { command: 'node', args: ['a.mjs'] } })
+    writeMcp(join(box.workspace, '.agents', 'mcps', 'b'), { wsAgents: { command: 'node', args: ['b.mjs'] } })
+    writeMcp(join(box.dshHome, 'mcps', 'c'), { userDsh: { url: 'https://dsh.test/mcp' } })
+    writeMcp(join(box.agentsHome, 'mcps', 'd'), {
+      userAgents: { url: 'https://example.test/mcp', headers: { Authorization: 'Bearer ${PROBE_TOKEN}' } },
+    })
 
     await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
       const { scanAll, scopedServerName } = await import('../src/mcp-workspace.ts')
       const result = await scanAll([box.workspace])
       const names = result.servers.map((server) => server.name).sort()
-      assert.deepEqual(names, ['local', 'shared'])
+      assert.deepEqual(names, ['userAgents', 'userDsh', 'wsAgents', 'wsDsh'])
       assert.deepEqual(result.errors, [])
 
-      const shared = result.servers.find((server) => server.name === 'shared')
-      assert.equal(shared?.scope, 'global')
-      assert.equal(shared?.serverName, 'shared', '全局层保留原名')
+      const userDsh = result.servers.find((server) => server.name === 'userDsh')
+      assert.equal(userDsh?.scope, 'global')
+      assert.equal(userDsh?.serverName, 'userDsh', '用户级保留原名')
+      assert.equal(userDsh?.root, join(box.dshHome, 'mcps'), '带出来源根目录')
 
-      const local = result.servers.find((server) => server.name === 'local')
+      const local = result.servers.find((server) => server.name === 'wsDsh')
       assert.equal(local?.scope, 'workspace')
       assert.equal(local?.workspace, box.workspace)
-      assert.equal(local?.serverName, scopedServerName(box.workspace, 'local'), '工作区层带路径哈希后缀')
-      assert.match(local?.serverName ?? '', /^local-[0-9a-f]{8}$/)
+      assert.equal(local?.serverName, scopedServerName(box.workspace, 'wsDsh'), '工作区层带路径哈希后缀')
+      assert.match(local?.serverName ?? '', /^wsDsh-[0-9a-f]{8}$/)
+      assert.equal(local?.root, join(box.workspace, '.dsh', 'mcps'), '带出来源根目录')
+    })
+  } finally {
+    rmSync(box.root, { recursive: true, force: true })
+  }
+})
+
+test('mcp-workspace: 同名时 .dsh 胜 .agents（工作区/用户层各留一台，被遮蔽的如实上报）', async () => {
+  const box = sandbox()
+  try {
+    // 同名 dup：工作区 .dsh / .agents 各一台，用户级 .dsh / .agents 也各一台。
+    writeMcp(join(box.workspace, '.dsh', 'mcps'), { dup: { url: 'https://ws-dsh.test/mcp' } })
+    writeMcp(join(box.workspace, '.agents', 'mcps'), { dup: { url: 'https://ws-agents.test/mcp' } })
+    writeMcp(join(box.dshHome, 'mcps'), { dup: { url: 'https://user-dsh.test/mcp' } })
+    writeMcp(join(box.agentsHome, 'mcps'), { dup: { url: 'https://user-agents.test/mcp' } })
+
+    await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
+      const { scanAll } = await import('../src/mcp-workspace.ts')
+      const result = await scanAll([box.workspace])
+      // 工作区层与用户层是两个作用域，各自留一台；层内同名才是遮蔽。
+      assert.equal(result.servers.length, 2, '每个作用域各保留一台')
+      const workspaceWinner = result.servers.find((server) => server.scope === 'workspace')
+      const userWinner = result.servers.find((server) => server.scope === 'global')
+      assert.equal(workspaceWinner?.root, join(box.workspace, '.dsh', 'mcps'), '工作区内 .dsh 胜出')
+      assert.equal(workspaceWinner?.summary, 'https://ws-dsh.test/mcp')
+      assert.equal(userWinner?.root, join(box.dshHome, 'mcps'), '用户级内 ~/.dsh 胜出')
+      assert.equal(userWinner?.summary, 'https://user-dsh.test/mcp')
+      assert.equal(result.shadowed.length, 2, '被遮蔽的两台如实上报')
+      assert.ok(result.shadowed.every((item) => item.name === 'dup'))
+      assert.deepEqual(result.shadowed.map((item) => item.file).sort(), [
+        join(box.agentsHome, 'mcps', 'mcp.json'),
+        join(box.workspace, '.agents', 'mcps', 'mcp.json'),
+      ].sort(), '被遮蔽的是 .agents 那两份')
     })
   } finally {
     rmSync(box.root, { recursive: true, force: true })
