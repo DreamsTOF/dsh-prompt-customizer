@@ -41,6 +41,7 @@ import {
   toolDisableTables,
 } from './mcp-tool-disable.ts'
 import { readPresetRoster } from './skill-toggles.ts'
+import { workspaceMcpStatus } from './mcp-workspace.ts'
 
 const STATUS_ROUTE = '/api/triad/mcp-status'
 const CONFIG_ROUTE = '/api/triad/mcp-config'
@@ -330,6 +331,9 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
   }
   servers.sort((a, b) => String(a.serverName).localeCompare(String(b.serverName)))
   const tables = toolDisableTables()
+  // 工作区级 / 全局 mcps 目录里的 server：本插件自己挂的（内核不读这些文件），
+  // 单独一组返回，面板把它和 profile patch 里的全局行、预设自带行并排展示。
+  const workspace = workspaceMcpStatus()
   return {
     at: new Date().toISOString(),
     serverCount: servers.length,
@@ -344,6 +348,23 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
     // 面板用它把「账本已写但工具还在」说清楚（以前只打日志，静默）。
     maskInstall: maskInstallReport(),
     presetServers,
+    // mcps 目录来源的 Server（全局层 + 工作区层），以及解析错误与挂载结果。
+    workspaceServers: {
+      global: workspace.global.map(server => ({
+        ...server,
+        tools: mergeWithKnown(server.serverName, groups.get(server.serverName) ?? []),
+      })),
+      workspaces: workspace.workspaces.map(entry => ({
+        root: entry.root,
+        servers: entry.servers.map(server => ({
+          ...server,
+          tools: mergeWithKnown(server.serverName, groups.get(server.serverName) ?? []),
+        })),
+      })),
+      errors: workspace.errors,
+      skipped: workspace.skipped,
+      dirs: { global: workspace.dirs.global },
+    },
     // 工具级禁用两层账本镜像（客户端按当前范围取状态）：
     // 有效禁用 = toolDisabled（全局层）∪ toolDisabledByPreset[当前预设]。
     toolDisabled: tables.disabled,

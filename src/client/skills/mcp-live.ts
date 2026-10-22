@@ -33,6 +33,38 @@ export interface PresetMcpRowWire {
   /** 该 server 的工具（活动 agent 作用域 ∪ 名单缓存；无数据时缺省）。 */
   tools?: LiveMcpTool[]
 }
+/**
+ * mcps 目录来源的一个 Server。
+ *
+ * 内核只认 Cordis 组合里的 mcp-client 行，没有「读某个目录下 mcp.json」的约定，
+ * 所以 `~/.agents/mcps/**`（全局）与 `<ws>/.dsh|.agents/mcps/**`（工作区）里的
+ * 配置由本插件读出来并挂成真正的 mcp-client 行。
+ */
+export interface WorkspaceMcpServer {
+  /** 配置文件里写的名字（工作区层不带路径哈希后缀）。 */
+  name: string
+  scope: 'global' | 'workspace'
+  /** 工作区根（仅 workspace 层）。 */
+  workspace?: string
+  /** 实际挂载用的 serverName（工作区层带 8 位路径哈希后缀）。 */
+  serverName: string
+  transport: string
+  summary: string
+  /** 来源文件（面板展示「这条从哪来」）。 */
+  file: string
+  /** 工具清单（注册工具 ∪ 名单缓存，与其它卡片同口径）。 */
+  tools?: LiveMcpTool[]
+}
+/** mcps 目录来源的 Server 汇总（全局层 + 每个工作区层 + 解析错误）。 */
+export interface WorkspaceMcpState {
+  global: WorkspaceMcpServer[]
+  workspaces: Array<{ root: string; servers: WorkspaceMcpServer[] }>
+  errors: Array<{ file: string; message: string }>
+  /** 与组合里既有 mcp-client 行同名、已让位不再重复挂载的那些（组合是权威来源）。 */
+  skipped: Array<{ serverName: string; name: string; scope: 'global' | 'workspace'; workspace?: string; reason: 'composition' }>
+  /** 全局层 mcps 目录（面板提示「把配置放哪」）。 */
+  dirs: { global: string }
+}
 export interface LiveMcpState {
   at: string
   serverCount: number
@@ -50,6 +82,8 @@ export interface LiveMcpState {
   toolDisabledByPreset?: Record<string, Record<string, { own: string[]; inherit: string[] }>>
   /** 遮蔽补丁运行期安装诊断：presetId → 活动 agent 数与 deny 数、失败原因。 */
   maskInstall?: Record<string, { agents: number; deniedAgents: number; denyTotal: number; errors: string[] }>
+  /** mcps 目录来源的 Server（全局层 + 工作区层；由本插件挂载）。 */
+  workspaceServers?: WorkspaceMcpState
 }
 export type LiveMcpStatus =
   | { state: 'loading'; data: null }

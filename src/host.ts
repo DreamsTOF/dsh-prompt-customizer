@@ -21,17 +21,19 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
-import { apply as applySkillsHost } from '../vendor/skill-manager/skills-host.js'
+import { apply as applySkillsHost, setExtraRoots as setSkillHostRoots } from '../vendor/skill-manager/skills-host.js'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
 import { apply as applyPromptHost } from '../vendor/prompt-customizer/index.js'
 import { apply as applySkillToggles } from './skill-toggles.js'
 import { applySkillHealth } from './skill-health.js'
+import { resolveSkillRoots, setSkillRoots } from './skill-roots.ts'
 import { applyMcpRecommended } from './mcp-recommended.js'
 import { applyMcpStatus } from './mcp-status.js'
 import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
 import { applyMcpToolDisable } from './mcp-tool-disable.js'
+import { applyWorkspaceMcp } from './mcp-workspace.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-prompt-customizer'
@@ -50,6 +52,44 @@ export const inject = [
 ]
 
 export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promise<void> {
+  // ── 技能根解析（用户级 + 工作区级，三处消费方共用一份）────────────────
+  // 内核 dsh-skill-filesystem 扫 5 类根，面板原先只认两个用户级根，工作区里的
+  // 技能（<ws>/.dsh/skills、<ws>/.agents/skills）内核看得见、面板看不见。
+  // 这里先算一次写进 skill-roots 的进程内快照，再喂给 vendor 技能管理器。
+  const refreshSkillRoots = async (): Promise<void> => {
+    const roots = await resolveSkillRoots(ctx as never)
+    setSkillRoots(roots)
+    setSkillHostRoots(roots)
+  }
+  try {
+    await refreshSkillRoots()
+  } catch (error) {
+    ctx.logger?.warn?.(
+      `[dsh-prompt-customizer] skill roots resolution failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+
+  // 活动工作区变化（新会话进别的目录）后重算根集合：否则面板只认启动那一刻的
+  // 工作区。事件里只做「重算 + 写快照」，路由下一次请求即读到新集合。
+  ctx.effect(() => {
+    let queued = false
+    const off = ctx.on('agent/created', () => {
+      if (queued) return
+      queued = true
+      // 微任务延后一拍：agent/created 时 session.header.cwd 已就位，但同一轮
+      // 可能有多个 agent 创建，合并成一次重算。
+      queueMicrotask(() => {
+        queued = false
+        void refreshSkillRoots().catch((error: unknown) => {
+          ctx.logger?.warn?.(
+            `[dsh-prompt-customizer] skill roots refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+          )
+        })
+      })
+    })
+    return off
+  }, 'dsh-prompt-customizer: skill roots follow workspace')
+
   // ── 技能集合管理（vendor/skill-manager：/api/skill-manager/*）──────────
   try {
     await applySkillsHost(ctx)
@@ -138,6 +178,23 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   } catch (error) {
     ctx.logger?.warn?.(
       `[dsh-prompt-customizer] mcp tool disable failed to mount: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+    )
+  }
+
+  // ── 工作区级 / 全局 mcps 目录的 MCP Server（内核不读，本插件补上）──────
+  // `~/.agents/mcps/**`（全局）与 `<ws>/.dsh|.agents/mcps/**`（仅本工作区可见）
+  // 里的 mcp.json 由本模块读出来挂成真正的 mcp-client 行 —— 内核只认 Cordis
+  // 组合里的行，没有「读某个目录」的约定，所以这些文件此前一直是死配置。
+  //
+  // 挂在「单工具级启停」之后：本模块也注册一个 system-prompt/assemble 监听器，
+  // 后注册可保持既有监听器的注册顺序不变（waterfall 的先后不影响结果，顺序
+  // 稳定更利于排查）。
+  try {
+    applyWorkspaceMcp(ctx)
+    ctx.logger?.info?.('[dsh-prompt-customizer] workspace mcp mounted')
+  } catch (error) {
+    ctx.logger?.warn?.(
+      `[dsh-prompt-customizer] workspace mcp failed to mount: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
     )
   }
 

@@ -192,14 +192,24 @@ const ownServersOf = presetId => (presetRows.get(presetId)?.options.config.plugi
   .filter(row => row.name === "@deepseek-ai/dsh-mcp-client")
   .map(row => row.config.serverName)
 
-/** 跑一遍装配 waterfall（presetId 缺省 = 无预设，只应用全局行）。 */
+/** 跑一遍装配 waterfall（presetId 缺省 = 无预设，只应用全局行）。
+ *
+ * 依次调用**全部**已注册的 system-prompt/assemble 监听器（每个的 next = 下一个），
+ * 而不是只看第一个：宿主里可能还有别的全局监听器（例如工作区 mcps 目录的可见性
+ * 过滤），只看 [0] 会在监听器增减时静默跑偏 —— 那种「测试绿着、行为变了」的假
+ * 阳性比直接报错更贵。
+ */
 async function assembleTools(names, presetId) {
   const assembly = { tools: names.map(name => ({ name })) }
-  const handler = assembleHandlers[0]
-  if (handler === undefined) throw new Error("no system-prompt/assemble listener registered")
+  if (assembleHandlers.length === 0) throw new Error("no system-prompt/assemble listener registered")
   const context = presetId === undefined ? {} : { agent: { ctx: { presetId } } }
   let nextCalled = false
-  await handler(assembly, context, async () => { nextCalled = true; return assembly })
+  const runChain = async (index) => {
+    const current = assembleHandlers[index]
+    if (current === undefined) { nextCalled = true; return assembly }
+    return current(assembly, context, () => runChain(index + 1))
+  }
+  await runChain(0)
   return { names: assembly.tools.map(tool => tool.name), nextCalled }
 }
 

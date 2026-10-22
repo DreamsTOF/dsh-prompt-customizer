@@ -80,6 +80,27 @@ function managedRoot() {
 function dshRoot() {
   return join(dshHome(), "skills");
 }
+/**
+ * 额外技能根（dsh-prompt-customizer patch）：内核 `dsh-skill-filesystem` 还扫
+ * 工作区级 `<projectRoot>/.dsh/skills` 与 `<projectRoot>/.agents/skills`，本模块
+ * 原先只认两个用户级根 —— 那些技能内核看得见、面板看不见。宿主在 apply 时把
+ * 解析好的工作区根注入这里。
+ *
+ * 顺序即优先级：额外根（工作区级）在前，与内核 rank 一致（100/200 先于 400/500），
+ * 同名技能先出现者胜出，面板因此与内核选中同一个目录。
+ */
+var extraRoots = [];
+function allRoots() {
+  return [...extraRoots.map((root) => root.path), managedRoot(), dshRoot()];
+}
+/** 该根的展示标签：注入时自带（project-dsh / project-agents），否则按两个用户根判定。 */
+function labelOf(root) {
+  const injected = extraRoots.find((item) => item.path === root);
+  if (injected !== void 0) return injected.label;
+  if (root === managedRoot()) return "agents";
+  if (root === dshRoot()) return "dsh";
+  return "other";
+}
 function parseFrontmatter(raw) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
   const block = match?.[1];
@@ -134,9 +155,7 @@ async function readSkillMeta(root, dir) {
   };
 }
 function rootLabel(root) {
-  if (root === managedRoot()) return "agents";
-  if (root === dshRoot()) return "dsh";
-  return "other";
+  return labelOf(root);
 }
 async function listRootSkills(root) {
   const views = [];
@@ -223,7 +242,7 @@ async function allSkills() {
   const views = [];
   const seenDir = /* @__PURE__ */ new Set();
   const seenName = /* @__PURE__ */ new Set();
-  for (const root of [managedRoot(), dshRoot()]) {
+  for (const root of allRoots()) {
     for (const skill of await listRootSkills(root)) {
       const dirKey = skill.root + "/" + skill.dir;
       if (seenDir.has(dirKey)) continue;
@@ -270,9 +289,9 @@ function checkedLookupName(value) {
   }
   return name2;
 }
-/** 定位技能目录：先按目录名直取，再按 frontmatter name 扫一遍两个根。 */
+/** 定位技能目录：先按目录名直取，再按 frontmatter name 扫所有根。 */
 async function locateSkillDir(name2) {
-  const roots = [managedRoot(), dshRoot()];
+  const roots = allRoots();
   for (const root of roots) {
     const candidate = join(root, name2);
     try {
@@ -604,7 +623,7 @@ async function readSkillFile(skillName, relPath) {
  */
 async function deleteSkill(skillName) {
   const name2 = checkedLookupName(skillName);
-  const roots = [managedRoot(), dshRoot()];
+  const roots = allRoots();
   const removed = [];
   const aliases = /* @__PURE__ */ new Set([name2]);
   for (const root of roots) {
@@ -763,7 +782,14 @@ async function handle(ctx, req, res) {
     json(res, 400, { error: error instanceof Error ? error.message : String(error) });
   }
 }
-async function apply(ctx) {
+async function apply(ctx, options) {
+  // 宿主可注入工作区级技能根（见 extraRoots 注释）。重复 apply 时以最后一次为准：
+  // HMR / 会话切换后根集合会变（活动工作区不同）。
+  if (Array.isArray(options?.roots)) {
+    extraRoots = options.roots.filter((root) => root !== null && typeof root === "object"
+      && typeof root.path === "string" && root.path !== "")
+      .map((root) => ({ path: root.path, label: typeof root.label === "string" ? root.label : "other" }));
+  }
   ctx.effect(() => ctx.webServer.register({
     kind: "prefix",
     path: ROUTE_PREFIX,
@@ -772,10 +798,20 @@ async function apply(ctx) {
     }
   }), "dsh-skill-manager: routes");
 }
+/**
+ * 刷新额外技能根（宿主在活动工作区变化时调用；不重挂路由）。
+ * 传空数组即退回「只有两个用户级根」的原始行为。
+ */
+function setExtraRoots(roots) {
+  extraRoots = Array.isArray(roots) ? roots.filter((root) => root !== null && typeof root === "object"
+    && typeof root.path === "string" && root.path !== "")
+    .map((root) => ({ path: root.path, label: typeof root.label === "string" ? root.label : "other" })) : [];
+}
 export {
   apply,
   inject,
   name,
+  setExtraRoots,
   // 仅供 test/home-paths.test.mjs 做与 src/home-paths.ts 的等值断言。
   managedRoot as __managedRoot,
   dshRoot as __dshRoot

@@ -1,8 +1,9 @@
 /**
  * skill-health — 技能目录健康检查（host 半身）。
  *
- * 同步状态卡片的数据源。不修改 vendored skills-host.js：独立的只读检查器，
- * 扫描与 skill-manager 相同的两个技能根目录 + bundle 账本：
+ * 同步状态卡片的数据源。不修改 vendored skills-host.js 的扫描逻辑：独立的只读
+ * 检查器，扫描与 skill-manager 相同的技能根（用户级 + 工作区级，见
+ * `./skill-roots.ts`）+ bundle 账本：
  *
  *   1. missing-skill-md   —— 目录缺少 SKILL.md（`/api/skill-manager/list`
  *      会静默忽略这类目录，面板里根本看不到，属于「隐形坏目录」）
@@ -17,19 +18,17 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import { agentsHome, dshHome } from './home-paths.ts'
+import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 
 const SKILL_FILE = 'SKILL.md'
 const BUNDLES_FILE = '.bundles.json'
 const ROUTE_PATH = '/api/skill-health'
 
-/** skill-manager 同款根目录定义。 */
-function managedRoot(): string {
-  return join(agentsHome(), 'skills')
-}
-
-function dshRoot(): string {
-  return join(dshHome(), 'skills')
+/** 账本所在根：用户 `~/.agents/skills`（与 skill-manager 的 managedRoot 一致）。 */
+function ledgerRoot(): string {
+  const roots = currentSkillRoots()
+  const managed = roots.find((root) => root.label === 'user-agents')
+  return managed?.path ?? roots[0]?.path ?? ''
 }
 
 /** skill-manager 同款 frontmatter 解析（naive line parser）。 */
@@ -135,13 +134,16 @@ async function scanRoot(root: string, nameSet: Set<string>): Promise<{ healthy: 
 export async function healthCheck(): Promise<HealthReport> {
   const issues: HealthIssue[] = []
   const nameSet = new Set<string>()
-  const a = await scanRoot(managedRoot(), nameSet)
-  const b = await scanRoot(dshRoot(), nameSet)
-  const healthy = a.healthy + b.healthy
-  issues.push(...a.issues, ...b.issues)
+  // 根集合由宿主注入（含工作区级根），三处消费方共用同一份。
+  let healthy = 0
+  for (const root of currentRootPaths()) {
+    const scanned = await scanRoot(root, nameSet)
+    healthy += scanned.healthy
+    issues.push(...scanned.issues)
+  }
 
-  // bundle 账本悬挂引用：引用了两个根目录里都不存在的技能。
-  const ledger = await readBundles(managedRoot())
+  // bundle 账本悬挂引用：引用了所有根目录里都不存在的技能。
+  const ledger = await readBundles(ledgerRoot())
   for (const record of ledger.bundles) {
     for (const skillName of record.skills) {
       if (!nameSet.has(skillName)) {

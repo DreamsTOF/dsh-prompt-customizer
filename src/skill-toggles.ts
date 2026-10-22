@@ -28,7 +28,7 @@
  *   写账本后调用各闸门的 invalidate() 使缓存失效,下一步即生效。
  *
  * 本模块只读写技能文件与自己的账本,不动 DSH 源码;数据面与技能管理面板
- * (/api/skill-manager)同一批技能目录(managedRoot + dshRoot)。
+ * (/api/skill-manager)同一批技能目录(见 ./skill-roots.ts:用户级 + 工作区级)。
  *
  * Routes (all under /api/skill-toggles):
  *   GET  /status                          → { skills: {name: enabled}, bundles: {id: enabled} }
@@ -46,7 +46,7 @@ import { URL } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { presetTrustOf } from './mcp-presets.ts'
-import { agentsHome, dshHome } from './home-paths.ts'
+import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -81,14 +81,15 @@ const MASK_PROVIDER = 'triad-preset-mask'
 /** 账本里 preset 条目上限(preset 名单本身十几条量级)。 */
 const MAX_PRESET_ENTRIES = 50
 
-/** The writable user-agents skill root (honors $DSH_AGENTS_HOME). */
+/** The writable user-agents skill root (honors $DSH_AGENTS_HOME); 账本落在这里。 */
 function managedRoot(): string {
-  return join(agentsHome(), 'skills')
+  const roots = currentSkillRoots()
+  return roots.find(root => root.label === 'user-agents')?.path ?? roots[0]?.path ?? ''
 }
 
-/** The user-dsh skill root (honors $DSH_HOME). */
-function dshRoot(): string {
-  return join(dshHome(), 'skills')
+/** 全部技能根（用户级 + 工作区级），按优先级排列。 */
+function allRoots(): string[] {
+  return currentRootPaths()
 }
 
 /** Serialized bundle ledger (mirrors skill-manager's shape). */
@@ -252,19 +253,20 @@ async function skillDirUnder(root: string, skillName: string): Promise<string | 
   return undefined
 }
 
-/** Locate a skill directory across both roots (managed first, then dsh). */
+/** Locate a skill directory across all roots (workspace roots first, then user roots). */
 async function locateSkillDir(skillName: string): Promise<string | undefined> {
-  const direct = await skillDirUnder(managedRoot(), skillName)
-    ?? await skillDirUnder(dshRoot(), skillName)
-  if (direct !== undefined) return direct
+  for (const root of allRoots()) {
+    const direct = await skillDirUnder(root, skillName)
+    if (direct !== undefined) return direct
+  }
   // 目录名与 frontmatter name 可以不一致（手工拷目录、改名导入）：面板与账本给的
   // 往往是规范名，只按目录名找就定位不到，开关点了没反应。
   return await skillDirByFrontmatterName(skillName)
 }
 
-/** 按 SKILL.md 的 frontmatter name 扫两个根，找技能的真实目录。 */
+/** 按 SKILL.md 的 frontmatter name 扫所有根，找技能的真实目录。 */
 async function skillDirByFrontmatterName(skillName: string): Promise<string | undefined> {
-  for (const root of [managedRoot(), dshRoot()]) {
+  for (const root of allRoots()) {
     let entries: string[] = []
     try {
       entries = (await readdir(root, { withFileTypes: true }))
@@ -298,7 +300,7 @@ async function canonicalNameOf(root: string, dir: string): Promise<string | unde
  */
 async function skillNameIndex(): Promise<Map<string, string>> {
   const index = new Map<string, string>()
-  for (const root of [managedRoot(), dshRoot()]) {
+  for (const root of allRoots()) {
     let entries: string[] = []
     try {
       entries = (await readdir(root, { withFileTypes: true }))
@@ -425,7 +427,7 @@ async function setBundleEnabled(bundleId: string, enabled: boolean): Promise<num
 async function status(): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
   const skills: Record<string, boolean> = {}
   const seen = new Set<string>()
-  for (const root of [managedRoot(), dshRoot()]) {
+  for (const root of allRoots()) {
     let entries: string[] = []
     try {
       entries = (await readdir(root, { withFileTypes: true }))

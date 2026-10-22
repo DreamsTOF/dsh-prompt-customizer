@@ -7,12 +7,14 @@
  */
 import { useState } from 'react'
 import {
-  IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
+  IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconFolderOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ConfirmDialog } from '../confirm-dialog'
 import { LockGlyph } from './icons.js'
 import { McpPasteAdd } from './McpAddModal.js'
-import { isToolRegistrationPending, type LiveMcpState, type LiveMcpStatus, type LiveMcpTool } from './mcp-live.js'
+import {
+  isToolRegistrationPending, type LiveMcpState, type LiveMcpStatus, type LiveMcpTool, type WorkspaceMcpServer,
+} from './mcp-live.js'
 import { css } from './styles.js'
 /**
  * 工具 chips：卡片上列出该 MCP 提供的**全部**工具名，绿 = 启用、灰 = 禁用，
@@ -98,6 +100,8 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   /** 两个列表块的折叠态（默认展开，点标题行收起）。 */
   const [globalOpen, setGlobalOpen] = useState(true)
   const [ownOpen, setOwnOpen] = useState(true)
+  /** mcps 目录来源那块（全局 + 工作区）的折叠态。 */
+  const [dirsOpen, setDirsOpen] = useState(true)
   /** 正在切换的工具全名（防连点）。 */
   const [toolBusy, setToolBusy] = useState<string | null>(null)
   /** 全局条目删除确认（null=关闭）。 */
@@ -257,6 +261,68 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   const shownOwn = ownRows.filter(row => needle === ''
     || row.serverName.toLowerCase().includes(needle)
     || row.summary.toLowerCase().includes(needle))
+
+  /* mcps 目录来源（全局层 + 工作区层）：内核不读这些文件，由本插件代读并挂载。
+   * 这些 Server 也是真正的 mcp-client 行，工具级开关照常可用（按 serverName 记账）。 */
+  const wsMcp = ready?.workspaceServers
+  const wsGlobal = wsMcp?.global ?? []
+  const wsWorkspaceGroups = wsMcp?.workspaces ?? []
+  const wsMatch = (server: { serverName: string; summary: string; tools?: LiveMcpTool[] }): boolean => needle === ''
+    || server.serverName.toLowerCase().includes(needle)
+    || server.summary.toLowerCase().includes(needle)
+    || (server.tools ?? []).some(tool => tool.name.toLowerCase().includes(needle))
+  const wsGlobalShown = wsGlobal.filter(wsMatch)
+  const wsGroupsShown = wsWorkspaceGroups
+    .map(group => ({ root: group.root, servers: group.servers.filter(wsMatch) }))
+    .filter(group => group.servers.length > 0)
+  const wsTotal = wsGlobal.length + wsWorkspaceGroups.reduce((sum, group) => sum + group.servers.length, 0)
+
+  /**
+   * mcps 目录来源的一张卡片。
+   *
+   * 这些 Server 由本插件挂成真正的 mcp-client 行（挂在 loader 根树），所以工具级
+   * 开关与其它全局行同一套语义：在「全部 Agent」层写全局账，在某个预设里写该预设的
+   * inherit 账 —— 故 source 恒为 'inherit'（它们不是任何预设自带的同名行）。
+   */
+  const renderDirCard = (server: WorkspaceMcpServer, scopeTag: string): JSX.Element => {
+    const offTools = offOf(server.serverName, 'inherit')
+    const lockedTools = lockedOf(server.serverName)
+    const listed = server.tools?.length ?? 0
+    return (
+      <section key={`dir-${server.serverName}`} className={css.mcpRecCard}>
+        <div className={css.mcpRecCardHead}>
+          <span className={css.mcpRecCardTitleRow}>
+            <span className={css.mcpRecCardName}>{server.name}</span>
+            <span className={css.mcpRecCardTags}>
+              <span className={css.mcpRecCatTag}>{scopeTag}</span>
+              <span className={css.mcpRecCatTag}>{server.transport}</span>
+              <span className={css.mcpRecCatTag}>{listed} {t('mcpLiveToolsOf')}</span>
+              {offTools.length > 0 && (
+                <span className={css.mcpRecCatTag} data-off="true">{t('mcpToolDisabledCount', { n: offTools.length })}</span>
+              )}
+            </span>
+          </span>
+        </div>
+        <p className={css.mcpRecCardDesc}>{server.summary}</p>
+        <McpToolChips
+          t={t}
+          serverName={server.serverName}
+          tools={server.tools ?? []}
+          disabledTools={offTools}
+          locked={lockedTools}
+          busy={toolBusy}
+          onToggle={(fullName, enabled) => { toggleTool(server.serverName, fullName, enabled, 'inherit') }}
+        />
+        <div className={css.mcpCardFoot}>
+          <span className={css.mcpCardItem}>
+            <span className={css.mcpCardItemLabel} title={server.file}>
+              {t('mcpDirsFileHint', { file: server.file })}
+            </span>
+          </span>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <div className={css.mcpServerMain}>
@@ -421,7 +487,63 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
             </>)}
           </section>
 
-          {/* ② 该预设专属 Server（写进该预设组合文件）；标题行同样可折叠 */}
+          {/* ② mcps 目录来源（全局层 + 工作区层）：内核不读这些文件，本插件代读挂载 */}
+          {wsMcp !== undefined && (
+            <section className={css.hubSection} data-open={dirsOpen ? 'true' : undefined}>
+              <header className={css.bundleRowOuter} data-open={dirsOpen ? 'true' : undefined}>
+                <button
+                  type="button"
+                  className={css.bundleRow}
+                  aria-expanded={dirsOpen}
+                  onClick={() => { setDirsOpen((value) => !value) }}
+                >
+                  <span className={css.bundleIcon} aria-hidden="true"><IconFolderOutlineRegular size={16} /></span>
+                  <span className={css.bundleName}>{t('mcpDirsSection')}</span>
+                  <span className={css.bundleCount}>{wsTotal}</span>
+                  <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
+                </button>
+              </header>
+              {dirsOpen && (<>
+                <p className={css.mcpEmptyList}>{t('mcpDirsHint')}</p>
+                {(wsMcp.skipped ?? []).length > 0 && (
+                  <p className={css.mcpEmptyList}>{t('mcpDirsSkipped', {
+                    names: (wsMcp.skipped ?? []).map(item => item.name).join('、'),
+                  })}</p>
+                )}
+                {wsMcp.errors.length > 0 && (
+                  <div className={css.mcpEmptyList} role="alert">
+                    <div>{t('mcpDirsErrors', { n: wsMcp.errors.length })}</div>
+                    {wsMcp.errors.slice(0, 5).map(item => (
+                      <div key={`${item.file}:${item.message}`}>{item.file} — {item.message}</div>
+                    ))}
+                  </div>
+                )}
+                {wsTotal === 0 ? (
+                  <p className={css.mcpEmptyList}>{t('mcpDirsEmpty', { dir: wsMcp.dirs.global })}</p>
+                ) : (
+                  <>
+                    {wsGlobalShown.length > 0 && (
+                      <div className={css.mcpRecGrid}>
+                        {wsGlobalShown.map(server => renderDirCard(server, t('mcpDirsGlobalTag')))}
+                      </div>
+                    )}
+                    {wsGroupsShown.map(group => (
+                      <div key={group.root}>
+                        <p className={css.mcpEmptyList}>
+                          {t('mcpDirsSubScope', { n: group.servers.length, root: group.root })}
+                        </p>
+                        <div className={css.mcpRecGrid}>
+                          {group.servers.map(server => renderDirCard(server, t('mcpDirsWorkspaceTag')))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </>)}
+            </section>
+          )}
+
+          {/* ③ 该预设专属 Server（写进该预设组合文件）；标题行同样可折叠 */}
           {scope !== '' && (
             <section className={css.hubSection} data-open={ownOpen ? 'true' : undefined}>
               <header className={css.bundleRowOuter} data-open={ownOpen ? 'true' : undefined}>

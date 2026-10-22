@@ -4716,6 +4716,16 @@ var SKILL_ZH = {
   mcpConnDown: "\u4E0D\u53EF\u7528",
   mcpConnTip: "\u5B9E\u65F6\u8BFB\u53D6\u5230 {n} \u4E2A\u5168\u5C40 MCP Server",
   mcpLiveConfigHint: "\u6DFB\u52A0\uFF1A\u7F16\u8F91 cordis.patch.yml\uFF08\u6216\u4F7F\u7528\u300C\u6DFB\u52A0 MCP Server\u300D\u751F\u6210\u914D\u7F6E\u7247\u6BB5\uFF09",
+  // mcps 目录来源（内核不读这些文件，本插件读出来挂载）
+  mcpDirsSection: "mcps \u76EE\u5F55\uFF08\u5DE5\u4F5C\u533A / \u5168\u5C40\uFF09",
+  mcpDirsHint: "\u5185\u6838\u53EA\u8BA4 Cordis \u7EC4\u5408\u91CC\u7684 mcp-client \u884C\uFF0C\u4E0D\u8BFB\u76EE\u5F55\u4E0B\u7684 mcp.json \u2014\u2014 \u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u4EE3\u8BFB\u5E76\u6302\u8F7D\u7684\u90A3\u4E9B\uFF1A\u5168\u5C40\u5C42\u6240\u6709\u4F1A\u8BDD\u53EF\u89C1\uFF0C\u5DE5\u4F5C\u533A\u5C42\u53EA\u5728\u8BE5\u5DE5\u4F5C\u533A\u4F1A\u8BDD\u53EF\u89C1\u3002",
+  mcpDirsGlobalTag: "\u5168\u5C40",
+  mcpDirsWorkspaceTag: "\u5DE5\u4F5C\u533A",
+  mcpDirsSubScope: "{n} \u4E2A Server \xB7 {root}",
+  mcpDirsEmpty: "\u6CA1\u6709\u53D1\u73B0 mcps \u76EE\u5F55\u91CC\u7684\u914D\u7F6E\u3002\u653E\u5230 {dir}/<\u4EFB\u610F\u540D\u5B57>/mcp.json\uFF1B\u5DE5\u4F5C\u533A\u914D\u7F6E\u653E <\u5DE5\u4F5C\u533A>/.agents/mcps/ \u6216 <\u5DE5\u4F5C\u533A>/.dsh/mcps/\u3002",
+  mcpDirsErrors: "{n} \u4E2A\u914D\u7F6E\u6587\u4EF6\u89E3\u6790\u5931\u8D25\uFF08\u89C1\u4E0B\u65B9\u660E\u7EC6\uFF09",
+  mcpDirsSkipped: "{names} \u4E0E cordis \u7EC4\u5408\u91CC\u7684\u540C\u540D mcp-client \u884C\u91CD\u540D\uFF1A\u4EE5\u7EC4\u5408\u4E3A\u51C6\uFF0C\u672A\u91CD\u590D\u6302\u8F7D\uFF08\u540C\u540D serverName \u5728\u540C\u4E00\u4F5C\u7528\u57DF\u53EA\u80FD\u6709\u4E00\u4E2A\u5B9E\u4F8B\uFF09\u3002",
+  mcpDirsFileHint: "\u6765\u6E90\uFF1A{file}",
   // 预设维度（0.1.6）：全局 / 预设专属 / 遮蔽
   mcpScopeTitle: "Agent \u9884\u8BBE\u8303\u56F4",
   mcpScopeHintAll: "\u5F53\u524D\u67E5\u770B\u5168\u5C40 Server\uFF08\u6240\u6709\u9884\u8BBE\u5171\u7528\uFF09\u3002\u9009\u62E9\u67D0\u4E2A\u9884\u8BBE\uFF0C\u53EF\u7BA1\u7406\u5B83\u4E13\u5C5E\u7684 Server \u4E0E\u906E\u853D\u3002",
@@ -5208,6 +5218,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const [error, setError] = (0, import_react13.useState)(null);
   const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
   const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
+  const [dirsOpen, setDirsOpen] = (0, import_react13.useState)(true);
   const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
   const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
   const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
@@ -5352,6 +5363,49 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const needle = query.trim().toLowerCase();
   const shownGlobals = globals.filter((server) => (needle === "" || server.serverName.toLowerCase().includes(needle) || server.tools.some((tool) => tool.name.toLowerCase().includes(needle))) && (status === "all" || (scope === "" ? status === "off" ? server.config.disabled : !server.config.disabled : status === "off" ? masked.has(server.serverName) : !masked.has(server.serverName))));
   const shownOwn = ownRows.filter((row) => needle === "" || row.serverName.toLowerCase().includes(needle) || row.summary.toLowerCase().includes(needle));
+  const wsMcp = ready?.workspaceServers;
+  const wsGlobal = wsMcp?.global ?? [];
+  const wsWorkspaceGroups = wsMcp?.workspaces ?? [];
+  const wsMatch = (server) => needle === "" || server.serverName.toLowerCase().includes(needle) || server.summary.toLowerCase().includes(needle) || (server.tools ?? []).some((tool) => tool.name.toLowerCase().includes(needle));
+  const wsGlobalShown = wsGlobal.filter(wsMatch);
+  const wsGroupsShown = wsWorkspaceGroups.map((group) => ({ root: group.root, servers: group.servers.filter(wsMatch) })).filter((group) => group.servers.length > 0);
+  const wsTotal = wsGlobal.length + wsWorkspaceGroups.reduce((sum, group) => sum + group.servers.length, 0);
+  const renderDirCard = (server, scopeTag) => {
+    const offTools = offOf(server.serverName, "inherit");
+    const lockedTools = lockedOf(server.serverName);
+    const listed = server.tools?.length ?? 0;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.mcpRecCard, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecCardHead, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCardName, children: server.name }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTags, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: scopeTag }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: server.transport }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCatTag, children: [
+            listed,
+            " ",
+            t("mcpLiveToolsOf")
+          ] }),
+          offTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offTools.length }) })
+        ] })
+      ] }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpRecCardDesc, children: server.summary }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        McpToolChips,
+        {
+          t,
+          serverName: server.serverName,
+          tools: server.tools ?? [],
+          disabledTools: offTools,
+          locked: lockedTools,
+          busy: toolBusy,
+          onToggle: (fullName, enabled) => {
+            toggleTool(server.serverName, fullName, enabled, "inherit");
+          }
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpCardFoot, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, title: server.file, children: t("mcpDirsFileHint", { file: server.file }) }) }) })
+    ] }, `dir-${server.serverName}`);
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpServerMain, children: [
     /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.hintRow, children: [
       /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.hintRowText, children: scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
@@ -5472,6 +5526,46 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               ] })
             ] }, `global-${server.serverName}`);
           }) })
+        ] })
+      ] }),
+      wsMcp !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.hubSection, "data-open": dirsOpen ? "true" : void 0, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("header", { className: css.bundleRowOuter, "data-open": dirsOpen ? "true" : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          "button",
+          {
+            type: "button",
+            className: css.bundleRow,
+            "aria-expanded": dirsOpen,
+            onClick: () => {
+              setDirsOpen((value) => !value);
+            },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconFolderOutlineRegular, { size: 16 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: t("mcpDirsSection") }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: wsTotal }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
+            ]
+          }
+        ) }),
+        dirsOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpDirsHint") }),
+          (wsMcp.skipped ?? []).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpDirsSkipped", {
+            names: (wsMcp.skipped ?? []).map((item) => item.name).join("\u3001")
+          }) }),
+          wsMcp.errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpEmptyList, role: "alert", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { children: t("mcpDirsErrors", { n: wsMcp.errors.length }) }),
+            wsMcp.errors.slice(0, 5).map((item) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+              item.file,
+              " \u2014 ",
+              item.message
+            ] }, `${item.file}:${item.message}`))
+          ] }),
+          wsTotal === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpDirsEmpty", { dir: wsMcp.dirs.global }) }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+            wsGlobalShown.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: wsGlobalShown.map((server) => renderDirCard(server, t("mcpDirsGlobalTag"))) }),
+            wsGroupsShown.map((group) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpDirsSubScope", { n: group.servers.length, root: group.root }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: group.servers.map((server) => renderDirCard(server, t("mcpDirsWorkspaceTag"))) })
+            ] }, group.root))
+          ] })
         ] })
       ] }),
       scope !== "" && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.hubSection, "data-open": ownOpen ? "true" : void 0, children: [
