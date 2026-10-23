@@ -25,19 +25,22 @@ import {
   apply as applySkillsHost,
   setExtraRoots as setSkillHostRoots,
   setSkillSource as setSkillHostSource,
+  setWorkspaceSource as setSkillHostWorkspaces,
+  setCurrentWorkspaceSource as setSkillHostCurrentWorkspace,
 } from '../vendor/skill-manager/skills-host.js'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
 import { apply as applyPromptHost } from '../vendor/prompt-customizer/index.js'
 import { apply as applySkillToggles } from './skill-toggles.js'
 import { applySkillHealth } from './skill-health.js'
 import { resolveSkillRoots, setSkillRoots } from './skill-roots.ts'
-import { kernelSkillViews } from './kernel-skills.ts'
+import { currentWorkspace, kernelSkillViews, workspaceRoots } from './kernel-skills.ts'
 import { applyMcpRecommended } from './mcp-recommended.js'
 import { applyMcpStatus } from './mcp-status.js'
 import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
 import { applyMcpToolDisable } from './mcp-tool-disable.js'
+import { applyMcpWorkspaceScope } from './mcp-workspace-scope.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-prompt-customizer'
@@ -76,7 +79,10 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   // 技能目录直接读内核注册表（`ctx.skills.list`）：bundled / office / 插件 / 用户级 /
   // 当前会话工作区 全部由内核按 scope + cwd 聚合，插件不再自扫目录。`setSkillSource`
   // 必须在 vendor 技能管理器挂载之前注册，列表路由首次请求即走内核。
-  setSkillHostSource(() => kernelSkillViews(ctx))
+  setSkillHostSource((cwd?: string) => kernelSkillViews(ctx, undefined, cwd))
+  // 面板顶栏工作区选择器的选项来源（活动会话 cwd ∪ 启动目录）。
+  setSkillHostWorkspaces(() => workspaceRoots(ctx))
+  setSkillHostCurrentWorkspace(() => currentWorkspace(ctx))
 
   // 活动工作区变化（新会话进别的目录）后重算根集合：否则面板只认启动那一刻的
   // 工作区。事件里只做「重算 + 写快照」，路由下一次请求即读到新集合。
@@ -192,6 +198,18 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
 
   // 0.11.0 起不再自搓 mcps 目录层：MCP Server 一律是内核 Cordis 组合里的
   // `mcp-client` 行（列表/开关/增删都走组合行），不再从 `mcps/` 目录读配置挂行。
+  //
+  // 0.11.2：MCP 的**工作区级关闭**（关掉 dsh-pulgn 的 anysearch，只影响该工作区；
+  // 换工作区照常注入）。这与「默认关闭某 server」不同：它按会话 cwd 过滤装配，
+  // 所以工具集合随工作区变化。
+  try {
+    applyMcpWorkspaceScope(ctx)
+    ctx.logger?.info?.('[dsh-prompt-customizer] mcp workspace scope mounted')
+  } catch (error) {
+    ctx.logger?.warn?.(
+      `[dsh-prompt-customizer] mcp workspace scope failed to mount: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+    )
+  }
 
   // ── 提示词管理（vendor/prompt-customizer：/api/prompt-customizer/*）──────
   // 在带 systemPrompt 的子作用域里挂载：该服务缺席时整块不挂（其余模块不受

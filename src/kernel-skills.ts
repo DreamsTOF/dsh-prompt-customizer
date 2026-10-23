@@ -151,13 +151,19 @@ function launchCwd(ctx: PluginContext): string {
  * @param candidate - 选定的会话，无会话时 undefined。
  * @returns 内核技能摘要数组（服务缺失/读失败时为空数组）。
  */
-async function listKernelSkills(ctx: PluginContext, candidate: SessionCandidate | undefined): Promise<KernelSkillSummary[]> {
+async function listKernelSkills(
+  ctx: PluginContext,
+  candidate: SessionCandidate | undefined,
+  cwdOverride?: string,
+): Promise<KernelSkillSummary[]> {
   const agentCtx = candidate === undefined ? undefined : candidate.agent?.ctx
   const scoped = typeof agentCtx?.get === 'function' ? agentCtx.get('skills') : undefined
   const global = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined
   const service = scoped ?? global
   if (typeof service?.list !== 'function') return []
-  const cwd = candidate === undefined ? launchCwd(ctx) : candidate.cwd
+  const cwd = cwdOverride !== undefined && cwdOverride !== ''
+    ? cwdOverride
+    : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   // scope key 就是 agent 对象本身：内核建 agent 时 `createScope(loopCtx, this)`
   // （`core/agent/src/agent.ts:104`）、遮蔽层用 `createScope(ctx, agent)`
   // （`mcp/src/mcp.ts:116`），`scopeChainOf` 走的就是这个对象。
@@ -171,11 +177,17 @@ async function listKernelSkills(ctx: PluginContext, candidate: SessionCandidate 
  * 内核技能目录 → vendor 视图。
  * @param ctx - 宿主上下文。
  * @param sessionId - 可选的显式会话 id。
+ * @param cwd - 可选的工作区目录（面板上的工作区选择器；缺省按会话解析）。
  * @returns 技能视图（保持内核给定的顺序：先出现的同名者胜出由调用方去重）。
  */
-export async function kernelSkillViews(ctx: PluginContext, sessionId?: string): Promise<KernelSkillView[]> {
+export async function kernelSkillViews(
+  ctx: PluginContext,
+  sessionId?: string,
+  cwd?: string,
+): Promise<KernelSkillView[]> {
   const candidate = resolveViewSession(ctx, sessionId)
-  const summaries = await listKernelSkills(ctx, candidate)
+  const summaries = await listKernelSkills(ctx, candidate, cwd)
+  const hidden = hiddenReader === undefined ? undefined : await hiddenReader()
   const views: KernelSkillView[] = []
   for (const summary of summaries) {
     const name = typeof summary?.name === 'string' ? summary.name : ''
@@ -183,7 +195,6 @@ export async function kernelSkillViews(ctx: PluginContext, sessionId?: string): 
     // 面板显隐由本插件的账本说了算：内核闸门在模型侧遮过一遍，但目录合并
     // 只按层/rank 去重，同名候选未必每次都压过真实来源，这里再过滤一次，
     // 保证「关掉的技能既不在面板、也不在模型目录里」。
-    const hidden = hiddenReader === undefined ? undefined : await hiddenReader()
     if (hidden?.has(name) === true) continue
     // 内核给的是 SKILL.md 的绝对路径；技能目录 = 它的父目录。虚拟技能没有 path。
     const dirPath = typeof summary.path === 'string' && summary.path !== '' ? dirname(summary.path) : undefined
@@ -212,4 +223,25 @@ export async function kernelSkillViews(ctx: PluginContext, sessionId?: string): 
  */
 export async function kernelSkillSummaries(ctx: PluginContext): Promise<KernelSkillSummary[]> {
   return listKernelSkills(ctx, resolveViewSession(ctx))
+}
+
+/**
+ * 工作区根按「最近的含 .git 祖先」归一（与内核 projectRoot 规则一致），
+ * 让选择器里的同一工作区不会因为路径层级不同而分裂成两个视图。
+ * @param ctx - 宿主上下文。
+ * @returns 去重后的工作区根绝对路径（当前所有会话 + 启动目录）。
+ */
+export async function workspaceRoots(ctx: PluginContext): Promise<string[]> {
+  const { workspaceDirs } = await import('./skill-roots.ts')
+  return workspaceDirs(ctx)
+}
+
+/**
+ * 当前会话实际所属的工作区（面板「跟随当前会话」时要拿它做工作区级记账）。
+ * @param ctx - 宿主上下文。
+ * @returns 工作区绝对路径；无会话时为启动目录。
+ */
+export function currentWorkspace(ctx: PluginContext): string {
+  const candidate = resolveViewSession(ctx)
+  return candidate === undefined ? launchCwd(ctx) : candidate.cwd
 }

@@ -144,6 +144,14 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
 
   const toggleLabel = lockedReason ?? (enabled ? skillT('disableSkill') : skillT('enableSkill'))
   const fileMeta = typeof skill.fileCount === 'number' ? skill.fileCount : files.length
+  /**
+   * 来源：内核 `source` 里 `project-*` = 当前工作区专用，其余（user-* / bundled /
+   * runtime / custom）= 全局可用。工作区同名技能优先于全局，这条标签就是让用户
+   * 一眼看出「我关掉的会不会影响别的项目」。
+   */
+  const skillOrigin: 'workspace' | 'global' | undefined = skill.root === undefined
+    ? undefined
+    : skill.root.startsWith('project-') ? 'workspace' : 'global'
   return (
     <li
       className={css.skillCard}
@@ -184,6 +192,12 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
       <div className={css.skillTags}>
         <span className={`${css.tag} ${css.tagSource}`}>{bundleName ?? skillT('tagLoose')}</span>
         <span className={`${css.tag} ${css.tagScope}`} data-off={enabled ? undefined : 'true'}>{scopeLabel}</span>
+        {/* 来源：工作区（当前工作区专用，同名时优先于全局）还是全局。 */}
+        {skillOrigin !== undefined && (
+          <span className={css.scopeTag} data-scope={skillOrigin} title={skillT(skillOrigin === 'workspace' ? 'originWorkspaceHint' : 'originGlobalHint')}>
+            {skillT(skillOrigin === 'workspace' ? 'originWorkspace' : 'originGlobal')}
+          </span>
+        )}
         {!enabled && <span className={`${css.tag} ${css.tagStatus}`}>{skillT('skillOffTag')}</span>}
         <span className={css.skillMeta}>{skillT('fileCount', { n: fileMeta })}</span>
       </div>

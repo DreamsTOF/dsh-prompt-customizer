@@ -14,10 +14,22 @@ import { css } from './styles.js'
 import { ALL_PRESETS, UNCATEGORIZED, type HealthViewModel, type PresetRow } from './types.js'
 
 /** 面板头部：标题（能力管理）+ 紧贴文字右侧的 SKILL / MCP / 提示词 顶层 tab。 */
-export function PanelHead({ t, kind, onKind }: {
+/**
+ * 面板头：标题 + SKILL / MCP / 提示词 三档，右侧是**工作区选择器**。
+ *
+ * 工作区放在这一行（而不是操作行）是因为它同时决定技能目录与 MCP 注入：
+ * 用户需要一眼看到「我现在配置的是哪个工作区」。
+ */
+export function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }: {
   t: (key: string, params?: Record<string, string | number>) => string
   kind: 'skill' | 'mcp' | 'prompt'
   onKind: (value: 'skill' | 'mcp' | 'prompt') => void
+  workspaces: string[]
+  /** 当前选中的工作区；null = 跟随当前会话。 */
+  workspaceValue: string | null
+  onWorkspace: (cwd: string | null) => void
+  openMenu: string | null
+  setOpenMenu: Dispatch<SetStateAction<string | null>>
 }): JSX.Element {
   return (
       <div className="psh-head">
@@ -41,6 +53,49 @@ export function PanelHead({ t, kind, onKind }: {
             </button>
           ))}
         </div>
+        <span className={css.toolbarSpacer} />
+        {/* 工作区选择器：技能目录与 MCP 注入都按它解析。 */}
+        {onWorkspace !== undefined && (
+          <div className={css.dropWrap} data-drop="workspace" style={{ alignSelf: 'center', marginRight: 4 }}>
+            <button
+              type="button"
+              className={css.toolButton}
+              style={{ height: 30, maxWidth: 240 }}
+              aria-haspopup="menu"
+              aria-expanded={openMenu === 'workspace' || undefined}
+              aria-label={t('workspacePickerAria')}
+              title={workspaceValue === null ? t('workspacePickerAuto') : workspaceValue}
+              onClick={() => { setOpenMenu((value) => value === 'workspace' ? null : 'workspace') }}
+            >
+              <span className={css.dropLabelEllipsis}>{workspaceValue === null
+                ? t('workspacePickerAuto')
+                : shortenPath(workspaceValue)}</span>
+              <IconChevronDownOutlineRegular size={11} aria-hidden="true" />
+            </button>
+            {openMenu === 'workspace' && (
+              <>
+                <button type="button" className={css.bulkOverlay} aria-label={t('close')} onClick={() => { setOpenMenu(null) }} />
+                <div className={css.dropMenu} role="menu">
+                  <button type="button" role="menuitemradio" className={css.dropItem}
+                    aria-checked={workspaceValue === null}
+                    onClick={() => { onWorkspace(null); setOpenMenu(null) }}>
+                    <span className={css.dropCheck} data-on={workspaceValue === null || undefined} aria-hidden="true">{workspaceValue === null ? '✓' : ''}</span>
+                    {t('workspacePickerAuto')}
+                  </button>
+                  {workspaces.map(item => (
+                    <button key={item} type="button" role="menuitemradio" className={css.dropItem}
+                      aria-checked={workspaceValue === item}
+                      title={item}
+                      onClick={() => { onWorkspace(item); setOpenMenu(null) }}>
+                      <span className={css.dropCheck} data-on={workspaceValue === item || undefined} aria-hidden="true">{workspaceValue === item ? '✓' : ''}</span>
+                      {shortenPath(item)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
   )
 }
@@ -424,6 +479,18 @@ export function McpTopBar({
       </div>
     </div>
   )
+}
+
+/**
+ * 路径缩写：只保留最后两段，长路径不至于把工具栏撑开。
+ * Windows 反斜杠与 POSIX 斜杠都按分隔符处理。
+ * @param path - 绝对路径。
+ * @returns 形如 `…/dsh-pulgn/skin` 的短标签。
+ */
+function shortenPath(path: string): string {
+  const parts = path.split(/[\\/]/).filter((item) => item !== '')
+  if (parts.length <= 2) return path
+  return `…/${parts.slice(-2).join('/')}`
 }
 
 /** ---------------------------------------------------------------- 预设圆球（历史保留组件，当前面板用 chips） */

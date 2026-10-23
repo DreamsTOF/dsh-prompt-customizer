@@ -99,12 +99,38 @@ var extraRoots = [];
  */
 var kernelSource;
 /**
+ * 当前请求选中的工作区（面板顶栏的工作区选择器）。
+ *
+ * 用模块级状态而不是把 cwd 一路透传到每个函数：`allSkills()` 有多个调用点，
+ * 而它们都在同一个 HTTP 请求的同步帧内完成，路由进来时设置、结束时清空即可。
+ * 未选中时内核按「当前会话」解析。
+ */
+var requestCwd;
+/** 可选工作区清单的注入口（宿主提供：活动会话 cwd ∪ 启动目录的并集）。 */
+var workspaceSource;
+/** 「跟随当前会话」时实际生效的工作区（宿主提供，供面板做工作区级记账）。 */
+var currentWorkspaceSource;
+/**
  * 注入内核技能来源。
  * @param {(() => Promise<Array<{name: string, dir: string, description?: string, root?: string, dirPath?: string, readOnly?: boolean}>>) | undefined} source
  *   返回内核视图的异步函数；传 undefined 退回自扫。
  */
 function setSkillSource(source) {
   kernelSource = typeof source === "function" ? source : void 0;
+}
+/**
+ * 注入可选工作区清单来源（面板顶栏选择器的选项）。
+ * @param source - 返回工作区绝对路径数组的异步函数。
+ */
+function setWorkspaceSource(source) {
+  workspaceSource = typeof source === "function" ? source : void 0;
+}
+/**
+ * 注入「当前会话所属工作区」的读取器。
+ * @param source - 返回工作区绝对路径的同步函数。
+ */
+function setCurrentWorkspaceSource(source) {
+  currentWorkspaceSource = typeof source === "function" ? source : void 0;
 }
 function allRoots() {
   return [...extraRoots.map((root) => root.path), managedRoot(), dshRoot()];
@@ -260,7 +286,7 @@ async function allSkills() {
   const seenName = /* @__PURE__ */ new Set();
   // 内核来源优先：内核已经按 scope/cwd/rank 合并去重过，这里只补文件清单。
   if (kernelSource !== void 0) {
-    for (const skill of await kernelSource()) {
+    for (const skill of await kernelSource(requestCwd)) {
       if (typeof skill?.name !== "string" || skill.name === "") continue;
       if (seenName.has(skill.name)) continue;
       seenName.add(skill.name);
@@ -338,7 +364,7 @@ function checkedLookupName(value) {
 async function locateSkillDir(name2) {
   // 内核来源下技能可能不在本进程的可写根里（bundled/office/插件）：先问内核视图。
   if (kernelSource !== void 0) {
-    for (const skill of await kernelSource()) {
+    for (const skill of await kernelSource(requestCwd)) {
       if ((skill.name === name2 || skill.dir === name2) && typeof skill.dirPath === "string" && skill.dirPath !== "") {
         return skill.dirPath;
       }
@@ -704,7 +730,7 @@ async function deleteSkill(skillName) {
     // 插件自带目录）：这些删不掉文件，但**可以被隐藏**。给出可执行的下一步，
     // 而不是笼统的 not found。
     if (kernelSource !== void 0) {
-      for (const skill of await kernelSource()) {
+      for (const skill of await kernelSource(requestCwd)) {
         if (skill.name !== name2 && skill.dir !== name2) continue;
         throw new Error(`skill ${JSON.stringify(name2)} is provided by the installation or a plugin `
           + `(${String(skill.root ?? "kernel")}); it cannot be deleted — switch it off instead to hide it from the panel and the model`);
@@ -795,9 +821,19 @@ async function handle(ctx, req, res) {
   const url = new URL(req.url ?? "/", "http://localhost");
   const rest = url.pathname.slice(ROUTE_PREFIX.length);
   const method = req.method ?? "GET";
+  // 面板顶栏的工作区选择器：`?cwd=` 指定按哪个工作区看技能（缺省=当前会话）。
+  const requested = url.searchParams.get("cwd");
+  requestCwd = requested !== null && requested.trim() !== "" ? requested.trim() : undefined;
   try {
     if (method === "GET" && (rest === "" || rest === "/list")) {
       json(res, 200, await snapshot());
+      return;
+    }
+    if (method === "GET" && rest === "/workspaces") {
+      const dirs = workspaceSource === void 0 ? [] : await workspaceSource();
+      // `current` = 「跟随当前会话」时实际生效的工作区，面板据此做工作区级记账。
+      const current = currentWorkspaceSource === void 0 ? null : currentWorkspaceSource();
+      json(res, 200, { workspaces: dirs, active: requestCwd ?? null, current });
       return;
     }
     if (method === "POST" && rest === "/bundles") {
@@ -845,6 +881,9 @@ async function handle(ctx, req, res) {
     json(res, 404, { error: `no route for ${method} ${rest}` });
   } catch (error) {
     json(res, 400, { error: error instanceof Error ? error.message : String(error) });
+  } finally {
+    // 请求级状态不跨请求残留：下个请求没带 cwd 就回到「按当前会话」。
+    requestCwd = void 0;
   }
 }
 async function apply(ctx, options) {
@@ -878,6 +917,8 @@ export {
   name,
   setExtraRoots,
   setSkillSource,
+  setWorkspaceSource,
+  setCurrentWorkspaceSource,
   // 仅供 test/home-paths.test.mjs 做与 src/home-paths.ts 的等值断言。
   managedRoot as __managedRoot,
   dshRoot as __dshRoot

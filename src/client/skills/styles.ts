@@ -320,6 +320,8 @@ export const css = {
   toolButton: 'skm-tool-button',
   toolbarSpacer: 'skm-toolbar-spacer',
   bulkOverlay: 'skm-bulk-overlay',
+  dropLabelEllipsis: 'skm-drop-label-ellipsis',
+  scopeTag: 'skm-scope-tag',
   presetPill: 'skm-preset-pill',
   presetSelect: 'skm-preset-select',
   presetPillChevron: 'skm-preset-pill-chevron',
@@ -870,6 +872,12 @@ export const SHEET = `
 .skm-tool-select-chevron{position:absolute;right:9px;pointer-events:none;color:var(--dsw-alias-label-caption,#adb2b8)}
 .skm-tool-button{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.12));border-radius:10px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#61666b);font-size:13px;line-height:18px;font-family:inherit;padding:0 12px;cursor:pointer;transition:border-color 140ms ease,background 140ms ease,color 140ms ease,transform 140ms ease}
 .skm-tool-button:hover{background:var(--dsw-alias-interactive-bg-hover-solid,#f7f8f9);color:var(--dsw-alias-label-primary,#0f1115)}
+.skm-drop-label-ellipsis{display:block;min-width:0;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 工作区/全局来源标签：面板块上区分「这条属于当前工作区」还是「全局共用」。 */
+.skm-scope-tag{flex:none;display:inline-flex;align-items:center;gap:3px;height:17px;padding:0 6px;border-radius:6px;font-size:11px;line-height:17px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.skm-scope-tag[data-scope='workspace']{background:var(--dsw-alias-bg-accent,rgba(88,101,242,.14));color:var(--dsw-alias-label-accent,#4b57d6)}
+.skm-scope-tag[data-scope='global']{background:var(--dsw-alias-bg-neutral,rgba(0,0,0,.06));color:var(--dsw-alias-label-secondary,#61666b)}
+.skm-scope-tag[data-side='closed']{background:var(--dsw-alias-bg-danger,rgba(220,38,38,.12));color:var(--dsw-alias-label-danger,#c02424)}
 .skm-tool-button:active{transform:scale(.97)}
 .skm-tool-button:disabled{opacity:.5;cursor:default}
 .skm-toolbar-spacer{flex:1 1 12px}

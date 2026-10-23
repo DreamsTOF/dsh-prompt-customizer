@@ -41,6 +41,7 @@ import {
   toolDisableTables,
 } from './mcp-tool-disable.ts'
 import { readPresetRoster } from './skill-toggles.ts'
+import { workspaceMcpLedger } from './mcp-workspace-scope.ts'
 
 const STATUS_ROUTE = '/api/triad/mcp-status'
 const CONFIG_ROUTE = '/api/triad/mcp-config'
@@ -344,6 +345,9 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
     // 面板用它把「账本已写但工具还在」说清楚（以前只打日志，静默）。
     maskInstall: maskInstallReport(),
     presetServers,
+    // 工作区级关闭账本：`{ 工作区路径: { serverName: false } }`。
+    // 前端按当前选中的工作区判定「这台是否在该工作区被关闭」。
+    workspaceClosed: workspaceMcpLedger().workspaces,
     // 工具级禁用两层账本镜像（客户端按当前范围取状态）：
     // 有效禁用 = toolDisabled（全局层）∪ toolDisabledByPreset[当前预设]。
     toolDisabled: tables.disabled,

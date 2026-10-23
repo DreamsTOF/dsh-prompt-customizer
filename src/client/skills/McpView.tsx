@@ -80,7 +80,7 @@ export function McpToolChips({ t, serverName, tools, disabledTools, locked, busy
  * 与「该预设专属 Server」（写进该预设组合文件）；「全部 Agent」层只有前者，
  * 开关直接启用/禁用全局条目。
  */
-export function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn }: {
+export function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace }: {
   t: (key: string, params?: Record<string, string | number>) => string
   live: LiveMcpStatus
   scope: string
@@ -94,6 +94,8 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   /** 「添加专属 Server」弹窗开关：按钮在顶栏，状态由面板持有。 */
   addOwnOpen: boolean
   onCloseAddOwn: () => void
+  /** 面板当前选中的工作区（null = 跟随当前会话）；工作区级关闭按它记账。 */
+  workspace: string | null
 }): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +112,17 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
 
   const ready = live.state === 'ready' ? live.data : null
   const globals = ready?.servers ?? []
+  /**
+   * 当前工作区被关掉的 Server 名单（账本按工作区绝对路径记账）。
+   * 空集 = 没有任何工作区级关闭，卡片照常显示。
+   */
+  const closedInWorkspace = new Set<string>(
+    workspace === null
+      ? []
+      : Object.entries(ready?.workspaceClosed?.[workspace] ?? {})
+        .filter(([, on]) => on === false)
+        .map(([name]) => name),
+  )
   const presets = ready?.presets ?? []
   const scoped = scope === '' ? undefined : presets.find(preset => preset.id === scope)
   const masked = new Set(Object.entries(ready?.masks?.[scope] ?? {})
@@ -166,6 +179,32 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   }
   const toggleGlobal = (serverName: string, disabled: boolean): void => {
     write(`toggle:${serverName}`, '/api/triad/mcp-config', { serverName, disabled })
+  }
+  /**
+   * 在**当前工作区**关闭/启用这台 Server（不动 profile patch）。
+   *
+   * 语义与技能的工作区分层一致：只影响该工作区的会话；换工作区照常注入，
+   * 于是工具集合随工作区变化。关闭后走 PUT /api/triad/mcp-workspace-scope。
+   */
+  const toggleWorkspaceServer = (serverName: string, enabled: boolean): void => {
+    if (workspace === null) return
+    const token = `ws:${serverName}`
+    setBusy(token)
+    setError(null)
+    void fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/servers/${encodeURIComponent(serverName)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ enabled }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({})) as { error?: string }
+          throw new Error(body.error ?? `HTTP ${String(response.status)}`)
+        }
+        onRefresh()
+      })
+      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
+      .finally(() => { setBusy(null) })
   }
   const removeGlobal = (serverName: string): void => {
     write(`remove:${serverName}`, '/api/triad/mcp-config', { serverName, action: 'remove' })
@@ -349,6 +388,13 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                             {scope === ''
                               ? (server.config.disabled ? <span className={css.mcpRecCatTag}>{t('mcpLiveDisabled')}</span> : null)
                               : (isMasked ? <span className={css.mcpRecCatTag}>{t('mcpPresetMasked')}</span> : null)}
+                            {/* 来源与工作区状态：全局行还是某工作区专用，以及本工作区是否已关。 */}
+                            <span className={css.scopeTag} data-scope='global' title={t('originGlobalHint')}>{t('originGlobal')}</span>
+                            {closedInWorkspace.has(server.serverName) && (
+                              <span className={css.scopeTag} data-scope='workspace' data-side='closed' title={t('mcpWorkspaceClosedHint')}>
+                                {t('mcpWorkspaceClosed')}
+                              </span>
+                            )}
                           </span>
                         </span>
                         <Tooltip
@@ -405,6 +451,19 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                                 : isMasked ? t('mcpPresetMasked') : t('mcpPresetMaskState')}
                           </span>
                         </span>
+                        {/* 工作区级关闭：只影响当前工作区，换工作区照常注入。 */}
+                        {workspace !== null && (
+                          <button
+                            type="button"
+                            className={css.mcpCardDelete}
+                            data-closed={closedInWorkspace.has(server.serverName) || undefined}
+                            title={closedInWorkspace.has(server.serverName) ? t('mcpWorkspaceEnableHint') : t('mcpWorkspaceDisableHint')}
+                            disabled={busy !== null}
+                            onClick={() => { toggleWorkspaceServer(server.serverName, closedInWorkspace.has(server.serverName)) }}
+                          >
+                            {closedInWorkspace.has(server.serverName) ? t('mcpWorkspaceEnable') : t('mcpWorkspaceDisable')}
+                          </button>
+                        )}
                         {scope === '' && server.config.editable ? (
                           <button
                             type="button"

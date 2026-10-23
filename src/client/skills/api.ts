@@ -16,7 +16,14 @@ export async function skillRequest<T>(path: string, options?: RequestInit): Prom
 }
 
 export const skillApi = {
-  list: (): Promise<SkillSnapshot> => skillRequest<SkillSnapshot>('/list', { headers: { accept: 'application/json' } }),
+  /** 技能快照；`cwd` 指定工作区（缺省按当前会话）。 */
+  list: (cwd?: string | null): Promise<SkillSnapshot> => skillRequest<SkillSnapshot>(
+    cwd === undefined || cwd === null || cwd === '' ? '/list' : `/list?cwd=${encodeURIComponent(cwd)}`,
+    { headers: { accept: 'application/json' } },
+  ),
+  /** 可选工作区清单（面板顶栏选择器）。 */
+  workspaces: (): Promise<{ workspaces: string[]; current?: string | null }> =>
+    skillRequest<{ workspaces: string[]; current?: string | null }>('/workspaces', { headers: { accept: 'application/json' } }),
   toggleStatus: (): Promise<ToggleStatus> =>
     fetch('/api/skill-toggles/status', { headers: { accept: 'application/json' } })
       .then((response) => response.json() as Promise<ToggleStatus & { error?: string }>)

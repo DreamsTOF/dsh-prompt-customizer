@@ -258,6 +258,18 @@ export const SKILL_ZH: Record<string, string> = {
   installNameRewrite: 'SKILL.md 里写的是「{meta}」，安装时会统一改成「{name}」（目录名与技能名保持一致）。',
   deleteSkillDirNote: '（技能目录「{dir}」与技能名不同，会一并删除）',
   skillOffTag: '已停用',
+  originWorkspace: '工作区',
+  originGlobal: '全局',
+  originWorkspaceHint: '当前工作区专用：同名的全局技能会被它覆盖；关掉只影响这个工作区。',
+  originGlobalHint: '全局可用：所有工作区都能看到；关掉对所有工作区生效（除非某工作区有同名技能）。',
+  workspacePickerAria: '选择要配置的工作区',
+  workspacePickerAuto: '跟随当前会话',
+  mcpWorkspaceDisable: '本工作区关闭',
+  mcpWorkspaceEnable: '本工作区启用',
+  mcpWorkspaceDisableHint: '只在这个工作区的会话里不注入它的工具；换到别的工作区照常注入。',
+  mcpWorkspaceEnableHint: '重新在这个工作区注入它的工具。',
+  mcpWorkspaceClosed: '本工作区已关',
+  mcpWorkspaceClosedHint: '该 Server 在当前工作区被关闭：这里的会话看不到它的工具，其它工作区不受影响。',
   presetCountTip: '该预设下已启用 {n} 个 / 共 {total} 个技能',
 }
 

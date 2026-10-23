@@ -50,6 +50,20 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   ensureStyles()
   const [state, setState] = useState<PanelState>({ status: 'loading' })
   const [reload, setReload] = useState(0)
+  /**
+   * 面板正在配置的工作区；null = 跟随当前会话。
+   *
+   * 它同时决定技能目录与 MCP 注入的工作区级开关 —— 放在顶部标签行，让用户
+   * 一眼看清「我现在改的是哪个工作区」。
+   */
+  const [workspace, setWorkspace] = useState<string | null>(null)
+  /** 可选工作区清单（宿主按活动会话 cwd ∪ 启动目录给出）。 */
+  const [workspaces, setWorkspaces] = useState<string[]>([])
+  /**
+   * 「跟随当前会话」时实际生效的工作区：MCP 的工作区级开关要用它记账，
+   * 否则用户没手动选工作区时那个按钮就无处可去。
+   */
+  const [currentWorkspace, setCurrentWorkspace] = useState<string | null>(null)
   // 分区展开集合：默认空 = 全部收起（面板打开时只显示技能包标题行）。
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 散装技能区展开。
@@ -256,7 +270,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   useEffect(() => {
     let current = true
     setState({ status: 'loading' })
-    void skillApi.list().then(
+    void skillApi.list(workspace).then(
       (snapshot) => {
         if (current) setState({ status: 'ready', snapshot })
       },
@@ -288,6 +302,20 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     return () => { current = false }
     // reload 拆分为变化键；open 恒 true（本组件在打开时才渲染）
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reload, workspace])
+
+  // 工作区清单：只在面板打开时取一次；失败就只剩「跟随当前会话」一项。
+  useEffect(() => {
+    let current = true
+    void skillApi.workspaces().then(
+      (result) => {
+        if (!current) return
+        setWorkspaces(Array.isArray(result.workspaces) ? result.workspaces : [])
+        setCurrentWorkspace(typeof result.current === 'string' && result.current !== '' ? result.current : null)
+      },
+      () => { if (current) setWorkspaces([]) },
+    )
+    return () => { current = false }
   }, [reload])
 
   // 卸载时清掉改名高亮与提示条定时器，避免卸载后 setState。
@@ -805,7 +833,16 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
       ariaLabel={t('panelTitle')}
     >
       {/* 头部：标题（能力管理）+ 紧贴文字右侧的 SKILL/MCP 顶层 tab + 关闭 */}
-      <PanelHead t={t} kind={kind} onKind={setKind} />
+      <PanelHead
+        t={t}
+        kind={kind}
+        onKind={setKind}
+        workspaces={workspaces}
+        workspaceValue={workspace}
+        onWorkspace={setWorkspace}
+        openMenu={openMenu}
+        setOpenMenu={setOpenMenu}
+      />
       <PshBody className={css.modalBody}>
       <span data-skm-panel-marker aria-hidden="true" style={{ display: 'none' }} />
       <div className={css.hub} aria-busy={state.status === 'loading'}>
@@ -880,6 +917,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             onWatchTools={(names) => { watchMcpTools(names) }}
             addOwnOpen={mcpAddOwnOpen}
             onCloseAddOwn={() => { setMcpAddOwnOpen(false) }}
+            workspace={workspace ?? currentWorkspace}
           />
         ) : (
           <SkillsView

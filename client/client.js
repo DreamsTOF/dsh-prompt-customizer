@@ -645,6 +645,8 @@ var css = {
   toolButton: "skm-tool-button",
   toolbarSpacer: "skm-toolbar-spacer",
   bulkOverlay: "skm-bulk-overlay",
+  dropLabelEllipsis: "skm-drop-label-ellipsis",
+  scopeTag: "skm-scope-tag",
   presetPill: "skm-preset-pill",
   presetSelect: "skm-preset-select",
   presetPillChevron: "skm-preset-pill-chevron",
@@ -1194,6 +1196,12 @@ var SHEET3 = `
 .skm-tool-select-chevron{position:absolute;right:9px;pointer-events:none;color:var(--dsw-alias-label-caption,#adb2b8)}
 .skm-tool-button{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.12));border-radius:10px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#61666b);font-size:13px;line-height:18px;font-family:inherit;padding:0 12px;cursor:pointer;transition:border-color 140ms ease,background 140ms ease,color 140ms ease,transform 140ms ease}
 .skm-tool-button:hover{background:var(--dsw-alias-interactive-bg-hover-solid,#f7f8f9);color:var(--dsw-alias-label-primary,#0f1115)}
+.skm-drop-label-ellipsis{display:block;min-width:0;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* \u5DE5\u4F5C\u533A/\u5168\u5C40\u6765\u6E90\u6807\u7B7E\uFF1A\u9762\u677F\u5757\u4E0A\u533A\u5206\u300C\u8FD9\u6761\u5C5E\u4E8E\u5F53\u524D\u5DE5\u4F5C\u533A\u300D\u8FD8\u662F\u300C\u5168\u5C40\u5171\u7528\u300D\u3002 */
+.skm-scope-tag{flex:none;display:inline-flex;align-items:center;gap:3px;height:17px;padding:0 6px;border-radius:6px;font-size:11px;line-height:17px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.skm-scope-tag[data-scope='workspace']{background:var(--dsw-alias-bg-accent,rgba(88,101,242,.14));color:var(--dsw-alias-label-accent,#4b57d6)}
+.skm-scope-tag[data-scope='global']{background:var(--dsw-alias-bg-neutral,rgba(0,0,0,.06));color:var(--dsw-alias-label-secondary,#61666b)}
+.skm-scope-tag[data-side='closed']{background:var(--dsw-alias-bg-danger,rgba(220,38,38,.12));color:var(--dsw-alias-label-danger,#c02424)}
 .skm-tool-button:active{transform:scale(.97)}
 .skm-tool-button:disabled{opacity:.5;cursor:default}
 .skm-toolbar-spacer{flex:1 1 12px}
@@ -4147,7 +4155,13 @@ async function skillRequest(path, options) {
   return body;
 }
 var skillApi = {
-  list: () => skillRequest("/list", { headers: { accept: "application/json" } }),
+  /** 技能快照；`cwd` 指定工作区（缺省按当前会话）。 */
+  list: (cwd) => skillRequest(
+    cwd === void 0 || cwd === null || cwd === "" ? "/list" : `/list?cwd=${encodeURIComponent(cwd)}`,
+    { headers: { accept: "application/json" } }
+  ),
+  /** 可选工作区清单（面板顶栏选择器）。 */
+  workspaces: () => skillRequest("/workspaces", { headers: { accept: "application/json" } }),
   toggleStatus: () => fetch("/api/skill-toggles/status", { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
     if (typeof body !== "object" || body === null || body.skills === void 0) {
       throw new Error("toggle status unavailable");
@@ -4855,6 +4869,18 @@ var SKILL_ZH = {
   installNameRewrite: "SKILL.md \u91CC\u5199\u7684\u662F\u300C{meta}\u300D\uFF0C\u5B89\u88C5\u65F6\u4F1A\u7EDF\u4E00\u6539\u6210\u300C{name}\u300D\uFF08\u76EE\u5F55\u540D\u4E0E\u6280\u80FD\u540D\u4FDD\u6301\u4E00\u81F4\uFF09\u3002",
   deleteSkillDirNote: "\uFF08\u6280\u80FD\u76EE\u5F55\u300C{dir}\u300D\u4E0E\u6280\u80FD\u540D\u4E0D\u540C\uFF0C\u4F1A\u4E00\u5E76\u5220\u9664\uFF09",
   skillOffTag: "\u5DF2\u505C\u7528",
+  originWorkspace: "\u5DE5\u4F5C\u533A",
+  originGlobal: "\u5168\u5C40",
+  originWorkspaceHint: "\u5F53\u524D\u5DE5\u4F5C\u533A\u4E13\u7528\uFF1A\u540C\u540D\u7684\u5168\u5C40\u6280\u80FD\u4F1A\u88AB\u5B83\u8986\u76D6\uFF1B\u5173\u6389\u53EA\u5F71\u54CD\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u3002",
+  originGlobalHint: "\u5168\u5C40\u53EF\u7528\uFF1A\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u80FD\u770B\u5230\uFF1B\u5173\u6389\u5BF9\u6240\u6709\u5DE5\u4F5C\u533A\u751F\u6548\uFF08\u9664\u975E\u67D0\u5DE5\u4F5C\u533A\u6709\u540C\u540D\u6280\u80FD\uFF09\u3002",
+  workspacePickerAria: "\u9009\u62E9\u8981\u914D\u7F6E\u7684\u5DE5\u4F5C\u533A",
+  workspacePickerAuto: "\u8DDF\u968F\u5F53\u524D\u4F1A\u8BDD",
+  mcpWorkspaceDisable: "\u672C\u5DE5\u4F5C\u533A\u5173\u95ED",
+  mcpWorkspaceEnable: "\u672C\u5DE5\u4F5C\u533A\u542F\u7528",
+  mcpWorkspaceDisableHint: "\u53EA\u5728\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u7684\u4F1A\u8BDD\u91CC\u4E0D\u6CE8\u5165\u5B83\u7684\u5DE5\u5177\uFF1B\u6362\u5230\u522B\u7684\u5DE5\u4F5C\u533A\u7167\u5E38\u6CE8\u5165\u3002",
+  mcpWorkspaceEnableHint: "\u91CD\u65B0\u5728\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u6CE8\u5165\u5B83\u7684\u5DE5\u5177\u3002",
+  mcpWorkspaceClosed: "\u672C\u5DE5\u4F5C\u533A\u5DF2\u5173",
+  mcpWorkspaceClosedHint: "\u8BE5 Server \u5728\u5F53\u524D\u5DE5\u4F5C\u533A\u88AB\u5173\u95ED\uFF1A\u8FD9\u91CC\u7684\u4F1A\u8BDD\u770B\u4E0D\u5230\u5B83\u7684\u5DE5\u5177\uFF0C\u5176\u5B83\u5DE5\u4F5C\u533A\u4E0D\u53D7\u5F71\u54CD\u3002",
   presetCountTip: "\u8BE5\u9884\u8BBE\u4E0B\u5DF2\u542F\u7528 {n} \u4E2A / \u5171 {total} \u4E2A\u6280\u80FD"
 };
 function skillT(key, params) {
@@ -5204,7 +5230,7 @@ ${description}`}`,
     );
   }) });
 }
-function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn }) {
+function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace }) {
   const [busy, setBusy] = (0, import_react13.useState)(null);
   const [error, setError] = (0, import_react13.useState)(null);
   const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
@@ -5214,6 +5240,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
+  const closedInWorkspace = new Set(
+    workspace === null ? [] : Object.entries(ready?.workspaceClosed?.[workspace] ?? {}).filter(([, on]) => on === false).map(([name]) => name)
+  );
   const presets = ready?.presets ?? [];
   const scoped = scope === "" ? void 0 : presets.find((preset) => preset.id === scope);
   const masked = new Set(Object.entries(ready?.masks?.[scope] ?? {}).filter(([, on]) => on === false).map(([name]) => name));
@@ -5259,6 +5288,27 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   };
   const toggleGlobal = (serverName, disabled) => {
     write(`toggle:${serverName}`, "/api/triad/mcp-config", { serverName, disabled });
+  };
+  const toggleWorkspaceServer = (serverName, enabled) => {
+    if (workspace === null) return;
+    const token = `ws:${serverName}`;
+    setBusy(token);
+    setError(null);
+    void fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/servers/${encodeURIComponent(serverName)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ enabled })
+    }).then(async (response) => {
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${String(response.status)}`);
+      }
+      onRefresh();
+    }).catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }).finally(() => {
+      setBusy(null);
+    });
   };
   const removeGlobal = (serverName) => {
     write(`remove:${serverName}`, "/api/triad/mcp-config", { serverName, action: "remove" });
@@ -5406,7 +5456,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       lockedCount > 1 ? ` ${lockedCount}` : ""
                     ] }),
                     offTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offTools.length }) }),
-                    scope === "" ? server.config.disabled ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpLiveDisabled") }) : null : isMasked ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpPresetMasked") }) : null
+                    scope === "" ? server.config.disabled ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpLiveDisabled") }) : null : isMasked ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: t("mcpPresetMasked") }) : null,
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.scopeTag, "data-scope": "global", title: t("originGlobalHint"), children: t("originGlobal") }),
+                    closedInWorkspace.has(server.serverName) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.scopeTag, "data-scope": "workspace", "data-side": "closed", title: t("mcpWorkspaceClosedHint"), children: t("mcpWorkspaceClosed") })
                   ] })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -5454,6 +5506,20 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               ),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: scope === "" ? t("mcpLiveConfigHint") : covered ? isMasked ? t("mcpPresetCoveredMasked") : t("mcpPresetCovered") : isMasked ? t("mcpPresetMasked") : t("mcpPresetMaskState") }) }),
+                workspace !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: css.mcpCardDelete,
+                    "data-closed": closedInWorkspace.has(server.serverName) || void 0,
+                    title: closedInWorkspace.has(server.serverName) ? t("mcpWorkspaceEnableHint") : t("mcpWorkspaceDisableHint"),
+                    disabled: busy !== null,
+                    onClick: () => {
+                      toggleWorkspaceServer(server.serverName, closedInWorkspace.has(server.serverName));
+                    },
+                    children: closedInWorkspace.has(server.serverName) ? t("mcpWorkspaceEnable") : t("mcpWorkspaceDisable")
+                  }
+                ),
                 scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",
                   {
@@ -5764,6 +5830,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
   };
   const toggleLabel = lockedReason ?? (enabled ? skillT("disableSkill") : skillT("enableSkill"));
   const fileMeta = typeof skill.fileCount === "number" ? skill.fileCount : files.length;
+  const skillOrigin = skill.root === void 0 ? void 0 : skill.root.startsWith("project-") ? "workspace" : "global";
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     "li",
     {
@@ -5809,6 +5876,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
         /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillTags, children: [
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagSource}`, children: bundleName ?? skillT("tagLoose") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagScope}`, "data-off": enabled ? void 0 : "true", children: scopeLabel }),
+          skillOrigin !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.scopeTag, "data-scope": skillOrigin, title: skillT(skillOrigin === "workspace" ? "originWorkspaceHint" : "originGlobalHint"), children: skillT(skillOrigin === "workspace" ? "originWorkspace" : "originGlobal") }),
           !enabled && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagStatus}`, children: skillT("skillOffTag") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillMeta, children: skillT("fileCount", { n: fileMeta }) })
         ] }),
@@ -6386,7 +6454,7 @@ function SkillsView({
 // src/client/skills/TopBar.tsx
 var import_dsh_client_ui_primitives9 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime11 = require("react/jsx-runtime");
-function PanelHead({ t, kind, onKind }) {
+function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }) {
   return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "psh-head", children: [
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "psh-title", style: { flex: "none" }, children: t("panelTitle") }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": "SKILL / MCP / \u63D0\u793A\u8BCD", children: [
@@ -6407,7 +6475,72 @@ function PanelHead({ t, kind, onKind }) {
         children: label
       },
       value
-    )) })
+    )) }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.toolbarSpacer }),
+    onWorkspace !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropWrap, "data-drop": "workspace", style: { alignSelf: "center", marginRight: 4 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        "button",
+        {
+          type: "button",
+          className: css.toolButton,
+          style: { height: 30, maxWidth: 240 },
+          "aria-haspopup": "menu",
+          "aria-expanded": openMenu === "workspace" || void 0,
+          "aria-label": t("workspacePickerAria"),
+          title: workspaceValue === null ? t("workspacePickerAuto") : workspaceValue,
+          onClick: () => {
+            setOpenMenu((value) => value === "workspace" ? null : "workspace");
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.dropLabelEllipsis, children: workspaceValue === null ? t("workspacePickerAuto") : shortenPath(workspaceValue) }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconChevronDownOutlineRegular, { size: 11, "aria-hidden": "true" })
+          ]
+        }
+      ),
+      openMenu === "workspace" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: css.bulkOverlay, "aria-label": t("close"), onClick: () => {
+          setOpenMenu(null);
+        } }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropMenu, role: "menu", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+            "button",
+            {
+              type: "button",
+              role: "menuitemradio",
+              className: css.dropItem,
+              "aria-checked": workspaceValue === null,
+              onClick: () => {
+                onWorkspace(null);
+                setOpenMenu(null);
+              },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.dropCheck, "data-on": workspaceValue === null || void 0, "aria-hidden": "true", children: workspaceValue === null ? "\u2713" : "" }),
+                t("workspacePickerAuto")
+              ]
+            }
+          ),
+          workspaces.map((item) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+            "button",
+            {
+              type: "button",
+              role: "menuitemradio",
+              className: css.dropItem,
+              "aria-checked": workspaceValue === item,
+              title: item,
+              onClick: () => {
+                onWorkspace(item);
+                setOpenMenu(null);
+              },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.dropCheck, "data-on": workspaceValue === item || void 0, "aria-hidden": "true", children: workspaceValue === item ? "\u2713" : "" }),
+                shortenPath(item)
+              ]
+            },
+            item
+          ))
+        ] })
+      ] })
+    ] })
   ] });
 }
 function SkillTopBar({
@@ -6856,6 +6989,11 @@ function McpTopBar({
     ] })
   ] });
 }
+function shortenPath(path) {
+  const parts = path.split(/[\\/]/).filter((item) => item !== "");
+  if (parts.length <= 2) return path;
+  return `\u2026/${parts.slice(-2).join("/")}`;
+}
 
 // src/client/skills/SkillsPanel.tsx
 var import_jsx_runtime12 = require("react/jsx-runtime");
@@ -6874,6 +7012,9 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   ensureStyles();
   const [state, setState] = (0, import_react15.useState)({ status: "loading" });
   const [reload, setReload] = (0, import_react15.useState)(0);
+  const [workspace, setWorkspace] = (0, import_react15.useState)(null);
+  const [workspaces, setWorkspaces] = (0, import_react15.useState)([]);
+  const [currentWorkspace, setCurrentWorkspace] = (0, import_react15.useState)(null);
   const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
   const [looseOpen, setLooseExpanded] = (0, import_react15.useState)(false);
   const [viewer, setViewer] = (0, import_react15.useState)(null);
@@ -7060,7 +7201,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   (0, import_react15.useEffect)(() => {
     let current2 = true;
     setState({ status: "loading" });
-    void skillApi.list().then(
+    void skillApi.list(workspace).then(
       (snapshot) => {
         if (current2) setState({ status: "ready", snapshot });
       },
@@ -7092,6 +7233,22 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       },
       () => {
         if (current2) setHealth({ state: "unavailable" });
+      }
+    );
+    return () => {
+      current2 = false;
+    };
+  }, [reload, workspace]);
+  (0, import_react15.useEffect)(() => {
+    let current2 = true;
+    void skillApi.workspaces().then(
+      (result) => {
+        if (!current2) return;
+        setWorkspaces(Array.isArray(result.workspaces) ? result.workspaces : []);
+        setCurrentWorkspace(typeof result.current === "string" && result.current !== "" ? result.current : null);
+      },
+      () => {
+        if (current2) setWorkspaces([]);
       }
     );
     return () => {
@@ -7499,7 +7656,19 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       size: { width: 1150, height: 860 },
       ariaLabel: t("panelTitle"),
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PanelHead, { t, kind, onKind: setKind }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          PanelHead,
+          {
+            t,
+            kind,
+            onKind: setKind,
+            workspaces,
+            workspaceValue: workspace,
+            onWorkspace: setWorkspace,
+            openMenu,
+            setOpenMenu
+          }
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(PshBody, { className: css.modalBody, children: [
           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "data-skm-panel-marker": true, "aria-hidden": "true", style: { display: "none" } }),
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.hub, "aria-busy": state.status === "loading", children: [
@@ -7587,7 +7756,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 addOwnOpen: mcpAddOwnOpen,
                 onCloseAddOwn: () => {
                   setMcpAddOwnOpen(false);
-                }
+                },
+                workspace: workspace ?? currentWorkspace
               }
             ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               SkillsView,
