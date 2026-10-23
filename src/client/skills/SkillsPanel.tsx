@@ -90,6 +90,11 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const [addOpen, setAddOpen] = useState(false)
   const [installName, setInstallName] = useState('')
   const [installDescription, setInstallDescription] = useState('')
+  /**
+   * 添加技能的落点：默认全局（所有工作区共用）；选工作区则写进该工作区的
+   * `.agents/skills`（目录不存在会自动创建）。
+   */
+  const [installScope, setInstallScope] = useState<AddScope>('global')
   const [installBundleId, setInstallBundleId] = useState<string | undefined>(undefined)
   const [installing, setInstalling] = useState(false)
   const [installError, setInstallError] = useState<string | null>(null)
@@ -555,6 +560,10 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     if (install.archive !== true && installName.trim() === '') return
     setInstalling(true)
     setInstallError(null)
+    // 落点：默认全局；选工作区时带上路径（宿主会创建缺失的 .agents/skills）。
+    const scopeFields = installScope === 'workspace' && (workspace ?? currentWorkspace) !== null
+      ? { scope: 'workspace' as const, workspace: (workspace ?? currentWorkspace)! }
+      : {}
     try {
       let installed: { name?: string } = {}
       if (install.archive === true) {
@@ -562,6 +571,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
           archive: install.data,
           description: installDescription.trim(),
           ...installBundleId === undefined ? {} : { bundleId: installBundleId },
+          ...scopeFields,
         })
       } else {
         const files = await Promise.all(install.files.map(async ({ path, file }) => ({
@@ -572,6 +582,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
           skillName: installName.trim(),
           description: installDescription.trim(),
           ...installBundleId === undefined ? {} : { bundleId: installBundleId },
+          ...scopeFields,
           files,
         })
       }
@@ -1095,6 +1106,17 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
                   {bundles.map((bundle) => <option key={bundle.id} value={bundle.id}>{bundle.name}</option>)}
                 </select>
               </label>
+              {/* 落点：默认全局（所有工作区共用）；选工作区则只装进该工作区。 */}
+              {(workspace ?? currentWorkspace) !== null && (
+                <label className={css.bundleSelect}>
+                  <span className={css.visuallyHidden}>{t('addScopeLabel')}</span>
+                  <select value={installScope} disabled={installing}
+                    onChange={(event) => { setInstallScope(event.currentTarget.value === 'workspace' ? 'workspace' : 'global') }}>
+                    <option value="global">{t('addScopeGlobal')}</option>
+                    <option value="workspace">{t('addScopeWorkspace')}</option>
+                  </select>
+                </label>
+              )}
               <span className={css.installMeta}>
                 {install.archive === true
                   ? t('uploadMeta', { n: 1, folder: install.folderName })

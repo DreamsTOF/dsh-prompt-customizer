@@ -22,9 +22,9 @@
  *                             重启桌面端才生效。
  */
 
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
 import { readMaskLedger } from './mcp-mask-ledger.ts'
@@ -179,6 +179,12 @@ function applyToggle(content: string, entry: PatchMcpEntry, disabled: boolean): 
 
 function readPatchContent(): string {
   const path = patchFilePath()
+  if (!existsSync(path)) return ''
+  return readFileSync(path, 'utf8')
+}
+
+/** 读工作区自己的 MCP patch（不存在就当空文件，首次添加会创建）。 */
+function readWorkspacePatchContent(path: string): string {
   if (!existsSync(path)) return ''
   return readFileSync(path, 'utf8')
 }
@@ -571,6 +577,16 @@ export function applyMcpStatus(ctx: Context): void {
             }
             const path = patchFilePath()
             const content = readPatchContent()
+            // 落点：默认全局（profile patch）；scope=workspace 时改写到该工作区的
+            // `.dsh/mcp.patch.yml`（新文件，目录不存在就创建），只在该工作区注入。
+            const scope = parsed.scope === 'workspace' ? 'workspace' : 'global'
+            const workspace = typeof parsed.workspace === 'string' ? parsed.workspace.trim() : ''
+            if (scope === 'workspace' && workspace === '') {
+              writeJsonResponse(res, 400, { ok: false, error: 'scope=workspace 需要 workspace 路径' })
+              return
+            }
+            const targetPath = scope === 'workspace' ? join(workspace, '.dsh', 'mcp.patch.yml') : path
+            const targetContent = scope === 'workspace' ? readWorkspacePatchContent(targetPath) : content
             const existing = new Set(scanPatchEntries(content).map(entry => entry.serverName))
             const added: string[] = []
             const fresh = outcome.rows.filter((row) => {
@@ -582,11 +598,14 @@ export function applyMcpStatus(ctx: Context): void {
             })
             const skipped = outcome.rows.length - fresh.length
             if (fresh.length > 0) {
-              const next = appendRowsToText(content, rowsToPatchYaml(fresh))
-              copyFileSync(path, `${path}${BACKUP_SUFFIX}`)
-              writeFileSync(path, next, 'utf8')
+              const next = appendRowsToText(targetContent, rowsToPatchYaml(fresh))
+              mkdirSync(dirname(targetPath), { recursive: true })
+              if (existsSync(targetPath)) copyFileSync(targetPath, `${targetPath}${BACKUP_SUFFIX}`)
+              writeFileSync(targetPath, next, 'utf8')
             }
-            writeJsonResponse(res, 200, { ok: true, added, skipped, warnings: outcome.warnings, patchFile: path, reload: 'live' })
+            writeJsonResponse(res, 200, {
+              ok: true, added, skipped, scope, warnings: outcome.warnings, patchFile: targetPath, reload: 'live',
+            })
           } catch (error) {
             writeJsonResponse(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
           }

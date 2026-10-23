@@ -74,8 +74,15 @@ export type ViewerState = { skill: SkillInfo; file: string; loading: boolean; er
 /** 收集到的一个待安装文件：相对技能根的路径 + 浏览器 File 句柄。 */
 export interface CollectedFile { path: string; file: File }
 export type InstallInput =
-  | { archive: string; description: string; bundleId?: string }
-  | { skillName: string; description: string; bundleId?: string; files: Array<{ path: string; data: string }> }
+  | { archive: string; description: string; bundleId?: string; scope?: AddScope; workspace?: string }
+  | { skillName: string; description: string; bundleId?: string; scope?: AddScope; workspace?: string; files: Array<{ path: string; data: string }> }
+
+/**
+ * 添加入口的作用域：`global`（~/.agents/skills、profile patch，所有工作区共用）
+ * 或 `workspace`（写进当前工作区的 `.agents/skills` / `.dsh/mcp.patch.yml`）。
+ * 默认 global。
+ */
+export type AddScope = 'global' | 'workspace'
 
 /** 健康扫描的展示模型（顶栏健康指示的 tone / 文案 / 悬停详情）。 */
 export interface HealthViewModel {

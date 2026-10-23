@@ -262,9 +262,130 @@ export function applyMcpWorkspaceScope(ctx: PluginContext): void {
   // 先把账本读进内存，装配时的快通道才成立（第一次读盘放在挂载期）。
   void readLedger().catch(() => {})
   installAssembleFilter(ctx)
+  installWorkspaceRows(ctx)
+}
+
+/**
+ * 工作区专属 MCP 行：会话建好后，把该工作区 `.dsh/mcp.patch.yml` 里的
+ * mcp-client 行挂进加载器（`agent/created` 时按会话 cwd 挂，销毁时回收）。
+ *
+ * 行 id 带工作区路径哈希，与 profile patch 里的全局行互不挤占；
+ * serverName 同样加后缀，于是同一个 anysearch 可以在两个工作区各配一份。
+ * @param ctx - 宿主上下文。
+ */
+function installWorkspaceRows(ctx: PluginContext): void {
+  /** 已挂的行：entryId → 回收函数。 */
+  const mounted = new Map<string, () => void>()
+  const sync = async (cwd: string): Promise<void> => {
+    const loader = typeof ctx?.get === 'function' ? ctx.get('loader') : undefined
+    if (typeof loader?.create !== 'function') return
+    const rows = await readWorkspaceRows(cwd)
+    const wanted = new Set(rows.map((row) => row.entryId))
+    // 回收该工作区已消失的行。
+    for (const [entryId, dispose] of [...mounted.entries()]) {
+      if (wanted.has(entryId)) continue
+      if (!entryId.startsWith(`${WORKSPACE_ROW_PREFIX}${pathHash(resolve(cwd))}-`)) continue
+      dispose()
+      mounted.delete(entryId)
+    }
+    for (const row of rows) {
+      if (mounted.has(row.entryId)) continue
+      try {
+        const handle = await loader.create({
+          id: row.entryId,
+          name: '@deepseek-ai/dsh-mcp-client',
+          config: row.config,
+        })
+        mounted.set(row.entryId, () => { void handle?.dispose?.() })
+      } catch (error) {
+        ctx.logger?.warn?.(`[mcp-workspace-scope] 挂载 ${row.serverName} 失败: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+  ctx.effect(() => {
+    const off = ctx.on('agent/created', ({ agent }: any) => {
+      const cwd = agent?.session?.header?.cwd
+      if (typeof cwd === 'string' && cwd.trim() !== '') void sync(cwd).catch(() => {})
+    })
+    return () => {
+      off()
+      for (const dispose of mounted.values()) dispose()
+      mounted.clear()
+    }
+  }, 'triad: mcp workspace rows')
 }
 
 /** 供状态接口合并：当前账本（同步读内存副本）。 */
 export function workspaceMcpLedger(): WorkspaceMcpLedger {
   return cache ?? { version: 1, workspaces: {} }
+}
+
+/* ── 工作区专属 MCP 行：`<ws>/.dsh/mcp.patch.yml` ─────────────────────────── */
+
+/** 挂载行 id 前缀（回收时按它区分本模块挂的行）。 */
+const WORKSPACE_ROW_PREFIX = 'wsmcp-'
+
+/** 一个工作区行定义。 */
+interface WorkspaceRow {
+  /** 目标工作区绝对路径。 */
+  workspace: string
+  /** 该工作区内的唯一 id（`wsmcp-<hash>-<在文件里的序号>`）。 */
+  entryId: string
+  /** 挂载用 serverName（带工作区哈希，避免与全局同名行冲突）。 */
+  serverName: string
+  /** 原始 config（serverName 会被替换成上面那个）。 */
+  config: Record<string, unknown>
+}
+
+/** djb2 路径哈希（与其它模块一致的 8 位十六进制）。 */
+function pathHash(path: string): string {
+  let hash = 5381
+  for (let index = 0; index < path.length; index += 1) hash = ((hash << 5) + hash + path.charCodeAt(index)) >>> 0
+  return hash.toString(16).padStart(8, '0')
+}
+
+/**
+ * 解析工作区 patch 文本里的 mcp-client 行。
+ *
+ * 只认本插件写出的形态（`- insert:` → `- id/name/config`），够用即可：
+ * 工作区文件是我们自己生成的，不做通用 YAML 解析。
+ * @param workspace - 工作区绝对路径。
+ * @param text - 文件内容。
+ * @returns 行定义列表。
+ */
+function parseWorkspaceRows(workspace: string, text: string): WorkspaceRow[] {
+  const rows: WorkspaceRow[] = []
+  const hash = pathHash(workspace)
+  // 以 `- id:` 切块，取本块里的 serverName 与 config 段原始文本。
+  const blocks = text.split(/^\s*-\s+id:\s*/m).slice(1)
+  let index = 0
+  for (const block of blocks) {
+    const serverName = /^\s*serverName:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? ''
+    const command = /^\s*command:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '')
+    const url = /^\s*url:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '')
+    if (serverName !== '' && (command !== undefined || url !== undefined)) {
+      const config: Record<string, unknown> = url === undefined
+        ? { serverName, transport: 'stdio', command }
+        : { serverName, transport: 'streamable-http', url }
+      // 同名不同工作区互不冲突：serverName 加路径哈希后缀。
+      const scoped = `${serverName.slice(0, 20)}-${hash}`
+      rows.push({ workspace, entryId: `${WORKSPACE_ROW_PREFIX}${hash}-${String(index)}`, serverName: scoped, config: { ...config, serverName: scoped } })
+      index += 1
+    }
+  }
+  return rows
+}
+
+/**
+ * 读一个工作区的 mcp.patch.yml。
+ * @param workspace - 工作区绝对路径。
+ * @returns 行定义（文件缺失/不可读时为空）。
+ */
+export async function readWorkspaceRows(workspace: string): Promise<WorkspaceRow[]> {
+  try {
+    const text = await readFile(join(resolve(workspace), '.dsh', 'mcp.patch.yml'), 'utf8')
+    return parseWorkspaceRows(resolve(workspace), text)
+  } catch {
+    return []
+  }
 }

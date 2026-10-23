@@ -4874,6 +4874,9 @@ var SKILL_ZH = {
   originWorkspaceHint: "\u5F53\u524D\u5DE5\u4F5C\u533A\u4E13\u7528\uFF1A\u540C\u540D\u7684\u5168\u5C40\u6280\u80FD\u4F1A\u88AB\u5B83\u8986\u76D6\uFF1B\u5173\u6389\u53EA\u5F71\u54CD\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u3002",
   originGlobalHint: "\u5168\u5C40\u53EF\u7528\uFF1A\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u80FD\u770B\u5230\uFF1B\u5173\u6389\u5BF9\u6240\u6709\u5DE5\u4F5C\u533A\u751F\u6548\uFF08\u9664\u975E\u67D0\u5DE5\u4F5C\u533A\u6709\u540C\u540D\u6280\u80FD\uFF09\u3002",
   workspacePickerAria: "\u9009\u62E9\u8981\u914D\u7F6E\u7684\u5DE5\u4F5C\u533A",
+  addScopeLabel: "\u6DFB\u52A0\u5230\u54EA\u91CC",
+  addScopeGlobal: "\u5168\u5C40",
+  addScopeWorkspace: "\u5F53\u524D\u5DE5\u4F5C\u533A",
   workspacePickerAuto: "\u8DDF\u968F\u5F53\u524D\u4F1A\u8BDD",
   mcpWorkspaceDisable: "\u672C\u5DE5\u4F5C\u533A\u5173\u95ED",
   mcpWorkspaceEnable: "\u672C\u5DE5\u4F5C\u533A\u542F\u7528",
@@ -4895,7 +4898,7 @@ function skillT(key, params) {
 var import_react10 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime5 = require("react/jsx-runtime");
-function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
+function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
   const [format, setFormat] = (0, import_react10.useState)("json");
   const [text, setText] = (0, import_react10.useState)("");
   const [busy, setBusy] = (0, import_react10.useState)(null);
@@ -4903,6 +4906,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
   const [errors, setErrors] = (0, import_react10.useState)([]);
   const [warnings, setWarnings] = (0, import_react10.useState)([]);
   const [notice, setNotice] = (0, import_react10.useState)(null);
+  const [scope, setScope] = (0, import_react10.useState)("global");
   const target = presetId === void 0 ? "global" : "preset";
   const placeholder = format === "json" ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }' : 'mcpServers:\n  my-server:\n    command: npx\n    args: ["-y", "@scope/mcp-server"]';
   const empty = text.trim() === "";
@@ -4944,7 +4948,8 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
     setBusy("add");
     reset();
     const path = presetId === void 0 ? "/api/triad/mcp-config" : `/api/triad/mcp-presets/${encodeURIComponent(presetId)}/servers`;
-    const payload = presetId === void 0 ? { action: "add", format, text } : { format, text };
+    const toWorkspace = presetId === void 0 && scope === "workspace" && typeof workspace === "string" && workspace !== "";
+    const payload = presetId === void 0 ? { action: "add", format, text, ...toWorkspace ? { scope: "workspace", workspace } : {} } : { format, text };
     void call(path, payload).then((body) => {
       const list = Array.isArray(body.errors) ? body.errors : [];
       if (list.length > 0) {
@@ -4984,6 +4989,22 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel }) {
           value.toUpperCase(),
           value === "yaml" ? ` \xB7 ${t("mcpPasteNative")}` : ""
         ]
+      },
+      value
+    )) }) }),
+    presetId === void 0 && typeof workspace === "string" && workspace !== "" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("addScopeLabel"), children: ["global", "workspace"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "button",
+      {
+        type: "button",
+        className: `${css.mcpAddTypeBtn} ${scope === value ? css.mcpAddTypeActive : ""}`,
+        "data-active": scope === value || void 0,
+        "aria-pressed": scope === value,
+        title: value === "workspace" ? workspace : void 0,
+        onClick: () => {
+          setScope(value);
+          reset();
+        },
+        children: value === "global" ? t("addScopeGlobal") : t("addScopeWorkspace")
       },
       value
     )) }) }),
@@ -5655,6 +5676,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
           {
             t,
             presetId: scope,
+            workspace,
             onAdded: (added) => {
               onRefresh();
               onWatchTools(added);
@@ -7035,6 +7057,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const [addOpen, setAddOpen] = (0, import_react15.useState)(false);
   const [installName, setInstallName] = (0, import_react15.useState)("");
   const [installDescription, setInstallDescription] = (0, import_react15.useState)("");
+  const [installScope, setInstallScope] = (0, import_react15.useState)("global");
   const [installBundleId, setInstallBundleId] = (0, import_react15.useState)(void 0);
   const [installing, setInstalling] = (0, import_react15.useState)(false);
   const [installError, setInstallError] = (0, import_react15.useState)(null);
@@ -7445,13 +7468,15 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     if (install.archive !== true && installName.trim() === "") return;
     setInstalling(true);
     setInstallError(null);
+    const scopeFields = installScope === "workspace" && (workspace ?? currentWorkspace) !== null ? { scope: "workspace", workspace: workspace ?? currentWorkspace } : {};
     try {
       let installed = {};
       if (install.archive === true) {
         installed = await skillApi.installSkill({
           archive: install.data,
           description: installDescription.trim(),
-          ...installBundleId === void 0 ? {} : { bundleId: installBundleId }
+          ...installBundleId === void 0 ? {} : { bundleId: installBundleId },
+          ...scopeFields
         });
       } else {
         const files = await Promise.all(install.files.map(async ({ path, file }) => ({
@@ -7462,6 +7487,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
           skillName: installName.trim(),
           description: installDescription.trim(),
           ...installBundleId === void 0 ? {} : { bundleId: installBundleId },
+          ...scopeFields,
           files
         });
       }
@@ -7998,6 +8024,23 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                       children: [
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "", children: t("installLoose") }),
                         bundles.map((bundle) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: bundle.id, children: bundle.name }, bundle.id))
+                      ]
+                    }
+                  )
+                ] }),
+                (workspace ?? currentWorkspace) !== null && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: css.bundleSelect, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: css.visuallyHidden, children: t("addScopeLabel") }),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+                    "select",
+                    {
+                      value: installScope,
+                      disabled: installing,
+                      onChange: (event) => {
+                        setInstallScope(event.currentTarget.value === "workspace" ? "workspace" : "global");
+                      },
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "global", children: t("addScopeGlobal") }),
+                        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "workspace", children: t("addScopeWorkspace") })
                       ]
                     }
                   )

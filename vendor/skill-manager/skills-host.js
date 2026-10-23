@@ -77,6 +77,20 @@ function dshHome() {
 function managedRoot() {
   return join(agentsHome(), "skills");
 }
+/**
+ * 工作区技能根：`<workspace>/.agents/skills`。
+ *
+ * 用户选择「添加到当前工作区」时写这里 —— 只对该工作区可见，且内核
+ * filesystem provider 的项目根正好包含它（rank 200）。目录不存在由调用方
+ * `mkdir -p` 创建，所以全新工作区也能直接用。
+ * @param {string} workspace - 工作区绝对路径。
+ * @returns {string} 技能根绝对路径。
+ */
+function workspaceSkillRoot(workspace) {
+  const trimmed = typeof workspace === "string" ? workspace.trim() : "";
+  if (trimmed === "") throw new Error("workspace is required when scope=workspace");
+  return join(trimmed, ".agents", "skills");
+}
 function dshRoot() {
   return join(dshHome(), "skills");
 }
@@ -584,7 +598,9 @@ function setFrontmatterName(raw, name2) {
 }
 
 async function installArchive(body) {
-  const root = managedRoot();
+  const root = body.scope === "workspace"
+    ? workspaceSkillRoot(typeof body.workspace === "string" ? body.workspace : "")
+    : managedRoot();
   const raw = typeof body.archive === "string" ? body.archive : "";
   if (raw === "") throw new Error("empty archive");
   const files = unzipArchive(Buffer.from(raw, "base64"));
@@ -630,7 +646,12 @@ async function installSkill(body) {
   }
   const rawRequested = typeof body.skillName === "string" ? body.skillName.trim() : "";
   const requested = rawRequested === "" ? "" : checkedName(rawRequested);
-  const root = managedRoot();
+  // 落盘位置：默认全局（~/.agents/skills）；scope=workspace 时写进该工作区的
+  // `.agents/skills`，目录不存在就新建（工作区可能还没初始化过 .agents）。
+  const scope = body.scope === "workspace" ? "workspace" : "global";
+  const root = scope === "workspace"
+    ? workspaceSkillRoot(typeof body.workspace === "string" ? body.workspace : "")
+    : managedRoot();
   const files = normalizeUploadFiles(body.files);
   const skillEntry = files.find((file) => file.path === SKILL_FILE);
   const fields = skillEntry === void 0 ? {} : parseFrontmatter(Buffer.from(skillEntry.data, "base64").toString("utf8"));

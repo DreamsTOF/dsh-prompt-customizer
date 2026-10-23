@@ -606,6 +606,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
         <McpPasteAdd
           t={t}
           presetId={scope}
+          workspace={workspace}
           onAdded={(added) => { onRefresh(); onWatchTools(added) }}
           onCancel={onCloseAddOwn}
         />

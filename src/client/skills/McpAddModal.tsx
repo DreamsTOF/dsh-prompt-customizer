@@ -11,10 +11,12 @@ import { css } from './styles.js'
  * 先「校验并预览」（宿主解析，带行号报错），确认后写入目标（全局 patch / 预设）。
  * 一次粘贴可含多个 server；已存在的 serverName 自动跳过。
  */
-export function McpPasteAdd({ t, presetId, onAdded, onCancel }: {
+export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
   t: (key: string, params?: Record<string, string | number>) => string
   /** 目标预设；undefined = 全局 profile patch。 */
   presetId?: string
+  /** 面板当前选中的工作区（提供后才能「添加到当前工作区」）。 */
+  workspace?: string | null
   /** 添加成功回调：带上本次新增的 serverName（面板据此自动等工具注册）。 */
   onAdded: (added: string[]) => void
   onCancel: () => void
@@ -26,6 +28,11 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel }: {
   const [errors, setErrors] = useState<string[]>([])
   const [warnings, setWarnings] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
+  /**
+   * 落点：默认全局（profile patch）。选工作区时写该工作区的 `.dsh/mcp.patch.yml`，
+   * 只在该工作区注入 —— 同名 server 可以两个工作区各配一份。
+   */
+  const [scope, setScope] = useState<'global' | 'workspace'>('global')
   const target = presetId === undefined ? 'global' : 'preset'
   const placeholder = format === 'json'
     ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }'
@@ -68,7 +75,10 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel }: {
     const path = presetId === undefined
       ? '/api/triad/mcp-config'
       : `/api/triad/mcp-presets/${encodeURIComponent(presetId)}/servers`
-    const payload = presetId === undefined ? { action: 'add', format, text } : { format, text }
+    const toWorkspace = presetId === undefined && scope === 'workspace' && typeof workspace === 'string' && workspace !== ''
+    const payload = presetId === undefined
+      ? { action: 'add', format, text, ...toWorkspace ? { scope: 'workspace', workspace } : {} }
+      : { format, text }
     void call(path, payload)
       .then((body) => {
         const list = Array.isArray(body.errors) ? (body.errors as string[]) : []
@@ -109,6 +119,26 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel }: {
           ))}
         </div>
       </div>
+      {/* 落点选择：默认全局；选工作区时写该工作区自己的 .dsh/mcp.patch.yml。 */}
+      {presetId === undefined && typeof workspace === 'string' && workspace !== '' && (
+        <div className={css.installRow}>
+          <div className={css.mcpAddTypeRow} role="group" aria-label={t('addScopeLabel')}>
+            {(['global', 'workspace'] as const).map(value => (
+              <button
+                key={value}
+                type="button"
+                className={`${css.mcpAddTypeBtn} ${scope === value ? css.mcpAddTypeActive : ''}`}
+                data-active={scope === value || undefined}
+                aria-pressed={scope === value}
+                title={value === 'workspace' ? workspace : undefined}
+                onClick={() => { setScope(value); reset() }}
+              >
+                {value === 'global' ? t('addScopeGlobal') : t('addScopeWorkspace')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <textarea
         className={css.inlineInput}
         value={text}
