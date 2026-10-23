@@ -144,16 +144,6 @@ export const SKILL_ZH: Record<string, string> = {
   mcpConnStatus: '连接状态', mcpConnOk: '已连接', mcpConnDown: '不可用', mcpConnTip: '实时读取到 {n} 个全局 MCP Server',
   mcpLiveConfigHint: '添加：编辑 cordis.patch.yml（或使用「添加 MCP Server」生成配置片段）',
   // mcps 目录来源（内核不读这些文件，本插件读出来挂载）
-  mcpDirsSection: 'mcps 目录（四个目录）',
-  mcpDirsHint: '内核只认 Cordis 组合里的 mcp-client 行，不读目录下的 mcp.json —— 这里列出本插件代读并挂载的那些。四个目录按优先级：工作区 .dsh/mcps → 工作区 .agents/mcps → ~/.dsh/mcps → ~/.agents/mcps；同名时前面的胜出（.dsh 优先于 .agents，工作区优先于用户级）。工作区层只在该工作区的会话里可见。',
-  mcpDirsGlobalTag: '全局',
-  mcpDirsWorkspaceTag: '工作区',
-  mcpDirsSubScope: '{n} 个 Server · {root}',
-  mcpDirsEmpty: '没有发现 mcps 目录里的配置。四个目录都认：<工作区>/.dsh/mcps/、<工作区>/.agents/mcps/、{dirs}，放成 <目录>/<任意名字>/mcp.json 即可。',
-  mcpDirsErrors: '{n} 个配置文件解析失败（见下方明细）',
-  mcpDirsSkipped: '{names} 与 cordis 组合里的同名 mcp-client 行重名：以组合为准，未重复挂载（同名 serverName 在同一作用域只能有一个实例）。',
-  mcpDirsShadowed: '同名遮蔽：{items}',
-  mcpDirsFileHint: '来源：{file}',
   // 预设维度（0.1.6）：全局 / 预设专属 / 遮蔽
   mcpScopeTitle: 'Agent 预设范围',
   mcpScopeHintAll: '当前查看全局 Server（所有预设共用）。选择某个预设，可管理它专属的 Server 与遮蔽。',
@@ -268,6 +258,7 @@ export const SKILL_ZH: Record<string, string> = {
   installNameRewrite: 'SKILL.md 里写的是「{meta}」，安装时会统一改成「{name}」（目录名与技能名保持一致）。',
   deleteSkillDirNote: '（技能目录「{dir}」与技能名不同，会一并删除）',
   skillOffTag: '已停用',
+  skillReadOnlyTag: '只读',
   presetCountTip: '该预设下已启用 {n} 个 / 共 {total} 个技能',
 }
 

@@ -21,19 +21,23 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
-import { apply as applySkillsHost, setExtraRoots as setSkillHostRoots } from '../vendor/skill-manager/skills-host.js'
+import {
+  apply as applySkillsHost,
+  setExtraRoots as setSkillHostRoots,
+  setSkillSource as setSkillHostSource,
+} from '../vendor/skill-manager/skills-host.js'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
 import { apply as applyPromptHost } from '../vendor/prompt-customizer/index.js'
 import { apply as applySkillToggles } from './skill-toggles.js'
 import { applySkillHealth } from './skill-health.js'
 import { resolveSkillRoots, setSkillRoots } from './skill-roots.ts'
+import { kernelSkillViews } from './kernel-skills.ts'
 import { applyMcpRecommended } from './mcp-recommended.js'
 import { applyMcpStatus } from './mcp-status.js'
 import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
 import { applyMcpToolDisable } from './mcp-tool-disable.js'
-import { applyWorkspaceMcp } from './mcp-workspace.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-prompt-customizer'
@@ -68,6 +72,11 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
       `[dsh-prompt-customizer] skill roots resolution failed: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
+
+  // 技能目录直接读内核注册表（`ctx.skills.list`）：bundled / office / 插件 / 用户级 /
+  // 当前会话工作区 全部由内核按 scope + cwd 聚合，插件不再自扫目录。`setSkillSource`
+  // 必须在 vendor 技能管理器挂载之前注册，列表路由首次请求即走内核。
+  setSkillHostSource(() => kernelSkillViews(ctx))
 
   // 活动工作区变化（新会话进别的目录）后重算根集合：否则面板只认启动那一刻的
   // 工作区。事件里只做「重算 + 写快照」，路由下一次请求即读到新集合。
@@ -181,22 +190,8 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
     )
   }
 
-  // ── 工作区级 / 全局 mcps 目录的 MCP Server（内核不读，本插件补上）──────
-  // `~/.agents/mcps/**`（全局）与 `<ws>/.dsh|.agents/mcps/**`（仅本工作区可见）
-  // 里的 mcp.json 由本模块读出来挂成真正的 mcp-client 行 —— 内核只认 Cordis
-  // 组合里的行，没有「读某个目录」的约定，所以这些文件此前一直是死配置。
-  //
-  // 挂在「单工具级启停」之后：本模块也注册一个 system-prompt/assemble 监听器，
-  // 后注册可保持既有监听器的注册顺序不变（waterfall 的先后不影响结果，顺序
-  // 稳定更利于排查）。
-  try {
-    applyWorkspaceMcp(ctx)
-    ctx.logger?.info?.('[dsh-prompt-customizer] workspace mcp mounted')
-  } catch (error) {
-    ctx.logger?.warn?.(
-      `[dsh-prompt-customizer] workspace mcp failed to mount: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
-    )
-  }
+  // 0.11.0 起不再自搓 mcps 目录层：MCP Server 一律是内核 Cordis 组合里的
+  // `mcp-client` 行（列表/开关/增删都走组合行），不再从 `mcps/` 目录读配置挂行。
 
   // ── 提示词管理（vendor/prompt-customizer：/api/prompt-customizer/*）──────
   // 在带 systemPrompt 的子作用域里挂载：该服务缺席时整块不挂（其余模块不受

@@ -90,6 +90,22 @@ function dshRoot() {
  * 同名技能先出现者胜出，面板因此与内核选中同一个目录。
  */
 var extraRoots = [];
+/**
+ * 内核技能目录来源（宿主注入，见 `src/kernel-skills.ts`）。
+ *
+ * 注入后 `allSkills()` 直接采用内核聚合的结果（filesystem 各类根 + bundled +
+ * office + 插件 provider），不再自己 walk 根目录 —— 两边各扫一遍只会在顺序、
+ * 去重与只读来源上对不齐。为空时保持原来的自扫行为（测试与独立使用）。
+ */
+var kernelSource;
+/**
+ * 注入内核技能来源。
+ * @param {(() => Promise<Array<{name: string, dir: string, description?: string, root?: string, dirPath?: string, readOnly?: boolean}>>) | undefined} source
+ *   返回内核视图的异步函数；传 undefined 退回自扫。
+ */
+function setSkillSource(source) {
+  kernelSource = typeof source === "function" ? source : void 0;
+}
 function allRoots() {
   return [...extraRoots.map((root) => root.path), managedRoot(), dshRoot()];
 }
@@ -242,6 +258,35 @@ async function allSkills() {
   const views = [];
   const seenDir = /* @__PURE__ */ new Set();
   const seenName = /* @__PURE__ */ new Set();
+  // 内核来源优先：内核已经按 scope/cwd/rank 合并去重过，这里只补文件清单。
+  if (kernelSource !== void 0) {
+    for (const skill of await kernelSource()) {
+      if (typeof skill?.name !== "string" || skill.name === "") continue;
+      if (seenName.has(skill.name)) continue;
+      seenName.add(skill.name);
+      const dir = typeof skill.dir === "string" && skill.dir !== "" ? skill.dir : skill.name;
+      const files = [];
+      if (typeof skill.dirPath === "string" && skill.dirPath !== "") {
+        try {
+          await walkSkillDir(skill.dirPath, "", files);
+        } catch {
+          // 只读/不可达目录：文件清单留空，技能本身照常列出。
+        }
+      }
+      views.push({
+        name: skill.name,
+        dir,
+        description: typeof skill.description === "string" ? skill.description : "",
+        compatibility: typeof skill.compatibility === "string" ? skill.compatibility : "",
+        fileCount: files.length,
+        files: files.slice(0, 200),
+        root: typeof skill.root === "string" && skill.root !== "" ? skill.root : "kernel",
+        ...typeof skill.dirPath === "string" && skill.dirPath !== "" ? { dirPath: skill.dirPath } : {},
+        readOnly: skill.readOnly !== false
+      });
+    }
+    return views;
+  }
   for (const root of allRoots()) {
     for (const skill of await listRootSkills(root)) {
       const dirKey = skill.root + "/" + skill.dir;
@@ -291,6 +336,14 @@ function checkedLookupName(value) {
 }
 /** 定位技能目录：先按目录名直取，再按 frontmatter name 扫所有根。 */
 async function locateSkillDir(name2) {
+  // 内核来源下技能可能不在本进程的可写根里（bundled/office/插件）：先问内核视图。
+  if (kernelSource !== void 0) {
+    for (const skill of await kernelSource()) {
+      if ((skill.name === name2 || skill.dir === name2) && typeof skill.dirPath === "string" && skill.dirPath !== "") {
+        return skill.dirPath;
+      }
+    }
+  }
   const roots = allRoots();
   for (const root of roots) {
     const candidate = join(root, name2);
@@ -812,6 +865,7 @@ export {
   inject,
   name,
   setExtraRoots,
+  setSkillSource,
   // 仅供 test/home-paths.test.mjs 做与 src/home-paths.ts 的等值断言。
   managedRoot as __managedRoot,
   dshRoot as __dshRoot
