@@ -183,10 +183,71 @@ function readPatchContent(): string {
   return readFileSync(path, 'utf8')
 }
 
-/** 读工作区自己的 MCP patch（不存在就当空文件，首次添加会创建）。 */
-function readWorkspacePatchContent(path: string): string {
-  if (!existsSync(path)) return ''
-  return readFileSync(path, 'utf8')
+/**
+ * 读工作区 `.mcp.json` 里已有的 server 键名（缺文件/坏 JSON 返回空集）。
+ * @param path - `.mcp.json` 绝对路径。
+ * @returns 已有的 serverName 集合。
+ */
+function readWorkspaceMcpJsonNames(path: string): Set<string> {
+  const names = new Set<string>()
+  if (!existsSync(path)) return names
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return names
+    const servers = (parsed as { mcpServers?: unknown }).mcpServers
+    if (servers === null || typeof servers !== 'object' || Array.isArray(servers)) return names
+    for (const key of Object.keys(servers as Record<string, unknown>)) names.add(key)
+  } catch {
+    // 坏 JSON：交给 mergeWorkspaceMcpJson 报错，这里只当没有已知键。
+  }
+  return names
+}
+
+/**
+ * 把新行合并进工作区的 `.mcp.json`（主流 agent 通用格式）。
+ *
+ * - 文件不存在 → 新建 `{ "mcpServers": {…} }`；
+ * - 已存在 → 保留别人的键与其它顶层字段，只追加本次的新 server；
+ * - 同名已存在 → 跳过（不覆盖，避免冲掉用户手写的配置）；
+ * - 文件存在但 JSON 损坏 → 抛错，绝不覆盖用户内容。
+ * @param path - `.mcp.json` 绝对路径。
+ * @param rows - 本次待写入的行。
+ */
+function mergeWorkspaceMcpJson(path: string, rows: readonly { id: string; name: string; config: Record<string, unknown> }[]): void {
+  let document: Record<string, unknown> = {}
+  if (existsSync(path)) {
+    const raw = readFileSync(path, 'utf8')
+    if (raw.trim() !== '') {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw) as unknown
+      } catch (error) {
+        throw new Error(`${path} 不是合法 JSON（${error instanceof Error ? error.message : String(error)}），请先修好再添加`)
+      }
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(`${path} 顶层不是对象，请先修好再添加`)
+      }
+      document = { ...parsed as Record<string, unknown> }
+    }
+  }
+  const servers = document.mcpServers !== null && typeof document.mcpServers === 'object' && !Array.isArray(document.mcpServers)
+    ? { ...document.mcpServers as Record<string, unknown> }
+    : {}
+  for (const row of rows) {
+    const name = String(row.config.serverName ?? row.name)
+    if (servers[name] !== undefined) continue
+    /**
+     * 落盘只写通用字段：`serverName` 是 DSH 内部键（键名已表达），`transport`
+     * 是推断值（主流 agent 按有无 url 判断，无需写）。其余 command/args/env/cwd/
+     * url/headers 原样保留，别人家的 agent 直接就能读。
+     */
+    const { serverName: _name, transport: _transport, ...rest } = row.config as Record<string, unknown>
+    servers[name] = rest
+  }
+  document.mcpServers = servers
+  mkdirSync(dirname(path), { recursive: true })
+  if (existsSync(path)) copyFileSync(path, `${path}${BACKUP_SUFFIX}`)
+  writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, 'utf8')
 }
 
 /**
@@ -577,17 +638,29 @@ export function applyMcpStatus(ctx: Context): void {
             }
             const path = patchFilePath()
             const content = readPatchContent()
-            // 落点：默认全局（profile patch）；scope=workspace 时改写到该工作区的
-            // `.dsh/mcp.patch.yml`（新文件，目录不存在就创建），只在该工作区注入。
+            // 落点：默认全局（profile patch）；scope=workspace 时写到该工作区项目根的
+            // `.mcp.json`（新文件，目录不存在就创建），只在该工作区注入。
             const scope = parsed.scope === 'workspace' ? 'workspace' : 'global'
             const workspace = typeof parsed.workspace === 'string' ? parsed.workspace.trim() : ''
             if (scope === 'workspace' && workspace === '') {
               writeJsonResponse(res, 400, { ok: false, error: 'scope=workspace 需要 workspace 路径' })
               return
             }
-            const targetPath = scope === 'workspace' ? join(workspace, '.dsh', 'mcp.patch.yml') : path
-            const targetContent = scope === 'workspace' ? readWorkspacePatchContent(targetPath) : content
-            const existing = new Set(scanPatchEntries(content).map(entry => entry.serverName))
+            /**
+             * 工作区落点是**项目根的 `.mcp.json`**（`{ "mcpServers": {…} }`）：
+             * Claude Desktop / Cursor / Cline 等主流 agent 读的就是这个文件，
+             * 写标准格式才能被它们直接复用。首次新建，后续在同文件上合并
+             * （同名跳过，不覆盖别人已有的配置）。全局仍走 profile patch。
+             */
+            const targetPath = scope === 'workspace' ? join(workspace, '.mcp.json') : path
+            /**
+             * 去重要按**目标文件**算：工作区只和该工作区 `.mcp.json` 里已有的键比，
+             * 不能拿全局 profile patch 的 serverName 判重 —— 否则「全局已有 anysearch」
+             * 会让工作区里想配同名的那条被误判为重复、直接跳过。
+             */
+            const existing = new Set(scope === 'workspace'
+              ? readWorkspaceMcpJsonNames(targetPath)
+              : scanPatchEntries(content).map(entry => entry.serverName))
             const added: string[] = []
             const fresh = outcome.rows.filter((row) => {
               const serverName = String(row.config.serverName ?? '')
@@ -598,10 +671,13 @@ export function applyMcpStatus(ctx: Context): void {
             })
             const skipped = outcome.rows.length - fresh.length
             if (fresh.length > 0) {
-              const next = appendRowsToText(targetContent, rowsToPatchYaml(fresh))
-              mkdirSync(dirname(targetPath), { recursive: true })
-              if (existsSync(targetPath)) copyFileSync(targetPath, `${targetPath}${BACKUP_SUFFIX}`)
-              writeFileSync(targetPath, next, 'utf8')
+              if (scope === 'workspace') {
+                mergeWorkspaceMcpJson(targetPath, fresh)
+              } else {
+                const next = appendRowsToText(content, rowsToPatchYaml(fresh))
+                copyFileSync(targetPath, `${targetPath}${BACKUP_SUFFIX}`)
+                writeFileSync(targetPath, next, 'utf8')
+              }
             }
             writeJsonResponse(res, 200, {
               ok: true, added, skipped, scope, warnings: outcome.warnings, patchFile: targetPath, reload: 'live',

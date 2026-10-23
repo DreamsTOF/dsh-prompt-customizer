@@ -266,7 +266,7 @@ export function applyMcpWorkspaceScope(ctx: PluginContext): void {
 }
 
 /**
- * 工作区专属 MCP 行：会话建好后，把该工作区 `.dsh/mcp.patch.yml` 里的
+ * 工作区专属 MCP 行：会话建好后，把该工作区 `.mcp.json` 里的
  * mcp-client 行挂进加载器（`agent/created` 时按会话 cwd 挂，销毁时回收）。
  *
  * 行 id 带工作区路径哈希，与 profile patch 里的全局行互不挤占；
@@ -320,7 +320,7 @@ export function workspaceMcpLedger(): WorkspaceMcpLedger {
   return cache ?? { version: 1, workspaces: {} }
 }
 
-/* ── 工作区专属 MCP 行：`<ws>/.dsh/mcp.patch.yml` ─────────────────────────── */
+/* ── 工作区专属 MCP 行：`<ws>/.mcp.json` ─────────────────────────── */
 
 /** 挂载行 id 前缀（回收时按它区分本模块挂的行）。 */
 const WORKSPACE_ROW_PREFIX = 'wsmcp-'
@@ -345,45 +345,57 @@ function pathHash(path: string): string {
 }
 
 /**
- * 解析工作区 patch 文本里的 mcp-client 行。
+ * 把工作区 `.mcp.json` 转成内部行。
  *
- * 只认本插件写出的形态（`- insert:` → `- id/name/config`），够用即可：
- * 工作区文件是我们自己生成的，不做通用 YAML 解析。
+ * `.mcp.json` 是主流 agent 的通用格式：`{ "mcpServers": { <name>: {command|url,…} } }`。
+ * 我们读的时候转一下 —— 键名当 serverName 并加工作区哈希后缀（同名跨工作区不冲突），
+ * 其余字段原样透传给 mcp-client（`command/args/env/cwd` 或 `url/headers`）。
  * @param workspace - 工作区绝对路径。
  * @param text - 文件内容。
- * @returns 行定义列表。
+ * @returns 行定义列表（非法 JSON/非对象返回空，不让一个坏文件拖垮整轮挂载）。
  */
 function parseWorkspaceRows(workspace: string, text: string): WorkspaceRow[] {
-  const rows: WorkspaceRow[] = []
+  let document: unknown
+  try {
+    document = JSON.parse(text) as unknown
+  } catch {
+    return []
+  }
+  if (document === null || typeof document !== 'object' || Array.isArray(document)) return []
+  const servers = (document as { mcpServers?: unknown }).mcpServers
+  if (servers === null || typeof servers !== 'object' || Array.isArray(servers)) return []
   const hash = pathHash(workspace)
-  // 以 `- id:` 切块，取本块里的 serverName 与 config 段原始文本。
-  const blocks = text.split(/^\s*-\s+id:\s*/m).slice(1)
+  const rows: WorkspaceRow[] = []
   let index = 0
-  for (const block of blocks) {
-    const serverName = /^\s*serverName:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? ''
-    const command = /^\s*command:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '')
-    const url = /^\s*url:\s*(.+)$/m.exec(block)?.[1]?.trim().replace(/^['"]|['"]$/g, '')
-    if (serverName !== '' && (command !== undefined || url !== undefined)) {
-      const config: Record<string, unknown> = url === undefined
-        ? { serverName, transport: 'stdio', command }
-        : { serverName, transport: 'streamable-http', url }
-      // 同名不同工作区互不冲突：serverName 加路径哈希后缀。
-      const scoped = `${serverName.slice(0, 20)}-${hash}`
-      rows.push({ workspace, entryId: `${WORKSPACE_ROW_PREFIX}${hash}-${String(index)}`, serverName: scoped, config: { ...config, serverName: scoped } })
-      index += 1
+  for (const [name, raw] of Object.entries(servers as Record<string, unknown>)) {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
+    const entry = raw as Record<string, unknown>
+    const hasCommand = typeof entry.command === 'string' && entry.command !== ''
+    const hasUrl = typeof entry.url === 'string' && entry.url !== ''
+    if (!hasCommand && !hasUrl) continue
+    // 透明传输：用户写的字段原样给 mcp-client，只补 transport 与 serverName。
+    const scoped = `${name.slice(0, 20)}-${hash}`
+    const config: Record<string, unknown> = {
+      ...entry,
+      serverName: scoped,
+      transport: typeof entry.transport === 'string' && entry.transport !== ''
+        ? entry.transport
+        : hasUrl ? 'streamable-http' : 'stdio',
     }
+    rows.push({ workspace, entryId: `${WORKSPACE_ROW_PREFIX}${hash}-${String(index)}`, serverName: scoped, config })
+    index += 1
   }
   return rows
 }
 
 /**
- * 读一个工作区的 mcp.patch.yml。
+ * 读一个工作区的 `.mcp.json`（主流 agent 通用格式）。
  * @param workspace - 工作区绝对路径。
- * @returns 行定义（文件缺失/不可读时为空）。
+ * @returns 行定义（文件缺失/不可读/格式非法时为空）。
  */
 export async function readWorkspaceRows(workspace: string): Promise<WorkspaceRow[]> {
   try {
-    const text = await readFile(join(resolve(workspace), '.dsh', 'mcp.patch.yml'), 'utf8')
+    const text = await readFile(join(resolve(workspace), '.mcp.json'), 'utf8')
     return parseWorkspaceRows(resolve(workspace), text)
   } catch {
     return []
