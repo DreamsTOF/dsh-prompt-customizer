@@ -129,6 +129,83 @@ function isWritableDir(dir: string | undefined): boolean {
   })
 }
 
+/**
+ * 按四根规则扫描**指定工作区**的技能（内核对非当前会话的工作区给不出条目时的兜底）。
+ *
+ * 内核 filesystem provider 挂在预设行里，读的是「当前会话」的项目根；面板要配置
+ * 任意工作区（哪怕那里没开过会话），所以这里用同一套根规则直接扫一遍：
+ * `<ws>/.dsh/skills` → `<ws>/.agents/skills` → `~/.dsh/skills` → `~/.agents/skills`。
+ * 同名先出现者胜出，与内核 rank 顺序一致。
+ *
+ * @param cwd - 目标工作区绝对路径。
+ * @param hidden - 面板关掉的技能名集合。
+ * @returns 技能视图（按工作区/全局标注来源）。
+ */
+async function scanWorkspaceSkills(cwd: string, hidden: ReadonlySet<string> | undefined): Promise<KernelSkillView[]> {
+  const { readdir, stat } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+  const { dshHome, agentsHome } = await import('./home-paths.ts')
+  const roots: Array<{ dir: string; source: string }> = [
+    { dir: join(cwd, '.dsh', 'skills'), source: 'project-dsh' },
+    { dir: join(cwd, '.agents', 'skills'), source: 'project-agents' },
+    { dir: join(dshHome(), 'skills'), source: 'user-dsh' },
+    { dir: join(agentsHome(), 'skills'), source: 'user-agents' },
+  ]
+  const views: KernelSkillView[] = []
+  const seen = new Set<string>()
+  for (const root of roots) {
+    let entries: string[] = []
+    try {
+      entries = (await readdir(root.dir, { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+    } catch {
+      continue
+    }
+    for (const dir of entries) {
+      const dirPath = join(root.dir, dir)
+      let raw: string
+      try {
+        raw = await (await import('node:fs/promises')).readFile(join(dirPath, 'SKILL.md'), 'utf8')
+      } catch {
+        continue
+      }
+      // frontmatter 里只取 name/description；其余字段不影响列表。
+      const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw)
+      const front = match === null ? '' : match[1]!
+      const name = (/^name:\s*(.+)$/m.exec(front)?.[1] ?? dir).trim().replace(/^['"]|['"]$/g, '')
+      const description = (/^description:\s*(.+)$/m.exec(front)?.[1] ?? '').trim().replace(/^['"]|['"]$/g, '')
+      if (name === '' || seen.has(name)) continue
+      if (hidden?.has(name) === true) continue
+      seen.add(name)
+      let fileCount = 0
+      try {
+        fileCount = (await readdir(dirPath, { withFileTypes: true })).length
+      } catch {
+        // 目录不可读时只是少一个计数，技能本身照常列出。
+      }
+      let isDir = false
+      try {
+        isDir = (await stat(dirPath)).isDirectory()
+      } catch {
+        isDir = false
+      }
+      views.push({
+        name,
+        dir,
+        description,
+        compatibility: '',
+        fileCount,
+        files: [],
+        root: root.source,
+        ...isDir ? { dirPath } : {},
+        deletable: isWritableDir(dirPath),
+      })
+    }
+  }
+  return views
+}
+
 /** 启动目录：profile 的 cwd，缺失时回落进程 cwd（无会话时的项目根依据）。 */
 function launchCwd(ctx: PluginContext): string {
   const fromProfile = ctx?.profileContext?.cwd
@@ -168,6 +245,12 @@ async function listKernelSkills(
   // （`core/agent/src/agent.ts:104`）、遮蔽层用 `createScope(ctx, agent)`
   // （`mcp/src/mcp.ts:116`），`scopeChainOf` 走的就是这个对象。
   // 不传 scope 只读 global 层，会把注册在 agent/预设层的 provider 全部漏掉。
+  /**
+   * scope 始终跟着会话走：用户级/预设层的 provider（`~/.agents/skills` 那 5 个）
+   * 就注册在链路里，不带 scope 会只剩 global 层的 bundled 一个。
+   * 切换工作区只改 `cwd`（内核 filesystem provider 用它解析项目根），
+   * 不动 scope —— 于是「同一个用户目录 + 不同工作区的 .dsh/.agents/skills」。
+   */
   const scope = candidate === undefined ? undefined : candidate.agent
   const listed: unknown = await service.list({ cwd, ...scope === undefined ? {} : { scope } })
   return Array.isArray(listed) ? (listed as KernelSkillSummary[]) : []
@@ -187,11 +270,32 @@ export async function kernelSkillViews(
 ): Promise<KernelSkillView[]> {
   const candidate = resolveViewSession(ctx, sessionId)
   const summaries = await listKernelSkills(ctx, candidate, cwd)
+  // 内核目录只在「有会话 + scope 命中预设层」时才完整（filesystem/office provider
+  // 挂在预设行里）。面板要能配置任意工作区，因此内核给不出条目时按同一套根规则
+  // 兜底扫描 —— 目标工作区明确时也走兜底，避免拿到别的会话的项目根。
+  const targetCwd = cwd !== undefined && cwd !== ''
+    ? cwd
+    : candidate === undefined ? launchCwd(ctx) : candidate.cwd
+  /**
+   * 内核结果只在「预设层的 provider 被读到」时才完整；没有会话时只剩 global 层的
+   * bundled 一条，那不算完整。判据：有会话且结果里出现用户级/项目级来源。
+   */
+  const complete = candidate !== undefined && summaries.some((summary) => {
+    const source = typeof summary?.source === 'string' ? summary.source : ''
+    return source.startsWith('project-') || source.startsWith('user-') || source === 'custom'
+  })
+  const needsFallback = !complete
   const hidden = hiddenReader === undefined ? undefined : await hiddenReader()
   const views: KernelSkillView[] = []
+  if (needsFallback) {
+    // 兜底扫到的四个根在前（工作区优先），再把内核独有的条目（bundled / office /
+    // 插件 provider —— 它们不在文件系统根里）补在后面，同名不重复。
+    views.push(...await scanWorkspaceSkills(targetCwd, hidden))
+  }
   for (const summary of summaries) {
     const name = typeof summary?.name === 'string' ? summary.name : ''
     if (name === '') continue
+    if (views.some((view) => view.name === name)) continue
     // 面板显隐由本插件的账本说了算：内核闸门在模型侧遮过一遍，但目录合并
     // 只按层/rank 去重，同名候选未必每次都压过真实来源，这里再过滤一次，
     // 保证「关掉的技能既不在面板、也不在模型目录里」。
@@ -229,11 +333,32 @@ export async function kernelSkillSummaries(ctx: PluginContext): Promise<KernelSk
  * 工作区根按「最近的含 .git 祖先」归一（与内核 projectRoot 规则一致），
  * 让选择器里的同一工作区不会因为路径层级不同而分裂成两个视图。
  * @param ctx - 宿主上下文。
- * @returns 去重后的工作区根绝对路径（当前所有会话 + 启动目录）。
+ * @returns 去重后的工作区根绝对路径（用户登记的全部工作区优先，再补活动会话与启动目录）。
  */
 export async function workspaceRoots(ctx: PluginContext): Promise<string[]> {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const push = (dir: string): void => {
+    const key = resolve(dir).toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(resolve(dir))
+  }
+  // 用户侧登记的工作区（侧边栏里那些）—— 没开过会话的也要能选。
+  const registry = typeof ctx?.get === 'function' ? ctx.get('workspaceRegistry') : undefined
+  if (typeof registry?.list === 'function') {
+    try {
+      for (const workspace of registry.list()) {
+        const path = workspace?.path ?? workspace?.root
+        if (typeof path === 'string' && path.trim() !== '') push(path)
+      }
+    } catch {
+      // 注册表不可用时退回会话/启动目录，面板至少还有当前工作区。
+    }
+  }
   const { workspaceDirs } = await import('./skill-roots.ts')
-  return workspaceDirs(ctx)
+  for (const dir of await workspaceDirs(ctx)) push(dir)
+  return out
 }
 
 /**
