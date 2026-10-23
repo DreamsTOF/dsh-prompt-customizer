@@ -79,7 +79,8 @@ export type InstallInput =
 
 /**
  * 添加入口的作用域：`global`（~/.agents/skills、profile patch，所有工作区共用）
- * 或 `workspace`（写进当前工作区的 `.agents/skills` / `.dsh/mcp.patch.yml`）。
+ * 或 `workspace`（技能写进当前工作区的 `.agents/skills`，MCP 写进项目根的
+ * `.mcp.json` —— 主流 agent 通用格式）。
  * 默认 global。
  */
 export type AddScope = 'global' | 'workspace'

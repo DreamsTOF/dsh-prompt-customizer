@@ -1,8 +1,9 @@
 /**
- * 添加技能 / MCP 的「全局 vs 当前工作区」落点测试。
+ * 添加**技能**的「全局 vs 当前工作区」落点测试。
  *
- * 覆盖：默认写全局；scope=workspace 写进该工作区且**目录不存在时自动创建**；
- * 工作区 MCP 行写进 `<ws>/.dsh/mcp.patch.yml` 而不是 profile patch。
+ * 覆盖：默认写全局（`~/.agents/skills`）；scope=workspace 写进该工作区的
+ * `.agents/skills` 且**目录不存在时自动创建**；缺 workspace 时报错而非退回全局。
+ * 工作区 MCP 的落点由 `test/workspace-mcp-json.test.mjs` 覆盖（`.mcp.json`）。
  *
  * Usage: node --test test/add-scope.test.mjs
  */

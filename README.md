@@ -88,7 +88,7 @@
 
 - **添加入口加落点选择**：默认 **全局**，可选 **当前工作区**。
   - 技能：全局写 `~/.agents/skills`；工作区写 `<ws>/.agents/skills`，**目录不存在自动创建**（全新工作区也能直接装）。
-  - MCP：全局写 profile patch；工作区写 `<ws>/.dsh/mcp.patch.yml`（新文件，同样自动建目录），由装配按该工作区会话挂载 —— 同一个 `anysearch` 可在两个工作区各配一份，互不覆盖。
+  - MCP：全局写 profile patch；工作区写 `<ws>/.dsh/mcp.patch.yml`（新文件，同样自动建目录），由装配按该工作区会话挂载 —— 同一个 `anysearch` 可在两个工作区各配一份，互不覆盖。（**0.11.5 起工作区落盘已改为项目根的标准 `.mcp.json`，见上节。**）
 - **缺 workspace 时明确报错**：`scope=workspace` 但没给路径 → 400，不会悄悄退回全局。
 - **验证**：新增 `test/add-scope.test.mjs`（默认全局 / 工作区自动建目录 / 工作区不污染全局 / 缺参数报错）；`node --test` 174/174。接口实测：工作区装技能落到 `<ws>/.agents/skills/zz-ui-ws/SKILL.md` 且全局无残留；工作区加 MCP 落到 `<ws>/.dsh/mcp.patch.yml` 且 profile patch 无污染。
 

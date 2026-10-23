@@ -65,6 +65,6 @@
 
 ## 未覆盖 / 验证缺口
 
-- **真实 rc.2 冷启动链路的 turn 段未验证**：`scripts/test-rc2-runtime.mjs` 在 0.2.1-rc.2 上跑到第 77 行断言（`model.requests.length === 2`）实得 0。已用对照实验排除插件因素——同一组合**带插件与不带插件都得到 0**，且最小探针（无 mount / 带 mount / 带 85 工具）单独跑均得 2。会话事件显示 `turn/start → step/start → step/end → turn/end` 走完但未发模型请求，属 fixture 在新版下的行为漂移，非插件回归。该脚本内还硬编码 `version !== '0.2.0-rc.2'` 即抛错，需要单独一轮修 fixture 才能跑通。
+- **真实 rc.2 冷启动链路的 turn 段未验证**：该链路原由 `scripts/test-rc2-runtime.mjs` 覆盖，它在 0.2.1-rc.2 上跑到第 77 行断言（`model.requests.length === 2`）实得 0。已用对照实验排除插件因素——同一组合**带插件与不带插件都得到 0**，且最小探针（无 mount / 带 mount / 带 85 工具）单独跑均得 2。会话事件显示 `turn/start → step/start → step/end → turn/end` 走完但未发模型请求，属 fixture 在新版下的行为漂移，非插件回归。该脚本内还硬编码 `version !== '0.2.0-rc.2'` 即抛错，需单独一轮修 fixture 才能跑通。**0.11.6 起该脚本已随测试精简移除**，rc.2 适配行为改由 `test/rc2-preview.test.mjs` 覆盖。
 - 预览段（零对话双模式、工具数、段顺序、模板变量）在真实 0.2.1-rc.2 上**全部通过**。
 - 真实外部模型、多平台、用户当前 GUI 的视觉验证未覆盖。

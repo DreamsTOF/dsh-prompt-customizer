@@ -29,8 +29,9 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
   const [warnings, setWarnings] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
   /**
-   * 落点：默认全局（profile patch）。选工作区时写该工作区的 `.dsh/mcp.patch.yml`，
-   * 只在该工作区注入 —— 同名 server 可以两个工作区各配一份。
+ * 落点：默认全局（profile patch）。选工作区时写该工作区项目根的 `.mcp.json`
+ * （主流 agent 通用格式，首次新建、后续合并），只在该工作区注入 ——
+ * 同名 server 可以两个工作区各配一份。
    */
   const [scope, setScope] = useState<'global' | 'workspace'>('global')
   const target = presetId === undefined ? 'global' : 'preset'
@@ -119,7 +120,7 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
           ))}
         </div>
       </div>
-      {/* 落点选择：默认全局；选工作区时写该工作区自己的 .dsh/mcp.patch.yml。 */}
+      {/* 落点选择：默认全局；选工作区时写该工作区自己的 .mcp.json。 */}
       {presetId === undefined && typeof workspace === 'string' && workspace !== '' && (
         <div className={css.installRow}>
           <div className={css.mcpAddTypeRow} role="group" aria-label={t('addScopeLabel')}>

@@ -1,10 +1,11 @@
 /**
  * 技能开关(skill-toggles):挂 /api/skill-toggles 路由,提供两级开关——
  *
- *  1. **全局层**:读写技能 SKILL.md 的 frontmatter 开关字段
- *     (`user-invocable: false` + `disable-model-invocation: true`),
- *     对所有 Agent 预设生效。DSH 内核 skill-filesystem 解析这两个字段,
- *     改完文件后内核 watcher 自动重扫,无需重启。
+ *  1. **全局层**:写隐藏账本 `<agentsHome>/skills/.hidden-skills.json`，
+ *     由闸门 provider 在内核目录里把这些名字遮掉（0.11.1 起）。
+ *     不改用户的 SKILL.md —— 随安装(asar)/office/插件提供的技能同样能关，
+ *     且随时可逆。文件层原有的 frontmatter 开关仍被尊重（`parseEnabled`），
+ *     我们只是额外叠加自己的账本。
  *
  *  2. **Agent 预设层**:同一个技能可以「对 standard 开、对 code 关」。
  *     账本存 `<agentsHome>/skills/.preset-skills.json`（agentsHome 解析规则见
@@ -421,29 +422,6 @@ function splitFrontmatter(raw: string): {
     if (pair !== null) fields.push({ key: pair[1]!, value: pair[2]!.trim() })
   }
   return { hasFence: true, fields, body: raw.slice(match[0].length) }
-}
-
-/**
- * 更新 SKILL.md:设置/移除开关字段,保留其它 frontmatter 字段与正文原样。
- * 禁用 = user-invocable: false + disable-model-invocation: true;
- * 启用 = 两者移除(缺省即允许)。
- */
-function applyToggle(raw: string, enabled: boolean): string {
-  const parsed = splitFrontmatter(raw)
-  const toggleKeys = new Set(['user-invocable', 'disable-model-invocation'])
-  const kept = parsed.fields.filter(field => !toggleKeys.has(field.key))
-  const lines = kept.map(field => `${field.key}: ${field.value}`)
-  if (!enabled) {
-    lines.push('user-invocable: false')
-    lines.push('disable-model-invocation: true')
-  }
-  const block = lines.join('\n')
-  if (parsed.hasFence) {
-    return `---\n${block}\n---\n${parsed.body}`
-  }
-  // 无 frontmatter 时创建;正文若以空行开头则保留一个空行分隔。
-  const body = parsed.body.startsWith('\n') ? parsed.body.slice(1) : parsed.body
-  return `---\n${block}\n---\n${body}`
 }
 
 /** 读技能当前开关状态(true = 启用)。 */
