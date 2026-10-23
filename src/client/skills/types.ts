@@ -16,11 +16,8 @@ export interface SkillInfo {
   dir?: string
   /** 来源标签（内核 `SkillSource`：user-agents / project-dsh / bundled / runtime …）。 */
   root?: string
-  /**
-   * 只读来源（bundled / office / 插件注册的技能，或不在可写根下的目录）：
-   * 面板只展示与查看，不提供改文件、删除、开关文件的操作。
-   */
-  readOnly?: boolean
+  /** 该技能是否落在可写根（决定「删除」能否真的删掉文件；显隐对所有来源一致）。 */
+  deletable?: boolean
   /** 内核 invocation 策略：模型可调用 / 用户可调用（仅展示）。 */
   modelInvocable?: boolean
   userInvocable?: boolean

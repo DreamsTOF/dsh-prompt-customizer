@@ -699,7 +699,19 @@ async function deleteSkill(skillName) {
       removed.push({ root: rootLabel(root), dir, name: meta === void 0 ? dir : meta.name });
     }
   }
-  if (removed.length === 0) throw new Error(`skill ${JSON.stringify(name2)} not found`);
+  if (removed.length === 0) {
+    // 内核来源里可能存在「不在可写根」的技能（随安装 app.asar 内、office 包、
+    // 插件自带目录）：这些删不掉文件，但**可以被隐藏**。给出可执行的下一步，
+    // 而不是笼统的 not found。
+    if (kernelSource !== void 0) {
+      for (const skill of await kernelSource()) {
+        if (skill.name !== name2 && skill.dir !== name2) continue;
+        throw new Error(`skill ${JSON.stringify(name2)} is provided by the installation or a plugin `
+          + `(${String(skill.root ?? "kernel")}); it cannot be deleted — switch it off instead to hide it from the panel and the model`);
+      }
+    }
+    throw new Error(`skill ${JSON.stringify(name2)} not found`);
+  }
   const root = managedRoot();
   const ledger = await readBundles(root);
   await writeBundles(root, {

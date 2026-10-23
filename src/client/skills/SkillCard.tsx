@@ -144,9 +144,6 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
 
   const toggleLabel = lockedReason ?? (enabled ? skillT('disableSkill') : skillT('enableSkill'))
   const fileMeta = typeof skill.fileCount === 'number' ? skill.fileCount : files.length
-  // 只读来源（bundled / office / 插件）：开关与删除都改不动别人的文件，直接收起来，
-  // 只留查看与复制。预设层的遮蔽不走这张卡片，所以功能没有丢。
-  const readOnly = skill.readOnly === true
   return (
     <li
       className={css.skillCard}
@@ -171,7 +168,7 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
             aria-label={toggleLabel}
             title={toggleLabel}
             className={`${css.toggle} ${enabled ? css.toggleOn : css.toggleOff}`}
-            disabled={lockedReason !== undefined || readOnly}
+            disabled={lockedReason !== undefined}
             onClick={(event) => {
               event.stopPropagation()
               onToggle(skill, !enabled)
@@ -188,7 +185,6 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
         <span className={`${css.tag} ${css.tagSource}`}>{bundleName ?? skillT('tagLoose')}</span>
         <span className={`${css.tag} ${css.tagScope}`} data-off={enabled ? undefined : 'true'}>{scopeLabel}</span>
         {!enabled && <span className={`${css.tag} ${css.tagStatus}`}>{skillT('skillOffTag')}</span>}
-        {readOnly && <span className={`${css.tag} ${css.tagScope}`}>{skillT('skillReadOnlyTag')}</span>}
         <span className={css.skillMeta}>{skillT('fileCount', { n: fileMeta })}</span>
       </div>
       <div className={css.skillCardFoot}>
@@ -221,15 +217,13 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
               </button>
             </Tooltip>
           )}
-          {!readOnly && (
-            <Tooltip label={skillT('deleteSkillBtn')} side="bottom" delayMs={500}>
-              <button type="button" className={`${css.skillFootIcon} ${css.skillFootIconDanger}`}
-                aria-label={skillT('deleteSkillBtn')} title={skillT('deleteSkillBtn')}
-                onClick={() => { onDelete?.(skill) }}>
-                <IconTrashOutlineRegular size={14} aria-hidden="true" />
-              </button>
-            </Tooltip>
-          )}
+          <Tooltip label={skillT('deleteSkillBtn')} side="bottom" delayMs={500}>
+            <button type="button" className={`${css.skillFootIcon} ${css.skillFootIconDanger}`}
+              aria-label={skillT('deleteSkillBtn')} title={skillT('deleteSkillBtn')}
+              onClick={() => { onDelete?.(skill) }}>
+              <IconTrashOutlineRegular size={14} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </li>

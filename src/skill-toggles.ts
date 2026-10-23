@@ -47,6 +47,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { presetTrustOf } from './mcp-presets.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
+import { kernelSkillSummaries, setHiddenSkillReader } from './kernel-skills.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -74,6 +75,7 @@ const SKILL_FILE = 'SKILL.md'
 const BUNDLES_FILE = '.bundles.json'
 /** 预设级开关账本(与 .bundles.json 同目录)。 */
 const PRESET_FILE = '.preset-skills.json'
+const HIDDEN_FILE = '.hidden-skills.json'
 const ROUTE_PREFIX = '/api/skill-toggles'
 const MAX_BODY_BYTES = 256 * 1024
 /** 闸门 provider 在每个 agent 层里的名字(同层唯一即可)。 */
@@ -132,6 +134,18 @@ async function readBundles(root: string): Promise<BundlesFile> {
 export interface PresetSkillsFile {
   version: 1
   presets: Record<string, Record<string, boolean>>
+}
+
+/**
+ * 全局层隐藏账本:`{ version: 1, hidden: string[] }`。
+ *
+ * 0.11.1 起全局开关不再改 SKILL.md 的 frontmatter，而是记在这里，由闸门 provider
+ * 在内核目录里遮掉 —— 这样随安装（app.asar 内）、office 包、插件自带的技能也能
+ * 被关掉，而不用去改它们背后只读的文件。显隐不区分来源，插件对所有技能负责。
+ */
+export interface HiddenSkillsFile {
+  version: 1
+  hidden: string[]
 }
 
 /** preset id 形状(与 dsh-agent-presets 的目录名规则一致)。 */
@@ -214,6 +228,51 @@ function disabledNames(ledger: PresetSkillsFile, presetId: string): Set<string> 
     if (state === false) disabled.add(skillName)
   }
   return disabled
+}
+
+/* ── 全局隐藏账本（所有来源通用；闸门在 list 里遮掉这些名字） ─────────────── */
+
+function hiddenLedgerPath(): string {
+  return join(managedRoot(), HIDDEN_FILE)
+}
+
+/** 进程内全局隐藏集合（写盘后立即刷新）。 */
+let hiddenCache: Set<string> | undefined
+
+/** 读全局隐藏集合（文件缺失/损坏视为空集）。 */
+async function readHidden(): Promise<Set<string>> {
+  if (hiddenCache !== undefined) return hiddenCache
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(hiddenLedgerPath(), 'utf8')) as unknown
+  } catch {
+    parsed = undefined
+  }
+  const hidden = new Set<string>()
+  const raw = parsed !== null && typeof parsed === 'object'
+    ? (parsed as Record<string, unknown>).hidden
+    : undefined
+  if (Array.isArray(raw)) {
+    for (const name of raw) {
+      if (typeof name === 'string' && isSkillName(name)) hidden.add(name)
+    }
+  }
+  hiddenCache = hidden
+  return hidden
+}
+
+/** 原子写全局隐藏集合 + 让所有闸门缓存失效。 */
+async function writeHidden(next: Set<string>): Promise<void> {
+  const file: HiddenSkillsFile = { version: 1, hidden: [...next].sort() }
+  const target = hiddenLedgerPath()
+  const temp = `${target}.tmp`
+  await mkdir(managedRoot(), { recursive: true })
+  await writeFile(temp, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
+  await rename(temp, target)
+  hiddenCache = new Set(file.hidden)
+  for (const invalidate of maskInvalidators) {
+    try { invalidate() } catch { /* 单个 agent 的失效失败不影响其它 */ }
+  }
 }
 
 /** 写入一批「预设 → 技能 → 开关」;enabled=true 时删除覆盖(回落全局)。 */
@@ -397,16 +456,26 @@ function parseEnabled(fields: Array<{ key: string; value: string }>): boolean {
 }
 
 /** 设置单个技能开关。 */
+/**
+ * 全局开关一个技能：写进隐藏账本，由闸门 provider 在内核目录里遮掉。
+ *
+ * 不再改写 SKILL.md 的 frontmatter —— 那对随安装/插件提供的技能根本不可写，
+ * 也会把用户的原文件改脏。隐藏账本对**所有来源**一致生效，且随时可逆。
+ * @param skillName - 技能规范名。
+ * @param enabled - false = 隐藏（模型目录不列、`skill` 工具拒绝加载）。
+ * @returns 是否处理（技能名合法即成功；是否存在于目录由面板保证）。
+ */
 async function setSkillEnabled(skillName: string, enabled: boolean): Promise<boolean> {
-  const found = await readSkillFile(skillName)
-  if (found === undefined) return false
-  const updated = applyToggle(found.raw, enabled)
-  if (updated === found.raw) return true
-  const target = join(found.dir, SKILL_FILE)
-  const temp = `${target}.toggle.tmp`
-  await mkdir(found.dir, { recursive: true })
-  await writeFile(temp, updated, 'utf8')
-  await rename(temp, target)
+  if (!isSkillName(skillName)) return false
+  const hidden = new Set(await readHidden())
+  if (enabled) {
+    if (!hidden.delete(skillName)) return true
+  } else if (!hidden.has(skillName)) {
+    hidden.add(skillName)
+  } else {
+    return true
+  }
+  await writeHidden(hidden)
   return true
 }
 
@@ -417,36 +486,53 @@ async function setBundleEnabled(bundleId: string, enabled: boolean): Promise<num
   const record = ledger.bundles.find(bundle => bundle.id === bundleId)
   if (record === undefined) return -1
   let handled = 0
-  for (const skillName of record.skills) {
+  // 账本条目可能是目录名（历史写入）：先归一到规范名，闸门才遮得住。
+  for (const skillName of await canonicalSkillNames(record.skills)) {
     if (await setSkillEnabled(skillName, enabled)) handled += 1
   }
   return handled
 }
 
-/** 全量状态:每个技能与每个技能包的启用状态。 */
-async function status(): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
+/**
+ * 全量状态:每个技能与每个技能包的启用状态。
+ *
+ * 技能名取自内核目录（所有来源），启用状态 = 不在全局隐藏账本里；文件层面的
+ * frontmatter 开关仍然尊重（内核自己会把它算进 invocation，这里只额外叠加
+ * 我们的隐藏账本，避免两套语义互相覆盖）。
+ */
+async function status(ctx: PluginContext): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
   const skills: Record<string, boolean> = {}
-  const seen = new Set<string>()
-  for (const root of allRoots()) {
-    let entries: string[] = []
-    try {
-      entries = (await readdir(root, { withFileTypes: true }))
-        .filter(entry => entry.isDirectory())
-        .map(entry => entry.name)
-    } catch {
-      continue
+  const hidden = await readHidden()
+  const summaries = await kernelSkillSummaries(ctx)
+  if (summaries.length > 0) {
+    for (const summary of summaries) {
+      const name = typeof summary?.name === 'string' ? summary.name : ''
+      if (name === '') continue
+      skills[name] = !hidden.has(name)
     }
-    for (const dir of entries) {
-      if (seen.has(dir)) continue
-      seen.add(dir)
+  } else {
+    // 内核 skills 服务缺失（裸组装/测试）：退回扫可写根，面板仍有状态可显示。
+    const seen = new Set<string>()
+    for (const root of allRoots()) {
+      let entries: string[] = []
       try {
-        const raw = await readFile(join(root, dir, SKILL_FILE), 'utf8')
-        const fields = splitFrontmatter(raw).fields
-        const nameField = fields.find(field => field.key === 'name')?.value
-        const name = nameField !== undefined && nameField !== '' ? nameField : dir
-        skills[name] = parseEnabled(fields)
+        entries = (await readdir(root, { withFileTypes: true }))
+          .filter(entry => entry.isDirectory())
+          .map(entry => entry.name)
       } catch {
-        // 非技能目录或不可读:跳过。
+        continue
+      }
+      for (const dir of entries) {
+        if (seen.has(dir)) continue
+        seen.add(dir)
+        try {
+          const fields = splitFrontmatter(await readFile(join(root, dir, SKILL_FILE), 'utf8')).fields
+          const nameField = fields.find(field => field.key === 'name')?.value
+          const name = nameField !== undefined && nameField !== '' ? nameField : dir
+          skills[name] = !hidden.has(name) && parseEnabled(fields)
+        } catch {
+          // 非技能目录或不可读：跳过。
+        }
       }
     }
   }
@@ -477,6 +563,46 @@ async function status(): Promise<{ skills: Record<string, boolean>; bundles: Rec
  * @param agent - 目标 agent(需带 ctx 与 scope)。
  * @returns 该 agent 的闸门 fiber,agent 销毁时由调用方 dispose。
  */
+/**
+ * 全局楼层闸门：把「全局隐藏」的技能在**全局层**遮掉。
+ *
+ * per-agent 闸门只能盖住它自己那一层：读目录时的 scope 一旦落回全局层
+ * （无会话、跨会话读、别的 profile 的实例），隐藏就失效。全局层闸门对
+ * 任何读取路径都生效，是「插件全权接管显隐」的兜底。
+ * @param ctx - host 上下文（注册进全局层）。
+ * @returns 闸门 fiber。
+ */
+function installGlobalMask(ctx: PluginContext): any {
+  return ctx.inject(['skills'], (scope: any) => {
+    // 裸组装（脚本/测试）里 skills 服务可能缺席：跳过闸门，路由照常可用。
+    if (typeof scope?.skills?.registerProvider !== 'function') return
+    scope.skills.registerProvider((control: any) => {
+      maskInvalidators.add(control.invalidate)
+      control.signal.addEventListener('abort', () => {
+        maskInvalidators.delete(control.invalidate)
+      }, { once: true })
+      return {
+        name: `${MASK_PROVIDER}-global`,
+        list: async () => {
+          const hidden = await readHidden()
+          if (hidden.size === 0) return []
+          return [...hidden].map(skillName => ({
+            name: skillName,
+            description: 'disabled by dsh-prompt-customizer',
+            invocation: { modelInvocable: false, userInvocable: false },
+            source: 'custom',
+            provider: `${MASK_PROVIDER}-global`,
+            // 负 rank：同层压过任何真实来源，否则同名去重会留下真技能。
+            rank: -1,
+            locator: null,
+          }))
+        },
+        get: async () => undefined,
+      }
+    })
+  })
+}
+
 function installMask(ctx: PluginContext, agent: any): any {
   const presetOf = (): string => {
     const presets = ctx.get?.('agentPresets')
@@ -493,16 +619,21 @@ function installMask(ctx: PluginContext, agent: any): any {
         name: MASK_PROVIDER,
         list: async () => {
           const presetId = presetOf()
-          if (presetId === '') return []
-          const disabled = disabledNames(await readLedger(), presetId)
+          // 两层取并集：全局隐藏（对所有预设生效）+ 该预设显式关闭。
+          const disabled = await readHidden()
+          if (presetId !== '') {
+            for (const skillName of disabledNames(await readLedger(), presetId)) disabled.add(skillName)
+          }
           if (disabled.size === 0) return []
           return [...disabled].map(skillName => ({
             name: skillName,
-            description: `disabled for agent preset "${presetId}"`,
+            description: `disabled by dsh-prompt-customizer${presetId === '' ? '' : ` for preset "${presetId}"`}`,
             invocation: { modelInvocable: false, userInvocable: false },
             source: 'custom',
             provider: MASK_PROVIDER,
-            rank: 0,
+            // 负 rank：同一层里压过任何真实来源（bundled=BUNDLED_SKILL_RANK 600、
+            // project=100、user=400/500），否则同名去重会留下真技能。
+            rank: -1,
             locator: null,
           }))
         },
@@ -624,7 +755,7 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
   const method = req.method ?? 'GET'
   try {
     if (method === 'GET' && (rest === '' || rest === '/status')) {
-      json(res, 200, await status())
+      json(res, 200, await status(ctx))
       return
     }
     const matchSkill = /^\/skills\/([^/]+)$/.exec(rest)
@@ -653,7 +784,7 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
     // ── 预设层 ────────────────────────────────────────────────────────────
     if (method === 'GET' && rest === '/presets') {
       const [roster, global, ledger] = await Promise.all([
-        readPresetRoster(ctx), status(), readLedger(),
+        readPresetRoster(ctx), status(ctx), readLedger(),
       ])
       json(res, 200, {
         presets: roster,
@@ -720,6 +851,12 @@ export async function apply(ctx: PluginContext): Promise<void> {
       void handle(ctx, req, res)
     },
   }), 'triad: skill-toggles routes')
+
+  // 全局层闸门（隐藏账本）：任何读取路径都能遮住，不依赖会话/作用域。
+  ctx.effect(() => installGlobalMask(ctx), 'triad: skill-toggles global mask')
+
+  // 面板目录（kernel-skills）按同一本账过滤：关掉的技能不出现，双保险。
+  setHiddenSkillReader(() => readHidden())
 
   // 闸门:每个 agent 一个,注册进它自己的 scope 层。agents 服务缺失(裸组装)
   // 时降级为「只有全局层开关」,不影响路由。

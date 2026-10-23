@@ -4523,7 +4523,7 @@ var SKILL_ZH = {
   presetAll: "\u5168\u90E8",
   presetAllName: "\u5168\u90E8 Agent",
   presetStripLabel: "Agent \u9884\u8BBE",
-  presetHintAll: "\u5F53\u524D\u7F16\u8F91\u300C\u5168\u90E8 Agent\u300D\uFF1A\u5F00\u5173\u76F4\u63A5\u6539\u6280\u80FD\u6587\u4EF6\uFF0C\u5BF9\u6240\u6709\u9884\u8BBE\u751F\u6548\u3002",
+  presetHintAll: "\u5F53\u524D\u7F16\u8F91\u300C\u5168\u90E8 Agent\u300D\uFF1A\u5F00\u5173\u5BF9\u6240\u6709\u9884\u8BBE\u751F\u6548\uFF0C\u6240\u6709\u6765\u6E90\u7684\u6280\u80FD\u90FD\u80FD\u5173\uFF08\u968F\u5B89\u88C5/\u63D2\u4EF6\u63D0\u4F9B\u7684\u4E5F\u4E00\u6837\uFF0C\u4E0D\u6539\u5B83\u4EEC\u7684\u6587\u4EF6\uFF09\u3002",
   presetHintScoped: "\u5F53\u524D\u7F16\u8F91\u300C{name}\u300D\uFF1A\u53EA\u5BF9\u8BE5 Agent \u9884\u8BBE\u751F\u6548\uFF0C\u5176\u5B83\u9884\u8BBE\u4E0D\u53D7\u5F71\u54CD\u3002",
   presetReset: "\u6E05\u7A7A\u8BE5\u9884\u8BBE\u7684\u5355\u72EC\u8BBE\u7F6E",
   presetDefaultTag: "\u9ED8\u8BA4",
@@ -4855,7 +4855,6 @@ var SKILL_ZH = {
   installNameRewrite: "SKILL.md \u91CC\u5199\u7684\u662F\u300C{meta}\u300D\uFF0C\u5B89\u88C5\u65F6\u4F1A\u7EDF\u4E00\u6539\u6210\u300C{name}\u300D\uFF08\u76EE\u5F55\u540D\u4E0E\u6280\u80FD\u540D\u4FDD\u6301\u4E00\u81F4\uFF09\u3002",
   deleteSkillDirNote: "\uFF08\u6280\u80FD\u76EE\u5F55\u300C{dir}\u300D\u4E0E\u6280\u80FD\u540D\u4E0D\u540C\uFF0C\u4F1A\u4E00\u5E76\u5220\u9664\uFF09",
   skillOffTag: "\u5DF2\u505C\u7528",
-  skillReadOnlyTag: "\u53EA\u8BFB",
   presetCountTip: "\u8BE5\u9884\u8BBE\u4E0B\u5DF2\u542F\u7528 {n} \u4E2A / \u5171 {total} \u4E2A\u6280\u80FD"
 };
 function skillT(key, params) {
@@ -5765,7 +5764,6 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
   };
   const toggleLabel = lockedReason ?? (enabled ? skillT("disableSkill") : skillT("enableSkill"));
   const fileMeta = typeof skill.fileCount === "number" ? skill.fileCount : files.length;
-  const readOnly = skill.readOnly === true;
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     "li",
     {
@@ -5796,7 +5794,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
               "aria-label": toggleLabel,
               title: toggleLabel,
               className: `${css.toggle} ${enabled ? css.toggleOn : css.toggleOff}`,
-              disabled: lockedReason !== void 0 || readOnly,
+              disabled: lockedReason !== void 0,
               onClick: (event) => {
                 event.stopPropagation();
                 onToggle(skill, !enabled);
@@ -5812,7 +5810,6 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagSource}`, children: bundleName ?? skillT("tagLoose") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagScope}`, "data-off": enabled ? void 0 : "true", children: scopeLabel }),
           !enabled && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagStatus}`, children: skillT("skillOffTag") }),
-          readOnly && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagScope}`, children: skillT("skillReadOnlyTag") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillMeta, children: skillT("fileCount", { n: fileMeta }) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillCardFoot, children: [
@@ -5855,7 +5852,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
                 children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.IconPlusOutlineRegular, { size: 14, "aria-hidden": "true" })
               }
             ) }),
-            !readOnly && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("deleteSkillBtn"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_dsh_client_ui_primitives6.Tooltip, { label: skillT("deleteSkillBtn"), side: "bottom", delayMs: 500, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "button",
               {
                 type: "button",

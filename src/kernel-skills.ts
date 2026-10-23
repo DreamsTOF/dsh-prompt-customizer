@@ -25,6 +25,20 @@ import { currentRootPaths } from './skill-roots.ts'
 /** 运行时上下文在类型上放宽（与其它 host 模块同惯例）。 */
 type PluginContext = any
 
+/**
+ * 隐藏账本的读取口（由 `skill-toggles` 注入，避免两模块循环 import）。
+ * 未注入时视为「没有任何隐藏」。
+ */
+let hiddenReader: (() => Promise<ReadonlySet<string>>) | undefined
+
+/**
+ * 注入隐藏账本读取器（技能开关模块在 apply 时调用一次）。
+ * @param reader - 返回当前隐藏技能名集合。
+ */
+export function setHiddenSkillReader(reader: (() => Promise<ReadonlySet<string>>) | undefined): void {
+  hiddenReader = reader
+}
+
 /** 内核 `SkillSummary` 里本模块用到的字段（其余字段不依赖，避免绑死内核小版本）。 */
 interface KernelSkillSummary {
   name: string
@@ -47,8 +61,11 @@ export interface KernelSkillView {
   root: string
   /** 技能目录绝对路径（内核给了 instruction 文件路径时才有）。 */
   dirPath?: string
-  /** 只读来源（bundled/office/插件/自定义）：面板不提供改文件类操作。 */
-  readOnly: boolean
+  /**
+   * 该技能是否落在可写根（仅用于「删除文件」这一个动作）。
+   * 显隐不区分来源：所有技能都能被开关（走内核分层遮蔽）。
+   */
+  deletable: boolean
   /** 模型可调用 / 用户可调用（内核 invocation 策略，当前只作展示）。 */
   modelInvocable?: boolean
   userInvocable?: boolean
@@ -122,9 +139,13 @@ function launchCwd(ctx: PluginContext): string {
 /**
  * 读取内核技能目录。
  *
- * 有会话时用该 agent 自己的 `ctx.skills`（scope 链 = 预设闸门 + agent 层，正是模型
- * 看到的那一份）；**没有会话时**（刚打开面板、还没开始对话）退回宿主全局
- * `ctx.skills` + 启动 cwd —— 否则面板会一片空白，而用户期待看到安装级/用户级技能。
+ * 关键点：内核 registry 的读取是 `[global 层, ...chainLayers(scope)]`
+ * （`packages/skill/skill/src/index.ts:556`）—— **不传 `scope` 就只读 global 层**，
+ * 会把注册在预设/agent 层里的 provider（绝大多数技能都在这儿）全部漏掉。
+ * 所以必须把该 agent ctx 的 scope key 传进去；`scopeOf()` 取的就是 `createScope`
+ * 写在 ctx 上的那个 key，与我们给 agent 注册闸门 provider 用的是同一个。
+ *
+ * 没有会话时退回宿主全局层 + 启动 cwd（此时确实只有全局 provider 可用）。
  *
  * @param ctx - 宿主上下文。
  * @param candidate - 选定的会话，无会话时 undefined。
@@ -137,7 +158,12 @@ async function listKernelSkills(ctx: PluginContext, candidate: SessionCandidate 
   const service = scoped ?? global
   if (typeof service?.list !== 'function') return []
   const cwd = candidate === undefined ? launchCwd(ctx) : candidate.cwd
-  const listed: unknown = await service.list({ cwd })
+  // scope key 就是 agent 对象本身：内核建 agent 时 `createScope(loopCtx, this)`
+  // （`core/agent/src/agent.ts:104`）、遮蔽层用 `createScope(ctx, agent)`
+  // （`mcp/src/mcp.ts:116`），`scopeChainOf` 走的就是这个对象。
+  // 不传 scope 只读 global 层，会把注册在 agent/预设层的 provider 全部漏掉。
+  const scope = candidate === undefined ? undefined : candidate.agent
+  const listed: unknown = await service.list({ cwd, ...scope === undefined ? {} : { scope } })
   return Array.isArray(listed) ? (listed as KernelSkillSummary[]) : []
 }
 
@@ -154,6 +180,11 @@ export async function kernelSkillViews(ctx: PluginContext, sessionId?: string): 
   for (const summary of summaries) {
     const name = typeof summary?.name === 'string' ? summary.name : ''
     if (name === '') continue
+    // 面板显隐由本插件的账本说了算：内核闸门在模型侧遮过一遍，但目录合并
+    // 只按层/rank 去重，同名候选未必每次都压过真实来源，这里再过滤一次，
+    // 保证「关掉的技能既不在面板、也不在模型目录里」。
+    const hidden = hiddenReader === undefined ? undefined : await hiddenReader()
+    if (hidden?.has(name) === true) continue
     // 内核给的是 SKILL.md 的绝对路径；技能目录 = 它的父目录。虚拟技能没有 path。
     const dirPath = typeof summary.path === 'string' && summary.path !== '' ? dirname(summary.path) : undefined
     const source = typeof summary.source === 'string' && summary.source !== '' ? summary.source : 'unknown'
@@ -166,10 +197,19 @@ export async function kernelSkillViews(ctx: PluginContext, sessionId?: string): 
       files: [],
       root: source,
       ...dirPath === undefined ? {} : { dirPath },
-      readOnly: !isWritableDir(dirPath),
+      deletable: isWritableDir(dirPath),
       ...typeof summary.invocation?.modelInvocable === 'boolean' ? { modelInvocable: summary.invocation.modelInvocable } : {},
       ...typeof summary.invocation?.userInvocable === 'boolean' ? { userInvocable: summary.invocation.userInvocable } : {},
     })
   }
   return views
+}
+
+/**
+ * 当前会话的内核技能摘要（技能开关、技能健康等模块共用，避免各自再扫目录）。
+ * @param ctx - 宿主上下文。
+ * @returns 内核 `SkillSummary` 数组。
+ */
+export async function kernelSkillSummaries(ctx: PluginContext): Promise<KernelSkillSummary[]> {
+  return listKernelSkills(ctx, resolveViewSession(ctx))
 }

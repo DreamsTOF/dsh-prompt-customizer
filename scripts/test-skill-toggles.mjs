@@ -70,10 +70,16 @@ const check = (cond, msg) => { if (cond) console.log(`ok    ${msg}`); else { fai
 const TOGGLES = "/api/skill-toggles"
 const SKILL_MD = join(agentsSkills, "odd-dir", "SKILL.md")
 
-// 1. 按规范名禁用：旧实现只按目录名定位 → not found，面板开关点了没反应
+const HIDDEN_LEDGER = join(agentsSkills, ".hidden-skills.json")
+const hiddenOf = () => {
+  try { return JSON.parse(readFileSync(HIDDEN_LEDGER, "utf8")).hidden ?? [] } catch { return [] }
+}
+
+// 1. 按规范名禁用：写进全局隐藏账本（不再改 SKILL.md，随安装/插件技能同样可关）
 const off = await call(TOGGLES, "PUT", "/api/skill-toggles/skills/canon-name", { enabled: false })
 check(off.status === 200 && off.body.ok === true, "按规范名禁用目录名不一致的技能")
-check(readFileSync(SKILL_MD, "utf8").includes("user-invocable: false"), "SKILL.md 写入禁用字段")
+check(hiddenOf().includes("canon-name"), "隐藏账本记录规范名")
+check(!readFileSync(SKILL_MD, "utf8").includes("user-invocable: false"), "不改写用户的 SKILL.md")
 
 // 2. 状态表按规范名回报
 const status = await call(TOGGLES, "GET", "/api/skill-toggles/status")
@@ -82,7 +88,7 @@ check(status.body.skills["canon-name"] === false, "status 按规范名回报禁�
 // 3. 整包开关：账本条目是目录名也要能处理
 const bundleOn = await call(TOGGLES, "PUT", "/api/skill-toggles/bundles/odd", { enabled: true })
 check(bundleOn.status === 200 && bundleOn.body.handled === 1, "整包开关按目录名条目也能命中成员")
-check(!readFileSync(SKILL_MD, "utf8").includes("user-invocable: false"), "整包启用后禁用字段已移除")
+check(!hiddenOf().includes("canon-name"), "整包启用后隐藏记录已移除")
 
 // 4. 整包状态：目录名条目要能查到规范名的状态
 const off2 = await call(TOGGLES, "PUT", "/api/skill-toggles/skills/canon-name", { enabled: false })

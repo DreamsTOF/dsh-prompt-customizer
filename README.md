@@ -63,15 +63,22 @@
 - **按会话阶段分层**：引导期（未晋级）/ 常驻期（晋级后）/ 压缩受控期（压缩后仍未晋级）各有**独立的屏蔽名单、独立的排序空间、独立的工具目录**。同一个预设可以做到首轮只给模型 1 个工具和几段提示词，晋级后放开全套。
 - **按 agent 预设分层**：顶部预设 Tab 选中某个 agent 预设后，改动只对该预设生效；**0.9.0 起「全部 Agent」全局层停用**——提示词必须按具体预设修改，预设未定制的字段 = 官方默认（旧全局层数据保留在 config.yaml 里不再生效，可手编回滚）。
 
+## 0.11.1：修技能目录只见 global 层 + 开关改为「全权接管、无只读」
+
+- **修「斜杠命令能看到 5 个技能，能力栏只有 1 个」**：内核 registry 的读取是 `[global 层, ...chainLayers(scope)]`（`packages/skill/skill/src/index.ts:556`）—— **不传 `scope` 就只读 global 层**。技能绝大多数注册在预设/agent 层，于是面板只剩随安装的那个 bundled 技能。现在把该 agent 的 scope key（agent 对象本身，`createScope(loopCtx, this)`）传给 `list()`，面板与 `/` 菜单、上下文里的「技能注入」条数一致。
+- **开关改为隐藏账本，不再改用户的 SKILL.md**：全局开关写 `<agentsHome>/skills/.hidden-skills.json`，由闸门 provider 在内核目录里遮掉。好处是**所有来源**（含 `app.asar` 内随安装技能、office 包、插件自带）都能关，且随时可逆、不动别人的文件。
+- **取消「只读」概念**：面板不再区分来源，任何技能都能开关；删除仍然只对真正可写根生效（随安装的技能删不掉文件），此时返回明确提示「该技能随安装/插件提供，请改为关闭」。
+- **双保险**：除闸门 provider 外，面板目录（`kernel-skills`）自己也按隐藏账本过滤一次 —— 内核合并只按层/rank 去重，同名候选未必每次压过真实来源。
+
 ## 0.11.0：技能目录直接读内核，MCP 只留组合行
 
 方向调整：**不再自搓扫描**。内核已经有「聚合全部技能来源」的服务与「组合行」这一层配置模型，插件自扫只会在根顺序、去重、只读来源上不断与内核打架。
 
 - **技能列表 = 内核真值**：面板改为 `agent.ctx.skills.list({ cwd })`（`packages/skill/skill/src/index.ts`）—— 文件系统各根（project-dsh / project-agents / custom / user-dsh / user-agents）+ `bundled` + `runtime`（office 包）+ 插件自注册 provider，全由内核按 scope 链与 cwd 聚合。**面板显示的就是模型这一会话能用的那一份**（与右侧「上下文 → 技能注入」条数一致）。
   - 选哪个会话：取最新创建的根会话（`agents.roots()` 按 `session.header.createdAt` 降序）；客户端目前读不到渲染期的当前会话 id（`uiSession` 是 hook/selector 面），因此面板以「最新会话」为准。无会话时退回宿主全局 `ctx.skills` + 启动 cwd。
-  - 只读来源（bundled / office / 插件）在卡片上标「只读」，不提供改文件开关与删除；写操作（导入/删除/归入技能包）仍只作用于可写根。
+  - （只读分级已在 0.11.1 取消：所有来源的技能都能开关，见上节。）
 - **MCP 不再有目录层**：删掉 0.10.x 的 `mcps/` 四目录扫描、挂载、可见性过滤与面板分区。MCP Server 就是内核 Cordis 组合里的 `mcp-client` 行 —— 列表、启停、增删都走组合行（`pluginManager.listPlugins()` / `setPluginEnabled()` 与 `configEditor`），插件不再额外挂行。
-- **验证**：`node --test` 170/170、五个自检脚本全 PASSED；web 实例真浏览器实测（注入的 bsk 工具）：SKILL 页 1 个技能（该会话内核目录就是 1 个 bundled 技能，与「技能注入 1 项」一致）且显示「只读」、开关禁用、无删除按钮；MCP 页只有 3 个组合行、无「mcps 目录」分区、不闪退。
+- **验证**：`node --test` 170/170、五个自检脚本全 PASSED；web 实例真浏览器实测（注入的 bsk 工具）：MCP 页只有 3 个组合行、无「mcps 目录」分区、不闪退。
 - **已知限制**：随安装发布的技能在 `app.asar` 内，文件清单读不到（卡片显示「0 文件」）；不同 profile/预设的组合不同，所以各处的技能数量天然不同（这不是漏扫）。
 
 ## 0.10.1：修复 MCP 页闪退 + 技能/MCP 统一为「四个目录、`.dsh` 优先」

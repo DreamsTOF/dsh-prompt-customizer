@@ -33,7 +33,7 @@ export const SKILL_ZH: Record<string, string> = {
   presetAll: '全部',
   presetAllName: '全部 Agent',
   presetStripLabel: 'Agent 预设',
-  presetHintAll: '当前编辑「全部 Agent」：开关直接改技能文件，对所有预设生效。',
+  presetHintAll: '当前编辑「全部 Agent」：开关对所有预设生效，所有来源的技能都能关（随安装/插件提供的也一样，不改它们的文件）。',
   presetHintScoped: '当前编辑「{name}」：只对该 Agent 预设生效，其它预设不受影响。',
   presetReset: '清空该预设的单独设置',
   presetDefaultTag: '默认',
@@ -258,7 +258,6 @@ export const SKILL_ZH: Record<string, string> = {
   installNameRewrite: 'SKILL.md 里写的是「{meta}」，安装时会统一改成「{name}」（目录名与技能名保持一致）。',
   deleteSkillDirNote: '（技能目录「{dir}」与技能名不同，会一并删除）',
   skillOffTag: '已停用',
-  skillReadOnlyTag: '只读',
   presetCountTip: '该预设下已启用 {n} 个 / 共 {total} 个技能',
 }
 
