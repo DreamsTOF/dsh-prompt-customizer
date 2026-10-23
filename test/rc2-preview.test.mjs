@@ -48,6 +48,9 @@ function harness(t, { live = false, fail = false, renderFail = false, literal = 
   return { request, sp, pristine, dispose: () => effects.reverse().forEach(fn => fn?.()), released: () => released, evaluations: () => evaluations }
 }
 
+// 表驱动合并：每个场景各自新建 harness（互不共享状态），逐项执行原断言，
+// 失败时错误信息前缀为场景名。
+
 test('rc.2 diagnostic acquires and releases the preset scope on each preview', async t => {
   const h = harness(t)
   for (let i = 0; i < 2; i++) {
@@ -73,27 +76,47 @@ test('preset preview is independent of an existing conversation of the same mode
   assert.equal(h.released(), 1)
 })
 
-test('failed scope acquisition reports failure instead of presenting global tools as the preset', async t => {
-  const h = harness(t, { fail: true })
-  const res = await h.request('preview?scope=standard')
-  assert.equal(res.status, 500)
-  assert.match(res.body.error, /broken preset/)
-})
-
-test('failed rendering still releases its diagnostic lease', async t => {
-  const h = harness(t, { renderFail: true })
-  const res = await h.request('preview?scope=standard')
-  assert.equal(res.status, 500)
-  assert.match(res.body.error, /provider unavailable/)
-  assert.equal(h.released(), 1)
-})
-
-test('unloading restores the original assembly instead of retaining the plugin wrapper', async t => {
-  const h = harness(t)
-  const wrapped = h.sp.assemble
-  h.dispose()
-  assert.notEqual(h.sp.assemble, wrapped)
-  assert.equal(h.sp[Symbol.for('prompt-customizer:assemble-pristine')], undefined)
+test('失败的预览与卸载：作用域获取失败、渲染失败仍释放租约、卸载还原装配', async t => {
+  const scenes = [
+    {
+      label: 'failed scope acquisition reports failure instead of presenting global tools as the preset',
+      options: { fail: true },
+      run: async (h) => {
+        const res = await h.request('preview?scope=standard')
+        assert.equal(res.status, 500)
+        assert.match(res.body.error, /broken preset/)
+      },
+    },
+    {
+      label: 'failed rendering still releases its diagnostic lease',
+      options: { renderFail: true },
+      run: async (h) => {
+        const res = await h.request('preview?scope=standard')
+        assert.equal(res.status, 500)
+        assert.match(res.body.error, /provider unavailable/)
+        assert.equal(h.released(), 1)
+      },
+    },
+    {
+      label: 'unloading restores the original assembly instead of retaining the plugin wrapper',
+      options: {},
+      run: async (h) => {
+        const wrapped = h.sp.assemble
+        h.dispose()
+        assert.notEqual(h.sp.assemble, wrapped)
+        assert.equal(h.sp[Symbol.for('prompt-customizer:assemble-pristine')], undefined)
+      },
+    },
+  ]
+  for (const scene of scenes) {
+    const h = harness(t, scene.options)
+    try {
+      await scene.run(h)
+    } catch (e) {
+      if (e instanceof Error) e.message = `[${scene.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 test('complete restoration does not discard the evaluated customizer sections', async t => {

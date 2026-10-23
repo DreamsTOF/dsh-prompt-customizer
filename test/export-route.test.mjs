@@ -117,25 +117,32 @@ test('导出是只读的：profile patch 与 config.yaml 一个字都不改', as
   assert.equal(fs.readFileSync(configFile, 'utf8'), before, 'config.yaml 必须原封不动')
 })
 
-test('组成读不到时导出仍成功（定制才是主体）', async () => {
-  const roster = {
-    defaultId: 'standard',
-    list: async () => [{ id: 'standard' }],
-    readDocument: async () => { throw Object.assign(new Error('nope'), { code: 'agent-preset/not-found' }) },
+test('组成读不到 / 没有 agentPresets 服务时导出仍成功（定制才是主体）', async () => {
+  for (const scene of [
+    {
+      label: '组成读不到时导出仍成功（定制才是主体）',
+      roster: {
+        defaultId: 'standard',
+        list: async () => [{ id: 'standard' }],
+        readDocument: async () => { throw Object.assign(new Error('nope'), { code: 'agent-preset/not-found' }) },
+      },
+    },
+    {
+      label: '没有 agentPresets 服务时也能导出定制',
+      roster: undefined,
+    },
+  ]) {
+    try {
+      const { routes } = await harness({ roster: scene.roster, config: CFG })
+      const res = await get(routes[EXPORT], `${EXPORT}?scope=standard`)
+      assert.equal(res.status, 200)
+      assert.equal(res.body.composition, undefined)
+      assert.deepEqual(res.body.customization.sections, ['guidelines'])
+    } catch (e) {
+      if (e instanceof Error) e.message = `[${scene.label}] ${e.message}`
+      throw e
+    }
   }
-  const { routes } = await harness({ roster, config: CFG })
-  const res = await get(routes[EXPORT], `${EXPORT}?scope=standard`)
-  assert.equal(res.status, 200)
-  assert.equal(res.body.composition, undefined)
-  assert.deepEqual(res.body.customization.sections, ['guidelines'])
-})
-
-test('没有 agentPresets 服务时也能导出定制', async () => {
-  const { routes } = await harness({ roster: undefined, config: CFG })
-  const res = await get(routes[EXPORT], `${EXPORT}?scope=standard`)
-  assert.equal(res.status, 200)
-  assert.equal(res.body.composition, undefined)
-  assert.deepEqual(res.body.customization.sections, ['guidelines'])
 })
 
 test('非 GET 被拒（导出不该有副作用路径）', async () => {

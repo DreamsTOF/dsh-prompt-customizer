@@ -70,6 +70,10 @@ function call(route, method, url, body) {
   })
 }
 
+// 表驱动合并：两条「添加技能落点」共用一个 skills-host 实例（同一套 env 与路由），
+// 逐个请求执行原断言；第二条要求第一个技能未被写到全局，所以顺序固定、共享实例
+// 正是原测试的前提（与合并前一致）。
+
 test('添加技能：默认写全局，scope=workspace 写进工作区并自动建目录', async () => {
   const box = mkdtempSync(join(tmpdir(), 'pc-add-scope-'))
   const agentsHome = join(box, 'agents')

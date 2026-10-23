@@ -54,29 +54,40 @@ test('unset removes a field entirely from the file', () => {
   assert.deepEqual(parse(fs.readFileSync(file, 'utf8')).sections, ['a'])
 })
 
-test('a corrupt file falls back to last-good resolution', () => {
-  const dir = tmpdir('pc-store-')
-  const file = path.join(dir, 'config.yaml')
-  const store = createConfigStore({ file, schema: Config, warn: () => {} })
+test('坏的磁盘内容（语法坏 / schema 坏）回落到 last-good，修好后恢复', () => {
+  const cases = [
+    {
+      label: 'a corrupt file falls back to last-good resolution',
+      broken: '{ not: [valid',
+      fixed: yamlStringify({ sections: ['fixed'] }),
+    },
+    {
+      label: 'a schema-invalid section falls back to last-good too',
+      // replace 值非字符串是 schemastery 明确拒绝的形状（见 schema.test.mjs）
+      broken: yamlStringify({ replace: { a: 42 } }),
+      fixed: undefined,
+    },
+  ]
+  for (const c of cases) {
+    try {
+      const dir = tmpdir('pc-store-')
+      const file = path.join(dir, 'config.yaml')
+      const store = createConfigStore({ file, schema: Config, warn: () => {} })
 
-  store.setField('sections', ['good'])
-  assert.deepEqual(store.readResolved().sections, ['good'])
-  fs.writeFileSync(file, '{ not: [valid')
-  assert.deepEqual(store.readResolved().sections, ['good']) // last-good
-  // 修好后恢复
-  fs.writeFileSync(file, yamlStringify({ sections: ['fixed'] }))
-  assert.deepEqual(store.readResolved().sections, ['fixed'])
-})
-
-test('a schema-invalid section falls back to last-good too', () => {
-  const dir = tmpdir('pc-store-')
-  const file = path.join(dir, 'config.yaml')
-  const store = createConfigStore({ file, schema: Config, warn: () => {} })
-
-  store.setField('sections', ['good'])
-  // replace 值非字符串是 schemastery 明确拒绝的形状（见 schema.test.mjs）
-  fs.writeFileSync(file, yamlStringify({ replace: { a: 42 } }))
-  assert.deepEqual(store.readResolved().sections, ['good'])
+      store.setField('sections', ['good'])
+      assert.deepEqual(store.readResolved().sections, ['good'], '写入后读到 good')
+      fs.writeFileSync(file, c.broken)
+      assert.deepEqual(store.readResolved().sections, ['good'], 'last-good')
+      // 修好后恢复（schema 坏的那份测试不覆盖修复路径，保持原样）
+      if (c.fixed !== undefined) {
+        fs.writeFileSync(file, c.fixed)
+        assert.deepEqual(store.readResolved().sections, ['fixed'], '修好后恢复')
+      }
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 // ── 旧版迁移 ────────────────────────────────────────────────────────────────

@@ -48,38 +48,59 @@ async function call(handler, body) {
 
 const RESET = '/api/prompt-customizer/config/reset'
 
-test('reset 清空全部定制并关闭 forceSections', async () => {
-  const { ctx, routes, dataDir } = makeCtx()
-  const configFile = path.join(dataDir, 'config.yaml')
-  fs.mkdirSync(dataDir, { recursive: true })
-  fs.writeFileSync(configFile,
-    'forceSections: true\n' +
-    'sections: [a]\n' +
-    'replace: { b: B }\n' +
-    'overrides:\n  liangshen:\n    sections: [c]\n')
-  apply(ctx, { dataDir })
+// 表驱动合并：两条「reset 本身」的断言都以 reset 响应为对象，进同一张表逐项
+// 执行（每项各自建环境）；开关闭环那条要串起 reset → set 两步，保持独立。
 
-  const res = await call(routes[RESET])
-  assert.equal(res.status, 200)
-  assert.equal(res.body.ok, true)
-  // 只剩 forceSections: false —— 其余全部清空
-  assert.deepEqual(res.body.config.sections, [])
-  assert.deepEqual(res.body.config.replace, {})
-  assert.deepEqual(res.body.config.overrides, {})
-  assert.equal(res.body.config.forceSections, false)
-  // 磁盘上的文件也确实是这份最小状态（不依赖内存缓存）
-  const onDisk = fs.readFileSync(configFile, 'utf8')
-  assert.match(onDisk, /forceSections: false/)
-  assert.ok(!onDisk.includes('sections: [a]'))
-})
-
-test('reset 在无既有文件时也正常（回到初始态）', async () => {
-  const { ctx, routes, dataDir } = makeCtx()
-  apply(ctx, { dataDir })
-  const res = await call(routes[RESET])
-  assert.equal(res.status, 200)
-  assert.equal(res.body.ok, true)
-  assert.equal(res.body.config.forceSections, false)
+test('reset 的结果（有既有文件 / 无既有文件）', async () => {
+  const cases = [
+    {
+      label: 'reset 清空全部定制并关闭 forceSections',
+      prepare: (dataDir) => {
+        const configFile = path.join(dataDir, 'config.yaml')
+        fs.mkdirSync(dataDir, { recursive: true })
+        fs.writeFileSync(configFile,
+          'forceSections: true\n' +
+          'sections: [a]\n' +
+          'replace: { b: B }\n' +
+          'overrides:\n  liangshen:\n    sections: [c]\n')
+        return configFile
+      },
+      check: (res, configFile) => {
+        assert.equal(res.status, 200)
+        assert.equal(res.body.ok, true)
+        // 只剩 forceSections: false —— 其余全部清空
+        assert.deepEqual(res.body.config.sections, [])
+        assert.deepEqual(res.body.config.replace, {})
+        assert.deepEqual(res.body.config.overrides, {})
+        assert.equal(res.body.config.forceSections, false)
+        // 磁盘上的文件也确实是这份最小状态（不依赖内存缓存）
+        const onDisk = fs.readFileSync(configFile, 'utf8')
+        assert.match(onDisk, /forceSections: false/)
+        assert.ok(!onDisk.includes('sections: [a]'))
+      },
+    },
+    {
+      label: 'reset 在无既有文件时也正常（回到初始态）',
+      prepare: () => undefined,
+      check: (res) => {
+        assert.equal(res.status, 200)
+        assert.equal(res.body.ok, true)
+        assert.equal(res.body.config.forceSections, false)
+      },
+    },
+  ]
+  for (const c of cases) {
+    try {
+      const { ctx, routes, dataDir } = makeCtx()
+      const configFile = c.prepare(dataDir)
+      apply(ctx, { dataDir })
+      const res = await call(routes[RESET])
+      c.check(res, configFile)
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 test('reset 后可用 /config/set 重新开启 forceSections（开关闭环）', async () => {

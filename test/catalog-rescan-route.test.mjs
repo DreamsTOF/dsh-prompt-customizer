@@ -6,6 +6,9 @@
  * 环境故障就会把用户的全部历史条目删光。
  *
  * Usage: node --test test/catalog-rescan-route.test.mjs
+ *
+ * 表驱动合并：三个以「重扫结果」为断言对象的场景（全部失败 / 部分失败 /
+ * 宿主无 acquireScope）进一张表逐项执行；每项仍然各自建宿主环境，互不共享状态。
  */
 
 import { test } from 'node:test'
@@ -119,34 +122,73 @@ test('重扫用真实并集整体替换登记表，并清掉历史条目', async
   assert.deepEqual(onDisk.tools.map((t) => t.name).sort(), ['bash', 'edit'])
 })
 
-test('全部预设失败 → 409 且绝不清空登记表', async () => {
-  const { routes, dataDir } = harness({
-    presets: [{ id: 'a' }, { id: 'b' }],
-    broken: ['a', 'b'],
-  })
-  fs.mkdirSync(dataDir, { recursive: true })
-  const keep = 'tools:\n  - name: survivor\n    description: still here\n'
-  fs.writeFileSync(path.join(dataDir, 'catalog.yaml'), keep)
+test('重扫的失败路径：全部失败绝不清空登记表 / 部分失败用成功部分替换 / 无 acquireScope 报 501', async () => {
+  const cases = [
+    {
+      label: '全部预设失败 → 409 且绝不清空登记表',
+      run: async () => {
+        const { routes, dataDir } = harness({
+          presets: [{ id: 'a' }, { id: 'b' }],
+          broken: ['a', 'b'],
+        })
+        fs.mkdirSync(dataDir, { recursive: true })
+        const keep = 'tools:\n  - name: survivor\n    description: still here\n'
+        fs.writeFileSync(path.join(dataDir, 'catalog.yaml'), keep)
 
-  const res = await post(routes[RESCAN])
-  assert.equal(res.status, 409)
-  assert.equal(res.body.ok, false)
-  assert.equal(res.body.skipped.length, 2)
-  assert.equal(fs.readFileSync(path.join(dataDir, 'catalog.yaml'), 'utf8'), keep, '登记表必须原封不动')
-})
-
-test('部分预设失败 → 用成功的那部分替换，失败原因回报', async () => {
-  const { routes } = harness({
-    presets: [{ id: 'good' }, { id: 'bad' }],
-    scopeViews: { good: { sections: [], tools: [{ name: 'ok-tool', description: '' }] } },
-    broken: ['bad'],
-  })
-  const res = await post(routes[RESCAN])
-  assert.equal(res.status, 200, JSON.stringify(res.body))
-  assert.deepEqual(res.body.scanned, ['good'])
-  assert.equal(res.body.skipped.length, 1)
-  assert.equal(res.body.skipped[0].preset, 'bad')
-  assert.deepEqual(res.body.catalog.tools.map((t) => t.name), ['ok-tool'])
+        const res = await post(routes[RESCAN])
+        assert.equal(res.status, 409)
+        assert.equal(res.body.ok, false)
+        assert.equal(res.body.skipped.length, 2)
+        assert.equal(fs.readFileSync(path.join(dataDir, 'catalog.yaml'), 'utf8'), keep, '登记表必须原封不动')
+      },
+    },
+    {
+      label: '部分预设失败 → 用成功的那部分替换，失败原因回报',
+      run: async () => {
+        const { routes } = harness({
+          presets: [{ id: 'good' }, { id: 'bad' }],
+          scopeViews: { good: { sections: [], tools: [{ name: 'ok-tool', description: '' }] } },
+          broken: ['bad'],
+        })
+        const res = await post(routes[RESCAN])
+        assert.equal(res.status, 200, JSON.stringify(res.body))
+        assert.deepEqual(res.body.scanned, ['good'])
+        assert.equal(res.body.skipped.length, 1)
+        assert.equal(res.body.skipped[0].preset, 'bad')
+        assert.deepEqual(res.body.catalog.tools.map((t) => t.name), ['ok-tool'])
+      },
+    },
+    {
+      label: '宿主没有 acquireScope → 501',
+      run: async () => {
+        const routes = {}
+        const ctx = {
+          on: () => {}, inject: () => {},
+          get: (name) => {
+            if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
+            if (name === 'agentPresets') return { list: async () => [{ id: 'a' }] }
+            if (name === 'connection') return { requestRejection: () => undefined }
+            return undefined
+          },
+          systemPrompt: { assemble: async () => ({ sections: [], tools: [], variables: {}, promptCustomizerBaseView: {} }) },
+          effect: () => {},
+        }
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-rescan2-'))
+        apply(ctx, { dataDir: path.join(dir, 'data') })
+        const res = await post(routes[RESCAN])
+        assert.equal(res.status, 501)
+        assert.match(res.body.error, /acquireScope/)
+      },
+    },
+  ]
+  for (const c of cases) {
+    try {
+      await c.run()
+    } catch (e) {
+      if (e instanceof Error) e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 test('重扫释放每个作用域租约（不泄漏挂载）', async () => {
@@ -166,24 +208,4 @@ test('GET 被拒（重扫有副作用，只允许 POST）', async () => {
     void routes[RESCAN](req, r)
   })
   assert.equal(res.status, 405)
-})
-
-test('宿主没有 acquireScope → 501', async () => {
-  const routes = {}
-  const ctx = {
-    on: () => {}, inject: () => {},
-    get: (name) => {
-      if (name === 'webServer') return { register: (r) => { routes[r.path] = r.handler; return () => {} } }
-      if (name === 'agentPresets') return { list: async () => [{ id: 'a' }] }
-      if (name === 'connection') return { requestRejection: () => undefined }
-      return undefined
-    },
-    systemPrompt: { assemble: async () => ({ sections: [], tools: [], variables: {}, promptCustomizerBaseView: {} }) },
-    effect: () => {},
-  }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-rescan2-'))
-  apply(ctx, { dataDir: path.join(dir, 'data') })
-  const res = await post(routes[RESCAN])
-  assert.equal(res.status, 501)
-  assert.match(res.body.error, /acquireScope/)
 })

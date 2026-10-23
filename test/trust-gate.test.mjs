@@ -3,6 +3,9 @@
  * （宿主 0.1.2-alpha.1 起：Host/Origin 围栏 + 浏览器 Cookie 认证）；被拒请求
  * 绝不触达业务处理器。闸本身不可用（connection 服务缺席）时 fail-closed：
  * 本插件的路由会写盘，「没有认证面」不等于「无需认证」。
+ *
+ * 表驱动合并：403 / 401 / 闸缺席 三种拒绝共用同一份「打补丁 → 不得写盘」断言，
+ * 逐项执行（每项各自建环境）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -53,29 +56,44 @@ async function call(handler, body) {
   })
 }
 
-test('403 fence rejection never reaches the handler', async () => {
-  const { ctx, routes, dataDir } = makeCtx(403)
-  apply(ctx, { dataDir })
-  const res = await call(routes[APPLY], { patch: { sections: ['a'] } })
-  assert.equal(res.status, 403)
-  assert.equal(res.text, 'forbidden')
-  assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false, '被拒请求不得写盘')
-})
-
-test('401 unauthenticated rejection never reaches the handler', async () => {
-  const { ctx, routes, dataDir } = makeCtx(401)
-  apply(ctx, { dataDir })
-  const res = await call(routes[APPLY], { patch: { sections: ['a'] } })
-  assert.equal(res.status, 401)
-  assert.equal(res.text, 'unauthorized')
-  assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false, '被拒请求不得写盘')
-})
-
-test('a composition without the connection service refuses to serve (fail-closed)', async () => {
-  const { ctx, routes, dataDir } = makeCtx(undefined)
-  apply(ctx, { dataDir })
-  const res = await call(routes[APPLY], { patch: { sections: ['a'] } })
-  assert.equal(res.status, 503)
-  assert.match(JSON.parse(res.text).error, /connection service unavailable/)
-  assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false, '闸不可用时不得写盘')
+test('被拒请求绝不触达处理器，且闸不可用时 fail-closed（403 / 401 / 无 connection 服务）', async () => {
+  const cases = [
+    {
+      label: '403 fence rejection never reaches the handler',
+      rejection: 403,
+      check: (res) => {
+        assert.equal(res.status, 403)
+        assert.equal(res.text, 'forbidden')
+      },
+    },
+    {
+      label: '401 unauthenticated rejection never reaches the handler',
+      rejection: 401,
+      check: (res) => {
+        assert.equal(res.status, 401)
+        assert.equal(res.text, 'unauthorized')
+      },
+    },
+    {
+      label: 'a composition without the connection service refuses to serve (fail-closed)',
+      rejection: undefined,
+      check: (res) => {
+        assert.equal(res.status, 503)
+        assert.match(JSON.parse(res.text).error, /connection service unavailable/)
+      },
+    },
+  ]
+  for (const c of cases) {
+    try {
+      const { ctx, routes, dataDir } = makeCtx(c.rejection)
+      apply(ctx, { dataDir })
+      const res = await call(routes[APPLY], { patch: { sections: ['a'] } })
+      c.check(res)
+      assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false,
+        c.rejection === undefined ? '闸不可用时不得写盘' : '被拒请求不得写盘')
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })

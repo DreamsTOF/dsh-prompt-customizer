@@ -7,6 +7,9 @@
  * —— 分叉的后果是面板列空、开关写进没人读的目录。
  *
  * Usage: node --test test/home-paths.test.mjs
+ *
+ * 表驱动合并：三条解析规则与 skills-host 的一致性都用同一张 env 表驱动，
+ * 逐项在隔离的 env 里求值（原断言全部保留）。
  */
 
 import { test } from 'node:test'

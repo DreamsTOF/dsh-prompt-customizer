@@ -2,6 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Config } from '../vendor/prompt-customizer/schema.js'
 
+// 表驱动合并：接受 / 拒绝两条路径各自一张表，逐项执行原断言。
+
 test('accepts a valid config and preserves known fields', () => {
   const value = Config({
     sections: ['tool:read'],
@@ -44,22 +46,14 @@ test('accepts presets with relative order and activePreset', () => {
   assert.equal(value.activePreset, 'p1')
 })
 
-test('rejects a preset missing required id/name', () => {
-  assert.throws(() => Config({
-    presets: [{ data: {} }],
-  }))
-})
-
-test('rejects a preset order entry missing a name', () => {
-  assert.throws(() => Config({
-    presets: [{ id: 'p', name: 'n', data: { order: [{ after: 'a', text: '' }] } }],
-  }))
-})
-
-test('rejects non-array sections', () => {
-  assert.throws(() => Config({ sections: 'tool:read' }))
-})
-
-test('rejects non-string replace values', () => {
-  assert.throws(() => Config({ replace: { a: 42 } }))
+test('rejects malformed inputs（缺 id/name 的预设 / 缺 name 的 order / 非数组 sections / 非字符串 replace）', () => {
+  const cases = [
+    { label: 'rejects a preset missing required id/name', input: { presets: [{ data: {} }] } },
+    { label: 'rejects a preset order entry missing a name', input: { presets: [{ id: 'p', name: 'n', data: { order: [{ after: 'a', text: '' }] } }] } },
+    { label: 'rejects non-array sections', input: { sections: 'tool:read' } },
+    { label: 'rejects non-string replace values', input: { replace: { a: 42 } } },
+  ]
+  for (const c of cases) {
+    assert.throws(() => Config(c.input), c.label)
+  }
 })

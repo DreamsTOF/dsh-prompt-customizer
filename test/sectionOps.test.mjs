@@ -2,6 +2,9 @@
  * 提示词段面板纯逻辑单测：与 SectionsTab.tsx 共用 lib/sectionOps.mjs。
  * 覆盖：阶段映射、每阶段独立屏蔽（三态互不继承）、注入身份与删除背书、
  * 阶段独立的文本通道、行重排/拖入、逐阶段持久化（虚拟 order 连续编号）。
+ *
+ * 表驱动合并：同组语义的断言放进数据表，逐项执行原断言（每项都带 label，
+ * 失败时能直接看出是哪一项）。断言内容与合并前逐条一致。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -213,83 +216,119 @@ const mirrorViews = () => Object.fromEntries(Object.keys(MIRROR_BASE).map((key) 
 }]))
 const mirrorNative = (key, name) => MIRROR_BASE[key].some((sec) => sec.name === name)
 
-test('mirroredRows：常驻期行序为骨架，其余两态独有段追加在尾部', () => {
-  const rows = mirroredRows({}, mirrorViews(), mirrorNative)
-  assert.deepEqual(rows.map((row) => row.name), ['shared', 'act', 'boot', 'comp'])
-  // 常驻期视图缺席 = 该阶段不参与并集（绝不臆造行）
-  const views = mirrorViews()
-  views.active = null
-  assert.deepEqual(mirroredRows({}, views, mirrorNative).map((row) => row.name), ['boot', 'shared', 'comp'])
-})
-
-test('mirroredRows：常驻期有的段以常驻期那份为准（勾选 / 文本覆写另外两态）', () => {
-  // 引导期单独屏蔽了 shared：常驻期没屏蔽 → 并集行取常驻期那份，屏蔽被覆写掉。
-  const rows = mirroredRows({ sectionsBootstrap: ['shared'] }, mirrorViews(), mirrorNative)
-  assert.deepEqual(rows.map((row) => [row.name, row.blocked]), [
-    ['shared', false], ['act', false], ['boot', false], ['comp', false],
-  ])
-  assert.deepEqual(mirroredDeniedLists(rows), { sections: [], sectionsBootstrap: [], sectionsCompaction: [] })
-})
-
-test('mirroredRows：同名段优先取原生那一阶段的行（注入正文不冻结回原生阶段）', () => {
-  const cfg = { inject: [{ name: 'boot', order: 0, text: 'BOOT', phase: 'active', custom: false }] }
-  const rows = mirroredRows(cfg, mirrorViews(), mirrorNative)
-  const boot = rows.find((row) => row.name === 'boot')
-  // 引导期原生 → 用引导期那份（override 为空），不是常驻期那份带正文的注入行
-  assert.equal(boot.override, '')
-  assert.equal(boot.text, 'BOOT')
-  assert.deepEqual(rows.map((row) => row.name), ['shared', 'boot', 'act', 'comp'])
-  assert.deepEqual(mirrorPhaseInjectEntries(cfg, rows, mirrorNative).filter((item) => item.name === 'boot'), [
-    { name: 'boot', order: 1, text: 'BOOT', phase: 'active', custom: false },
-    { name: 'boot', order: 1, text: '', phase: 'bootstrap', custom: false },
-    { name: 'boot', order: 1, text: 'BOOT', phase: 'compaction', custom: false },
-  ])
-})
-
-test('mirrorPhaseInjectEntries：原生系统段只写 order，非原生段带正文，替换文本恒写', () => {
-  const rows = [
-    { name: 'shared', text: 'S', custom: false, override: '', blocked: false },
-    { name: 'act', text: 'ACT', custom: false, override: '', blocked: false },
-    { name: 'replaced', text: 'OLD', custom: false, override: 'NEW', blocked: false },
+test('镜像行集（mirroredRows）：常驻期为骨架、常驻期那份为准、同名优先原生行', () => {
+  const cases = [
+    {
+      label: '常驻期行序为骨架，其余两态独有段追加在尾部',
+      run: () => {
+        const rows = mirroredRows({}, mirrorViews(), mirrorNative)
+        assert.deepEqual(rows.map((row) => row.name), ['shared', 'act', 'boot', 'comp'], '常驻期骨架')
+        // 常驻期视图缺席 = 该阶段不参与并集（绝不臆造行）
+        const views = mirrorViews()
+        views.active = null
+        assert.deepEqual(mirroredRows({}, views, mirrorNative).map((row) => row.name), ['boot', 'shared', 'comp'], '常驻期缺席')
+      },
+    },
+    {
+      label: '常驻期有的段以常驻期那份为准（勾选 / 文本覆写另外两态）',
+      run: () => {
+        // 引导期单独屏蔽了 shared：常驻期没屏蔽 → 并集行取常驻期那份，屏蔽被覆写掉。
+        const rows = mirroredRows({ sectionsBootstrap: ['shared'] }, mirrorViews(), mirrorNative)
+        assert.deepEqual(rows.map((row) => [row.name, row.blocked]), [
+          ['shared', false], ['act', false], ['boot', false], ['comp', false],
+        ], '常驻期那份为准')
+        assert.deepEqual(mirroredDeniedLists(rows), { sections: [], sectionsBootstrap: [], sectionsCompaction: [] }, '名单归一')
+      },
+    },
+    {
+      label: '同名段优先取原生那一阶段的行（注入正文不冻结回原生阶段）',
+      run: () => {
+        const cfg = { inject: [{ name: 'boot', order: 0, text: 'BOOT', phase: 'active', custom: false }] }
+        const rows = mirroredRows(cfg, mirrorViews(), mirrorNative)
+        const boot = rows.find((row) => row.name === 'boot')
+        // 引导期原生 → 用引导期那份（override 为空），不是常驻期那份带正文的注入行
+        assert.equal(boot.override, '', 'override 为空')
+        assert.equal(boot.text, 'BOOT', 'text 取原生')
+        assert.deepEqual(rows.map((row) => row.name), ['shared', 'boot', 'act', 'comp'], '行序')
+        assert.deepEqual(mirrorPhaseInjectEntries(cfg, rows, mirrorNative).filter((item) => item.name === 'boot'), [
+          { name: 'boot', order: 1, text: 'BOOT', phase: 'active', custom: false },
+          { name: 'boot', order: 1, text: '', phase: 'bootstrap', custom: false },
+          { name: 'boot', order: 1, text: 'BOOT', phase: 'compaction', custom: false },
+        ], '三阶段条目')
+      },
+    },
   ]
-  const nativeOf = (key, name) => key === 'active' && (name === 'shared' || name === 'replaced')
-  const list = mirrorPhaseInjectEntries({ inject: [] }, rows, nativeOf)
-  assert.deepEqual(list.filter((item) => item.phase === 'active'), [
-    // 原生且无替换 → 只覆盖 order（注册表原文不冻结进配置）
-    { name: 'shared', order: 0, text: '', phase: 'active', custom: false },
-    // 非原生 → 必须带正文才能被服务端建出来
-    { name: 'act', order: 1, text: 'ACT', phase: 'active', custom: false },
-    // 原生但有替换文本 → 正文照写（否则替换在该阶段不生效）
-    { name: 'replaced', order: 2, text: 'NEW', phase: 'active', custom: false },
-  ])
-  assert.deepEqual(list.filter((item) => item.phase === 'bootstrap'), [
-    { name: 'shared', order: 0, text: 'S', phase: 'bootstrap', custom: false },
-    { name: 'act', order: 1, text: 'ACT', phase: 'bootstrap', custom: false },
-    { name: 'replaced', order: 2, text: 'NEW', phase: 'bootstrap', custom: false },
-  ])
-})
-
-test('mirrorPhaseInjectEntries：动态段跳过、always 只留行集里的名字、未就绪阶段整段跳过', () => {
-  const cfg = {
-    inject: [
-      { name: 'keep', order: 0, text: 'K', custom: true },
-      { name: 'gone', order: 1, text: 'G', custom: true },
-    ],
+  for (const c of cases) {
+    try {
+      c.run()
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
   }
-  const rows = [
-    { name: 'keep', text: 'K', custom: true, override: 'K', blocked: false },
-    { name: 'dyn', text: '<动态生成>', custom: false, override: '', blocked: false },
+})
+
+test('mirrorPhaseInjectEntries：原生段只写 order / 非原生段带正文 / 替换文本恒写，动态段与未就绪阶段跳过', () => {
+  const cases = [
+    {
+      label: '原生系统段只写 order，非原生段带正文，替换文本恒写',
+      run: () => {
+        const rows = [
+          { name: 'shared', text: 'S', custom: false, override: '', blocked: false },
+          { name: 'act', text: 'ACT', custom: false, override: '', blocked: false },
+          { name: 'replaced', text: 'OLD', custom: false, override: 'NEW', blocked: false },
+        ]
+        const nativeOf = (key, name) => key === 'active' && (name === 'shared' || name === 'replaced')
+        const list = mirrorPhaseInjectEntries({ inject: [] }, rows, nativeOf)
+        assert.deepEqual(list.filter((item) => item.phase === 'active'), [
+          // 原生且无替换 → 只覆盖 order（注册表原文不冻结进配置）
+          { name: 'shared', order: 0, text: '', phase: 'active', custom: false },
+          // 非原生 → 必须带正文才能被服务端建出来
+          { name: 'act', order: 1, text: 'ACT', phase: 'active', custom: false },
+          // 原生但有替换文本 → 正文照写（否则替换在该阶段不生效）
+          { name: 'replaced', order: 2, text: 'NEW', phase: 'active', custom: false },
+        ], 'active 阶段')
+        assert.deepEqual(list.filter((item) => item.phase === 'bootstrap'), [
+          { name: 'shared', order: 0, text: 'S', phase: 'bootstrap', custom: false },
+          { name: 'act', order: 1, text: 'ACT', phase: 'bootstrap', custom: false },
+          { name: 'replaced', order: 2, text: 'NEW', phase: 'bootstrap', custom: false },
+        ], 'bootstrap 阶段')
+      },
+    },
+    {
+      label: '动态段跳过、always 只留行集里的名字、未就绪阶段整段跳过',
+      run: () => {
+        const cfg = {
+          inject: [
+            { name: 'keep', order: 0, text: 'K', custom: true },
+            { name: 'gone', order: 1, text: 'G', custom: true },
+          ],
+        }
+        const rows = [
+          { name: 'keep', text: 'K', custom: true, override: 'K', blocked: false },
+          { name: 'dyn', text: '<动态生成>', custom: false, override: '', blocked: false },
+        ]
+        const list = mirrorPhaseInjectEntries(cfg, rows, () => false)
+        // always 条目只保留名字仍在行集里的（删除一个自定义段 = 三态一起消失）
+        assert.deepEqual(list[0], { name: 'keep', order: 0, text: 'K', custom: true }, 'always 只留行集内')
+        assert.equal(list.some((item) => item.name === 'gone'), false, '删除的自定义段消失')
+        // 动态段建不出来 → 三个阶段都不写（它留在自己原有的阶段里）
+        assert.equal(list.some((item) => item.name === 'dyn'), false, '动态段不写')
+        assert.deepEqual(mirrorSkippedNames(rows, () => false), ['dyn'], '跳过名单')
+        // 某阶段视图未就绪（null）→ 该阶段整段跳过，绝不把缺失的阶段当空集写掉
+        const partial = mirrorPhaseInjectEntries({ inject: [] }, rows, (key) => (key === 'compaction' ? null : false))
+        assert.deepEqual(partial.map((item) => item.phase), ['active', 'bootstrap'], '未就绪阶段跳过')
+      },
+    },
   ]
-  const list = mirrorPhaseInjectEntries(cfg, rows, () => false)
-  // always 条目只保留名字仍在行集里的（删除一个自定义段 = 三态一起消失）
-  assert.deepEqual(list[0], { name: 'keep', order: 0, text: 'K', custom: true })
-  assert.equal(list.some((item) => item.name === 'gone'), false)
-  // 动态段建不出来 → 三个阶段都不写（它留在自己原有的阶段里）
-  assert.equal(list.some((item) => item.name === 'dyn'), false)
-  assert.deepEqual(mirrorSkippedNames(rows, () => false), ['dyn'])
-  // 某阶段视图未就绪（null）→ 该阶段整段跳过，绝不把缺失的阶段当空集写掉
-  const partial = mirrorPhaseInjectEntries({ inject: [] }, rows, (key) => (key === 'compaction' ? null : false))
-  assert.deepEqual(partial.map((item) => item.phase), ['active', 'bootstrap'])
+  for (const c of cases) {
+    try {
+      c.run()
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 test('mirroredDeniedLists：三份屏蔽名单统一为并集行集里的屏蔽名集合', () => {

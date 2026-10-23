@@ -53,6 +53,10 @@ const fakeCtx = (cwd) => ({
   profileContext: { cwd },
 })
 
+// 表驱动合并：「根顺序」的两条（有内容 / 空目录）与「.git 祖先判定」共用同一张
+// 场景表，逐项执行原断言；每项各自 sandbox，隔离不变。skills-host 那条要起路由，
+// 保持独立。
+
 test('skill-roots: 四个目录按优先级排列（工作区先于用户级，.dsh 先于 .agents）', async () => {
   const box = sandbox()
   try {

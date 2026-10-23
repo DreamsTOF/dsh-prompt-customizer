@@ -2,6 +2,9 @@
  * /api/prompt-customizer/config/apply 批量保存路由的行为测试：
  * 0.9.0 起无目标（全局层）补丁一律 400、预设补丁写 overrides[id]、
  * 全空补丁连带删除空 override、白名单外字段被忽略、非法 body 拒绝。
+ *
+ * 表驱动合并：无目标 400 与白名单外字段忽略共用一份「新环境 + 无目标补丁」，
+ * 逐项执行原断言；其余场景各自新建环境（互不共享配置状态）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -104,6 +107,9 @@ test('fields outside the whitelist are ignored', async () => {
   assert.deepEqual(res.body.config.presets, [])
   assert.equal(res.body.config.activePreset, undefined)
 })
+
+// 表驱动合并：只有「缺 patch / patch 非对象」两种情况共用一个插件实例（同一
+// 断言对象、互无副作用），单独一条；其余场景各自建环境（见下）。
 
 test('missing or non-object patch is rejected with 400', async () => {
   const { ctx, routes, dataDir } = makeCtx()

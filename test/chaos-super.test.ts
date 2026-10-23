@@ -319,22 +319,49 @@ function checkAfterApply(w: World, before: Config, preset: Preset, after: Config
 // 原实现只在浏览器可用（Blob+<a download> / <input type=file>+FileReader）。
 // 宿主被封装成 tauri WebView 后，导出优先走原生保存对话框+dialog/fs 插件，
 // 导入优先走原生打开对话框；宿主未注册插件或被 ACL 拦截时优雅回退 web 路径。
+//
+// 表驱动合并：同一入口（导出 / 导入 / 原生命令 / 浏览器下载与选文件）的各场景
+// 放进数据表，逐项执行原断言；每项失败时 label 会写进错误信息。
+
+/** 当前场景前缀，供断言 label 使用（避免每个断言都手写场景名）。 */
+let IO_SCENE = ''
+
+/** 把场景名盖到断言错误信息上，失败时能直接看出是哪一项。 */
+async function asScene<T>(label: string, run: () => T | Promise<T>): Promise<void> {
+  IO_SCENE = label
+  try {
+    await run()
+  } catch (e) {
+    if (e instanceof Error) e.message = `[${IO_SCENE}] ${e.message}`
+    throw e
+  }
+}
+
+const ioLabel = (what: string): string => `${IO_SCENE}｜${what}`
 
 test('io: 导出文件名净化非法字符并修剪尾部点/空格', () => {
-  assert.equal(presetExportFilename('a/b\\c:d*e?"f<g>h|i'), 'a_b_c_d_e__f_g_h_i.json')
-  assert.equal(presetExportFilename('preset.'), 'preset.json')
-  assert.equal(presetExportFilename('   '), 'preset.json')
-  assert.equal(presetExportFilename('Weird\tName'), 'Weird_Name.json')
-  assert.equal(presetExportFilename('αβγ'), 'αβγ.json')
+  for (const [input, expected] of [
+    ['a/b\\c:d*e?"f<g>h|i', 'a_b_c_d_e__f_g_h_i.json'],
+    ['preset.', 'preset.json'],
+    ['   ', 'preset.json'],
+    ['Weird\tName', 'Weird_Name.json'],
+    ['αβγ', 'αβγ.json'],
+  ] as const) {
+    assert.equal(presetExportFilename(input), expected, ioLabel(`净化 ${JSON.stringify(input)}`))
+  }
 })
 
 test('io: tauri 环境检测（v2 __TAURI_INTERNALS__ / v1 __TAURI__）', () => {
-  assert.equal(isTauriEnv({ __TAURI_INTERNALS__: { invoke() {} } }), true)
-  assert.equal(isTauriEnv({ __TAURI_INTERNALS__: {} }), true)
-  assert.equal(isTauriEnv({ __TAURI__: {} }), true)
-  assert.equal(isTauriEnv({}), false)
-  assert.equal(isTauriEnv(null), false)
-  assert.equal(isTauriEnv(undefined), false)
+  for (const [label, probe, expected] of [
+    ['v2 internals 带 invoke', { __TAURI_INTERNALS__: { invoke() {} } }, true],
+    ['v2 internals 空对象', { __TAURI_INTERNALS__: {} }, true],
+    ['v1 __TAURI__', { __TAURI__: {} }, true],
+    ['空对象', {}, false],
+    ['null', null, false],
+    ['undefined', undefined, false],
+  ] as const) {
+    assert.equal(isTauriEnv(probe as never), expected, ioLabel(label))
+  }
 })
 
 test('io: encode→decode→import 走真实文件格式无损往返', () => {
@@ -349,163 +376,187 @@ test('io: encode→decode→import 走真实文件格式无损往返', () => {
     },
   }
   const text = encodePresetExport(preset)
-  assert.equal(JSON.parse(text).name, preset.name)
+  assert.equal(JSON.parse(text).name, preset.name, '编码后的 name')
   const imported = addImportedPresets([], decodePresetExport(text), () => 'new')[0]!
-  assert.equal(imported.name, preset.name)
+  assert.equal(imported.name, preset.name, '导入后的 name')
   // JSON 语义无损：encode→decode 与纯 JSON 序列化等价（undefined 键被 JSON 合法剥离）。
-  assert.deepEqual(imported.data, JSON.parse(JSON.stringify(preset.data)))
+  assert.deepEqual(imported.data, JSON.parse(JSON.stringify(preset.data)), 'data 无损')
 })
 
 test('io: decode 拒绝非法 JSON/空文本，垃圾形状导入不出错', () => {
-  assert.throws(() => decodePresetExport('{oops'))
-  assert.throws(() => decodePresetExport('undefined'))
-  assert.throws(() => decodePresetExport(''))
-  assert.throws(() => decodePresetExport('   '))
+  for (const bad of ['{oops', 'undefined', '', '   ']) {
+    assert.throws(() => decodePresetExport(bad), ioLabel(`拒绝 ${JSON.stringify(bad)}`))
+  }
   // null 是合法 JSON：解析出 null，导入时被滤掉，不抛错。
-  assert.doesNotThrow(() => decodePresetExport(null as unknown as string))
-  assert.equal(addImportedPresets([], decodePresetExport('null'), () => 'x').length, 0)
+  assert.doesNotThrow(() => decodePresetExport(null as unknown as string), ioLabel('null 不抛错'))
+  assert.equal(addImportedPresets([], decodePresetExport('null'), () => 'x').length, 0, ioLabel('null 导入被滤掉'))
   const two = addImportedPresets([], decodePresetExport(JSON.stringify([{ name: 'A', data: {} }])), () => 'y')
-  assert.deepEqual(two.map((p) => p.name), ['A'])
+  assert.deepEqual(two.map((p) => p.name), ['A'], ioLabel('数组导入'))
 })
 
-test('io: 导出在宿主提供原生 dialog/fs 时走 tauri 保存对话框', async () => {
-  const calls: Array<{ file: string; text: string }> = []
-  const io: PresetIoEnv = {
-    tauri: true,
-    saveText: async (file, text) => { calls.push({ file, text }); return { kind: 'saved' } },
-    openText: async () => ({ kind: 'cancelled' }),
-    download: () => { throw new Error('web fallback must not run') },
+test('io: 导出的宿主分派（tauri 原生保存 / 回退 web / 取消 / 纯 web / 原生不可用）', async () => {
+  const scenes = [
+    {
+      label: '原生 dialog/fs 可用 → tauri 保存对话框',
+      preset: { id: 'p', name: 'My Preset', data: { sections: ['a'] } } as Preset,
+      io: (calls: Array<{ file: string; text: string }>): PresetIoEnv => ({
+        tauri: true,
+        saveText: async (file, text) => { calls.push({ file, text }); return { kind: 'saved' } },
+        openText: async () => ({ kind: 'cancelled' }),
+        download: () => { throw new Error('web fallback must not run') },
+      }),
+      check: async (res: any, calls: Array<{ file: string; text: string }>) => {
+        assert.equal(res.ok, true)
+        assert.equal(res.via, 'tauri')
+        assert.equal(calls.length, 1)
+        assert.equal(calls[0]!.file, 'My Preset.json')
+        assert.deepEqual(JSON.parse(calls[0]!.text), { name: 'My Preset', data: { sections: ['a'] } })
+      },
+    },
+    {
+      label: '原生对话框不可用（未注册插件 / ACL 拦截）→ 回退 web 下载',
+      preset: { id: 'p', name: 'P', data: {} } as Preset,
+      io: (downloads: string[]): PresetIoEnv => ({
+        tauri: true,
+        saveText: async () => ({ kind: 'unavailable' }),
+        openText: async () => ({ kind: 'unavailable' }),
+        download: (_n, text) => { downloads.push(text) },
+      }),
+      check: async (res: any, downloads: string[]) => {
+        assert.equal(res.ok, true)
+        assert.equal(res.via, 'browser')
+        assert.equal(downloads.length, 1)
+        assert.equal(JSON.parse(downloads[0]!).name, 'P')
+      },
+    },
+    {
+      label: '用户取消原生保存 → 不得再触发 web 下载',
+      preset: { id: 'p', name: 'P', data: {} } as Preset,
+      io: (): PresetIoEnv => ({
+        tauri: true,
+        saveText: async () => ({ kind: 'cancelled' }),
+        openText: async () => ({ kind: 'cancelled' }),
+        download: () => { throw new Error('must not download after cancel') },
+      }),
+      check: async (res: any) => {
+        assert.equal(res.ok, false)
+        assert.equal(res.cancelled, true)
+      },
+    },
+    {
+      label: '纯 web 环境 → 直接走浏览器下载',
+      preset: { id: 'p', name: 'web', data: {} } as Preset,
+      io: (downloads: string[]): PresetIoEnv => ({
+        tauri: false,
+        saveText: async () => ({ kind: 'unavailable' }),
+        openText: async () => ({ kind: 'unavailable' }),
+        download: (_n, text) => { downloads.push(text) },
+      }),
+      check: async (res: any, downloads: string[]) => {
+        assert.equal(res.ok, true)
+        assert.equal(res.via, 'browser')
+        assert.equal(downloads.length, 1)
+      },
+    },
+  ] as const
+
+  for (const scene of scenes) {
+    await asScene(scene.label, async () => {
+      const sink: any[] = []
+      const io = (scene.io as (sink: any[]) => PresetIoEnv)(sink)
+      const res = await exportPresetFile(scene.preset, io)
+      await (scene.check as (res: any, sink: any[]) => Promise<void>)(res, sink)
+    })
   }
-  const preset: Preset = { id: 'p', name: 'My Preset', data: { sections: ['a'] } }
-  const res = await exportPresetFile(preset, io)
-  assert.equal(res.ok, true)
-  assert.equal(res.via, 'tauri')
-  assert.equal(calls.length, 1)
-  assert.equal(calls[0]!.file, 'My Preset.json')
-  assert.deepEqual(JSON.parse(calls[0]!.text), { name: 'My Preset', data: { sections: ['a'] } })
 })
 
-test('io: 原生对话框不可用（未注册插件/ACL 拦截）时导出回退 web 下载', async () => {
-  const downloads: string[] = []
-  const io: PresetIoEnv = {
-    tauri: true,
-    saveText: async () => ({ kind: 'unavailable' }),
-    openText: async () => ({ kind: 'unavailable' }),
-    download: (_n, text) => { downloads.push(text) },
-  }
-  const res = await exportPresetFile({ id: 'p', name: 'P', data: {} }, io)
-  assert.equal(res.ok, true)
-  assert.equal(res.via, 'browser')
-  assert.equal(downloads.length, 1)
-  assert.equal(JSON.parse(downloads[0]!).name, 'P')
-})
-
-test('io: 用户取消原生保存对话框后不得再触发 web 下载', async () => {
-  const io: PresetIoEnv = {
-    tauri: true,
-    saveText: async () => ({ kind: 'cancelled' }),
-    openText: async () => ({ kind: 'cancelled' }),
-    download: () => { throw new Error('must not download after cancel') },
-  }
-  const res = await exportPresetFile({ id: 'p', name: 'P', data: {} }, io)
-  assert.equal(res.ok, false)
-  assert.equal(res.cancelled, true)
-})
-
-test('io: 纯 web 环境导出直接走浏览器下载', async () => {
-  const downloads: string[] = []
-  const io: PresetIoEnv = {
-    tauri: false,
-    saveText: async () => ({ kind: 'unavailable' }),
-    openText: async () => ({ kind: 'unavailable' }),
-    download: (_n, text) => { downloads.push(text) },
-  }
-  const res = await exportPresetFile({ id: 'p', name: 'web', data: {} }, io)
-  assert.equal(res.ok, true)
-  assert.equal(res.via, 'browser')
-  assert.equal(downloads.length, 1)
-})
-
-test('io: 导入在 tauri 下读原生打开对话框选中的文件', async () => {
+test('io: 导入分派（tauri 原生打开 / 取消与不可用回退选择器）', async () => {
   const text = encodePresetExport({ id: 'p', name: 'N', data: { sections: ['a'] } })
-  const io: PresetIoEnv = {
-    tauri: true,
-    saveText: async () => ({ kind: 'unavailable' }),
-    openText: async () => ({ kind: 'text', text }),
-    download: () => {},
-  }
-  const res = await importPresetFile(io)
-  assert.equal(res.kind, 'text')
-  assert.equal(res.via, 'tauri')
-  if (res.kind === 'text') assert.equal(res.text, text)
+
+  await asScene('tauri 下读原生打开对话框选中的文件', async () => {
+    const io: PresetIoEnv = {
+      tauri: true,
+      saveText: async () => ({ kind: 'unavailable' }),
+      openText: async () => ({ kind: 'text', text }),
+      download: () => {},
+    }
+    const res = await importPresetFile(io)
+    assert.equal(res.kind, 'text')
+    assert.equal(res.via, 'tauri')
+    if (res.kind === 'text') assert.equal(res.text, text)
+  })
+
+  await asScene('取消 / 不可用 → 组件回退文件选择器', async () => {
+    const base: PresetIoEnv = {
+      tauri: true,
+      saveText: async () => ({ kind: 'unavailable' }),
+      openText: async () => ({ kind: 'unavailable' }),
+      download: () => {},
+    }
+    assert.equal((await importPresetFile(base)).kind, 'unavailable')
+    assert.equal((await importPresetFile({ ...base, openText: async () => ({ kind: 'cancelled' }) })).kind, 'cancelled')
+    assert.equal((await importPresetFile({ ...base, tauri: false })).kind, 'unavailable')
+  })
 })
 
-test('io: 导入取消 / 不可用 → 组件回退文件选择器', async () => {
-  const base: PresetIoEnv = {
-    tauri: true,
-    saveText: async () => ({ kind: 'unavailable' }),
-    openText: async () => ({ kind: 'unavailable' }),
-    download: () => {},
-  }
-  assert.equal((await importPresetFile(base)).kind, 'unavailable')
-  assert.equal((await importPresetFile({ ...base, openText: async () => ({ kind: 'cancelled' }) })).kind, 'cancelled')
-  assert.equal((await importPresetFile({ ...base, tauri: false })).kind, 'unavailable')
+test('io: 原生命令契约（plugin:dialog|* + plugin:fs|*，拒绝降级、null 视为取消）', async () => {
+  await asScene('原生命令契约 = plugin:dialog|* + plugin:fs|*', async () => {
+    const cmds: string[] = []
+    const writes: Array<Record<string, unknown>> = []
+    const invoke: TauriInvoke = async (cmd, args) => {
+      cmds.push(cmd)
+      if (cmd === 'plugin:dialog|save') return '/tmp/out.json'
+      if (cmd === 'plugin:fs|write_text_file') { writes.push(args ?? {}); return null }
+      if (cmd === 'plugin:dialog|open') return '/tmp/in.json'
+      if (cmd === 'plugin:fs|read_text_file') return '{"name":"N","data":{}}'
+      throw new Error('unexpected ' + cmd)
+    }
+    assert.deepEqual(await tauriSaveText(invoke, 'p.json', '{}'), { kind: 'saved' })
+    assert.deepEqual(cmds, ['plugin:dialog|save', 'plugin:fs|write_text_file'])
+    assert.deepEqual(writes, [{ path: '/tmp/out.json', contents: '{}' }])
+    cmds.length = 0
+    assert.deepEqual(await tauriOpenText(invoke), { kind: 'text', text: '{"name":"N","data":{}}' })
+    assert.deepEqual(cmds, ['plugin:dialog|open', 'plugin:fs|read_text_file'])
+  })
+
+  await asScene('原生命令被拒（缺插件 / ACL）降级 unavailable，对话框返回 null 视为取消', async () => {
+    const reject: TauriInvoke = async () => { throw new Error('not allowed') }
+    assert.deepEqual(await tauriSaveText(reject, 'p.json', 'x'), { kind: 'unavailable' })
+    assert.deepEqual(await tauriOpenText(reject), { kind: 'unavailable' })
+    const cancel: TauriInvoke = async (cmd) => (cmd === 'plugin:dialog|save' || cmd === 'plugin:dialog|open' ? null : 'x')
+    assert.deepEqual(await tauriSaveText(cancel, 'p.json', 'x'), { kind: 'cancelled' })
+    assert.deepEqual(await tauriOpenText(cancel), { kind: 'cancelled' })
+  })
 })
 
-test('io: 原生命令契约 = plugin:dialog|* + plugin:fs|*', async () => {
-  const cmds: string[] = []
-  const writes: Array<Record<string, unknown>> = []
-  const invoke: TauriInvoke = async (cmd, args) => {
-    cmds.push(cmd)
-    if (cmd === 'plugin:dialog|save') return '/tmp/out.json'
-    if (cmd === 'plugin:fs|write_text_file') { writes.push(args ?? {}); return null }
-    if (cmd === 'plugin:dialog|open') return '/tmp/in.json'
-    if (cmd === 'plugin:fs|read_text_file') return '{"name":"N","data":{}}'
-    throw new Error('unexpected ' + cmd)
-  }
-  assert.deepEqual(await tauriSaveText(invoke, 'p.json', '{}'), { kind: 'saved' })
-  assert.deepEqual(cmds, ['plugin:dialog|save', 'plugin:fs|write_text_file'])
-  assert.deepEqual(writes, [{ path: '/tmp/out.json', contents: '{}' }])
-  cmds.length = 0
-  assert.deepEqual(await tauriOpenText(invoke), { kind: 'text', text: '{"name":"N","data":{}}' })
-  assert.deepEqual(cmds, ['plugin:dialog|open', 'plugin:fs|read_text_file'])
-})
+test('io: web 下载与选文件适配（anchor.click / objectURL 撤销 / FileReader）', async () => {
+  await asScene('web 下载触发 anchor.click 并撤销 objectURL', async () => {
+    let clicked = ''
+    let revoked = ''
+    let blobText = ''
+    const target: BrowserDownloadTarget = {
+      makeAnchor: () => ({ href: '', download: '', click() { clicked = this.download } }),
+      makeBlob: (text) => { blobText = text; return {} },
+      objectUrl: () => 'blob:fake',
+      revoke: (u) => { revoked = u },
+    }
+    webDownload(target, 'p.json', '{"a":1}')
+    assert.equal(clicked, 'p.json')
+    assert.equal(blobText, '{"a":1}')
+    assert.equal(revoked, 'blob:fake')
+  })
 
-test('io: 原生命令被拒（缺插件/ACL）降级 unavailable，对话框返回 null 视为取消', async () => {
-  const reject: TauriInvoke = async () => { throw new Error('not allowed') }
-  assert.deepEqual(await tauriSaveText(reject, 'p.json', 'x'), { kind: 'unavailable' })
-  assert.deepEqual(await tauriOpenText(reject), { kind: 'unavailable' })
-  const cancel: TauriInvoke = async (cmd) => (cmd === 'plugin:dialog|save' || cmd === 'plugin:dialog|open' ? null : 'x')
-  assert.deepEqual(await tauriSaveText(cancel, 'p.json', 'x'), { kind: 'cancelled' })
-  assert.deepEqual(await tauriOpenText(cancel), { kind: 'cancelled' })
-})
-
-test('io: web 下载触发 anchor.click 并撤销 objectURL', () => {
-  let clicked = ''
-  let revoked = ''
-  let blobText = ''
-  const target: BrowserDownloadTarget = {
-    makeAnchor: () => ({ href: '', download: '', click() { clicked = this.download } }),
-    makeBlob: (text) => { blobText = text; return {} },
-    objectUrl: () => 'blob:fake',
-    revoke: (u) => { revoked = u },
-  }
-  webDownload(target, 'p.json', '{"a":1}')
-  assert.equal(clicked, 'p.json')
-  assert.equal(blobText, '{"a":1}')
-  assert.equal(revoked, 'blob:fake')
-})
-
-test('io: readPickedFile 通过 FileReader-like 解析选中文件文本', async () => {
-  const fake: FileReaderLike = {
-    onload: null,
-    onerror: null,
-    result: '{"name":"R","data":{}}',
-    readAsText() { this.onload?.() },
-  }
-  assert.equal(await readPickedFile(fake, {}), '{"name":"R","data":{}}')
-  const bad: FileReaderLike = { onload: null, onerror: null, result: null, readAsText() { this.onerror?.() } }
-  await assert.rejects(() => readPickedFile(bad, {}))
+  await asScene('readPickedFile 通过 FileReader-like 解析选中文件文本', async () => {
+    const fake: FileReaderLike = {
+      onload: null,
+      onerror: null,
+      result: '{"name":"R","data":{}}',
+      readAsText() { this.onload?.() },
+    }
+    assert.equal(await readPickedFile(fake, {}), '{"name":"R","data":{}}')
+    const bad: FileReaderLike = { onload: null, onerror: null, result: null, readAsText() { this.onerror?.() } }
+    await assert.rejects(() => readPickedFile(bad, {}))
+  })
 })
 
 test('io: makeIoEnv 在有 __TAURI_INTERNALS__ 的宿主上接上原生桥', async () => {

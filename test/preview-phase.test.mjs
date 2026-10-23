@@ -14,33 +14,30 @@ import { createPhaseProjection, presetOfSession, statusOf, PHASE_PROJECTION_KEY 
 // 阶段裁剪插件在只读预览里运行；最新 harness 的裁剪已移到 agent-loop 层，
 // 且 roster 不变量对「未加入预设的 agent」直接 fail —— 预览已改为纯 scope
 // 诊断装配，伪会话随之删除，只保留这份阶段语义测试。
+//
+// 表驱动合并：事件序列与读取回落都是纯数据表，逐项执行原断言。
 
 /** 按投影契约折叠一串事件（宿主 materializeCells 懒折叠的最小同构）。 */
 function fold(projection, events) {
   return events.reduce((state, event) => projection.apply(state, event), projection.init({}, 0))
 }
 
-test('bootstrap phase: no events, not promoted, no boundary', () => {
-  assert.deepEqual(fold(createPhaseProjection(), []), { boundary: -1, promoted: false })
-})
-
-test('compaction phase: compaction/end resets promotion', () => {
-  assert.deepEqual(fold(createPhaseProjection(), [{ type: 'compaction/end', seq: 1 }]), { boundary: 1, promoted: false })
-})
-
-test('active phase: promotion signal after boundary', () => {
-  assert.deepEqual(fold(createPhaseProjection(), [{ type: 'assistant/message', seq: 1 }]), { boundary: -1, promoted: true })
-})
-
-test('a signal at the compaction boundary does not promote; a newer one does', () => {
-  const events = [
+test('阶段投影折叠：bootstrap / compaction / active / 边界同 seq 不 promote、更新 signal 才 promote', () => {
+  const boundaryEvents = [
     { type: 'tool/call', seq: 1 },
     { type: 'compaction/end', seq: 2 },
     { type: 'tool/call', seq: 2 }, // 与边界同 seq：不算「边界之后」
   ]
-  assert.deepEqual(fold(createPhaseProjection(), events), { boundary: 2, promoted: false })
-  events.push({ type: 'tool/call', seq: 3 })
-  assert.deepEqual(fold(createPhaseProjection(), events), { boundary: 2, promoted: true })
+  const cases = [
+    { label: 'bootstrap phase: no events, not promoted, no boundary', events: [], expected: { boundary: -1, promoted: false } },
+    { label: 'compaction phase: compaction/end resets promotion', events: [{ type: 'compaction/end', seq: 1 }], expected: { boundary: 1, promoted: false } },
+    { label: 'active phase: promotion signal after boundary', events: [{ type: 'assistant/message', seq: 1 }], expected: { boundary: -1, promoted: true } },
+    { label: 'a signal at the compaction boundary does not promote', events: boundaryEvents, expected: { boundary: 2, promoted: false } },
+    { label: 'a newer signal after the boundary does promote', events: [...boundaryEvents, { type: 'tool/call', seq: 3 }], expected: { boundary: 2, promoted: true } },
+  ]
+  for (const c of cases) {
+    assert.deepEqual(fold(createPhaseProjection(), c.events), c.expected, c.label)
+  }
 })
 
 test('unrelated events keep the same state reference (Object.is suppression)', () => {

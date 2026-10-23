@@ -92,13 +92,41 @@ async function inventoryOf(routes) {
   return JSON.parse(res.body)
 }
 
-test('模式清单不把已有对话的专属段当作预设定义', async () => {
-  const { ctx, routes, dataDir } = makeCtx()
-  apply(ctx, { dataDir })
-  const body = await inventoryOf(routes)
-  const names = body.sections.map(sec => sec.name)
-  assert.ok(!names.includes(RUNTIME_ONLY.name))
-  assert.ok(names.includes('persona') && names.includes('core'))
+// 表驱动合并：两条「清单里不该出现什么」的断言都以清单响应为对象，进同一张表
+// 逐项执行（每项各自建环境）；其余用例要串起多步装配 / 路由请求，保持独立。
+
+test('清单的首屏形状：模式清单不含对话专属段，只跑预览时也不凭空多段', async () => {
+  const cases = [
+    {
+      label: '模式清单不把已有对话的专属段当作预设定义',
+      run: async (h) => {
+        const body = await inventoryOf(h.routes)
+        const names = body.sections.map(sec => sec.name)
+        assert.ok(!names.includes(RUNTIME_ONLY.name))
+        assert.ok(names.includes('persona') && names.includes('core'))
+      },
+    },
+    {
+      label: '预览只并它自己看见的：预设 scope 里没有的段不会凭空出现',
+      liveAgent: false,
+      run: async (h) => {
+        // 只跑预览（promptCustomizerBase 那次由 buildPreview 自己并），作用域是预设。
+        await h.ctx.systemPrompt.assemble({ scope: 'preset:standard', promptCustomizerBase: true, promptCustomizerPhase: 'active' })
+        const body = await inventoryOf(h.routes)
+        assert.deepEqual(body.sections.map((sec) => sec.name).sort(), ['core', 'persona'])
+      },
+    },
+  ]
+  for (const c of cases) {
+    try {
+      const h = makeCtx(c.liveAgent === undefined ? undefined : { liveAgent: c.liveAgent })
+      apply(h.ctx, { dataDir: h.dataDir })
+      await c.run(h)
+    } catch (e) {
+      e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
+  }
 })
 
 test('没有活着的 agent 时回落运行时累积：跑过一次真实装配就列出来', async () => {
@@ -122,7 +150,6 @@ test('预览只并它自己看见的：预设 scope 里没有的段不会凭空�
   const body = await inventoryOf(routes)
   assert.deepEqual(body.sections.map((sec) => sec.name).sort(), ['core', 'persona'])
 })
-
 test('真实 agent 预览列出会话级段，诊断预览不混入其它 agent', async () => {
   const { ctx } = makeCtx()
   apply(ctx, { dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'pc-preview-agent-')) })

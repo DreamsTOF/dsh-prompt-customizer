@@ -24,20 +24,22 @@ const CLIENT = path.join(ROOT, 'client/client.js')
 
 const bundle = fs.readFileSync(CLIENT, 'utf8')
 
-test('面板让出 Windows 标题栏高度（否则顶部 tab 被拖拽条吞掉点击）', () => {
-  assert.match(
-    bundle,
-    /\[data-windows-titlebar\]\s*\.psh-card\{[^}]*dsh-windows-titlebar-height/,
-    'client.js 里缺少 [data-windows-titlebar] .psh-card 的 top 让位规则',
-  )
-})
-
-test('drawer 让位后高度由 top/bottom 决定（不能留死高 100dvh）', () => {
-  assert.match(
-    bundle,
-    /\[data-windows-titlebar\]\s*\.psh-card\[data-mode='drawer'\]\{[^}]*bottom:0/,
-    'drawer 在 Windows 下需要取消固定高度，否则让位后底部溢出',
-  )
+test('Windows 标题栏适配：面板与 drawer 都让出 --dsh-windows-titlebar-height', () => {
+  const cases = [
+    {
+      label: '面板让出 Windows 标题栏高度（否则顶部 tab 被拖拽条吞掉点击）',
+      pattern: /\[data-windows-titlebar\]\s*\.psh-card\{[^}]*dsh-windows-titlebar-height/,
+      hint: 'client.js 里缺少 [data-windows-titlebar] .psh-card 的 top 让位规则',
+    },
+    {
+      label: 'drawer 让位后高度由 top/bottom 决定（不能留死高 100dvh）',
+      pattern: /\[data-windows-titlebar\]\s*\.psh-card\[data-mode='drawer'\]\{[^}]*bottom:0/,
+      hint: 'drawer 在 Windows 下需要取消固定高度，否则让位后底部溢出',
+    },
+  ]
+  for (const c of cases) {
+    assert.match(bundle, c.pattern, `${c.label}：${c.hint}`)
+  }
 })
 
 test('样式文本里不残留 CSS Module 的 :global()（注入的是纯 CSS）', () => {

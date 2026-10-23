@@ -63,6 +63,17 @@
 - **按会话阶段分层**：引导期（未晋级）/ 常驻期（晋级后）/ 压缩受控期（压缩后仍未晋级）各有**独立的屏蔽名单、独立的排序空间、独立的工具目录**。同一个预设可以做到首轮只给模型 1 个工具和几段提示词，晋级后放开全套。
 - **按 agent 预设分层**：顶部预设 Tab 选中某个 agent 预设后，改动只对该预设生效；**0.9.0 起「全部 Agent」全局层停用**——提示词必须按具体预设修改，预设未定制的字段 = 官方默认（旧全局层数据保留在 config.yaml 里不再生效，可手编回滚）。
 
+## 0.11.6：测试精简（176 → 117 用例）
+
+两轮清理，`node --test` 始终全绿：
+
+1. **删除 6 个过时测试文件**（−19%）：`scripts/test-mcp-layering.mjs`、`scripts/test-mcp-tool-disable.mjs`（0.11.0 已废弃的 mcp-client 行挂载模型）、`scripts/test-skill-toggles.mjs`（旧 frontmatter 语义，与现有覆盖重复）、`scripts/test-rc2-runtime.mjs`（硬编码只认 0.2.0-rc.2，自述在 0.2.1-rc.2 上必然失败）、`test/catalog-replace.test.mjs`（mergeSighting 与 `catalog.test.mjs` 逐条重复）、`test/live-preview.test.mjs`（被 `rc2-preview` / `apply-route` 覆盖）。
+2. **同组用例参数化合并**（−27%）：结构相同的多个 `test()` 合并为「数据表 + 循环」，每个表项执行原用例的**全部**断言，并给断言传场景 label（失败时能看出是哪一项）。涉及 `sectionOps`（27→24）、`chaos-super`（17→11）、`catalog`（11→2）、`effective`（8→2）、`preview-phase`（9→6）、`rc2-preview`（9→7）、`schema`（7→4）、`trust-gate`（3→1）、`windows-titlebar`（3→2）等 16 个文件。
+
+**没有删除或弱化任何断言**：合并处逐条 diff 核对过输入表（文件名净化仍覆盖 5 个原始输入、`isTauriEnv` 仍覆盖 6 个探针、trust-gate 三种拒绝各自仍校验「不得写盘」）。生产代码零改动。
+
+保留的「看起来可疑但必要」：`test/mcp-workspace-scope.test.mjs` 测的是 0.11.4 的 `src/mcp-workspace-scope.ts`（不是已删的 `mcp-workspace.ts`），`host.ts` 至今仍在 import 它。
+
 ## 0.11.5：工作区 MCP 落盘改为主流 agent 通用的 `.mcp.json`
 
 - **格式对齐大众 agent**：工作区「添加 MCP」不再写 DSH 私有的 `patch.yml`，改写项目根的 **`.mcp.json`**（`{ "mcpServers": { <name>: { command|url, … } } }`）—— Claude Desktop / Cursor / Cline 等直接就能读。
@@ -114,7 +125,7 @@
   - 选哪个会话：取最新创建的根会话（`agents.roots()` 按 `session.header.createdAt` 降序）；客户端目前读不到渲染期的当前会话 id（`uiSession` 是 hook/selector 面），因此面板以「最新会话」为准。无会话时退回宿主全局 `ctx.skills` + 启动 cwd。
   - （只读分级已在 0.11.1 取消：所有来源的技能都能开关，见上节。）
 - **MCP 不再有目录层**：删掉 0.10.x 的 `mcps/` 四目录扫描、挂载、可见性过滤与面板分区。MCP Server 就是内核 Cordis 组合里的 `mcp-client` 行 —— 列表、启停、增删都走组合行（`pluginManager.listPlugins()` / `setPluginEnabled()` 与 `configEditor`），插件不再额外挂行。
-- **验证**：`node --test` 170/170、五个自检脚本全 PASSED；web 实例真浏览器实测（注入的 bsk 工具）：MCP 页只有 3 个组合行、无「mcps 目录」分区、不闪退。
+- **验证**：`node --test` 全绿；web 实例真浏览器实测（注入的 bsk 工具）：MCP 页只有 3 个组合行、无「mcps 目录」分区、不闪退。
 - **已知限制**：随安装发布的技能在 `app.asar` 内，文件清单读不到（卡片显示「0 文件」）；不同 profile/预设的组合不同，所以各处的技能数量天然不同（这不是漏扫）。
 
 ## 0.10.1：修复 MCP 页闪退 + 技能/MCP 统一为「四个目录、`.dsh` 优先」
@@ -153,9 +164,7 @@
 
 本地源码更新后执行 `npm run build`。链接安装无需复制；已启动宿主可能持有旧模块，保存工作后重启原来的 `dsh web` 并硬刷新，确认不再有「预览会话」，来源显示为「当前模式预设」。
 
-目标版本冷启动测试：设置 `PC_DSH_MANIFEST` 为已安装 **0.2.0-rc.2** 的 `package.json`，运行 `node scripts/test-rc2-runtime.mjs`。测试先在零对话状态查看两个模式的独立工具、正文、相反顺序和未绑定变量，再完成离线用户消息 → 工具 → 回复，并断言预览切换不改变对话模式。测试只使用临时 DSH_HOME，不使用真实模型凭据，不修改用户 profile。
-
-> 该脚本目前只面向 0.2.0-rc.2：内部硬编码版本校验，且在 0.2.1-rc.2 上 turn 段断言会失败（对照实验确认与插件无关，详见 `docs/rc2-migration.md`）。在 0.2.1-rc.2 上请以 `npm run check` 为准。
+目标版本冷启动测试（`scripts/test-rc2-runtime.mjs`）已随测试精简移除：它硬编码只认 **0.2.0-rc.2**，且在 0.2.1-rc.2 上 turn 段断言必然失败。rc.2 适配相关行为改由 `test/rc2-preview.test.mjs` 覆盖，完整校验以 `npm run check` 为准。
 
 ## 会话阶段怎么流转
 

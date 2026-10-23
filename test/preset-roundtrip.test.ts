@@ -59,48 +59,67 @@ function roundTrip(source: Config, into: Config, names: string[]) {
 const SOURCE = rich()
 const allNames = ['harness:identity', 'harness:source', 'plan:policy', 'genui:fence', 'note:boot', 'note:act', 'note:comp']
 
-test('全量快照守恒：阶段屏蔽名单与静态字段逐项一致', () => {
-  const { data, applied } = roundTrip(SOURCE, { sections: [], inject: [] }, allNames)
-  assert.deepEqual(data.sectionsBootstrap, ['harness:source'])
-  assert.deepEqual(data.sectionsCompaction, ['genui:fence'])
-  assert.deepEqual(applied.sectionsBootstrap, ['harness:source'])
-  assert.deepEqual(applied.sectionsCompaction, ['genui:fence'])
-  assert.deepEqual([...applied.sections].sort(), [...SOURCE.sections!].sort())
-  assert.deepEqual(applied.replace, SOURCE.replace)
-})
-
-test('全量快照守恒：三个阶段的工具目录都被带走', () => {
-  const { applied } = roundTrip(SOURCE, { tools: { exclude: ['other'], include: [] } }, allNames)
-  assert.deepEqual(applied.tools.exclude, ['bash'])
-  assert.deepEqual(applied.tools.bootstrap, { exclude: [], include: ['read'] })
-  assert.deepEqual(applied.tools.compaction, { exclude: ['read'], include: [] })
-})
-
-test('全量快照守恒：每阶段各自的成员与排序回放后不变', () => {
-  const { applied } = roundTrip(SOURCE, { inject: [] }, allNames)
-  const seq = (phase: string) => applied.inject
-    .filter((x) => (x.phase ?? 'always') === phase)
-    .sort((a, b) => a.order - b.order)
-    .map((x) => x.name)
-  // 三个阶段：成员与序逐一守恒（这就是 phaseInjectEntries 写出去的那份空间）。
-  for (const phase of ['bootstrap', 'active', 'compaction']) {
-    assert.deepEqual(seq(phase), phaseSeq(SOURCE, phase), `${phase} 阶段的序列应守恒`)
+test('全量快照守恒（阶段名单 / 三阶段工具目录 / 每阶段成员与排序）', () => {
+  const cases = [
+    {
+      label: '全量快照守恒：阶段屏蔽名单与静态字段逐项一致',
+      run: () => {
+        const { data, applied } = roundTrip(SOURCE, { sections: [], inject: [] }, allNames)
+        assert.deepEqual(data.sectionsBootstrap, ['harness:source'], 'data.sectionsBootstrap')
+        assert.deepEqual(data.sectionsCompaction, ['genui:fence'], 'data.sectionsCompaction')
+        assert.deepEqual(applied.sectionsBootstrap, ['harness:source'], 'applied.sectionsBootstrap')
+        assert.deepEqual(applied.sectionsCompaction, ['genui:fence'], 'applied.sectionsCompaction')
+        assert.deepEqual([...applied.sections].sort(), [...SOURCE.sections!].sort(), 'applied.sections')
+        assert.deepEqual(applied.replace, SOURCE.replace, 'applied.replace')
+      },
+    },
+    {
+      label: '全量快照守恒：三个阶段的工具目录都被带走',
+      run: () => {
+        const { applied } = roundTrip(SOURCE, { tools: { exclude: ['other'], include: [] } }, allNames)
+        assert.deepEqual(applied.tools.exclude, ['bash'], 'tools.exclude')
+        assert.deepEqual(applied.tools.bootstrap, { exclude: [], include: ['read'] }, 'tools.bootstrap')
+        assert.deepEqual(applied.tools.compaction, { exclude: ['read'], include: [] }, 'tools.compaction')
+      },
+    },
+    {
+      label: '全量快照守恒：每阶段各自的成员与排序回放后不变',
+      run: () => {
+        const { applied } = roundTrip(SOURCE, { inject: [] }, allNames)
+        const seq = (phase: string) => applied.inject
+          .filter((x) => (x.phase ?? 'always') === phase)
+          .sort((a, b) => a.order - b.order)
+          .map((x) => x.name)
+        // 三个阶段：成员与序逐一守恒（这就是 phaseInjectEntries 写出去的那份空间）。
+        for (const phase of ['bootstrap', 'active', 'compaction']) {
+          assert.deepEqual(seq(phase), phaseSeq(SOURCE, phase), `${phase} 阶段的序列应守恒`)
+        }
+        // always 组按设计来自「合并后的完整段列表」（快照要带完整有序集合），
+        // 因此它比 cfg.inject 的 always 条目更多 —— 源条目必须以同样相对序在内。
+        const always = seq('always')
+        const srcAlways = phaseSeq(SOURCE, 'always')
+        let cursor = -1
+        for (const name of srcAlways) {
+          const at = always.indexOf(name, cursor + 1)
+          assert.ok(at > cursor, `always 组里 ${name} 的相对序应守恒：${always.join(',')}`)
+          cursor = at
+        }
+        // 自定义段的文本必须跟着回来（系统段永远留空文本，不冻结动态内容）
+        const note = applied.inject.find((x) => x.name === 'note:act')
+        assert.equal(note?.text, 'ACTIVE 注记', 'note:act 文本')
+        assert.equal(note?.custom, true, 'note:act custom')
+        assert.equal(applied.inject.find((x) => x.name === 'harness:identity' && x.phase === 'bootstrap')?.text, '', '系统段空文本')
+      },
+    },
+  ]
+  for (const c of cases) {
+    try {
+      c.run()
+    } catch (e) {
+      if (e instanceof Error) e.message = `[${c.label}] ${e.message}`
+      throw e
+    }
   }
-  // always 组按设计来自「合并后的完整段列表」（快照要带完整有序集合），
-  // 因此它比 cfg.inject 的 always 条目更多 —— 源条目必须以同样相对序在内。
-  const always = seq('always')
-  const srcAlways = phaseSeq(SOURCE, 'always')
-  let cursor = -1
-  for (const name of srcAlways) {
-    const at = always.indexOf(name, cursor + 1)
-    assert.ok(at > cursor, `always 组里 ${name} 的相对序应守恒：${always.join(',')}`)
-    cursor = at
-  }
-  // 自定义段的文本必须跟着回来（系统段永远留空文本，不冻结动态内容）
-  const note = applied.inject.find((x) => x.name === 'note:act')
-  assert.equal(note?.text, 'ACTIVE 注记')
-  assert.equal(note?.custom, true)
-  assert.equal(applied.inject.find((x) => x.name === 'harness:identity' && x.phase === 'bootstrap')?.text, '')
 })
 
 test('阶段条目排在 always 组之后：运行时后写覆盖前写，阶段序才赢', () => {
