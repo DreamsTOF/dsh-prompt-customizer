@@ -10,6 +10,12 @@
 
 ## 版本历史
 
+## 0.12.0：适配 DSH 0.2.2-rc.1
+
+- `system-prompt/assemble` 不再携带 `tools`：提示词阶段化工具目录、工作区级 MCP 关闭都迁到 agent 作用域 `tools.restrict`；预览 / 清单工具目录改读 `ctx.tools.schemas()`。
+- 新增 `vendor/prompt-customizer/tool-visibility.js` 与 `test/tool-visibility.test.mjs`；`package.json` 升到 `0.12.0`，peer / engines 对齐 `0.2.2-rc.1`。
+- 完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
+
 ## 0.11.6：测试精简（176 → 117 用例）
 
 两轮清理，`node --test` 始终全绿：
