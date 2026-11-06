@@ -112,7 +112,20 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
     try {
       installed.set(agent, { key, dispose: tools.restrict({ deny }) })
     } catch (error) {
-      ctx.logger?.warn?.(`[prompt-customizer] tool phase restrict rejected for "${agent.id}": ${error instanceof Error ? error.message : String(error)}`)
+      // 作用域内注册（预设自带工具）会被 restrict 拒绝：逐名安装，跳过那部分，
+      // 保证其余全局工具的阶段过滤仍然生效。
+      const disposers = []
+      for (const name of deny) {
+        try { disposers.push(tools.restrict({ deny: [name] })) } catch { /* 作用域内名字：跳过 */ }
+      }
+      if (disposers.length > 0) {
+        installed.set(agent, {
+          key,
+          dispose: () => { for (const dispose of disposers) { try { dispose() } catch { /* 已释放 */ } } },
+        })
+      } else {
+        ctx.logger?.warn?.(`[prompt-customizer] tool phase restrict rejected for "${agent.id}": ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
   }
 
