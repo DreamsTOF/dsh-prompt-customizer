@@ -1,6 +1,6 @@
 {
   "name": "dsh-prompt-customizer",
-  "version": "0.11.6",
+  "version": "0.12.0",
   "description": "DeepSeek Harness 的三合一能力台：提示词定制（按名称屏蔽 / 替换 / 注入 / 排序，按会话阶段与 agent 预设分层）+ 技能集合管理（导入 / 分组 / 开关）+ MCP Server 接入（分层遮蔽与工具级启停）。纯插件注入，不动官方源码。",
   "keywords": [
     "dsh",
@@ -38,6 +38,7 @@
     "lib",
     "client",
     "scripts",
+    "docs",
     "build.mjs",
     "cordis.patch.yml",
     "README.md",
@@ -68,12 +69,13 @@
     "prepack": "npm run build"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24.9",
+    "dsh": "^0.2.2-rc.1"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-client-locale": "^0.2.1-rc.2",
-    "@deepseek-ai/dsh-settings": "^0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-locale": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.2.2-rc.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

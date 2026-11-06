@@ -24,7 +24,9 @@ function harness(t, { live = false, fail = false, renderFail = false, literal = 
     variable: () => () => {},
     layers: { merge: (scope, pick) => pick({ sections: new Map(definitions(scope).map(d => [d.name, d])), contexts: new Map() }) },
     assemble: async context => {
-      const assembly = { sections: definitions(context.scope).map(d => ({ name: d.name, ...d.interpolate !== undefined ? { interpolate: d.interpolate } : {}, text: typeof d.text === 'function' ? d.text(context) : d.text })), contexts: [{ name: 'sandbox:policy', text: 'POLICY {{cwd}}' }], tools: schemas(context.scope), variables: { cwd: context.agent?.session.header.cwd ?? '/diagnostic' } }
+      // 0.2.2-rc.1 的 PromptPresentation：只有 sections / contexts / variables，
+      // 没有 tools（工具目录由工具提供者拥有）。
+      const assembly = { sections: definitions(context.scope).map(d => ({ name: d.name, ...d.interpolate !== undefined ? { interpolate: d.interpolate } : {}, text: typeof d.text === 'function' ? d.text(context) : d.text })), contexts: [{ name: 'sandbox:policy', text: 'POLICY {{cwd}}' }], variables: { cwd: context.agent?.session.header.cwd ?? '/diagnostic' } }
       if (missingVariable) delete assembly.variables.cwd
       const result = await handler(assembly, context, async () => assembly)
       return complete ? { ...result, sections: [assembly.sections[0]] } : result

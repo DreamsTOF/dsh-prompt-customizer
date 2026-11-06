@@ -70,6 +70,29 @@ export function createPhaseProjection(promoteEvents = DEFAULT_PROMOTE_EVENTS) {
 }
 
 /**
+ * 从投影注册表或注册句柄读取本插件的阶段状态。
+ *
+ * `sessionProjections.register()` 在 0.2.1-rc.2 起返回「可 await 的句柄」：
+ * `handle.stateOf(session)` 只读本 unit；注册表级 `registry.stateOf(session, key)`
+ * 仍可用但已标记 deprecated。两种形态都兼容，避免在 0.2.2 上打弃用告警。
+ * @param projections - 注册表或注册句柄。
+ * @param session - 目标会话。
+ * @returns `{ boundary, promoted }`；读不到时返回 undefined。
+ */
+export function phaseStatusOf(projections, session) {
+  if (!session || typeof projections?.stateOf !== 'function') return undefined
+  try {
+    // 句柄的 stateOf(session) 只收一个参数；注册表的形式是 (session, key)。
+    const value = projections.stateOf.length <= 1
+      ? projections.stateOf(session)
+      : projections.stateOf(session, PHASE_PROJECTION_KEY)
+    return value !== undefined && value !== null ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * 当前 agent 的阶段。agent 缺席（纯清单读取等）或子代理一律已晋级；
  * 投影 unit 未注册（服务缺席 / 尚未注册）时同样回落到已晋级。
  */
@@ -77,7 +100,7 @@ export function statusOf(projections, agent) {
   const session = agent?.session
   if (!session) return PROMOTED_STATUS
   if ((session.header?.delegationDepth ?? 0) > 0) return PROMOTED_STATUS
-  return projections?.stateOf?.(session, PHASE_PROJECTION_KEY) ?? PROMOTED_STATUS
+  return phaseStatusOf(projections, session) ?? PROMOTED_STATUS
 }
 
 /**

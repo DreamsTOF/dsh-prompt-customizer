@@ -112,13 +112,13 @@ need(paths.some(p => p.startsWith('/api/prompt-customizer')), 'prompt customizer
 need(listeners.has('agent/created'), 'agent/created hooked (预设层开关与遮蔽)')
 need(listeners.has('tools/change'), 'tools/change hooked (装配过滤失效重算)')
 need(listeners.has('system-prompt/assemble'), 'system-prompt/assemble hooked (提示词段覆盖)')
+need(listeners.has('session/event'), 'session/event hooked (阶段化工具目录按会话事件重算)')
 
 // 三个已移除的模块不得留下任何路由、工具或事件钩子。
 const leftovers = paths.filter(p => /^\/api\/(dsh-memory|usage-stats|triad-automation)/.test(p))
 need(leftovers.length === 0, `removed modules left no routes${leftovers.length > 0 ? `: ${leftovers.join(', ')}` : ''}`)
 need(tools.length === 0, `no model tools registered${tools.length > 0 ? `: ${tools.join(', ')}` : ''}`)
 need(!listeners.has('agent/pre-step'), 'agent/pre-step injection gone')
-need(!listeners.has('session/event'), 'session/event capture gone')
 
 const warns = logs.filter(([lvl]) => lvl === 'warn')
 if (warns.length > 0) {

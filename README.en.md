@@ -5,8 +5,8 @@
 <h1 align="center">dsh-prompt-customizer</h1>
 
 <p align="center">
-  <strong>System-prompt &amp; tool-catalog customizer for DeepSeek Harness.<br>
-  Block / replace / inject / reorder prompt sections by name, layered by session phase and agent preset — all from a settings-panel UI.</strong>
+  <strong>The DeepSeek Harness capability desk: prompt customization + skill collection management + MCP server integration.<br>
+  Manage prompt sections, import and toggle skills, and connect MCP servers from the sidebar "Capabilities" panel.</strong>
 </p>
 
 <p align="center">
@@ -15,24 +15,10 @@
 </p>
 
 <p align="center">
-  <a href="#installation">Installation</a> •
-  <a href="#features">Features</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#how-it-works">How it works</a> •
-  <a href="#known-limitations">Known limitations</a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/releases"><img src="https://img.shields.io/badge/version-0.4.2-blue.svg" alt="Version"></a>
+  <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/releases"><img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version"></a>
   <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek_Harness-Plugin-blueviolet.svg" alt="DeepSeek Harness Plugin"></a>
-  <a href="https://www.npmjs.com/package/dsh-prompt-customizer"><img src="https://img.shields.io/npm/v/dsh-prompt-customizer" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/dsh-prompt-customizer"><img src="https://img.shields.io/npm/dm/dsh-prompt-customizer" alt="npm downloads"></a>
   <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/stargazers"><img src="https://img.shields.io/github/stars/DreamsTOF/dsh-prompt-customizer?style=social" alt="GitHub Stars"></a>
-</p>
-
-<p align="center">
-  <b>⭐ GitHub repo: <a href="https://github.com/DreamsTOF/dsh-prompt-customizer">DreamsTOF/dsh-prompt-customizer</a></b> — if you find it useful, please drop a star; bug reports and feature requests go to <a href="https://github.com/DreamsTOF/dsh-prompt-customizer/issues">Issues</a>
 </p>
 
 <p align="center">
@@ -41,262 +27,89 @@
 
 ---
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin that lets you control the **system prompt** and the **tool catalog** from a settings-panel UI.
+## What it is
 
-Plugin-injected prompt sections can pollute your system prompt. This plugin lets you **block**, **replace**, **inject** and **reorder** prompt sections by name, and **hide tools** from the model-facing catalog — live, without touching any other plugin.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin. It adds an independent "Capabilities" panel to the sidebar that brings three otherwise configuration-heavy jobs into one visual surface:
 
-Two ideas run through the whole design:
+- **Prompt customization**: block, replace, inject and reorder system-prompt sections by name;
+- **Skill collection management**: import, group and toggle skills;
+- **MCP server integration**: add MCP servers and apply preset-level or tool-level masking.
 
-- **Per session phase.** Bootstrap (before promotion) / resident (after promotion) / compaction-controlled (after a compaction, before re-promotion) each get their **own block list, their own ordering space and their own tool catalog**. One preset can therefore show the model 1 tool and a handful of sections on the first turn, then open everything up after promotion.
-- **Per agent preset.** The selector at the top chooses where edits land: `Target: global default` edits the defaults; picking an agent preset writes a field-level override for that preset only (set fields take over, unset fields keep falling back to global).
-
-## How the session phases flow
-
-The phases are not a fixed three-beat rhythm — they are **derived from durable session
-events**: the first durable `tool/call` or `assistant/message` promotes, and a
-`compaction/end` resets that promotion. The three parts of the panel map to those states.
-
-<table>
-  <tr align="center">
-    <td width="28%"><b>① Session starts</b><br><code>bootstrap</code><br><b>Guide period</b></td>
-    <td width="6%">→</td>
-    <td width="28%"><b>② First durable signal</b><br><code>tool/call</code> · <code>assistant/message</code><br><b>Resident period</b> <code>active</code></td>
-    <td width="6%">→</td>
-    <td width="32%"><b>③ A compaction</b><br><code>compaction/end</code><br><b>Compaction-controlled</b> <code>compaction</code></td>
-  </tr>
-  <tr>
-    <td colspan="5" align="center">
-      ④ another durable signal after the compaction → <b>back to the resident period</b>; compact again and it falls back to compaction-controlled
-    </td>
-  </tr>
-</table>
-
-Every transition (note the guide period can reach compaction-controlled without passing through resident):
-
-| Current phase         | Event                                           | Next                      |
-| --------------------- | ----------------------------------------------- | ------------------------- |
-| Guide                 | first durable `tool/call` / `assistant/message` | **Resident**              |
-| Guide                 | `compaction/end`                                | **Compaction-controlled** |
-| Resident              | `compaction/end` (promotion reset)              | **Compaction-controlled** |
-| Compaction-controlled | a new durable signal after the compaction       | **Resident**              |
-| Any                   | subagent session (`delegationDepth > 0`)        | always **Resident**       |
-| Any                   | read with no session (inventory, preview)       | always **Resident**       |
-
-What each phase resolves to — the three panel parts map one-to-one onto config fields:
-
-| Panel part                             | Effective section blocks | Injected `phase`          | Effective tool blacklist                                           |
-| -------------------------------------- | ------------------------ | ------------------------- | ------------------------------------------------------------------ |
-| Guide-period sections / tools          | `sectionsBootstrap`      | `bootstrap` (+ `always`)  | `tools.bootstrap.exclude`, falling back to static when unset       |
-| Resident-period sections / tools       | `sections`               | `active` (+ `always`)     | `tools.exclude` (static)                                           |
-| Compaction-controlled sections / tools | `sectionsCompaction`     | `compaction` (+ `always`) | `tools.compaction.exclude`, falling back to bootstrap, then static |
-
-Two things that bite:
-
-- **`always` injections are present in all three phases**, and each phase has its own ordering space — which is why this plugin emits phase entries _after_ the `always` group: the assembly applies inject records in array order and the last write wins, so the phase order is what survives.
-- **A phase view is "what this state resolves to", not "what the session has been".** Native preset phase rules (zero-tool bootstrap, warmup, …) are in play at the same moment and may still change the result after other plugins — see [Known limitations](#known-limitations).
-
-## What's in the box
-
-One sidebar entry — **capability panel** — with three top-level tabs:
-
-- **SKILL** — skill bundles (grouping, categories, import from ZIP/folder, rename/delete), per-skill and per-bundle toggles on a global layer plus a per-agent-preset layer, skill-root health, and a `/` slash source that feeds skills into a session.
-- **MCP** — paste-to-add MCP servers (JSON / native `mcpServers` YAML / `mcp-client` line), per-preset server rows, layered masking (global row + per-preset own/inherit ledgers, with a global veto), per-server and per-tool enable/disable, and a recommended-server catalog.
-- **Prompt** — everything documented below.
-
-> The Chinese README is the primary one and covers the SKILL / MCP tabs in more detail（见「功能特性 → 技能集合管理 / MCP Server 接入」）。
-
-## UI
-
-![Prompt tab: four tabs, edit-target selector, section rows](docs/images/prompt-sections.png)
-
-![Three phase parts, each with its own section list](docs/images/prompt-resident.png)
-
-![Tools tab: three phase catalogs with enabled/total counts](docs/images/tools-phases.png)
-
-![Config tab: save current config / save as agent preset / import](docs/images/config-tab.png)
-
-![Preview tab: model-view prompt switchable per phase, with the yellow warning for a complete-section takeover](docs/images/preview-tab.png)
+All changes go through documented plugin extension points. No DSH source is modified, and prompt/tool changes take effect for the model as soon as they are saved.
 
 ## Features
 
-### Prompt sections
+- **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives.
+- **Phase and preset layering**: bootstrap, resident and compaction-controlled phases each have their own section lists, ordering space and tool catalog; the top preset selector scopes edits to one agent preset.
+- **Tool catalog**: hide or add back tools per phase, with a "model-visible / registry total" comparison that also handles PTC / Code Mode `run_code` wrapping.
+- **Skill management**: skill bundles, ZIP / folder import, global and preset toggles, skill-root and membership health checks.
+- **MCP management**: paste JSON / YAML to connect, preset-owned server rows, global / preset masking, per-tool enable/disable, recommended templates.
+- **Prompt variables**: built-in date / host / environment facts plus `process.env` mapping with a secret blocklist.
 
-- **Block** — remove a section by name. A blocked row does not disappear: it stays draggable and editable and can be restored at any time. Blocking only means "not injected into the model".
-- **Replace** — edit a section's text; the editor is pre-filled with the text currently in effect (dynamically generated sections are resolved first so you see real content).
-- **Inject** — every phase part has its own name + text box to add a brand-new section, badged `manual` and deletable.
-- **Reorder** — drag the handle at the row's left edge (an insert line shows where it will land) or use ↑/↓. Order is stored as a contiguous 0-based virtual index, so there are never duplicate or fractional orders and no number to type by hand. Dragging a row out onto _All system sections_ removes it from the current phase (an injected section is un-injected, a native one becomes blocked); dropping it on a phase button in the header copies it into that phase.
-- **Independent per phase** — bootstrap blocks go to `sectionsBootstrap`, compaction blocks to `sectionsCompaction`, resident blocks to `sections`; each phase has its own ordering space, so "5 sections during bootstrap, everything when resident" is expressible.
-- **Sync phases** (header switch, off by default) — ticking it immediately overwrites the other two phases with the resident period's **union row set** (written to the edit draft; press Save to apply). From then on all three phases share one section list and text: add / remove / reorder / check / text edits are written to all three at once. The resident period is the backbone order, sections that only exist in the other two phases are appended and also injected into the resident period (a same-named row follows the phase where it natively exists), and the three block lists are unified into one. Runtime-generated dynamic sections cannot be materialised into the other phases; the list says so. Tool hiding / showing and adding back also apply to all three phases.
+## UI
 
-### Tool catalog
+Open **Capabilities** in the sidebar. The panel has three tabs: **SKILL**, **MCP** and **Prompts**.
 
-- **Blacklist only** (`exclude`) — unchecking a tool hides it **in that phase**; checking it back restores it. There is no whitelist mode: it silenced `exclude` entirely, and a single drag could quietly switch off every other tool in the phase while offering no expressive gain.
-- **Dragging in = make that one tool visible in the phase** (remove it from the phase blacklist); dragging back to _All system tools_ hides it there. Every action touches only the tool you dragged.
-- **Phase catalogs** — bootstrap and compaction each have their own blacklist. Runtime precedence is **compaction > bootstrap > static**: after a compaction with a compaction catalog configured, it applies; otherwise an un-promoted session uses the bootstrap catalog; everything else uses the static filter.
-- **Narrowing only, never widening** — the filter operates on the catalog the assembly already produced. A tool a phase never had cannot be made to appear here; that means editing the preset's composition.
-- Only the model-facing catalog is affected; the tools themselves and routing keep working.
+![Prompt mode: checkbox list on the left, live preview on the right](docs/images/prompt.png)
 
-### Model-view preview
-
-The Preview tab shows the final system prompt and tool catalog after **all** plugins have filtered, switchable per phase. It reads the same assembly as the prompt and tools tabs, so what you see is what the model sees. The tools view reports "visible to the model / registry total" side by side — presets such as PTC or Code Mode wrap the whole catalog into a single `run_code`, so the registry alone misleads.
-
-### Prompt template variables
-
-The host registers only `provider` / `model` / `cwd` as template variables; referencing any other `{{name}}` in section text makes the whole assembly fail. This plugin adds two more families through the official extension point:
-
-- **Built-in system facts**: `date` / `time` / `datetime` / `weekday` / `hostname` / `platform` / `arch` / `username` / `home` / `shell` / `locale` / `node_version`, computed fresh at every assembly.
-- **Every environment variable**: each `process.env` key maps to `env_<lowercase, non-alphanumerics collapsed to _>`, e.g. `PATH` → `{{env_path}}`, `USER.NAME` → `{{env_user_name}}`.
-
-**Blocklist (`envBlocklist`)**: environment variables often carry secrets, and anything in the prompt is sent to the model with every request, so keys matching the blocklist are never registered. The prefilled entries cover common credential-style keys (`SECRET` / `TOKEN` / `PASSWORD` / `API_KEY` / `*_DSN` and friends); entries support `*` wildcards and are case-insensitive. The environment variable blocklist card in the panel lets you add or remove entries at any time, and its collapsible list shows the variables actually registered right now. Blocklist changes take effect at the next assembly (whether you edit the panel or `config.yaml` by hand).
-
-**Carried by export / import**: exporting a preset writes the current blocklist along with it; import merges it in by union (grow-only), consistent with the snapshot library semantics.
-
-The cost of strict rendering: referencing an unregistered name (such as a key the blocklist blocks) makes the **whole assembly fail** rather than rendering empty — only use names that appear in the panel's variable list.
-
-### Config snapshots and agent presets
-
-- **Save current config** — capture the complete customization of the current scope (per-phase block lists, per-phase ordering and phase tool catalogs) as a reusable snapshot.
-- **Apply** — same-name sections are overridden, current sections outside the snapshot list are blocked, and snapshot sections that do not match the current system are skipped (cross-system imports never fabricate sections). Phase fields the snapshot does not carry keep your current values instead of being wiped. Only one snapshot is active at a time.
-- **Export / import** — snapshots round-trip as JSON (native save/open dialogs under Tauri, download / file picker on web); same-name presets are skipped. Order is stored relatively (each section records which section it follows), so snapshots stay portable across different section sets.
-- **Save as agent preset** — **copy** the whole preset directory of the current edit target (composition file, companion scripts, skill directories) into the user preset root, then write the current customization into its override. The new preset immediately appears in the target selector: a real switchable agent preset, not merely a config copy.
-
-### Cross-preset registry pool
-
-_All system sections_ / _All system tools_ do not follow the edit target: they are a **union across presets that only ever grows** (same name — last seen wins; new name — appended), stored in the derived cache `catalog.yaml`, which rebuilds itself if deleted.
-
-The pool is filled from three sources, and **the first two hold the moment the panel opens**:
-
-- **the current scope's registry** (the preset you are editing);
-- **sections registered in the agent scope**: several plugins register their section per agent (`tool:subagent`, `context:file-reference`, …). Those live in neither the global layer nor any preset scope — they only exist in a real session assembly. They hold for *every* agent and belong to no particular mode, so the inventory merges the live agents' scopes on request: they are listed as soon as you open the panel, with no session round needed;
-- **presets you have browsed**: sections and tools registered only inside one preset (`tools:ptc-only`, `raw-html-v2:vcp`, …) join as you switch edit targets. That part grows on demand — mounting every preset tree eagerly takes tens of seconds each, which is not worth doing on every panel open.
-
-A real session assembly also feeds the registry, as the fallback for when no agent is alive.
-
-## How it works
-
-The full path a change takes from the panel to the model:
-
-<table>
-  <tr align="center">
-    <td width="19%"><b>① Settings panel</b><br>sections / tools / config / preview<br><i>edits an in-memory draft only</i></td>
-    <td width="3%">→</td>
-    <td width="19%"><b>② Plugin routes</b><br><code>/config</code> · <code>/config/apply</code><br><code>/preview</code> · <code>/inventory</code> · <code>/presets</code></td>
-    <td width="3%">→</td>
-    <td width="19%"><b>③ config.yaml</b><br>global fields + <code>overrides[preset]</code><br><i>mtime-lazy reload, hand edits apply at once</i></td>
-    <td width="3%">→</td>
-    <td width="34%"><b>④ Assembly waterfall</b><br>the <code>system-prompt/assemble</code> hook derives the phase from the session, resolves the effective config and filters</td>
-  </tr>
-  <tr>
-    <td colspan="9" align="center"><b>inside ④, in order</b>: <code>mergeConfig(global, overrides[session preset])</code> → sections: block → replace → inject → sort by <code>order</code>; tools: <code>pickToolsFilter</code> (compaction &gt; bootstrap &gt; static) → <code>applyToolFilter</code></td>
-  </tr>
-  <tr>
-    <td colspan="9" align="center">
-      <b>⑤ one last move before handing in</b>: after the waterfall the host restores the single <code>complete: true</code> section as the whole <code>sections</code> array when one exists — exactly why the panel shows a yellow warning for such presets (the tool catalog is unaffected)
-    </td>
-  </tr>
-  <tr>
-    <td colspan="9" align="center"><b>⑥ the model receives</b>: the final system prompt + visible tool catalog; the Preview tab reads this very result</td>
-  </tr>
-</table>
-
-Code map:
-
-| Path                              | Role                                                                                                                                            |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/index.js`                    | host half: assembly hook, five HTTP routes, agent-preset fork, one-off legacy cleanup                                                           |
-| `lib/effective.js`                | pure functions: field-level override merge, phase selection (injections / tool catalogs), blacklist filtering                                   |
-| `lib/promotion.js`                | derives `{promoted, boundary}` from durable events — compaction resets, subagents always promoted                                               |
-| `lib/vars.js`                     | prompt variables: built-in system facts + full env mapping / blocklist, lazily re-synced at the assembly entry by signature                     |
-| `lib/sectionOps.mjs`              | phase-state pure functions **shared by the panel and the unit tests** (which list to write, injection identity, reorder, per-phase persistence) |
-| `lib/store.js` / `lib/catalog.js` | atomic write + last-good fallback config store; cross-preset section/tool accumulation cache                                                    |
-| `src/client/`                     | the panel (React written with `h()`, no JSX sugar), bundled into `client/client.js`                                                             |
-
-The key convention: phase logic exists once. `lib/sectionOps.mjs` is both bundled into the
-browser by tsdown and imported directly by `node --test`, so there is no second
-implementation standing between "tests pass" and "the UI behaves".
+![Tool mode: phase catalog checkboxes and model-visible tool preview](docs/images/tool.png)
 
 ## Installation
+
+Web profile:
 
 ```bash
 dsh plugin --profile web add dsh-prompt-customizer
 ```
 
-Or from a local checkout:
+Desktop (DeepSeek Harness Desktop):
+
+```bash
+dsh plugin --profile desktop add dsh-prompt-customizer
+```
+
+Or install from a local checkout:
 
 ```bash
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Then open the dsh web UI → **Settings** → **提示词定制** (Prompt Customizer) in the sidebar.
+Current release targets **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
-## Usage
+## Quick start
 
-### Prompt tab
+1. Open the dsh Web UI and click **Capabilities** in the sidebar.
+2. Switch to the **Prompts** tab and choose an agent preset at the top.
+3. Edit in Prompt / Tool / Config mode, then click **Save**. The right-hand preview shows exactly what the model will receive.
 
-The three phase parts (bootstrap / resident / compaction-controlled) are **always rendered** — if a preset has no such phase, that part is simply empty rather than hidden. Each row offers:
+Prompt sections and tools can be configured separately for the bootstrap, compaction-controlled and resident phases; switch the phase tab to see that phase's own checkbox state and preview.
 
-- a **checkbox** to block / unblock (`未屏蔽` / `已屏蔽` badge)
-- **Edit** to replace the section text; replaced rows carry an `已替换` badge and a restore button
-- **↑/↓** and a **drag handle** to reorder within the phase; `#N` is the current virtual index
-- a `system` / `manual` badge for provenance — only `manual` sections can be deleted
+## Where the configuration lives
 
-`阶段可见 N` next to each title is the number of rows in that part. The name + text box at the bottom injects into that part, with the phase already fixed.
-
-### Tools tab
-
-One part per phase, chip-listing the catalog entering that phase's filter, titled `阶段可见 enabled / total`. Check to keep a tool visible in that phase, uncheck to hide it; dragging a tool in from _All system tools_ only makes **that one tool** visible in the phase, and dragging it back hides it there. For what the model actually receives, use the tools view in the Preview tab.
-
-### Config tab
-
-Five cards: **Save current config** (snapshot), **Save as agent preset** (fork the current target's preset directory), **Import config**, **Environment variable blocklist** (add/remove entries, inspect the variables actually registered right now), **Force override switch**. Each snapshot row is Apply / Export / Delete, and the active row carries an "in use" badge.
-
-### Edit target and saving
-
-The selector at the top decides where changes land. The prompt and tools tabs share one unsaved draft, and **Save** writes it in a single request; switching to the config / preview tabs or changing the edit target discards the draft (after confirming). Nothing you mistype reaches the file until you press Save.
-
-## Where the config lives
-
-- `~/.dsh/prompt-customizer/config.yaml` — the single source of truth. On first start, if this file is missing but the legacy `settings.yaml` has the section, it is migrated once (the master document is left intact and stays rollback-able). Hand edits take effect on the next read, no restart needed.
-- `~/.dsh/prompt-customizer/catalog.yaml` — the cross-preset accumulation cache for the pools above. Purely derived; delete it and it rebuilds as you browse.
-
-## Known limitations
-
-All of the below are measured, and the panel shows a yellow warning in exactly these situations rather than leaving you to guess:
-
-- **Some presets have no section-composed prompt.** If a section is registered with `complete: true` (dsh-persona's wholesale takeover), the host restores that single section as the entire `sections` array **after** the assembly waterfall — so this plugin's blocking / replacement / injection / ordering never reaches the model (tool filtering still applies). The panel says so explicitly ("taken over wholesale by `deployment:persona`"). The only way to make section customization work is to turn off `complete` in that agent preset.
-- **Dropping sections has more than one cause.** Besides `complete` takeover, a preset can also trim sections itself for a specific phase (measured: 20 → 1 sections during bootstrap, with no `complete` section in the registry). The panel therefore also compares names mechanically: it diffs the sections this plugin emitted against the final assembly and reports "emitted N, model sees M" when they disagree.
-- **The synthetic session behind a preview can degrade.** Phase views are driven by a fabricated session; some preset plugins throw on it, so that phase falls back to an agent-less assembly and is marked degraded — i.e. it shows the result _without_ native phase narrowing.
-- **Replacing a dynamically generated section freezes its content.** Sections like `app:web-surface` are generated at assembly time (embedding the current web port and so on). After replacing, the text is fixed at the value you edited and no longer tracks runtime state. To keep following it, block the section instead.
-- **Dynamic text resolution is best-effort.** The panel calls a dynamic section's generator with a minimal context to echo real content; sections that need richer context and throw fall back to `<动态生成>`, with no other effect. Also, sections containing `{{model}}` / `{{cwd}}` style variables show the **unsubstituted template** in the list — the Preview tab is where the substituted final text appears.
-- **Export depends on the host allowing downloads.** The web fallback uses a browser download: if the host webview silently drops it, the panel still reports "exported" while no file lands. Import (file picker) is unaffected.
-- **Tool catalogs cannot be widened** — see "narrowing only" above.
+- `~/.dsh/prompt-customizer/config.yaml`: prompt customization and per-phase tool catalog.
+- `~/.dsh/prompt-customizer/catalog.yaml`: cross-preset section / tool catalog cache (derived; safe to delete).
+- Skill and MCP ledgers live under the plugin's directory in `$DSH_HOME` and the relevant workspace directories.
 
 ## Development
 
 ```bash
 npm install
-npm run check   # typecheck + build + full test suite
+npm run check   # build + full unit tests + host / client smoke
 ```
 
-The browser half is built with [tsdown](https://github.com/rolldown/tsdown) into `client/client.js` (a `__ModuleLoader__` factory bundle); the host half lives in `lib/`. Phase state logic sits in `lib/sectionOps.mjs`: the same pure functions are bundled into the UI and exercised directly by `node --test`, so the tests are the shipped code.
+Build artifacts: `lib/index.js` (host half) and `client/client.js` (browser half).
+
+## Documentation
+
+- [Version upgrade and migration records](docs/upgrades/README.md)
+- [DSH 0.2.2-rc.1 migration record](docs/upgrades/dsh-0.2.2-rc1.md)
+- [DSH 0.2.1-rc.2 migration record](docs/upgrades/rc2-migration.md)
 
 ## Credits
 
-- The **SKILL and MCP halves (UI and host modules) come from [Kr-ATG/dsh-triad](https://github.com/Kr-ATG/dsh-triad)** — skill bundle management, global/per-preset toggles, layered MCP masking and per-tool enable/disable, the sidebar capability entry, and the `/` skill source all follow that project. Since 0.6.0 they ship merged with the prompt customizer in this plugin.
-- The prompt panel derives from this repository's own 0.5.x implementation.
+- The SKILL and MCP UI and host modules reference [Kr-ATG/dsh-triad](https://github.com/Kr-ATG/dsh-triad).
+- The prompt panel derives from this repository's standalone 0.5.x implementation.
 
 ## License
 
 [MIT](LICENSE) © 2026 DreamsTOF
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=DreamsTOF/dsh-prompt-customizer&type=Date)](https://star-history.com/#DreamsTOF/dsh-prompt-customizer&Date)
-
----
-
-<p align="center">
-  <strong>⭐ If this plugin keeps your system prompt cleaner and your tool catalog tamer, give it a star!</strong>
-</p>

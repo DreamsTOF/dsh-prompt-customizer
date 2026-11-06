@@ -147,9 +147,113 @@ function assemblyCwd(context: unknown): string | undefined {
 }
 
 /**
+ * 安装 agent 作用域 restrict：把该会话工作区被关掉的 Server 工具从模型目录
+ * 与 PTC 绑定里一并收窄（0.2.2-rc.1 起装配瀑布流不再携带 tools，这是主路径）。
+ * 旧宿主仍保留下面的装配过滤作为兜底。
+ * @param ctx - 宿主上下文。
+ * @returns 立即同步全部活动 agent 的函数（路由写盘后调用）。
+ */
+function installAgentRestrictions(ctx: PluginContext): () => void {
+  /** agent → 当前 deny 集与 disposer。 */
+  const installed = new Map<object, { key: string; dispose: () => void }>()
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const globalNames = (): Set<string> => {
+    try {
+      const schemas = ctx?.tools?.schemas?.() ?? []
+      return new Set((Array.isArray(schemas) ? schemas : [])
+        .map((tool: any) => (typeof tool?.name === 'string' ? tool.name : undefined))
+        .filter((name: string | undefined): name is string => name !== undefined))
+    } catch {
+      return new Set()
+    }
+  }
+
+  const sync = (agent: any): void => {
+    if (stopped || agent === null || typeof agent !== 'object' || agent.ctx === undefined) return
+    const ledger = cache
+    const cwd = agent?.session?.header?.cwd
+    const closed = ledger !== undefined && typeof cwd === 'string' && cwd.trim() !== ''
+      ? closedInWorkspace(ledger, cwd)
+      : new Set<string>()
+    const tools = agent.ctx.get?.('tools')
+    if (typeof tools?.restrict !== 'function') return
+    const names = globalNames()
+    const deny = closed.size === 0
+      ? []
+      : [...names].filter((name) => {
+          const serverName = serverOfToolName(name)
+          return serverName !== undefined && closed.has(serverName)
+        })
+    const key = deny.join('\u0000')
+    const current = installed.get(agent)
+    if (current?.key === key) return
+    if (current !== undefined) {
+      installed.delete(agent)
+      try { current.dispose() } catch { /* 已被宿主回收 */ }
+    }
+    if (deny.length === 0) return
+    try {
+      installed.set(agent, { key, dispose: tools.restrict({ deny }) })
+    } catch (error) {
+      // 作用域内注册（预设自带行）会被 restrict 拒绝：逐名尝试，跳过那部分。
+      const disposers: Array<() => void> = []
+      for (const name of deny) {
+        try { disposers.push(tools.restrict({ deny: [name] })) } catch { /* 作用域内名字：装配兜底 */ }
+      }
+      if (disposers.length > 0) {
+        installed.set(agent, {
+          key,
+          dispose: () => { for (const dispose of disposers) { try { dispose() } catch { /* 已释放 */ } } },
+        })
+      } else {
+        ctx.logger?.warn?.(`[mcp-workspace-scope] restrict 拒绝全部工作区 deny：${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+
+  const syncAll = (): void => {
+    for (const agent of [...installed.keys()]) sync(agent)
+    try {
+      const list = ctx?.get?.('agents')?.list?.()
+      for (const agent of Array.isArray(list) ? list : []) sync(agent)
+    } catch { /* agents 服务缺席 */ }
+  }
+
+  ctx.effect(() => {
+    const offCreated = ctx.on?.('agent/created', ({ agent }: any) => { sync(agent) })
+    const offDisposed = ctx.on?.('agent/disposed', ({ agent }: any) => {
+      const current = installed.get(agent)
+      if (current === undefined) return
+      installed.delete(agent)
+      try { current.dispose() } catch { /* 已释放 */ }
+    })
+    const offTools = ctx.on?.('tools/change', () => {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = setTimeout(() => { timer = undefined; if (!stopped) syncAll() }, 300)
+    })
+    syncAll()
+    return () => {
+      stopped = true
+      if (timer !== undefined) clearTimeout(timer)
+      try { offCreated?.() } catch { /* 已卸载 */ }
+      try { offDisposed?.() } catch { /* 已卸载 */ }
+      try { offTools?.() } catch { /* 已卸载 */ }
+      for (const current of installed.values()) { try { current.dispose() } catch { /* 已释放 */ } }
+      installed.clear()
+    }
+  }, 'triad: mcp workspace scope restrictions')
+
+  return syncAll
+}
+
+/**
  * 安装装配过滤：在该工作区的会话里剔除被关掉的 Server 的工具。
  *
  * `{ global: true }` 才能收到每个 agent 的装配（waterfall 按作用域派发）。
+ * 0.2.2-rc.1 起 `assembly.tools` 不存在，本过滤器退化为无操作；主路径改为
+ * `installAgentRestrictions` 的 agent 作用域 restrict。
  * @param ctx - 宿主上下文。
  */
 function installAssembleFilter(ctx: PluginContext): void {
@@ -211,8 +315,8 @@ async function readBody(req: any): Promise<Record<string, unknown>> {
   return parsed !== null && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
 }
 
-/** 处理一条请求。 */
-async function handle(ctx: PluginContext, req: any, res: any): Promise<void> {
+/** 处理一条请求；`onChanged` 在账本写盘后触发 agent 作用域重算。 */
+async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => void): Promise<void> {
   if (!loopback(req)) {
     json(res, 403, { error: 'loopback-only' })
     return
@@ -240,6 +344,7 @@ async function handle(ctx: PluginContext, req: any, res: any): Promise<void> {
       if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
       if (cwd.trim() === '' || serverName.trim() === '') throw new Error('cwd and serverName are required')
       const ledger = await setWorkspaceServer(cwd, serverName, enabled)
+      onChanged?.()
       json(res, 200, { ok: true, cwd: resolve(cwd), serverName, enabled, workspaces: ledger.workspaces })
       return
     }
@@ -254,13 +359,14 @@ async function handle(ctx: PluginContext, req: any, res: any): Promise<void> {
  * @param ctx - 宿主上下文。
  */
 export function applyMcpWorkspaceScope(ctx: PluginContext): void {
+  const syncAgents = installAgentRestrictions(ctx)
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: ROUTE_PREFIX,
-    handler: (req: any, res: any) => { void handle(ctx, req, res) },
+    handler: (req: any, res: any) => { void handle(ctx, req, res, syncAgents) },
   }), 'triad: mcp workspace scope routes')
-  // 先把账本读进内存，装配时的快通道才成立（第一次读盘放在挂载期）。
-  void readLedger().catch(() => {})
+  // 先把账本读进内存，装配 / restrict 的快通道才成立（第一次读盘放在挂载期）。
+  void readLedger().then(() => syncAgents()).catch(() => {})
   installAssembleFilter(ctx)
   installWorkspaceRows(ctx)
 }

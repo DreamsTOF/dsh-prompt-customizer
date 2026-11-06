@@ -25,11 +25,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { Config, NS } from './schema.js'
-import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applyToolFilter, applySectionPolicy } from './effective.js'
+import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore, readLegacySection } from './store.js'
 import { createCatalog } from './catalog.js'
 import { registerVariables, listVariableNames } from './vars.js'
+import { createPhaseToolVisibility } from './tool-visibility.js'
 
 export const name = 'prompt-customizer'
 // settings 仍被注入：只读 documentPath 做一次性旧版迁移。cordis 对未在
@@ -148,12 +149,42 @@ export function apply(ctx, entry = {}) {
   //    折叠（含 resume / reload 后从日志重建）并增量驱动，本插件不再自扫历史
   //    （`Session.events` 已在 0.1.2-alpha.4 移除，同步历史读在 0.1.6 已 deprecated；
   //    见 promotion.js 顶部说明）。注册随本插件的 fiber 一起注销。
+  let phaseHandle
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     try {
-      projectionCtx.sessionProjections.register(createPhaseProjection())
+      const registration = projectionCtx.sessionProjections.register(createPhaseProjection())
+      // 0.2.1-rc.2 起 register 返回可 await 的句柄；同步 disposer 形态仍兼容。
+      if (registration !== null && typeof registration?.then === 'function') {
+        Promise.resolve(registration).then(
+          (handle) => { phaseHandle = handle },
+          (error) => { try { ctx.logger?.warn?.(`prompt-customizer: 阶段投影注册失败（阶段视图回落为已晋级）：${String((error && error.message) || error)}`) } catch { /* logger 缺席 */ } },
+        )
+      } else {
+        phaseHandle = registration
+      }
     } catch (error) {
       try { ctx.logger?.warn?.(`prompt-customizer: 阶段投影注册失败（阶段视图回落为已晋级）：${String((error && error.message) || error)}`) } catch { /* logger 缺席 */ }
     }
+  })
+
+  /** 该 agent 的预设 id：0.2.2 的 presetForSession 优先，旧宿主回落到 header / 投影。 */
+  const presetOfAgent = (agent) => {
+    const presets = ctx.get('agentPresets')
+    if (typeof presets?.presetForSession === 'function') {
+      try {
+        const id = presets.presetForSession(agent?.session)
+        if (typeof id === 'string' && id !== '') return id
+      } catch { /* 投影尚未就绪：继续回落 */ }
+    }
+    return presetOfSession(ctx.get('sessionProjections'), agent?.session)
+  }
+
+  // 阶段化工具目录：0.2.2 起由 agent 作用域 restrict 承担（装配瀑布流不再带 tools）。
+  const toolVisibility = createPhaseToolVisibility({
+    ctx,
+    readConfig: () => read(),
+    phaseOf: (agent) => statusOf(phaseHandle ?? ctx.get('sessionProjections'), agent),
+    presetOf: presetOfAgent,
   })
 
   // 单次降级告警：过滤逻辑出错时退回未加工的装配，绝不拖垮会话。
@@ -203,7 +234,7 @@ export function apply(ctx, entry = {}) {
       : raw
     const id = typeof context?.promptCustomizerPreset === 'string'
       ? context.promptCustomizerPreset
-      : presetOfSession(ctx.get('sessionProjections'), context?.agent?.session)
+      : presetOfAgent(context?.agent)
     const cfg = effectiveConfig(base.overrides?.[id])
     const phaseHint = typeof context?.promptCustomizerPhase === 'string'
       ? context.promptCustomizerPhase
@@ -211,7 +242,7 @@ export function apply(ctx, entry = {}) {
     const status = phaseHint === 'bootstrap' ? { promoted: false, boundary: -1 }
       : phaseHint === 'compaction' ? { promoted: false, boundary: 1 }
       : phaseHint === 'active' ? { promoted: true, boundary: -1 }
-      : statusOf(ctx.get('sessionProjections'), context?.agent)
+      : statusOf(phaseHandle ?? ctx.get('sessionProjections'), context?.agent)
     return { raw, cfg, status }
   }
 
@@ -230,12 +261,15 @@ export function apply(ctx, entry = {}) {
       const baseSections = raw?.forceSections === false
         ? (Array.isArray(assembled.sections) ? assembled.sections : [])
         : [...registeredSections, ...(assembled.sections ?? []).filter(section => !registeredSections.some(item => item.name === section.name))]
-      const baseTools = Array.isArray(assembled.tools) ? assembled.tools : []
       const baseView = context?.promptCustomizerBase === true
+      // 0.2.2 起 `PromptPresentation` 只含 sections / contexts / variables，
+      // 工具声明由工具提供者拥有；装配瀑布流不再读写 `assembled.tools`。
+      const baseTools = baseView ? toolSchemasOf(ctx, context?.scope) : []
       if (catalog !== undefined && !baseView) {
         catalog.observe({
           sections: baseSections.map(section => ({ name: section.name, text: section.text })),
-          tools: baseTools.map(tool => ({ name: tool.name, description: tool.description })),
+          // 运行期装配不再暴露工具；工具池由 preview / inventory 的注册表读取补充。
+          tools: [],
         })
       }
 
@@ -243,9 +277,7 @@ export function apply(ctx, entry = {}) {
       // 统一实现：瀑布流与 assemble 强制覆盖共用同一份逻辑。
       const sections = applySectionPolicy(baseSections, cfg, status)
 
-      const tools = appendAddedTools(ctx, context?.scope, applyToolFilter(baseTools, te), te.add, te.exclude)
-
-      const result = { ...assembled, sections, tools, promptCustomizerSections: sections }
+      const result = { ...assembled, sections, promptCustomizerSections: sections }
       if (baseView) {
         result.promptCustomizerBaseView = {
           sections: baseSections.map((section) => ({
@@ -366,7 +398,7 @@ export function apply(ctx, entry = {}) {
           const target = await acquireTarget(ctx, id)
           try {
             syncVariables()
-            const preview = await buildPreview(ctx, target.scopeKey, target.hintId, 'active', catalog, undefined, undefined)
+            const preview = await buildPreview(ctx, read(), target.scopeKey, target.hintId, 'active', catalog, undefined, undefined)
             const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, catalog, preview)
             writeJson(res, 200, { ...inventory, scopeResolved: target.scopeResolved, variables: listVariableNames(read().envBlocklist ?? []) })
           } finally {
@@ -405,7 +437,7 @@ export function apply(ctx, entry = {}) {
               && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
               ? body.patch : undefined
             const patchTarget = typeof body?.target === 'string' && body.target.length > 0 ? body.target : undefined
-            const preview = await buildPreview(ctx, target.scopeKey, target.hintId, target.phase, catalog, patch, patchTarget, target.agent)
+            const preview = await buildPreview(ctx, read(), target.scopeKey, target.hintId, target.phase, catalog, patch, patchTarget, target.agent)
             writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved, phase: target.phase, source: target.source })
           } finally {
             await target.release()
@@ -603,6 +635,7 @@ export function apply(ctx, entry = {}) {
           return
         }
         handler(body)
+        toolVisibility.syncAll()
         writeJson(res, 200, { ok: true, config: read() })
       } catch (error) {
         writeJson(res, 400, {
@@ -635,6 +668,7 @@ export function apply(ctx, entry = {}) {
       handler: async (_req, res) => {
         try {
           store.writeSection({ forceSections: false })
+          toolVisibility.syncAll()
           writeJson(res, 200, { ok: true, config: read() })
         } catch (error) {
           writeJson(res, 500, {
@@ -668,6 +702,7 @@ export function apply(ctx, entry = {}) {
             return
           }
           store.writeSection(overlayPatch({ ...(store.raw() ?? {}) }, target, patch))
+          toolVisibility.syncAll()
           writeJson(res, 200, { ok: true, config: read() })
         } catch (error) {
           writeJson(res, 400, {
@@ -723,6 +758,24 @@ async function acquireTarget(ctx, id) {
     return { scopeKey: lease.key, hintId: requestedId, scopeResolved: true, source: 'preset', release: () => lease[Symbol.asyncDispose]() }
   }
   return { scopeKey: undefined, hintId: id, scopeResolved: false, source: 'preset', release: async () => {} }
+}
+
+/**
+ * 读某 scope 的可见工具 schema 列表（0.2.2 起代替废弃的 `assembly.tools`）。
+ * 解析出的预设 scope 优先；为空时回落全局层，避免预设作用域尚未挂载时清单为空。
+ * @param {object} ctx - 插件上下文。
+ * @param {object|undefined} scopeKey - agent 预设 scope key。
+ * @returns {Array<{name: string, description?: string}>} 工具 schema 列表。
+ */
+function toolSchemasOf(ctx, scopeKey) {
+  const scopes = scopeKey === undefined ? [undefined] : [scopeKey, undefined]
+  for (const scope of scopes) {
+    try {
+      const schemas = ctx.tools?.schemas?.(scope) ?? []
+      if (Array.isArray(schemas) && schemas.length > 0) return schemas
+    } catch { /* scope 尚未就绪：尝试下一层 */ }
+  }
+  return []
 }
 
 /** 枚举当前生效的段与工具，并附上各自的屏蔽 / 隐藏标记。 */
@@ -798,13 +851,19 @@ async function collectScopeBase(ctx, scopeKey, presetId) {
     promptCustomizerBase: true,
   })
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
+  const registryTools = toolSchemasOf(ctx, scopeKey)
   return {
     sections: (Array.isArray(baseView.sections) ? baseView.sections : []).map((sec) => ({ name: sec.name, text: sec.text })),
-    tools: (Array.isArray(baseView.tools) ? baseView.tools : []).map((tool) => ({ name: tool.name, description: tool.description })),
+    // 0.2.2 起装配结果不再携带 tools：优先从注册表读；测试 / 旧宿主没有 tools
+    // 服务时回落到装配 base 视图里的工具原文。
+    tools: (registryTools.length > 0
+      ? registryTools
+      : (Array.isArray(baseView.tools) ? baseView.tools : []))
+      .map((tool) => ({ name: tool.name, description: tool.description })),
   }
 }
 
-async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchTarget) {
+async function buildPreview(ctx, rawConfig, scopeKey, hintId, phase, catalog, patch, patchTarget) {
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
   // 视图生效（AssembleContext 允许插件自定义字段）。
@@ -828,14 +887,28 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
   const sections = Array.isArray(assembled.sections)
     ? assembled.sections.map(section => ({ name: section.name, text: renderSection(section, assembled.variables ?? {}, diagnostics) }))
     : []
-  // 预过滤视图（base）：与 post 视图来自同一次装配，三个 Tab 共用同一份数据。
+  // 预过滤视图（base）：段来自装配 base 视图；工具目录 0.2.2 起改从注册表读。
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
+  const phaseStatus = phase === 'bootstrap'
+    ? { promoted: false, boundary: -1 }
+    : phase === 'compaction'
+      ? { promoted: false, boundary: 1 }
+      : { promoted: true, boundary: -1 }
+  const previewCfg = effectiveConfig(rawConfig?.overrides?.[hintId])
+  const previewToolFilter = pickToolsFilter(previewCfg.tools, phaseStatus)
+  const baseTools = (Array.isArray(baseView.tools) && baseView.tools.length > 0
+    ? baseView.tools
+    : toolSchemasOf(ctx, scopeKey).map(tool => ({
+        name: typeof tool.name === 'string' ? tool.name : String(tool.name),
+        description: typeof tool.description === 'string' ? tool.description : '',
+        hidden: (previewToolFilter.exclude ?? []).includes(tool.name),
+      })))
   // 预览带 scope，是「浏览其它预设」时唯一真正跑过该预设装配的入口 —— 把它
   // 见到的段与工具并进池子（base 视图不含 order，新条目由登记表按追加序补）。
   if (catalog !== undefined) {
     catalog.observe({
       sections: (Array.isArray(baseView.sections) ? baseView.sections : []).map((sec) => ({ name: sec.name, text: sec.text })),
-      tools: (Array.isArray(baseView.tools) ? baseView.tools : []).map((tool) => ({ name: tool.name, description: tool.description })),
+      tools: baseTools.map((tool) => ({ name: tool.name, description: tool.description })),
     })
   }
   const registryTools = registryToolNames(ctx, scopeKey)
@@ -866,17 +939,18 @@ async function buildPreview(ctx, scopeKey, hintId, phase, catalog, patch, patchT
     sections,
     text: sections.map(section => section.text).filter(Boolean).join('\n\n'),
     diagnostics,
-    tools: Array.isArray(assembled.tools)
-      ? assembled.tools.map((tool) => ({
-          name: typeof tool.name === 'string' ? tool.name : String(tool.name),
-          description: typeof tool.description === 'string' ? tool.description : '',
-        }))
-      : [],
+    // 该阶段最终可见的工具目录 = 注册表预过滤视图去掉该阶段 exclude。
+    tools: baseTools
+      .filter(tool => !(previewToolFilter.exclude ?? []).includes(tool.name))
+      .map((tool) => ({
+        name: typeof tool.name === 'string' ? tool.name : String(tool.name),
+        description: typeof tool.description === 'string' ? tool.description : '',
+      })),
     // 预过滤视图：段（含该阶段独立屏蔽标记 blocked / 替换标记）与工具
     // （含该阶段隐藏标记 hidden）—— 供提示词 / 工具 Tab 渲染「每阶段
     // 独立名单」，被屏蔽 / 被隐藏的条目仍保留在此可反选。
     baseSections: Array.isArray(baseView.sections) ? baseView.sections : [],
-    baseTools: Array.isArray(baseView.tools) ? baseView.tools : [],
+    baseTools,
   }
 }
 
@@ -893,29 +967,6 @@ function registryToolNames(ctx, scopeKey) {
     }
     return [...byName.keys()]
   } catch { return [] }
-}
-
-/**
- * 把该阶段 `add` 名单里、当前目录还没有的工具，从注册表查回 schema 追加回去
- *（「把被该阶段裁掉、但注册表里仍有的工具加回来」）。`exclude` 优先 —— 同一
- * 名字两者都在 = 隐藏，不加；目录里已有的不重复；注册表查不到的名字跳过（通常
- * 是别的预设独有的工具，当前预设没有可查的 schema，加不进来）。
- */
-function appendAddedTools(ctx, scopeKey, tools, add, exclude) {
-  if (!Array.isArray(add) || add.length === 0) return tools
-  const excluded = new Set(exclude ?? [])
-  const present = new Set(tools.map((tool) => tool.name))
-  const wanted = add.filter((name) => !present.has(name) && !excluded.has(name))
-  if (wanted.length === 0) return tools
-  const registry = new Map()
-  for (const scope of [scopeKey, undefined]) {
-    let schemas = []
-    try { schemas = ctx.tools.schemas(scope) ?? [] } catch { schemas = [] }
-    for (const tool of schemas) if (tool.name) registry.set(tool.name, tool)
-    if (registry.size > 0) break
-  }
-  const extra = wanted.map((name) => registry.get(name)).filter(Boolean)
-  return extra.length > 0 ? [...tools, ...extra] : tools
 }
 
 /**
