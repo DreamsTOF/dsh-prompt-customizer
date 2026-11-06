@@ -27,15 +27,29 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 // 可选：指向一份 DSH 检出，用于在没装 esbuild 时借用它 pnpm store 里的副本。
-// 缺省为空 = 只认本仓库 node_modules（正常安装路径）。
+// 缺省时自动探测同级的 `deepseek-harness` 检出与其它同级目录（开发机便利）。
 const DSH_CHECKOUT = process.env.DSH_CHECKOUT ?? ''
 const PLUGIN_ID = 'dsh-prompt-customizer'
+
+/** 可能含 pnpm store 的检出根：显式 env、同级 deepseek-harness、同级其它目录。 */
+function checkoutCandidates() {
+  const parent = resolve(HERE, '..')
+  const roots = []
+  if (DSH_CHECKOUT !== '') roots.push(DSH_CHECKOUT)
+  roots.push(join(parent, 'deepseek-harness'))
+  try {
+    for (const entry of readdirSync(parent, { withFileTypes: true })) {
+      if (entry.isDirectory()) roots.push(join(parent, entry.name))
+    }
+  } catch { /* 无同级目录 */ }
+  return [...new Set(roots)]
+}
 
 /**
  * Resolve esbuild.
  *
- * Three tiers, in order — the first two keep this plugin buildable both for
- * a fresh clone (`pnpm install` puts esbuild in node_modules) and for a
+ * Tiers, in order — the first two keep this plugin buildable both for a
+ * fresh clone (`pnpm install` puts esbuild in node_modules) and for a
  * contributor hacking inside a DSH checkout:
  *
  *  1. the plugin's own `node_modules` (normal install path; esbuild is a
@@ -56,23 +70,26 @@ function loadEsbuild() {
     // Not installed locally; fall through to the checkout scan.
   }
 
-  const store = join(DSH_CHECKOUT, 'node_modules', '.pnpm')
-  const candidates = []
-  if (existsSync(store)) {
+  for (const root of checkoutCandidates()) {
+    const store = join(root, 'node_modules', '.pnpm')
+    if (!existsSync(store)) continue
+    const candidates = []
     for (const entry of readdirSync(store)) {
       if (!entry.startsWith('esbuild@')) continue
       candidates.push(join(store, entry, 'node_modules', 'esbuild'))
     }
-  }
-  if (candidates.length > 0) {
+    if (candidates.length === 0) continue
     const pick = candidates.sort().at(-1)
-    return createRequire(resolve(pick, 'package.json'))(pick)
+    try {
+      return createRequire(resolve(pick, 'package.json'))(pick)
+    } catch { /* store 里没有可用的平台二进制：试下一个根 */ }
   }
 
   throw new Error(
     'dsh-prompt-customizer: cannot find esbuild.\n'
     + '  Run `pnpm install` in this directory (esbuild is a devDependency).\n'
-    + `  Or set DSH_CHECKOUT to a DSH checkout to borrow its copy (currently: ${DSH_CHECKOUT}).`,
+    + '  Or set DSH_CHECKOUT to a DSH checkout to borrow its copy.\n'
+    + `  Checked: ${checkoutCandidates().join(', ')}`,
   )
 }
 
