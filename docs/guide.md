@@ -57,11 +57,11 @@
 
 **提示词模式**：左栏当前阶段的勾选列表（屏蔽 / 替换 / 注入 / 排序，底部三态过滤），右栏实时预览装配后的最终系统提示词：
 
-![提示词模式：左栏勾选列表 + 右栏实时预览](docs/images/prompt.png)
+![提示词模式：左栏勾选列表 + 右栏实时预览](images/prompt.png)
 
 **工具模式**：左栏该阶段的工具目录勾选列表，「本系统全部工具」池可把注册表里仍有的工具加回该阶段；右栏是模型可见目录（含「模型可见 / 注册表总数」对照）：
 
-![工具模式：阶段目录勾选 + 模型可见目录预览](docs/images/tool.png)
+![工具模式：阶段目录勾选 + 模型可见目录预览](images/tool.png)
 
 ## 功能特性
 
@@ -264,3 +264,4 @@ node scripts/verify-panel-browser.mjs --url "<带 token 的 URL>" \
 `--headless` 可切无头；脚本只用 Node 内建能力（`fetch` + `WebSocket` 驱动 CDP），不引第三方依赖。
 
 阶段性与可测的纯逻辑集中在 `vendor/prompt-customizer/`（提示词策略 / 清单登记表 / 阶段投影）与 `vendor/skill-manager/`：同一份纯函数既被两侧打包使用，也被 `node --test` 直接覆盖，测试即上线代码。`npm run check` = 构建 + 全量单测 + 两半 smoke。
+
