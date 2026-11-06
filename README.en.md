@@ -101,6 +101,7 @@ Build artifacts: `lib/index.js` (host half) and `client/client.js` (browser half
 
 ## Documentation
 
+- [Full usage and implementation guide (Chinese)](docs/guide.md)
 - [Version upgrade and migration records](docs/upgrades/README.md)
 - [DSH 0.2.2-rc.1 migration record](docs/upgrades/dsh-0.2.2-rc1.md)
 - [DSH 0.2.1-rc.2 migration record](docs/upgrades/rc2-migration.md)

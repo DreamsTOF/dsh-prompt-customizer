@@ -113,6 +113,7 @@ npm run check   # 构建 + 全量单测 + 宿主 / 客户端 smoke
 
 ## 文档
 
+- [完整使用与实现指南](docs/guide.md)
 - [版本升级与适配记录](docs/upgrades/README.md)
 - [DSH 0.2.2-rc.1 适配记录](docs/upgrades/dsh-0.2.2-rc1.md)
 - [DSH 0.2.1-rc.2 适配记录](docs/upgrades/rc2-migration.md)
