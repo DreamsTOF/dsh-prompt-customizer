@@ -264,4 +264,3 @@ node scripts/verify-panel-browser.mjs --url "<带 token 的 URL>" \
 `--headless` 可切无头；脚本只用 Node 内建能力（`fetch` + `WebSocket` 驱动 CDP），不引第三方依赖。
 
 阶段性与可测的纯逻辑集中在 `vendor/prompt-customizer/`（提示词策略 / 清单登记表 / 阶段投影）与 `vendor/skill-manager/`：同一份纯函数既被两侧打包使用，也被 `node --test` 直接覆盖，测试即上线代码。`npm run check` = 构建 + 全量单测 + 两半 smoke。
-
