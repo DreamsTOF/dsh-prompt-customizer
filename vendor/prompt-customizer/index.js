@@ -25,23 +25,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { Config, NS, WorkspaceOverrides } from './schema.js'
-/**
- * 目录条目的「预设归属」：name → 见过它的预设 id 集合。目录池本身是全局累积的，
- * 但**提示词/工具段严格按预设隔离**——具体预设只并回自己观察过的条目，绝不把
- * 别的预设独有段/工具（如某预设的 `tools:ptc-only`）串进来。无 scope 的老调用
- * （内部/测试）按并集处理。
- */
-const catalogOwners = new Map()
-function rememberOwners(items, presetId) {
-  const id = presetId === undefined || presetId === null ? '' : String(presetId)
-  for (const it of Array.isArray(items) ? items : []) {
-    const name = String(it?.name ?? '')
-    if (name === '') continue
-    let set = catalogOwners.get(name)
-    if (set === undefined) { set = new Set(); catalogOwners.set(name, set) }
-    set.add(id)
-  }
-}
 import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
@@ -283,14 +266,6 @@ export function apply(ctx, entry = {}) {
       // 0.2.2 起 `PromptPresentation` 只含 sections / contexts / variables，
       // 工具声明由工具提供者拥有；装配瀑布流不再读写 `assembled.tools`。
       const baseTools = baseView ? toolSchemasOf(ctx, context?.scope) : []
-      if (catalog !== undefined && !baseView) {
-        catalog.observe({
-          sections: baseSections.map(section => ({ name: section.name, text: section.text })),
-          // 运行期装配不再暴露工具；工具池由 preview / inventory 的注册表读取补充。
-          tools: [],
-        })
-        rememberOwners(baseSections, typeof context?.promptCustomizerPreset === 'string' ? context.promptCustomizerPreset : (presetOfAgent(context?.agent) ?? ''))
-      }
 
       // 段级策略（屏蔽 / 替换 / 注入 / 排序）由 effective.applySectionPolicy
       // 统一实现：瀑布流与 assemble 强制覆盖共用同一份逻辑。
@@ -530,72 +505,6 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposeSession, 'prompt-customizer: current session route')
 
-    // 全量重扫：逐个挂载已声明的 agent 预设，跑一次装配，用真实并集**整体替换**
-    // 累积登记表。
-    //
-    // 必要性：catalog 是「只增不减」的累积缓存 —— 浏览过的名字永远留在池子里。
-    // 一旦某个预设被删除、某插件被卸载，它带来的段与工具仍会以可拖动条目的形式
-    // 留在面板上（实测 407 个工具里只剩约 100 个还在真实注册表里）。这是唯一能
-    // 真正缩小登记表、且按真实注册表对齐的入口。
-    //
-    // 代价：每个预设都要挂载整棵插件树（重的一棵树可达十几秒），所以只由用户
-    // 显式触发，不做自动预热。扫描期间逐个预设失败不影响其它预设：坏预设跳过
-    // 并把原因回给界面，剩下的照常并入。
-    const disposeRescan = register({
-      kind: 'exact',
-      path: '/api/prompt-customizer/catalog/rescan',
-      handler: async (req, res) => {
-        try {
-          if (req.method !== 'POST') {
-            writeJson(res, 405, { ok: false, error: 'POST only' })
-            return
-          }
-          const roster = ctx.get('agentPresets')
-          if (roster === undefined || typeof roster.acquireScope !== 'function') {
-            writeJson(res, 501, { ok: false, error: '宿主未提供 agent 预设作用域（agentPresets.acquireScope），无法重扫' })
-            return
-          }
-          const declared = await roster.list()
-          const sections = []
-          const tools = []
-          const skipped = []
-          const scanned = []
-          for (const preset of Array.isArray(declared) ? declared : []) {
-            const presetId = preset?.id
-            if (typeof presetId !== 'string' || presetId === '') continue
-            let lease
-            try {
-              lease = await roster.acquireScope(presetId)
-              // base 视图 = 进入本插件过滤前的真实段 / 工具原文，正是要留的并集。
-              const base = await collectScopeBase(ctx, lease.key, presetId)
-              sections.push(...base.sections)
-              tools.push(...base.tools)
-              scanned.push(presetId)
-            } catch (error) {
-              skipped.push({ preset: presetId, reason: String(error && error.message ? error.message : error) })
-            } finally {
-              if (lease !== undefined) {
-                try { await lease[Symbol.asyncDispose]() } catch { /* 释放失败不影响结果 */ }
-              }
-            }
-          }
-          if (scanned.length === 0) {
-            writeJson(res, 409, {
-              ok: false,
-              error: '没有任何预设扫描成功，保留现有登记表以免清空',
-              skipped,
-            })
-            return
-          }
-          // 多个预设会重复贡献同名条目：catalog.replace 内部按名字归一（后见到者赢）。
-          const report = catalog.replace({ sections, tools })
-          writeJson(res, 200, { ok: true, scanned, skipped, report, catalog: catalog.read() })
-        } catch (error) {
-          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
-        }
-      },
-    })
-    ctx.effect(() => disposeRescan, 'prompt-customizer: catalog rescan route')
 
     // agent 预设枚举路由：直接读 roster 的 list()（未 memo 化，运行中新增
     // 的预设立即可见），给 UI 的目标选择器与预览选择器供货。
@@ -1238,20 +1147,9 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
       ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
     }))
 
-  // 并进累积登记表（全局池，供再扫描 / 健康统计 / 同预设运行时动态段兜底）。
-  if (catalog !== undefined) catalog.observe({ sections: seenSections, tools: seenTools })
-  rememberOwners(seenSections, presetId)
-  rememberOwners(seenTools, presetId)
-  const unscoped = presetId === undefined || presetId === ''
-  // 具体预设只并回“本预设观察过”的池条目；无 scope（内部/测试）按并集。
-  const ownerOk = (name) => {
-    const owners = catalogOwners.get(String(name))
-    if (unscoped) return true
-    return owners !== undefined && owners.has(String(presetId))
-  }
-  const pool = catalog === undefined ? { sections: seenSections, tools: seenTools } : catalog.read()
-  const seenNames = new Set(seenSections.map((x) => x.name))
-  const sections = [...seenSections, ...pool.sections.filter((x) => !seenNames.has(x.name) && ownerOk(x.name))]
+  // 清单只来自「当前预设的真实装配」：有就有、没有就没有。不再读任何累积池，
+  // 也不需要手动重扫；预设之间天然隔离。
+  const sections = seenSections
     .map((item) => ({
       ...item,
       order: orderOf.get(String(item.name)) ?? Number.MAX_SAFE_INTEGER,
@@ -1259,8 +1157,7 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
       replaced: Object.hasOwn(replace, item.name),
     }))
     .sort((a, b) => a.order - b.order || String(a.name).localeCompare(String(b.name)))
-  const seenToolNames = new Set(seenTools.map((x) => x.name))
-  const tools = [...seenTools, ...pool.tools.filter((x) => !seenToolNames.has(x.name) && ownerOk(x.name))]
+  const tools = seenTools
     .map((item) => ({ ...item, hidden: isHidden(item.name) }))
 
   return { sections, tools, config: cfg }
@@ -1392,14 +1289,6 @@ async function buildPreview(ctx, rawConfig, target, phase, catalog, patch, patch
   const baseTools = union.rows
   // 预览带 scope，是「浏览其它预设」时唯一真正跑过该预设装配的入口 —— 把它
   // 见到的段与工具并进池子（base 视图不含 order，新条目由登记表按追加序补）。
-  if (catalog !== undefined) {
-    catalog.observe({
-      sections: baseSections.map((sec) => ({ name: sec.name, text: sec.text })),
-      tools: baseTools.map((tool) => ({ name: tool.name, description: tool.description })),
-    })
-    rememberOwners(baseSections, configTargetId)
-    rememberOwners(baseTools, configTargetId)
-  }
   const registryTools = union.registryTools
   const registryTotal = union.registryTools.length
   // 兜底探测（机制无关）：本插件产出的段有多少没进最终装配。下游丢弃段的规则
@@ -1508,14 +1397,6 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       name: typeof tool.name === 'string' ? tool.name : String(tool.name),
       description: typeof tool.description === 'string' ? tool.description : '',
     }))
-  if (catalog !== undefined) {
-    catalog.observe({
-      sections: baseSections.map((section) => ({ name: section.name, text: section.text })),
-      tools: union.rows.map((tool) => ({ name: tool.name, description: tool.description })),
-    })
-    rememberOwners(baseSections, presetId)
-    rememberOwners(union.rows, presetId)
-  }
   const emitted = Array.isArray(assembled.promptCustomizerEmitted) ? assembled.promptCustomizerEmitted : null
   const survivedNames = new Set(sections.map((section) => String(section.name)))
   const droppedNames = emitted === null ? [] : emitted.filter((name) => !survivedNames.has(String(name)))

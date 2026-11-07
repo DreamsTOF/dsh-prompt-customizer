@@ -152,12 +152,3 @@ test('agent-presets 带回当前会话所属预设', async (t) => {
   assert.equal(res.body.currentPreset, 'standard')
 })
 
-test('catalog/rescan 保留 agent 作用域段与工具（不会被清掉）', async (t) => {
-  const h = harness(t)
-  const res = await h.request('catalog/rescan', 'POST')
-  assert.equal(res.statusCode, 200)
-  const names = res.body.catalog.sections.map(section => section.name)
-  assert.ok(names.includes('tool:undo_last_edit'))
-  const tools = res.body.catalog.tools.map(tool => tool.name)
-  assert.ok(tools.includes('undo_last_edit'))
-})

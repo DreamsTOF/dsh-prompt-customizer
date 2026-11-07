@@ -130,16 +130,14 @@ test('清单的首屏形状：模式清单不含对话专属段，只跑预览�
   }
 })
 
-test('没有活着的 agent 时回落运行时累积：跑过一次真实装配就列出来', async () => {
+test('清单只反映当前装配：不再依赖运行时累积池', async () => {
   const { ctx, routes, dataDir } = makeCtx({ liveAgent: false })
   apply(ctx, { dataDir })
-  assert.ok(!(await inventoryOf(routes)).sections.some((sec) => sec.name === RUNTIME_ONLY.name), '没有 agent 时清单列不出它')
-
-  // 一次真实会话装配：作用域是 agent，装配里带着只在该作用域注册的 tool:subagent。
+  // 一次真实会话装配（agent 作用域，带只在该作用域注册的段）。
   await ctx.systemPrompt.assemble({ scope: AGENT, promptCustomizerPhase: 'active' })
-
+  // 已取消累积池：清单只来自当前预设的真实装配，不因别的装配跑过就凭空出现。
   const names = (await inventoryOf(routes)).sections.map((sec) => sec.name)
-  assert.ok(names.includes(RUNTIME_ONLY.name), `跑过一轮后应列出，实际：${names.join(', ')}`)
+  assert.ok(!names.includes(RUNTIME_ONLY.name), `不应再靠运行时累积列出，实际：${names.join(', ')}`)
 })
 
 test('预览只并它自己看见的：预设 scope 里没有的段不会凭空出现', async () => {

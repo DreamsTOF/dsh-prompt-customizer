@@ -3375,7 +3375,6 @@ var CONFIG_UNSET_URL = "/api/prompt-customizer/config/unset";
 var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
 var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
 var EXPORT_URL = "/api/prompt-customizer/export";
-var CATALOG_RESCAN_URL = "/api/prompt-customizer/catalog/rescan";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
 var SESSION_URL = "/api/prompt-customizer/session";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
@@ -3404,7 +3403,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [saving, setSaving] = (0, import_react9.useState)(false);
   const [flash, setFlash] = (0, import_react9.useState)(null);
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
-  const [rescanning, setRescanning] = (0, import_react9.useState)(false);
   const [exporting, setExporting] = (0, import_react9.useState)(false);
   const [backingUp, setBackingUp] = (0, import_react9.useState)(false);
   const [restoring, setRestoring] = (0, import_react9.useState)(false);
@@ -3520,30 +3518,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     setFlash(text);
     setFlashKind(kind);
     flashTimer.current = setTimeout(() => setFlash(null), 3200);
-  };
-  const rescanCatalog = () => {
-    if (rescanning) return;
-    setRescanning(true);
-    showFlash(t("rescanCatalogRunning"), "ok");
-    fetch(CATALOG_RESCAN_URL, { method: "POST" }).then((r) => r.json()).then((body) => {
-      if (body?.ok !== true) throw new Error(body?.error ?? t("rescanCatalogFail"));
-      const report = body.report ?? {};
-      const tools = report.tools ?? {};
-      const sections = report.sections ?? {};
-      if ((report.tools?.after ?? 0) === 0 && (report.sections?.after ?? 0) === 0) {
-        showFlash(t("rescanCatalogEmpty"), "err");
-        return;
-      }
-      showFlash(t("rescanCatalogOk", {
-        toolsBefore: tools.before ?? 0,
-        toolsAfter: tools.after ?? 0,
-        toolsRemoved: tools.removed ?? 0,
-        sectionsBefore: sections.before ?? 0,
-        sectionsAfter: sections.after ?? 0,
-        sectionsRemoved: sections.removed ?? 0
-      }), "ok");
-      void refresh();
-    }).catch((error2) => showFlash(`${t("rescanCatalogFail")}: ${String(error2 instanceof Error ? error2.message : error2)}`, "err")).finally(() => setRescanning(false));
   };
   const clearDraft = () => {
     syncSeq.current += 1;
@@ -3881,13 +3855,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
         (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
-        // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
-        (0, import_react9.createElement)("button", {
-          style: s.saveBtn,
-          disabled: rescanning,
-          title: t("rescanCatalogHint"),
-          onClick: rescanCatalog
-        }, rescanning ? t("rescanCatalogRunning") : t("rescanCatalog")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
         onClose === void 0 ? null : (0, import_react9.createElement)(
           "button",

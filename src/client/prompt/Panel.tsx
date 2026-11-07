@@ -37,7 +37,6 @@ const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
 const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
 const EXPORT_URL = '/api/prompt-customizer/export'
-const CATALOG_RESCAN_URL = '/api/prompt-customizer/catalog/rescan'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
 const SESSION_URL = '/api/prompt-customizer/session'
 
@@ -107,7 +106,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
-  const [rescanning, setRescanning] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -262,40 +260,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     flashTimer.current = setTimeout(() => setFlash(null), 3200)
   }
 
-  // 全量重扫登记表：catalog 是「只增不减」的累积缓存，浏览过的名字永远留着。
-  // 这是唯一能按真实注册表对齐、把已不存在的条目清掉的入口（宿主端逐个挂载
-  // 预设跑一次装配），所以只由用户显式触发，并给出进行中状态。
-  // 状态 hook 声明在组件顶部（所有提前 return 之前）：放在这里会让 loading
-  // 那次渲染跳过它，两次渲染的 hook 数量不一致 → React #310。
-  const rescanCatalog = (): void => {
-    if (rescanning) return
-    setRescanning(true)
-    showFlash(t('rescanCatalogRunning'), 'ok')
-    fetch(CATALOG_RESCAN_URL, { method: 'POST' })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? t('rescanCatalogFail'))
-        const report = body.report ?? {}
-        const tools = report.tools ?? {}
-        const sections = report.sections ?? {}
-        if ((report.tools?.after ?? 0) === 0 && (report.sections?.after ?? 0) === 0) {
-          showFlash(t('rescanCatalogEmpty'), 'err')
-          return
-        }
-        showFlash(t('rescanCatalogOk', {
-          toolsBefore: tools.before ?? 0,
-          toolsAfter: tools.after ?? 0,
-          toolsRemoved: tools.removed ?? 0,
-          sectionsBefore: sections.before ?? 0,
-          sectionsAfter: sections.after ?? 0,
-          sectionsRemoved: sections.removed ?? 0,
-        }), 'ok')
-        // 登记表换了，清单与预览都要重拉。
-        void refresh()
-      })
-      .catch((error: unknown) => showFlash(`${t('rescanCatalogFail')}: ${String(error instanceof Error ? error.message : error)}`, 'err'))
-      .finally(() => setRescanning(false))
-  }
 
   // 丢弃草稿：递增同步序号，作废在途的草稿预览响应（保存后 GET 会整体覆盖，
   // 过期响应绝不能反过来盖掉权威数据）。
@@ -739,13 +703,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
         h('button', { style: s.saveBtn, onClick: () => { void refresh().then(() => syncDraftPreview()) } }, t('refresh')),
-        // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
-        h('button', {
-          style: s.saveBtn,
-          disabled: rescanning,
-          title: t('rescanCatalogHint'),
-          onClick: rescanCatalog,
-        }, rescanning ? t('rescanCatalogRunning') : t('rescanCatalog')),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
         onClose === undefined ? null : h('button', { style: s.iconBtn, onClick: onClose, 'aria-label': t('close'), title: t('close') },
           h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' }, [
