@@ -73,6 +73,7 @@ test('具体预设 inventory 不混入其它预设独有段（串台回归）', 
     const names = std.body.sections.map((s) => s.name)
     assert.ok(names.includes('persona'), 'standard 应含自己的 persona')
     assert.ok(!names.includes('tools:ptc-only'), `standard 不应混入 ptc 专属段，实际=${JSON.stringify(names)}`)
+    // 注：无 scope 仅内部/测试用（后端保留并集以兜底运行时动态段）；面板始终带具体预设 scope。
   } finally {
     closeAllDbs()
   }

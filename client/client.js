@@ -3421,6 +3421,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   (0, import_react9.useEffect)(load, []);
   const refresh = () => {
     const seq = ++refreshSeq.current;
+    if (level === "preset" && target === void 0) return Promise.resolve();
     setSessionLoading(true);
     const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;

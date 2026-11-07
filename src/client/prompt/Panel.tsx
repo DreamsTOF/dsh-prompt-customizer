@@ -130,6 +130,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 返回 Promise：手动刷新后可以链上草稿补同步（见「刷新」按钮）。
   const refresh = (): Promise<void> => {
     const seq = ++refreshSeq.current
+    // 提示词/工具严格按具体预设：未选定预设前不发无 scope 请求（避免并集串台）。
+    if (level === 'preset' && target === undefined) return Promise.resolve()
     setSessionLoading(true)
     const qs = target ? `?scope=${encodeURIComponent(target)}` : ''
     // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。

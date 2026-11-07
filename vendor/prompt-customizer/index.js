@@ -25,6 +25,23 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { Config, NS, WorkspaceOverrides } from './schema.js'
+/**
+ * 目录条目的「预设归属」：name → 见过它的预设 id 集合。目录池本身是全局累积的，
+ * 但**提示词/工具段严格按预设隔离**——具体预设只并回自己观察过的条目，绝不把
+ * 别的预设独有段/工具（如某预设的 `tools:ptc-only`）串进来。无 scope 的老调用
+ * （内部/测试）按并集处理。
+ */
+const catalogOwners = new Map()
+function rememberOwners(items, presetId) {
+  const id = presetId === undefined || presetId === null ? '' : String(presetId)
+  for (const it of Array.isArray(items) ? items : []) {
+    const name = String(it?.name ?? '')
+    if (name === '') continue
+    let set = catalogOwners.get(name)
+    if (set === undefined) { set = new Set(); catalogOwners.set(name, set) }
+    set.add(id)
+  }
+}
 import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
@@ -272,6 +289,7 @@ export function apply(ctx, entry = {}) {
           // 运行期装配不再暴露工具；工具池由 preview / inventory 的注册表读取补充。
           tools: [],
         })
+        rememberOwners(baseSections, typeof context?.promptCustomizerPreset === 'string' ? context.promptCustomizerPreset : (presetOfAgent(context?.agent) ?? ''))
       }
 
       // 段级策略（屏蔽 / 替换 / 注入 / 排序）由 effective.applySectionPolicy
@@ -1220,18 +1238,20 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
       ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
     }))
 
-  // 并进累积登记表（供“全部”视图与再扫描使用）。
+  // 并进累积登记表（全局池，供再扫描 / 健康统计 / 同预设运行时动态段兜底）。
   if (catalog !== undefined) catalog.observe({ sections: seenSections, tools: seenTools })
-  // 预设隔离：具体预设只列“本预设真实拥有”的段/工具，绝不把别的预设独有项
-  // （如某预设专属的 `tools:ptc-only` 段、专属工具）带进来。只有“全部”视图
-  // （presetId 为空 / `*`）才并集化，用于跨预设总览。
-  const isolate = typeof presetId === 'string' && presetId !== '' && presetId !== '*'
+  rememberOwners(seenSections, presetId)
+  rememberOwners(seenTools, presetId)
+  const unscoped = presetId === undefined || presetId === ''
+  // 具体预设只并回“本预设观察过”的池条目；无 scope（内部/测试）按并集。
+  const ownerOk = (name) => {
+    const owners = catalogOwners.get(String(name))
+    if (unscoped) return true
+    return owners !== undefined && owners.has(String(presetId))
+  }
   const pool = catalog === undefined ? { sections: seenSections, tools: seenTools } : catalog.read()
   const seenNames = new Set(seenSections.map((x) => x.name))
-  const sectionSource = isolate
-    ? seenSections
-    : [...seenSections, ...pool.sections.filter((x) => !seenNames.has(x.name))]
-  const sections = sectionSource
+  const sections = [...seenSections, ...pool.sections.filter((x) => !seenNames.has(x.name) && ownerOk(x.name))]
     .map((item) => ({
       ...item,
       order: orderOf.get(String(item.name)) ?? Number.MAX_SAFE_INTEGER,
@@ -1240,12 +1260,7 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
     }))
     .sort((a, b) => a.order - b.order || String(a.name).localeCompare(String(b.name)))
   const seenToolNames = new Set(seenTools.map((x) => x.name))
-  const toolSource = isolate
-    ? seenTools
-    : [...seenTools, ...pool.tools
-      .filter((x) => !seenToolNames.has(x.name))
-      .sort((a, b) => String(a.name).localeCompare(String(b.name)))]
-  const tools = toolSource
+  const tools = [...seenTools, ...pool.tools.filter((x) => !seenToolNames.has(x.name) && ownerOk(x.name))]
     .map((item) => ({ ...item, hidden: isHidden(item.name) }))
 
   return { sections, tools, config: cfg }
@@ -1382,6 +1397,8 @@ async function buildPreview(ctx, rawConfig, target, phase, catalog, patch, patch
       sections: baseSections.map((sec) => ({ name: sec.name, text: sec.text })),
       tools: baseTools.map((tool) => ({ name: tool.name, description: tool.description })),
     })
+    rememberOwners(baseSections, configTargetId)
+    rememberOwners(baseTools, configTargetId)
   }
   const registryTools = union.registryTools
   const registryTotal = union.registryTools.length
@@ -1496,6 +1513,8 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       sections: baseSections.map((section) => ({ name: section.name, text: section.text })),
       tools: union.rows.map((tool) => ({ name: tool.name, description: tool.description })),
     })
+    rememberOwners(baseSections, presetId)
+    rememberOwners(union.rows, presetId)
   }
   const emitted = Array.isArray(assembled.promptCustomizerEmitted) ? assembled.promptCustomizerEmitted : null
   const survivedNames = new Set(sections.map((section) => String(section.name)))
