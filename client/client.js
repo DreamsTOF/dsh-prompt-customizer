@@ -3424,7 +3424,8 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     const seq = ++refreshSeq.current;
     if (level === "preset" && target === void 0) return Promise.resolve();
     setSessionLoading(true);
-    const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
+    const wsSel = level === "workspace" ? workspace ?? currentWorkspace ?? "" : "";
+    const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ""}${wsSel === "" ? "" : `${target ? "&" : "?"}workspace=${encodeURIComponent(wsSel)}`}`;
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
     const failures = [];
     const grab = (phase2) => fetch(PREVIEW_URL + params(phase2)).then((r) => r.json()).then((body) => {
@@ -3474,7 +3475,8 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     if (Object.keys(patch).length === 0) return;
     const seq = ++syncSeq.current;
-    const scopeQs = target !== void 0 ? `?scope=${encodeURIComponent(target)}` : "";
+    const wsSel2 = level === "workspace" ? workspace ?? currentWorkspace ?? "" : "";
+    const scopeQs = `${target !== void 0 ? `?scope=${encodeURIComponent(target)}` : ""}${wsSel2 === "" ? "" : `${target !== void 0 ? "&" : "?"}workspace=${encodeURIComponent(wsSel2)}`}`;
     fetch(PREVIEW_URL + scopeQs, {
       method: "POST",
       headers: { "content-type": "application/json" },

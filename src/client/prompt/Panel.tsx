@@ -131,7 +131,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     // 提示词/工具严格按具体预设：未选定预设前不发无 scope 请求（避免并集串台）。
     if (level === 'preset' && target === undefined) return Promise.resolve()
     setSessionLoading(true)
-    const qs = target ? `?scope=${encodeURIComponent(target)}` : ''
+    const wsSel = level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''
+    const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ''}${wsSel === '' ? '' : `${target ? '&' : '?'}workspace=${encodeURIComponent(wsSel)}`}`
     // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。
     const params = (phase: string): string =>
       `${qs}${qs ? '&' : '?'}phase=${phase}&t=${Date.now()}`
@@ -200,7 +201,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     const seq = ++syncSeq.current
     // scope 走查询串（服务端 previewTarget 只认 query）：草稿补丁必须落在
     // 当前编辑的预设上，否则生效视图为空、预览退回官方原样。
-    const scopeQs = target !== undefined ? `?scope=${encodeURIComponent(target)}` : ''
+    const wsSel2 = level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''
+    const scopeQs = `${target !== undefined ? `?scope=${encodeURIComponent(target)}` : ''}${wsSel2 === '' ? '' : `${target !== undefined ? '&' : '?'}workspace=${encodeURIComponent(wsSel2)}`}`
     fetch(PREVIEW_URL + scopeQs, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

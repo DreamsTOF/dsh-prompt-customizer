@@ -228,8 +228,12 @@ export function apply(ctx, entry = {}) {
     const id = typeof context?.promptCustomizerPreset === 'string'
       ? context.promptCustomizerPreset
       : presetOfAgent(context?.agent)
-    // 运行时生效配置：预设级 override，叠加该会话所属工作区的工作区级 override。
-    const workspaceOvr = workspaceOverrideFor(context?.agent?.session?.header?.cwd)
+    // 运行时生效配置：预设级 override，叠加工作区级 override。预览可显式指定
+    // promptCustomizerWorkspace（所选工作区），否则用会话 cwd。
+    const workspaceCwd = typeof context?.promptCustomizerWorkspace === 'string' && context.promptCustomizerWorkspace !== ''
+      ? context.promptCustomizerWorkspace
+      : context?.agent?.session?.header?.cwd
+    const workspaceOvr = workspaceOverrideFor(workspaceCwd)
     const cfg = effectiveConfig(mergeOverrideLayers(base.overrides?.[id], workspaceOvr))
     const phaseHint = typeof context?.promptCustomizerPhase === 'string'
       ? context.promptCustomizerPhase
@@ -410,7 +414,10 @@ export function apply(ctx, entry = {}) {
           // 宿主共享 webserver 的 req 是原始 IncomingMessage：没有 Express 的
           // query 属性，必须自行解析 URL 参数。
           const id = queryOf(req).get('scope') ?? undefined
+          const workspace = queryOf(req).get('workspace') ?? undefined
           const target = await acquireTarget(ctx, id)
+          if (workspace !== undefined && workspace !== '') target.workspace = workspace
+          if (workspace !== undefined && workspace !== '') target.workspaceOvr = workspaceOverrideFor(workspace)
           try {
             syncVariables()
             const preview = await buildPreview(ctx, read(), target, 'active', undefined, undefined, undefined, toolMask)
@@ -447,6 +454,7 @@ export function apply(ctx, entry = {}) {
             try { body = await readJsonBody(req) } catch { body = null }
           }
           const target = await previewTarget(ctx, req, body)
+          if (typeof target.workspace === 'string' && target.workspace !== '') target.workspaceOvr = workspaceOverrideFor(target.workspace)
           try {
             const patch = body !== null && typeof body === 'object'
               && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
@@ -1153,8 +1161,8 @@ function mergeAgentScopedSections(presetSections, liveSections, denied, replace,
 
 /** 枚举当前生效的段与工具，并附上各自的屏蔽 / 隐藏标记。 */
 async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
-  // 生效配置：目标 agent 预设的 override（0.9.0 起无全局基底）。
-  const cfg = effectiveConfig(raw.overrides?.[presetId])
+  // 生效配置：目标预设 override + 工作区 override（预览已合并好则为 preview.config）。
+  const cfg = preview?.config ?? effectiveConfig(raw.overrides?.[presetId])
   const denied = new Set(cfg.sections ?? [])
   const replace = cfg.replace ?? {}
   const te = pickToolsFilter(cfg.tools, { promoted: true, boundary: -1 }) // 清单无会话概念：恒展示静态（晋级后）视图
@@ -1207,9 +1215,10 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
 async function previewTarget(ctx, req, body = null) {
   const query = queryOf(req)
   const target = await acquireTarget(ctx, query.get('scope') ?? undefined)
+  const workspace = query.get('workspace') ?? (typeof body?.workspace === 'string' ? body.workspace : undefined)
   const rawPhase = body?.phase ?? query.get('phase')
   const phase = ['bootstrap', 'compaction', 'active'].includes(rawPhase) ? rawPhase : undefined
-  return { ...target, phase }
+  return { ...target, phase, workspace: workspace ?? undefined }
 }
 
 /** Assemble one leased mode revision; unresolved session variables stay in the template. */
@@ -1253,6 +1262,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const hintId = target?.hintId
   const liveAgent = liveAgentForPreset(ctx, hintId)
   const configTargetId = hintId ?? (liveAgent === undefined ? undefined : presetIdOfAgent(ctx, liveAgent))
+  const workspace = typeof target?.workspace === 'string' && target.workspace !== '' ? target.workspace : undefined
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
   // 视图生效（AssembleContext 允许插件自定义字段）。
@@ -1263,6 +1273,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     // 请求预过滤视图（base）：本插件的过滤器把进入过滤前的段 / 工具原文
     // 连同屏蔽 / 隐藏标记一起附在装配结果上，作为面板两个栏的统一数据源。
     promptCustomizerBase: true,
+    ...(workspace === undefined ? {} : { promptCustomizerWorkspace: workspace }),
   }
   // 实时预览（UI 未保存草稿）：补丁挂进装配上下文，过滤器在 resolveTarget
   // 里把它叠加到目标层 —— 只读内存，磁盘不动。
@@ -1283,7 +1294,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     : phase === 'compaction'
       ? { promoted: false, boundary: 1 }
       : { promoted: true, boundary: -1 }
-  const previewCfg = effectiveConfig(rawConfig?.overrides?.[configTargetId])
+  const previewCfg = effectiveConfig(mergeOverrideLayers(rawConfig?.overrides?.[configTargetId], target?.workspaceOvr))
   const previewToolFilter = pickToolsFilter(previewCfg.tools, phaseStatus)
   // 左栏的「基座」：纯预设 base 段 + 同预设活动 agent 的 agent 作用域段。
   // 右栏最终装配仍用上面的纯预设装配（预设预览保持纯净）；右栏之外的列表
@@ -1343,6 +1354,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     : undefined
   return {
     ok: true,
+    config: previewCfg,
     contexts: (assembled.contexts ?? []).map(context => ({ name: context.name, text: renderSection(context, assembled.variables ?? {}, diagnostics) })),
     registryTotal,
     /** 该 scope 注册表的工具名清单：供界面区分「在本预设里、只是被该阶段裁掉」
