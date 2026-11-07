@@ -20,10 +20,12 @@ import { ALL_PRESETS, UNCATEGORIZED, type HealthViewModel, type PresetRow } from
  * 工作区放在这一行（而不是操作行）是因为它同时决定技能目录与 MCP 注入：
  * 用户需要一眼看到「我现在配置的是哪个工作区」。
  */
-export function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }: {
+export function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }: {
   t: (key: string, params?: Record<string, string | number>) => string
   kind: 'skill' | 'mcp' | 'prompt'
   onKind: (value: 'skill' | 'mcp' | 'prompt') => void
+  level: 'preset' | 'workspace'
+  onLevel: (value: 'preset' | 'workspace') => void
   workspaces: string[]
   /** 当前选中的工作区；null = 跟随当前会话。 */
   workspaceValue: string | null
@@ -48,6 +50,22 @@ export function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorks
               className={`${css.kindTab} ${kind === value ? css.kindTabActive : ''}`}
               data-active={kind === value || undefined}
               onClick={() => { onKind(value) }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {/* 统一层级切换：预设级 / 工作区级，三 tab 共用同一份。 */}
+        <div className={css.kindTabs} role="tablist" aria-label={t('levelAria')} style={{ marginLeft: 8 }}>
+          {([['preset', t('levelPreset')], ['workspace', t('levelWorkspace')]] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={level === value}
+              className={`${css.kindTab} ${level === value ? css.kindTabActive : ''}`}
+              data-active={level === value || undefined}
+              onClick={() => { onLevel(value) }}
             >
               {label}
             </button>

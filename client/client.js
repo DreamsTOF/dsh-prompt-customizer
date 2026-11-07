@@ -31,11 +31,11 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/client/skills/entry.tsx
-var import_react19 = require("react");
+var import_react18 = require("react");
 var import_client = require("react-dom/client");
 
 // src/client/skills/SkillsPanel.tsx
-var import_react16 = require("react");
+var import_react15 = require("react");
 var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/popover-shell.tsx
@@ -325,7 +325,7 @@ function PshBody({ children, className }) {
 }
 
 // src/client/prompt/Panel.tsx
-var import_react10 = require("react");
+var import_react9 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/styles.ts
@@ -3354,79 +3354,6 @@ function PreviewPane({ t, phases, phase, sub }) {
   ]);
 }
 
-// src/client/prompt/SessionView.tsx
-var import_react9 = require("react");
-function SessionView({ data, loading, error, t, onRefresh }) {
-  const [sub, setSub] = (0, import_react9.useState)("prompt");
-  const session = data?.session ?? null;
-  const phaseLabel = session?.phase === "bootstrap" ? t("phaseStageGuide") : session?.phase === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
-  const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
-  const toolRows = data?.baseTools ?? (data?.tools ?? []).map((tool) => typeof tool === "string" ? { name: tool, description: "", hidden: false } : { name: tool.name, description: tool.description, hidden: false });
-  const visibleNames = new Set((data?.tools ?? []).map((tool) => typeof tool === "string" ? tool : tool.name));
-  return (0, import_react9.createElement)("div", { style: { ...s.colRight, flex: 1 } }, [
-    (0, import_react9.createElement)("div", { style: s.colRightScroll }, [
-      (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-        (0, import_react9.createElement)("span", { style: s.headTitle }, t("tabsSession")),
-        session !== null ? (0, import_react9.createElement)("span", { style: s.orderTag }, `${t("sessionId")}: ${session.id} \xB7 ${t("sessionPreset")}: ${session.presetId ?? "\u2014"} \xB7 ${t("sessionPhase")}: ${phaseLabel}`) : null,
-        (0, import_react9.createElement)("button", { style: { ...s.mini, marginLeft: "auto" }, onClick: onRefresh }, t("refresh"))
-      ]),
-      (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("sessionHint")),
-      error !== null ? (0, import_react9.createElement)("div", { style: s.error }, error) : null,
-      loading && data === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("loading")) : null,
-      !loading && data !== null && session === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("sessionNone")) : null,
-      data !== null && session !== null ? [
-        (0, import_react9.createElement)("div", { style: { ...s.seg, margin: "4px 0 8px" } }, [
-          (0, import_react9.createElement)("button", {
-            style: sub === "prompt" ? s.segBtnActive : s.segBtn,
-            onClick: () => setSub("prompt")
-          }, t("tabsSections")),
-          (0, import_react9.createElement)("button", {
-            style: sub === "tools" ? s.segBtnActive : s.segBtn,
-            onClick: () => setSub("tools")
-          }, t("tabsTools"))
-        ]),
-        lossNote !== null ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
-        data.diagnostics?.length ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("previewUnresolved", {
-          names: [...new Set(data.diagnostics.map((item) => `{{${item.variable}}}`))].join(", ")
-        })) : null,
-        sub === "prompt" ? [
-          (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-            (0, import_react9.createElement)("span", { style: s.muted }, t("sessionPromptTitle")),
-            (0, import_react9.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
-          ]),
-          (0, import_react9.createElement)("pre", { style: s.previewText }, data.text || t("empty")),
-          (0, import_react9.createElement)("div", { style: s.rowTitle }, t("runtimeContexts")),
-          ...(data.contexts ?? []).map((context) => (0, import_react9.createElement)("div", { key: context.name }, [
-            (0, import_react9.createElement)("div", { style: s.muted }, context.name),
-            (0, import_react9.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
-          ]))
-        ] : [
-          (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-            (0, import_react9.createElement)("span", { style: s.muted }, t("sessionToolsTitle")),
-            (0, import_react9.createElement)(
-              "span",
-              { style: s.orderTag },
-              `${data.tools.length} ${t("sessionToolsVisible")} / ${data.registryTotal ?? toolRows.length} ${t("sessionToolsTotal")}`
-            )
-          ]),
-          (0, import_react9.createElement)("div", { style: s.list }, toolRows.map((tool) => (0, import_react9.createElement)("div", {
-            key: `${tool.name}:${tool.state ?? tool.scope ?? ""}`,
-            style: s.row
-          }, [
-            (0, import_react9.createElement)("div", { style: s.rowBody }, [
-              (0, import_react9.createElement)("div", { style: s.rowTitle }, [
-                (0, import_react9.createElement)("span", { style: s.code }, tool.name),
-                tool.maskedByOwnPlugin === true ? (0, import_react9.createElement)("span", { style: s.badgeBlocked, title: t("toolMaskedByOwnPluginHint") }, t("toolMaskedByOwnPlugin")) : tool.maskedByPlugin === true ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("toolMaskedByPluginHint") }, t("toolMaskedByPlugin")) : tool.scope === "agent" ? (0, import_react9.createElement)("span", { style: s.badgeSystem, title: t("toolAgentScopedHint") }, t("toolAgentScoped")) : tool.scope === "executor" ? (0, import_react9.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : tool.hidden === true ? (0, import_react9.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : visibleNames.has(tool.name) ? null : (0, import_react9.createElement)("span", { style: s.badgeReplaced }, t("hiddenOn"))
-              ]),
-              tool.description !== "" ? (0, import_react9.createElement)("div", { style: s.preview }, tool.description.slice(0, 140)) : null
-            ])
-          ])))
-        ]
-      ] : null
-    ])
-  ]);
-}
-
 // src/client/prompt/Panel.tsx
 var INVENTORY_URL = "/api/prompt-customizer/inventory";
 var AGENT_PRESETS_URL = "/api/prompt-customizer/agent-presets";
@@ -3441,34 +3368,33 @@ var PREVIEW_URL = "/api/prompt-customizer/preview";
 var SESSION_URL = "/api/prompt-customizer/session";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
-function Panel({ t, onClose }) {
-  const [cfg, setCfg] = (0, import_react10.useState)(null);
-  const [inv, setInv] = (0, import_react10.useState)(null);
-  const [phases, setPhases] = (0, import_react10.useState)(null);
-  const [agentPresets, setAgentPresets] = (0, import_react10.useState)([]);
-  const [currentPreset, setCurrentPreset] = (0, import_react10.useState)(void 0);
-  const [sessionView, setSessionView] = (0, import_react10.useState)(null);
-  const [sessionLoading, setSessionLoading] = (0, import_react10.useState)(false);
-  const [level, setLevel] = (0, import_react10.useState)("preset");
-  const [workspaceOverrides, setWorkspaceOverrides] = (0, import_react10.useState)({});
-  const [currentWorkspace, setCurrentWorkspace] = (0, import_react10.useState)(void 0);
-  const [mode, setMode] = (0, import_react10.useState)("sections");
-  const [error, setError] = (0, import_react10.useState)(null);
-  const [version, setVersion] = (0, import_react10.useState)(0);
-  const [phase, setPhase] = (0, import_react10.useState)("bootstrap");
-  const [dropPhase, setDropPhase] = (0, import_react10.useState)(null);
-  const syncSeq = (0, import_react10.useRef)(0);
-  const refreshSeq = (0, import_react10.useRef)(0);
-  const [target, setTarget] = (0, import_react10.useState)(void 0);
-  const [syncAll, setSyncAll] = (0, import_react10.useState)(false);
-  const [previewSub, setPreviewSub] = (0, import_react10.useState)("prompt");
-  const [draft, setDraft] = (0, import_react10.useState)(null);
-  const [saving, setSaving] = (0, import_react10.useState)(false);
-  const [flash, setFlash] = (0, import_react10.useState)(null);
-  const [flashKind, setFlashKind] = (0, import_react10.useState)("ok");
-  const [rescanning, setRescanning] = (0, import_react10.useState)(false);
-  const [exporting, setExporting] = (0, import_react10.useState)(false);
-  const flashTimer = (0, import_react10.useRef)(null);
+function Panel({ t, onClose, level = "preset", workspace }) {
+  const [cfg, setCfg] = (0, import_react9.useState)(null);
+  const [inv, setInv] = (0, import_react9.useState)(null);
+  const [phases, setPhases] = (0, import_react9.useState)(null);
+  const [agentPresets, setAgentPresets] = (0, import_react9.useState)([]);
+  const [currentPreset, setCurrentPreset] = (0, import_react9.useState)(void 0);
+  const [sessionView, setSessionView] = (0, import_react9.useState)(null);
+  const [sessionLoading, setSessionLoading] = (0, import_react9.useState)(false);
+  const [workspaceOverrides, setWorkspaceOverrides] = (0, import_react9.useState)({});
+  const [currentWorkspace, setCurrentWorkspace] = (0, import_react9.useState)(void 0);
+  const [mode, setMode] = (0, import_react9.useState)("sections");
+  const [error, setError] = (0, import_react9.useState)(null);
+  const [version, setVersion] = (0, import_react9.useState)(0);
+  const [phase, setPhase] = (0, import_react9.useState)("bootstrap");
+  const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
+  const syncSeq = (0, import_react9.useRef)(0);
+  const refreshSeq = (0, import_react9.useRef)(0);
+  const [target, setTarget] = (0, import_react9.useState)(void 0);
+  const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
+  const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
+  const [draft, setDraft] = (0, import_react9.useState)(null);
+  const [saving, setSaving] = (0, import_react9.useState)(false);
+  const [flash, setFlash] = (0, import_react9.useState)(null);
+  const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
+  const [rescanning, setRescanning] = (0, import_react9.useState)(false);
+  const [exporting, setExporting] = (0, import_react9.useState)(false);
+  const flashTimer = (0, import_react9.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
@@ -3478,7 +3404,7 @@ function Panel({ t, onClose }) {
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react10.useEffect)(load, []);
+  (0, import_react9.useEffect)(load, []);
   const refresh = () => {
     const seq = ++refreshSeq.current;
     setSessionLoading(true);
@@ -3519,7 +3445,7 @@ function Panel({ t, onClose }) {
       setError(String(e instanceof Error ? e.message : e));
     });
   };
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     void refresh();
   }, [target, version]);
   const syncDraftPreview = () => {
@@ -3546,7 +3472,7 @@ function Panel({ t, onClose }) {
       setError(`${t("previewSyncFail")}\uFF1A${e instanceof Error ? e.message : String(e)}`);
     });
   };
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (draft === null || !draft.dirty) return void 0;
     const timer = setTimeout(syncDraftPreview, 600);
     return () => {
@@ -3562,10 +3488,10 @@ function Panel({ t, onClose }) {
       setCurrentPreset(void 0);
     });
   };
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     fetchPresets();
   }, []);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     setTarget((current2) => {
       if (current2 !== void 0) return current2;
       const live = currentPreset === void 0 ? void 0 : agentPresets.find((p) => p.id === currentPreset && !p.broken);
@@ -3609,9 +3535,9 @@ function Panel({ t, onClose }) {
     setDraft(null);
   };
   if (cfg === null) {
-    return (0, import_react10.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
+    return (0, import_react9.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
   }
-  const wsKey = currentWorkspace;
+  const wsKey = workspace ?? currentWorkspace ?? void 0;
   const wsTarget = target ?? "__workspace__";
   const baseSource = level === "workspace" ? { ...cfg, overrides: { [wsTarget]: (wsKey !== void 0 ? workspaceOverrides[wsKey] : void 0) ?? {} } } : cfg;
   const base = editView(baseSource, level === "workspace" ? wsTarget : target);
@@ -3746,13 +3672,6 @@ function Panel({ t, onClose }) {
     setMode(next);
     setPreviewSub(next === "tools" ? "tools" : "prompt");
   };
-  const switchLevel = (next) => {
-    if (next === level) return;
-    if (draft?.dirty && !window.confirm(t("discardConfirm"))) return;
-    clearDraft();
-    setLevel(next);
-    if (next === "workspace") void refresh();
-  };
   const switchTarget = (next) => {
     if (draft?.dirty && !window.confirm(t("discardConfirm"))) return;
     clearDraft();
@@ -3775,14 +3694,14 @@ function Panel({ t, onClose }) {
       });
     }).catch((e) => showFlash(`${t("exportPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setExporting(false));
   };
-  const modeBtn = (key, label) => (0, import_react10.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
+  const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
   const draftDirty = draft?.dirty === true;
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
     const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length;
-    return (0, import_react10.createElement)("button", {
+    return (0, import_react9.createElement)("button", {
       key: id,
       type: "button",
       className: css.catItem,
@@ -3790,56 +3709,43 @@ function Panel({ t, onClose }) {
       onClick: () => switchTarget(id),
       title: bad ? `${label} \u2014 ${t("broken")}` : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
     }, [
-      (0, import_react10.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
-      (0, import_react10.createElement)("span", { className: css.catLabel }, label),
-      bad ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
-      !bad && customized > 0 ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
+      (0, import_react9.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
+      (0, import_react9.createElement)("span", { className: css.catLabel }, label),
+      bad ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
+      !bad && customized > 0 ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
     ]);
   };
-  return (0, import_react10.createElement)("div", { style: s.pRoot }, [
+  return (0, import_react9.createElement)("div", { style: s.pRoot }, [
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
     // 0.9.0 起「全部 Agent」入口移除：提示词必须按具体预设修改，无全局目标。
-    (0, import_react10.createElement)("div", { key: "targets", className: css.topbar }, [
-      (0, import_react10.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
-        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react10.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
+    (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
+      (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
+        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
       ])
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
     // 阶段按钮合并放在三态同步选择框左侧：左栏列表与右栏预览跟着同一个
     // 阶段状态走，一处切换两边联动。仅在提示词 / 工具两个模式显示。
-    (0, import_react10.createElement)("div", { style: s.head }, [
-      (0, import_react10.createElement)("span", { style: s.headTitle }, [
-        (0, import_react10.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
-          (0, import_react10.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          (0, import_react10.createElement)("path", { d: "M14 2v6h6" }),
-          (0, import_react10.createElement)("path", { d: "M16 13H8" }),
-          (0, import_react10.createElement)("path", { d: "M16 17H8" }),
-          (0, import_react10.createElement)("path", { d: "M10 9H8" })
+    (0, import_react9.createElement)("div", { style: s.head }, [
+      (0, import_react9.createElement)("span", { style: s.headTitle }, [
+        (0, import_react9.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
+          (0, import_react9.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+          (0, import_react9.createElement)("path", { d: "M14 2v6h6" }),
+          (0, import_react9.createElement)("path", { d: "M16 13H8" }),
+          (0, import_react9.createElement)("path", { d: "M16 17H8" }),
+          (0, import_react9.createElement)("path", { d: "M10 9H8" })
         ]),
         t("nav")
       ]),
-      (0, import_react10.createElement)("div", { style: s.seg }, [
+      (0, import_react9.createElement)("div", { style: s.seg }, [
         modeBtn("sections", t("tabsSections")),
         modeBtn("tools", t("tabsTools")),
-        modeBtn("session", t("tabsSession")),
         modeBtn("presets", t("tabsPresets"))
       ]),
-      (0, import_react10.createElement)("div", { style: s.seg }, [
-        (0, import_react10.createElement)("button", {
-          key: "lvl-preset",
-          style: level === "preset" ? s.segBtnActive : s.segBtn,
-          onClick: () => switchLevel("preset")
-        }, t("levelPreset")),
-        (0, import_react10.createElement)("button", {
-          key: "lvl-workspace",
-          style: level === "workspace" ? s.segBtnActive : s.segBtn,
-          onClick: () => switchLevel("workspace")
-        }, t("levelWorkspace"))
-      ]),
-      (0, import_react10.createElement)("div", { style: s.headActions }, [
-        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react10.createElement)("button", {
+      (0, import_react9.createElement)("div", { style: s.headActions }, [
+        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react9.createElement)("button", {
           key,
           style: dropPhase === key ? phase === key ? s.segBtnDropActive : s.segBtnDrop : phase === key ? s.segBtnActive : s.segBtn,
           onClick: () => setPhase(key),
@@ -3858,12 +3764,12 @@ function Panel({ t, onClose }) {
             dropOnPhase(key, payload);
           }
         }, stageLabel(key)))) : null,
-        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react10.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
-        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("label", {
+        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
+        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("syncAllPhasesHint")
         }, [
-          (0, import_react10.createElement)("input", {
+          (0, import_react9.createElement)("input", {
             type: "checkbox",
             checked: syncAll,
             onChange: (e) => toggleSyncAll(e.target.checked),
@@ -3871,11 +3777,11 @@ function Panel({ t, onClose }) {
           }),
           t("syncAllPhases")
         ]) : null,
-        mode === "sections" ? (0, import_react10.createElement)("label", {
+        mode === "sections" ? (0, import_react9.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("zhHint")
         }, [
-          (0, import_react10.createElement)("input", {
+          (0, import_react9.createElement)("input", {
             type: "checkbox",
             checked: zhOn,
             onChange: toggleZh,
@@ -3883,63 +3789,55 @@ function Panel({ t, onClose }) {
           }),
           t("zhSwitch")
         ]) : null,
-        (0, import_react10.createElement)("button", {
+        (0, import_react9.createElement)("button", {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
           disabled: !draft?.dirty || saving,
           onClick: save
         }, t("save")),
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
-        (0, import_react10.createElement)("button", { style: s.saveBtn, onClick: () => {
+        (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
         // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
-        (0, import_react10.createElement)("button", {
+        (0, import_react9.createElement)("button", {
           style: s.saveBtn,
           disabled: rescanning,
           title: t("rescanCatalogHint"),
           onClick: rescanCatalog
         }, rescanning ? t("rescanCatalogRunning") : t("rescanCatalog")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
-        onClose === void 0 ? null : (0, import_react10.createElement)(
+        onClose === void 0 ? null : (0, import_react9.createElement)(
           "button",
           { style: s.iconBtn, onClick: onClose, "aria-label": t("close"), title: t("close") },
-          (0, import_react10.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
-            (0, import_react10.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
+          (0, import_react9.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
+            (0, import_react9.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
           ])
         )
       ])
     ]),
     // ── 消息条（错误 / 闪示 / 目标异常警示） ──
-    (0, import_react10.createElement)("div", { style: { padding: "0 14px" } }, [
-      error ? (0, import_react10.createElement)("div", { style: s.error }, String(error)) : null,
-      flash ? (0, import_react10.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
-      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react10.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
-      inv?.scopeResolved === false && mode !== "presets" && mode !== "session" ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
-      level === "workspace" && currentWorkspace === void 0 ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("workspaceNoSession")) : null
+    (0, import_react9.createElement)("div", { style: { padding: "0 14px" } }, [
+      error ? (0, import_react9.createElement)("div", { style: s.error }, String(error)) : null,
+      flash ? (0, import_react9.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
+      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react9.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
+      inv?.scopeResolved === false && mode !== "presets" && mode !== "session" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
+      level === "workspace" && currentWorkspace === void 0 ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("workspaceNoSession")) : null
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
-    (0, import_react10.createElement)(
+    (0, import_react9.createElement)(
       "div",
       { key: "body", style: s.body },
-      mode === "session" ? (0, import_react10.createElement)(SessionView, {
-        data: sessionView,
-        loading: sessionLoading,
-        error,
-        t,
-        onRefresh: () => {
-          void refresh();
-        }
-      }) : mode === "sections" ? [
-        (0, import_react10.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
-        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
+      mode === "sections" ? [
+        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
       ] : mode === "tools" ? [
-        (0, import_react10.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
-        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
+        (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
       ] : [
-        (0, import_react10.createElement)(PresetsPane, {
+        (0, import_react9.createElement)(PresetsPane, {
           key: "presets",
           cfg: view,
           inv,
@@ -3950,7 +3848,7 @@ function Panel({ t, onClose }) {
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
         }),
-        (0, import_react10.createElement)(SettingsPane, {
+        (0, import_react9.createElement)(SettingsPane, {
           key: "settings",
           cfg: view,
           inv,
@@ -4117,7 +4015,7 @@ var DICT = {
     phaseVisible: "\u9636\u6BB5\u53EF\u89C1",
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
-    previewSessionOverlay: "\u5DE6\u680F\u5DF2\u5E76\u5165\u5F53\u524D\u4F1A\u8BDD\u7684\u4F1A\u8BDD\u7EA7\u6761\u76EE\uFF1B\u53F3\u680F\u4ECD\u662F\u7F16\u8F91\u76EE\u6807\u9884\u8BBE\u7684\u7EAF\u88C5\u914D\uFF0C\u771F\u5B9E\u4F1A\u8BDD\u7684\u5B8C\u6574\u89C6\u56FE\u89C1\u300C\u5F53\u524D\u4F1A\u8BDD\u300D\u3002",
+    previewSessionOverlay: "\u5DE6\u680F\u5DF2\u5E76\u5165\u5F53\u524D\u4F1A\u8BDD\u7684\u4F1A\u8BDD\u7EA7\u6761\u76EE\uFF1B\u53F3\u680F\u4ECD\u662F\u7F16\u8F91\u76EE\u6807\u9884\u8BBE\u7684\u7EAF\u88C5\u914D\u3002",
     sessionHint: "\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF08\u53EA\u8BFB\uFF09\uFF1A\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u6765\u81EA\u6700\u65B0\u6D3B\u52A8\u6839\u4F1A\u8BDD\u81EA\u5DF1\u7684 agent \u4F5C\u7528\u57DF\u3002",
     sessionNone: "\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF1B\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u8FD9\u91CC\u4F1A\u663E\u793A\u6A21\u578B\u771F\u5B9E\u770B\u5230\u7684\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u3002",
     sessionPromptTitle: "\u6700\u7EC8\u7CFB\u7EDF\u63D0\u793A\u8BCD\uFF08\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF09",
@@ -4298,7 +4196,7 @@ var DICT = {
     phaseVisible: "visible in phase",
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
-    previewSessionOverlay: 'The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset. See "Current session" for the real view.',
+    previewSessionOverlay: "The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset.",
     sessionHint: "Real assembly of the current session (read-only): prompt sections and tools come from the newest active root session's own agent scope.",
     sessionNone: "No active session right now. Start a conversation and this view will show exactly what the model sees.",
     sessionPromptTitle: "Final system prompt (real current-session assembly)",
@@ -4382,8 +4280,8 @@ function applyPrompt(ctx) {
 
 // src/client/prompt/PromptView.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
-function PromptView() {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT() }) });
+function PromptView({ level, workspace }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT(), level, workspace: workspace ?? void 0 }) });
 }
 
 // src/client/skills/api.ts
@@ -4452,6 +4350,27 @@ var skillApi = {
     headers: { accept: "application/json" }
   }).then((response) => response.json()).then((body) => {
     if (!body.ok) throw new Error(body.error || "reset failed");
+    return body;
+  }),
+  /** 工作区级开关：全部工作区覆盖（按 cwd）。 */
+  workspaceStatus: () => fetch("/api/skill-toggles/workspaces", { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+    if (body.error) throw new Error(body.error);
+    return { workspaces: body.workspaces ?? {} };
+  }),
+  setWorkspaceSkillEnabled: (cwd, name, enabled) => fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/skills/${encodeURIComponent(name)}`, {
+    method: "PUT",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ enabled })
+  }).then((response) => response.json()).then((body) => {
+    if (!body.ok) throw new Error(body.error || "toggle failed");
+    return body;
+  }),
+  setWorkspaceBundleEnabled: (cwd, bundleId, enabled) => fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/bundles/${encodeURIComponent(bundleId)}`, {
+    method: "PUT",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ enabled })
+  }).then((response) => response.json()).then((body) => {
+    if (!body.ok) throw new Error(body.error || "toggle failed");
     return body;
   }),
   createBundle: (name, categories = []) => skillRequest("/bundles", { method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify({ name, categories }) }),
@@ -4878,6 +4797,9 @@ var SKILL_ZH = {
   kindSkill: "SKILL",
   kindPrompt: "\u63D0\u793A\u8BCD",
   kindMcp: "MCP",
+  levelPreset: "\u9884\u8BBE\u7EA7",
+  levelWorkspace: "\u5DE5\u4F5C\u533A\u7EA7",
+  levelAria: "\u9884\u8BBE\u7EA7 / \u5DE5\u4F5C\u533A\u7EA7",
   // MCP 视图
   mcpServer: "MCP Server",
   mcpTools: "\u5DE5\u5177\u5217\u8868",
@@ -5135,18 +5057,18 @@ function skillT(key, params) {
 }
 
 // src/client/skills/McpAddModal.tsx
-var import_react11 = require("react");
+var import_react10 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime5 = require("react/jsx-runtime");
 function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
-  const [format, setFormat] = (0, import_react11.useState)("json");
-  const [text, setText] = (0, import_react11.useState)("");
-  const [busy, setBusy] = (0, import_react11.useState)(null);
-  const [preview, setPreview] = (0, import_react11.useState)(null);
-  const [errors, setErrors] = (0, import_react11.useState)([]);
-  const [warnings, setWarnings] = (0, import_react11.useState)([]);
-  const [notice, setNotice] = (0, import_react11.useState)(null);
-  const [scope, setScope] = (0, import_react11.useState)("global");
+  const [format, setFormat] = (0, import_react10.useState)("json");
+  const [text, setText] = (0, import_react10.useState)("");
+  const [busy, setBusy] = (0, import_react10.useState)(null);
+  const [preview, setPreview] = (0, import_react10.useState)(null);
+  const [errors, setErrors] = (0, import_react10.useState)([]);
+  const [warnings, setWarnings] = (0, import_react10.useState)([]);
+  const [notice, setNotice] = (0, import_react10.useState)(null);
+  const [scope, setScope] = (0, import_react10.useState)("global");
   const target = presetId === void 0 ? "global" : "preset";
   const placeholder = format === "json" ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }' : 'mcpServers:\n  my-server:\n    command: npx\n    args: ["-y", "@scope/mcp-server"]';
   const empty = text.trim() === "";
@@ -5302,11 +5224,11 @@ function McpAddModal({ t, open, onClose, onAdded }) {
 }
 
 // src/client/skills/McpView.tsx
-var import_react14 = require("react");
+var import_react13 = require("react");
 var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/confirm-dialog.tsx
-var import_react12 = require("react");
+var import_react11 = require("react");
 var import_react_dom3 = require("react-dom");
 var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime6 = require("react/jsx-runtime");
@@ -5369,7 +5291,7 @@ function ConfirmDialog({
   ensureModalAnimStyles();
   ensureDialogStyles();
   const { closing, requestClose } = useModalClose(open, onClose);
-  (0, import_react12.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!open) return void 0;
     const onKey = (event) => {
       if (event.key === "Escape") requestClose();
@@ -5414,7 +5336,7 @@ function ConfirmDialog({
 }
 
 // src/client/skills/mcp-live.ts
-var import_react13 = require("react");
+var import_react12 = require("react");
 var MCP_TOOL_WATCH_INTERVAL_MS = 2e3;
 var MCP_TOOL_WATCH_TIMEOUT_MS = 15e4;
 function mcpRegisteredToolCountOf(data, serverName) {
@@ -5429,7 +5351,7 @@ function isToolRegistrationPending(registered, listed) {
   return registered === 0 && listed > 0;
 }
 function useMcpLiveState() {
-  const [status, setStatus] = (0, import_react13.useState)({ state: "loading", data: null });
+  const [status, setStatus] = (0, import_react12.useState)({ state: "loading", data: null });
   const load = () => {
     setStatus((current2) => current2.state === "ready" ? current2 : { state: "loading", data: null });
     void fetch("/api/triad/mcp-status", { headers: { accept: "application/json" } }).then((response) => {
@@ -5443,7 +5365,7 @@ function useMcpLiveState() {
       setStatus({ state: "unavailable", data: null });
     });
   };
-  (0, import_react13.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     load();
   }, []);
   return [status, load];
@@ -5491,14 +5413,14 @@ ${description}`}`,
     );
   }) });
 }
-function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace }) {
-  const [busy, setBusy] = (0, import_react14.useState)(null);
-  const [error, setError] = (0, import_react14.useState)(null);
-  const [globalOpen, setGlobalOpen] = (0, import_react14.useState)(true);
-  const [ownOpen, setOwnOpen] = (0, import_react14.useState)(true);
-  const [toolBusy, setToolBusy] = (0, import_react14.useState)(null);
-  const [removeReq, setRemoveReq] = (0, import_react14.useState)(null);
-  const [removeOwnReq, setRemoveOwnReq] = (0, import_react14.useState)(null);
+function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace, level }) {
+  const [busy, setBusy] = (0, import_react13.useState)(null);
+  const [error, setError] = (0, import_react13.useState)(null);
+  const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
+  const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
+  const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
+  const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
+  const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
   const closedInWorkspace = new Set(
@@ -5767,7 +5689,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               ),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: scope === "" ? t("mcpLiveConfigHint") : covered ? isMasked ? t("mcpPresetCoveredMasked") : t("mcpPresetCovered") : isMasked ? t("mcpPresetMasked") : t("mcpPresetMaskState") }) }),
-                workspace !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                workspace !== null && level === "workspace" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   "button",
                   {
                     type: "button",
@@ -5968,7 +5890,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
 }
 
 // src/client/skills/SkillCard.tsx
-var import_react15 = require("react");
+var import_react14 = require("react");
 var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/types.ts
@@ -5983,7 +5905,7 @@ var ALL_PRESETS = "*";
 // src/client/skills/SkillCard.tsx
 var import_jsx_runtime8 = require("react/jsx-runtime");
 function CategoryEditor({ value, onChange, label }) {
-  const [draft, setDraft] = (0, import_react15.useState)("");
+  const [draft, setDraft] = (0, import_react14.useState)("");
   const full = value.length >= MAX_BUNDLE_CATEGORIES;
   const add = (raw) => {
     const name = raw.trim().slice(0, 24);
@@ -6049,9 +5971,9 @@ function CategoryEditor({ value, onChange, label }) {
 function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLabel, index, onToggle, onView, onAssign, onRemove, onDelete }) {
   const files = Array.isArray(skill.files) ? skill.files : [];
   const description = skill.description ?? "";
-  const [copied, setCopied] = (0, import_react15.useState)(false);
-  const copiedTimer = (0, import_react15.useRef)(null);
-  (0, import_react15.useEffect)(() => () => {
+  const [copied, setCopied] = (0, import_react14.useState)(false);
+  const copiedTimer = (0, import_react14.useRef)(null);
+  (0, import_react14.useEffect)(() => () => {
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
   }, []);
   const flashCopied = () => {
@@ -6716,7 +6638,7 @@ function SkillsView({
 // src/client/skills/TopBar.tsx
 var import_dsh_client_ui_primitives9 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime11 = require("react/jsx-runtime");
-function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }) {
+function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspaceValue, onWorkspace, openMenu, setOpenMenu }) {
   return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "psh-head", children: [
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "psh-title", style: { flex: "none" }, children: t("panelTitle") }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": "SKILL / MCP / \u63D0\u793A\u8BCD", children: [
@@ -6733,6 +6655,21 @@ function PanelHead({ t, kind, onKind, workspaces, workspaceValue, onWorkspace, o
         "data-active": kind === value || void 0,
         onClick: () => {
           onKind(value);
+        },
+        children: label
+      },
+      value
+    )) }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": t("levelAria"), style: { marginLeft: 8 }, children: [["preset", t("levelPreset")], ["workspace", t("levelWorkspace")]].map(([value, label]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      "button",
+      {
+        type: "button",
+        role: "tab",
+        "aria-selected": level === value,
+        className: `${css.kindTab} ${level === value ? css.kindTabActive : ""}`,
+        "data-active": level === value || void 0,
+        onClick: () => {
+          onLevel(value);
         },
         children: label
       },
@@ -7272,37 +7209,37 @@ function frontmatterName(text) {
 }
 function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter, onCardMouseLeave }) {
   ensureStyles();
-  const [state, setState] = (0, import_react16.useState)({ status: "loading" });
-  const [reload, setReload] = (0, import_react16.useState)(0);
-  const [workspace, setWorkspace] = (0, import_react16.useState)(null);
-  const [workspaces, setWorkspaces] = (0, import_react16.useState)([]);
-  const [currentWorkspace, setCurrentWorkspace] = (0, import_react16.useState)(null);
-  const [expanded, setExpanded] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
-  const [looseOpen, setLooseExpanded] = (0, import_react16.useState)(false);
-  const [viewer, setViewer] = (0, import_react16.useState)(null);
-  const [viewerFont, setViewerFont] = (0, import_react16.useState)(() => readViewerPrefs().font);
-  const [viewerFull, setViewerFull] = (0, import_react16.useState)(() => readViewerPrefs().full);
-  const [assignTarget, setAssignTarget] = (0, import_react16.useState)(null);
-  const [newBundleOpen, setNewBundleOpen] = (0, import_react16.useState)(false);
-  const [newBundleName, setNewBundleName] = (0, import_react16.useState)("");
-  const [newBundleCats, setNewBundleCats] = (0, import_react16.useState)([]);
-  const [creatingBundle, setCreatingBundle] = (0, import_react16.useState)(false);
-  const [renameTarget, setRenameTarget] = (0, import_react16.useState)(null);
-  const [renaming, setRenaming] = (0, import_react16.useState)(false);
-  const [renamedFlash, setRenamedFlash] = (0, import_react16.useState)(null);
-  const renamedTimer = (0, import_react16.useRef)(null);
-  const [confirm, setConfirm] = (0, import_react16.useState)(null);
-  const [confirming, setConfirming] = (0, import_react16.useState)(false);
-  const [install, setInstall] = (0, import_react16.useState)(null);
-  const [addOpen, setAddOpen] = (0, import_react16.useState)(false);
-  const [installName, setInstallName] = (0, import_react16.useState)("");
-  const [installDescription, setInstallDescription] = (0, import_react16.useState)("");
-  const [installScope, setInstallScope] = (0, import_react16.useState)("global");
-  const [installBundleId, setInstallBundleId] = (0, import_react16.useState)(void 0);
-  const [installing, setInstalling] = (0, import_react16.useState)(false);
-  const [installError, setInstallError] = (0, import_react16.useState)(null);
-  const [toasts, setToasts] = (0, import_react16.useState)([]);
-  const toastTimers = (0, import_react16.useRef)([]);
+  const [state, setState] = (0, import_react15.useState)({ status: "loading" });
+  const [reload, setReload] = (0, import_react15.useState)(0);
+  const [workspace, setWorkspace] = (0, import_react15.useState)(null);
+  const [workspaces, setWorkspaces] = (0, import_react15.useState)([]);
+  const [currentWorkspace, setCurrentWorkspace] = (0, import_react15.useState)(null);
+  const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
+  const [looseOpen, setLooseExpanded] = (0, import_react15.useState)(false);
+  const [viewer, setViewer] = (0, import_react15.useState)(null);
+  const [viewerFont, setViewerFont] = (0, import_react15.useState)(() => readViewerPrefs().font);
+  const [viewerFull, setViewerFull] = (0, import_react15.useState)(() => readViewerPrefs().full);
+  const [assignTarget, setAssignTarget] = (0, import_react15.useState)(null);
+  const [newBundleOpen, setNewBundleOpen] = (0, import_react15.useState)(false);
+  const [newBundleName, setNewBundleName] = (0, import_react15.useState)("");
+  const [newBundleCats, setNewBundleCats] = (0, import_react15.useState)([]);
+  const [creatingBundle, setCreatingBundle] = (0, import_react15.useState)(false);
+  const [renameTarget, setRenameTarget] = (0, import_react15.useState)(null);
+  const [renaming, setRenaming] = (0, import_react15.useState)(false);
+  const [renamedFlash, setRenamedFlash] = (0, import_react15.useState)(null);
+  const renamedTimer = (0, import_react15.useRef)(null);
+  const [confirm, setConfirm] = (0, import_react15.useState)(null);
+  const [confirming, setConfirming] = (0, import_react15.useState)(false);
+  const [install, setInstall] = (0, import_react15.useState)(null);
+  const [addOpen, setAddOpen] = (0, import_react15.useState)(false);
+  const [installName, setInstallName] = (0, import_react15.useState)("");
+  const [installDescription, setInstallDescription] = (0, import_react15.useState)("");
+  const [installScope, setInstallScope] = (0, import_react15.useState)("global");
+  const [installBundleId, setInstallBundleId] = (0, import_react15.useState)(void 0);
+  const [installing, setInstalling] = (0, import_react15.useState)(false);
+  const [installError, setInstallError] = (0, import_react15.useState)(null);
+  const [toasts, setToasts] = (0, import_react15.useState)([]);
+  const toastTimers = (0, import_react15.useRef)([]);
   const pushToast = (tone, text) => {
     const id = Date.now() + Math.random();
     setToasts((current2) => [...current2.slice(-2), { id, tone, text }]);
@@ -7314,8 +7251,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const failToast = (label, error) => {
     pushToast("err", skillT("opFailed", { label, message: error instanceof Error ? error.message : String(error) }));
   };
-  const [installMetaName, setInstallMetaName] = (0, import_react16.useState)(null);
-  (0, import_react16.useEffect)(() => {
+  const [installMetaName, setInstallMetaName] = (0, import_react15.useState)(null);
+  (0, import_react15.useEffect)(() => {
     if (install === null || install.archive === true) {
       setInstallMetaName(null);
       return void 0;
@@ -7336,36 +7273,38 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [install]);
-  const [dropActive, setDropActive] = (0, import_react16.useState)(false);
-  const fileInput = (0, import_react16.useRef)(null);
-  const [toggles, setToggles] = (0, import_react16.useState)({ skills: {}, bundles: {} });
-  const [toggling, setToggling] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
-  const [presets, setPresets] = (0, import_react16.useState)([]);
-  const [overrides, setOverrides] = (0, import_react16.useState)({});
-  const [activePreset, setActivePreset] = (0, import_react16.useState)(ALL_PRESETS);
-  const [query, setQuery] = (0, import_react16.useState)("");
-  const [sourceFilter, setSourceFilter] = (0, import_react16.useState)("all");
-  const [sortAsc, setSortAsc] = (0, import_react16.useState)(true);
-  const [viewMode] = (0, import_react16.useState)("grid");
-  const [statusFilter, setStatusFilter] = (0, import_react16.useState)("all");
-  const [catFilter, setCatFilter] = (0, import_react16.useState)(null);
-  const [catTarget, setCatTarget] = (0, import_react16.useState)(null);
-  const [catDraft, setCatDraft] = (0, import_react16.useState)([]);
-  const [savingCats, setSavingCats] = (0, import_react16.useState)(false);
-  const [openMenu, setOpenMenu] = (0, import_react16.useState)(null);
-  const [health, setHealth] = (0, import_react16.useState)({ state: "loading" });
-  const [guideOpen, setGuideOpen] = (0, import_react16.useState)(false);
-  const [kind, setKind] = (0, import_react16.useState)("skill");
-  const [mcpScope, setMcpScope] = (0, import_react16.useState)("");
-  const [mcpQuery, setMcpQuery] = (0, import_react16.useState)("");
-  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react16.useState)("all");
+  const [dropActive, setDropActive] = (0, import_react15.useState)(false);
+  const fileInput = (0, import_react15.useRef)(null);
+  const [toggles, setToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
+  const [toggling, setToggling] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
+  const [presets, setPresets] = (0, import_react15.useState)([]);
+  const [overrides, setOverrides] = (0, import_react15.useState)({});
+  const [workspaceOverrides, setWorkspaceOverrides] = (0, import_react15.useState)({});
+  const [activePreset, setActivePreset] = (0, import_react15.useState)(ALL_PRESETS);
+  const [query, setQuery] = (0, import_react15.useState)("");
+  const [sourceFilter, setSourceFilter] = (0, import_react15.useState)("all");
+  const [sortAsc, setSortAsc] = (0, import_react15.useState)(true);
+  const [viewMode] = (0, import_react15.useState)("grid");
+  const [statusFilter, setStatusFilter] = (0, import_react15.useState)("all");
+  const [catFilter, setCatFilter] = (0, import_react15.useState)(null);
+  const [catTarget, setCatTarget] = (0, import_react15.useState)(null);
+  const [catDraft, setCatDraft] = (0, import_react15.useState)([]);
+  const [savingCats, setSavingCats] = (0, import_react15.useState)(false);
+  const [openMenu, setOpenMenu] = (0, import_react15.useState)(null);
+  const [health, setHealth] = (0, import_react15.useState)({ state: "loading" });
+  const [guideOpen, setGuideOpen] = (0, import_react15.useState)(false);
+  const [kind, setKind] = (0, import_react15.useState)("skill");
+  const [level, setLevel] = (0, import_react15.useState)("preset");
+  const [mcpScope, setMcpScope] = (0, import_react15.useState)("");
+  const [mcpQuery, setMcpQuery] = (0, import_react15.useState)("");
+  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react15.useState)("all");
   const [mcpLive, mcpRefreshLive] = useMcpLiveState();
-  const [mcpAddOpen, setMcpAddOpen] = (0, import_react16.useState)(false);
-  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react16.useState)(false);
-  const mcpWatchTimer = (0, import_react16.useRef)(null);
-  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react16.useState)([]);
-  const mcpLiveRef = (0, import_react16.useRef)(mcpLive);
-  (0, import_react16.useEffect)(() => {
+  const [mcpAddOpen, setMcpAddOpen] = (0, import_react15.useState)(false);
+  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react15.useState)(false);
+  const mcpWatchTimer = (0, import_react15.useRef)(null);
+  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react15.useState)([]);
+  const mcpLiveRef = (0, import_react15.useRef)(mcpLive);
+  (0, import_react15.useEffect)(() => {
     mcpLiveRef.current = mcpLive;
   }, [mcpLive]);
   const stopMcpWatch = () => {
@@ -7413,6 +7352,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         setToggles({ skills: status.skills, bundles: status.bundles });
         setOverrides(status.overrides);
         setPresets(status.presets);
+        void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
+        });
       },
       () => {
         void skillApi.toggleStatus().then((status) => {
@@ -7429,7 +7370,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       }
     );
   };
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     const timer = window.setInterval(silentSync, 3e4);
     const onVis = () => {
       if (document.visibilityState === "visible") silentSync();
@@ -7451,6 +7392,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         setToggles({ skills: status.skills, bundles: status.bundles });
         setOverrides(status.overrides);
         setPresets(status.presets);
+        void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
+        });
       },
       () => {
         void skillApi.toggleStatus().then((status) => {
@@ -7461,7 +7404,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     );
   };
   const t = skillT;
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     let current2 = true;
     setState({ status: "loading" });
     void skillApi.list(workspace).then(
@@ -7478,6 +7421,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         setToggles({ skills: status.skills, bundles: status.bundles });
         setOverrides(status.overrides);
         setPresets(status.presets);
+        void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
+        });
       },
       () => {
         void skillApi.toggleStatus().then(
@@ -7502,7 +7447,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload, workspace]);
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     let current2 = true;
     void skillApi.workspaces().then(
       (result) => {
@@ -7518,13 +7463,13 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload]);
-  (0, import_react16.useEffect)(() => () => {
+  (0, import_react15.useEffect)(() => () => {
     if (renamedTimer.current !== null) window.clearTimeout(renamedTimer.current);
     if (mcpWatchTimer.current !== null) window.clearInterval(mcpWatchTimer.current);
     for (const timer of toastTimers.current) window.clearTimeout(timer);
   }, []);
-  const [guidePos, setGuidePos] = (0, import_react16.useState)(null);
-  (0, import_react16.useEffect)(() => {
+  const [guidePos, setGuidePos] = (0, import_react15.useState)(null);
+  (0, import_react15.useEffect)(() => {
     if (!guideOpen) return;
     const marker = document.querySelector("[data-skm-panel-marker]");
     const card = marker?.closest(".psh-card");
@@ -7557,6 +7502,15 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     }
   };
   const toggleSkill = (skill, enabled) => {
+    if (level === "workspace") {
+      const cwd = workspace ?? currentWorkspace;
+      if (cwd === null) {
+        pushToast("err", "no active workspace");
+        return;
+      }
+      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(cwd, skill.name, enabled));
+      return;
+    }
     if (activePreset === ALL_PRESETS) {
       void runToggle(`skill:${skill.name}`, () => skillApi.setSkillEnabled(skill.name, enabled));
       return;
@@ -7567,6 +7521,15 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     );
   };
   const toggleBundle = (bundle, enabled) => {
+    if (level === "workspace") {
+      const cwd = workspace ?? currentWorkspace;
+      if (cwd === null) {
+        pushToast("err", "no active workspace");
+        return;
+      }
+      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(cwd, bundle.id, enabled));
+      return;
+    }
     if (activePreset === ALL_PRESETS) {
       void runToggle(`bundle:${bundle.id}`, () => skillApi.setBundleEnabled(bundle.id, enabled));
       return;
@@ -7576,7 +7539,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       () => skillApi.setPresetBundleEnabled(activePreset, bundle.id, enabled)
     );
   };
-  const presetOverride = activePreset === ALL_PRESETS ? {} : overrides[activePreset] ?? {};
+  const effectiveWorkspace = workspace ?? currentWorkspace;
+  const presetOverride = level === "workspace" ? effectiveWorkspace !== null ? workspaceOverrides[effectiveWorkspace] ?? {} : {} : activePreset === ALL_PRESETS ? {} : overrides[activePreset] ?? {};
   const skillEnabledAt = (presetId, name) => {
     if (toggles.skills[name] === false) return false;
     if (presetId === ALL_PRESETS) return true;
@@ -7620,13 +7584,13 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     setViewer({ skill, file: "SKILL.md", loading: true });
     void loadViewerContent(skill.name, "SKILL.md");
   };
-  const setViewerFontLevel = (level) => {
-    setViewerFont(Math.min(Math.max(level, 0), VIEWER_FONT_SIZES.length - 1));
+  const setViewerFontLevel = (level2) => {
+    setViewerFont(Math.min(Math.max(level2, 0), VIEWER_FONT_SIZES.length - 1));
   };
   const toggleViewerFull = () => {
     setViewerFull((current2) => !current2);
   };
-  (0, import_react16.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     writeViewerPrefs({ font: viewerFont, full: viewerFull });
   }, [viewerFont, viewerFull]);
   const selectViewerFile = (filePath) => {
@@ -7928,6 +7892,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             t,
             kind,
             onKind: setKind,
+            level,
+            onLevel: setLevel,
             workspaces,
             workspaceValue: workspace,
             onWorkspace: setWorkspace,
@@ -8004,7 +7970,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.hubMain, children: kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, {}) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.hubMain, children: kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, { level, workspace: workspace ?? currentWorkspace }) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               McpView,
               {
                 t,
@@ -8023,7 +7989,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 onCloseAddOwn: () => {
                   setMcpAddOwnOpen(false);
                 },
-                workspace: workspace ?? currentWorkspace
+                workspace: workspace ?? currentWorkspace,
+                level
               }
             ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               SkillsView,
@@ -8372,8 +8339,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
 }
 
 // src/client/error-boundary.tsx
-var import_react17 = require("react");
-var ErrorBoundary = class extends import_react17.Component {
+var import_react16 = require("react");
+var ErrorBoundary = class extends import_react16.Component {
   constructor() {
     super(...arguments);
     __publicField(this, "state", { error: null });
@@ -8396,7 +8363,7 @@ var ErrorBoundary = class extends import_react17.Component {
 };
 
 // src/client/sidebar-nav.tsx
-var import_react18 = require("react");
+var import_react17 = require("react");
 var import_react_dom4 = require("react-dom");
 var import_jsx_runtime13 = require("react/jsx-runtime");
 var HOST_ID = "dsh-prompt-customizer-nav-host";
@@ -8467,8 +8434,8 @@ function ensureNavMount() {
   };
 }
 function useNavSlot(name) {
-  const [slot, setSlot] = (0, import_react18.useState)(null);
-  (0, import_react18.useEffect)(() => {
+  const [slot, setSlot] = (0, import_react17.useState)(null);
+  (0, import_react17.useEffect)(() => {
     let timer = 0;
     let tries = 0;
     const poll = () => {
@@ -8486,8 +8453,8 @@ function useNavSlot(name) {
   return slot;
 }
 function useRail() {
-  const [rail, setRail] = (0, import_react18.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
-  (0, import_react18.useEffect)(() => {
+  const [rail, setRail] = (0, import_react17.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
+  (0, import_react17.useEffect)(() => {
     const read = () => {
       setRail(document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
     };
@@ -8571,11 +8538,11 @@ function clickInSidebar(target) {
   return false;
 }
 function usePanelAutoClose(name, open, requestClose) {
-  (0, import_react18.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (!open) return;
     window.dispatchEvent(new CustomEvent(PANEL_OPEN_EVENT, { detail: name }));
   }, [open, name]);
-  (0, import_react18.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (!open) return void 0;
     const onSiblingOpen = (event) => {
       if (event.detail !== name) requestClose();
@@ -8611,9 +8578,9 @@ function anchorFromEvent(e) {
 function SkillsEntry() {
   ensureModalAnimStyles();
   ensureShellStyles();
-  const [open, setOpen] = (0, import_react19.useState)(false);
-  const [anchor, setAnchor] = (0, import_react19.useState)(null);
-  const onClose = (0, import_react19.useCallback)(() => {
+  const [open, setOpen] = (0, import_react18.useState)(false);
+  const [anchor, setAnchor] = (0, import_react18.useState)(null);
+  const onClose = (0, import_react18.useCallback)(() => {
     setOpen(false);
   }, []);
   const { closing, requestClose } = useModalClose(open, onClose);

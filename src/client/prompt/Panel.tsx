@@ -27,7 +27,6 @@ import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
-import { SessionView } from './SessionView.tsx'
 import { makeIoEnv } from './preset-io.ts'
 
 const INVENTORY_URL = '/api/prompt-customizer/inventory'
@@ -70,7 +69,7 @@ interface EditDraft {
   dirty: boolean
 }
 
-export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): ReactElement {
+export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translate; onClose?: () => void; level?: 'preset' | 'workspace'; workspace?: string }): ReactElement {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [inv, setInv] = useState<Inventory | null>(null)
   // 三阶段预览装配：模型视角的唯一数据源（加载中为 null）。
@@ -79,8 +78,6 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   const [currentPreset, setCurrentPreset] = useState<string | undefined>(undefined)
   const [sessionView, setSessionView] = useState<Preview | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
-  // 自定义层级：预设级（overrides[preset]）/ 工作区级（workspaceOverrides[cwd]，覆盖预设级）。
-  const [level, setLevel] = useState<'preset' | 'workspace'>('preset')
   const [workspaceOverrides, setWorkspaceOverrides] = useState<Record<string, Config>>({})
   const [currentWorkspace, setCurrentWorkspace] = useState<string | undefined>(undefined)
   const [mode, setMode] = useState<PanelMode>('sections')
@@ -311,7 +308,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 草稿只含用户实际编辑过的字段，未编辑字段回落基线 —— 绝不把继承值
   // 冻结进 override。
   // 工作区级：把该工作区的 override 当作编辑源（叠在预设级之上、运行时工作区优先）。
-  const wsKey = currentWorkspace
+  const wsKey = workspace ?? currentWorkspace ?? undefined
   const wsTarget = target ?? '__workspace__'
   const baseSource = level === 'workspace'
     ? ({ ...cfg, overrides: { [wsTarget]: (wsKey !== undefined ? workspaceOverrides[wsKey] : undefined) ?? {} } } as Config)
@@ -500,13 +497,6 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   }
 
   // 切换自定义层级：预设级 ↔ 工作区级（工作区级作用于当前工作区、覆盖预设级）。
-  const switchLevel = (next: 'preset' | 'workspace'): void => {
-    if (next === level) return
-    if (draft?.dirty && !window.confirm(t('discardConfirm'))) return
-    clearDraft()
-    setLevel(next)
-    if (next === 'workspace') void refresh()
-  }
 
   // 切换编辑目标（顶部预设 Tab）：草稿基线随目标变化，脏草稿先经确认再丢弃。
   const switchTarget = (next: string | undefined): void => {
@@ -608,20 +598,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
       h('div', { style: s.seg }, [
         modeBtn('sections', t('tabsSections')),
         modeBtn('tools', t('tabsTools')),
-        modeBtn('session', t('tabsSession')),
         modeBtn('presets', t('tabsPresets')),
-      ]),
-      h('div', { style: s.seg }, [
-        h('button', {
-          key: 'lvl-preset',
-          style: level === 'preset' ? s.segBtnActive : s.segBtn,
-          onClick: () => switchLevel('preset'),
-        }, t('levelPreset')),
-        h('button', {
-          key: 'lvl-workspace',
-          style: level === 'workspace' ? s.segBtnActive : s.segBtn,
-          onClick: () => switchLevel('workspace'),
-        }, t('levelWorkspace')),
       ]),
       h('div', { style: s.headActions }, [
         mode === 'sections' || mode === 'tools'
@@ -718,15 +695,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
     h('div', { key: 'body', style: s.body },
-      mode === 'session'
-        ? h(SessionView, {
-            data: sessionView,
-            loading: sessionLoading,
-            error,
-            t,
-            onRefresh: () => { void refresh() },
-          })
-        : mode === 'sections'
+      mode === 'sections'
         ? [
             h(SectionsPane, { key: 'sections', cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
             h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub }),

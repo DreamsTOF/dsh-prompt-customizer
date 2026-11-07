@@ -81,6 +81,7 @@ export const SKILL_ZH: Record<string, string> = {
   guideClose: '收起指南',
   // SKILL / MCP 顶层 tab
   kindSkill: 'SKILL', kindPrompt: '提示词', kindMcp: 'MCP',
+  levelPreset: '预设级', levelWorkspace: '工作区级', levelAria: '预设级 / 工作区级',
   // MCP 视图
   mcpServer: 'MCP Server', mcpTools: '工具列表', mcpLog: '连接日志', mcpConfig: '配置模板',
   mcpRecommendMenu: '推荐 MCP Server', mcpRecommendTitle: '推荐 MCP Server', mcpAdd: '添加',

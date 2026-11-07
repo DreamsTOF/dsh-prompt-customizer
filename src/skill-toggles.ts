@@ -216,6 +216,65 @@ async function writeLedger(next: PresetSkillsFile): Promise<void> {
   }
 }
 
+/** 工作区级技能开关账本：`{ version: 1, workspaces: { <cwd>: { <skillName>: boolean } } }`。 */
+export interface WorkspaceSkillsFile { version: 1; workspaces: Record<string, Record<string, boolean>> }
+
+function normalizeWorkspaceLedger(input: unknown): WorkspaceSkillsFile {
+  const workspaces: Record<string, Record<string, boolean>> = {}
+  const raw = (input !== null && typeof input === 'object'
+    ? (input as Record<string, unknown>).workspaces
+    : undefined)
+  if (raw !== null && typeof raw === 'object') {
+    for (const [cwd, table] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof cwd !== 'string' || cwd === '') continue
+      if (table === null || typeof table !== 'object') continue
+      const entries: Record<string, boolean> = {}
+      for (const [skillName, state] of Object.entries(table as Record<string, unknown>)) {
+        if (!isSkillName(skillName) || typeof state !== 'boolean') continue
+        entries[skillName] = state
+      }
+      workspaces[cwd] = entries
+    }
+  }
+  return { version: 1, workspaces }
+}
+
+async function readWorkspaceLedger(): Promise<WorkspaceSkillsFile> {
+  let parsed: unknown
+  try { parsed = readPluginDoc('skills/workspace-toggles') } catch { parsed = undefined }
+  return normalizeWorkspaceLedger(parsed)
+}
+
+async function writeWorkspaceLedger(next: WorkspaceSkillsFile): Promise<void> {
+  writePluginDoc('skills/workspace-toggles', next)
+  for (const invalidate of maskInvalidators) {
+    try { invalidate() } catch { /* 单个 agent 的失效失败不影响其它 */ }
+  }
+}
+
+/** 写入一批「工作区 → 技能 → 开关」；enabled=true 删除覆盖（回落预设/全局）。 */
+async function setWorkspaceSkills(cwd: string, names: readonly string[], enabled: boolean): Promise<number> {
+  if (typeof cwd !== 'string' || cwd === '') throw new Error('workspace cwd is required')
+  const current = await readWorkspaceLedger()
+  const table = { ...(current.workspaces[cwd] ?? {}) }
+  let changed = 0
+  for (const skillName of names) {
+    if (!isSkillName(skillName)) continue
+    if (enabled) {
+      if (table[skillName] !== undefined) { delete table[skillName]; changed += 1 }
+    } else if (table[skillName] !== false) {
+      table[skillName] = false
+      changed += 1
+    }
+  }
+  if (changed === 0) return 0
+  const workspaces = { ...current.workspaces }
+  if (Object.keys(table).length === 0) delete workspaces[cwd]
+  else workspaces[cwd] = table
+  await writeWorkspaceLedger({ version: 1, workspaces })
+  return changed
+}
+
 /** 该预设下被显式关闭的技能名集合(空集 = 完全继承全局层)。 */
 function disabledNames(ledger: PresetSkillsFile, presetId: string): Set<string> {
   const table = ledger.presets[presetId]
@@ -588,10 +647,18 @@ function installMask(ctx: PluginContext, agent: any): any {
         name: MASK_PROVIDER,
         list: async () => {
           const presetId = presetOf()
-          // 两层取并集：全局隐藏（对所有预设生效）+ 该预设显式关闭。
-          const disabled = await readHidden()
-          if (presetId !== '') {
-            for (const skillName of disabledNames(await readLedger(), presetId)) disabled.add(skillName)
+          const cwd = typeof agent?.session?.header?.cwd === 'string' ? agent.session.header.cwd : ''
+          // 三层优先级：工作区 > 预设 > 全局。工作区显式 true 可覆盖预设/全局的关闭。
+          const globalHidden = await readHidden()
+          const presetTable = presetId !== '' ? ((await readLedger()).presets[presetId] ?? {}) : {}
+          const wsTable = cwd !== '' ? ((await readWorkspaceLedger()).workspaces[cwd] ?? {}) : {}
+          const disabled = new Set<string>()
+          for (const name of new Set<string>([...globalHidden, ...Object.keys(presetTable), ...Object.keys(wsTable)])) {
+            let isDisabled: boolean
+            if (Object.hasOwn(wsTable, name)) isDisabled = wsTable[name] === false
+            else if (Object.hasOwn(presetTable, name)) isDisabled = presetTable[name] === false
+            else isDisabled = globalHidden.has(name)
+            if (isDisabled) disabled.add(name)
           }
           if (disabled.size === 0) return []
           return [...disabled].map(skillName => ({
@@ -803,6 +870,51 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
         await writeLedger({ version: 1, presets })
       }
       json(res, 200, { ok: true, preset: presetId })
+      return
+    }
+
+    // ── 工作区层 ──────────────────────────────────────────────────────────
+    if (method === 'GET' && rest === '/workspaces') {
+      const ledger = await readWorkspaceLedger()
+      json(res, 200, { workspaces: ledger.workspaces })
+      return
+    }
+    const matchWsSkill = /^\/workspaces\/([^/]+)\/skills\/([^/]+)$/.exec(rest)
+    if (method === 'PUT' && matchWsSkill !== null) {
+      const body = (await readBody(req)) as Record<string, unknown>
+      const enabled = body.enabled
+      if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
+      const cwd = decodeURIComponent(matchWsSkill[1]!)
+      const skillName = decodeURIComponent(matchWsSkill[2]!)
+      if (!isSkillName(skillName)) throw new Error(`invalid skill name ${JSON.stringify(skillName)}`)
+      const changed = await setWorkspaceSkills(cwd, [skillName], enabled)
+      json(res, 200, { ok: true, workspace: cwd, name: skillName, enabled, changed })
+      return
+    }
+    const matchWsBundle = /^\/workspaces\/([^/]+)\/bundles\/([^/]+)$/.exec(rest)
+    if (method === 'PUT' && matchWsBundle !== null) {
+      const body = (await readBody(req)) as Record<string, unknown>
+      const enabled = body.enabled
+      if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
+      const cwd = decodeURIComponent(matchWsBundle[1]!)
+      const bundleId = decodeURIComponent(matchWsBundle[2]!)
+      const ledger = await readBundles(managedRoot())
+      const record = ledger.bundles.find(bundle => bundle.id === bundleId)
+      if (record === undefined) throw new Error(`bundle ${JSON.stringify(bundleId)} not found`)
+      const changed = await setWorkspaceSkills(cwd, await canonicalSkillNames(record.skills), enabled)
+      json(res, 200, { ok: true, workspace: cwd, id: bundleId, enabled, changed })
+      return
+    }
+    const matchWsReset = /^\/workspaces\/([^/]+)\/reset$/.exec(rest)
+    if (method === 'POST' && matchWsReset !== null) {
+      const cwd = decodeURIComponent(matchWsReset[1]!)
+      const current = await readWorkspaceLedger()
+      if (current.workspaces[cwd] !== undefined) {
+        const workspaces = { ...current.workspaces }
+        delete workspaces[cwd]
+        await writeWorkspaceLedger({ version: 1, workspaces })
+      }
+      json(res, 200, { ok: true, workspace: cwd })
       return
     }
     json(res, 404, { error: `no route for ${method} ${rest}` })

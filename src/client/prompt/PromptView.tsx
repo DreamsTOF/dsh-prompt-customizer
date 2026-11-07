@@ -7,10 +7,10 @@
 import { Panel } from './Panel.tsx'
 import { promptT } from './index.ts'
 
-export function PromptView(): JSX.Element {
+export function PromptView({ level, workspace }: { level: 'preset' | 'workspace'; workspace: string | null }): JSX.Element {
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <Panel t={promptT()} />
+      <Panel t={promptT()} level={level} workspace={workspace ?? undefined} />
     </div>
   )
 }

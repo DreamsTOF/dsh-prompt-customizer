@@ -139,6 +139,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   // Agent 预设分类：名单 + 各预设覆盖 + 当前选中的预设（'*' = 全部 Agent）
   const [presets, setPresets] = useState<PresetRow[]>([])
   const [overrides, setOverrides] = useState<Record<string, Record<string, boolean>>>({})
+  const [workspaceOverrides, setWorkspaceOverrides] = useState<Record<string, Record<string, boolean>>>({})
   const [activePreset, setActivePreset] = useState<string>(ALL_PRESETS)
   // Skills Hub 工具栏：搜索词 / 来源筛选(全部=all|bundles|loose) / 名称排序 / 视图切换
   const [query, setQuery] = useState('')
@@ -161,6 +162,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const [guideOpen, setGuideOpen] = useState(false)
   /** 左侧顶层 tab：SKILL（技能管理）/ MCP（MCP Server）。 */
   const [kind, setKind] = useState<'skill' | 'mcp' | 'prompt'>('skill')
+  // 统一编辑层级（预设级 / 工作区级），三 tab 共用；工作区由顶部工作区选择器决定。
+  const [level, setLevel] = useState<'preset' | 'workspace'>('preset')
   /** MCP 页范围（'' = 全部 Agent）。 */
   const [mcpScope, setMcpScope] = useState('')
   /** MCP Server 搜索词。 */
@@ -229,6 +232,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         setToggles({ skills: status.skills, bundles: status.bundles })
         setOverrides(status.overrides)
         setPresets(status.presets)
+        void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
       },
       () => {
         void skillApi.toggleStatus().then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
@@ -262,6 +266,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         setToggles({ skills: status.skills, bundles: status.bundles })
         setOverrides(status.overrides)
         setPresets(status.presets)
+        void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
       },
       () => {
         // 预设接口不可用（老 host）时退回只读全局层状态。
@@ -289,6 +294,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         setToggles({ skills: status.skills, bundles: status.bundles })
         setOverrides(status.overrides)
         setPresets(status.presets)
+        void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
       },
       () => {
         // 预设接口不可用时退化为「只有全局层」：圆球条只剩「全部 Agent」。
@@ -368,6 +374,12 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   }
 
   const toggleSkill = (skill: SkillInfo, enabled: boolean): void => {
+    if (level === 'workspace') {
+      const cwd = workspace ?? currentWorkspace
+      if (cwd === null) { pushToast('err', 'no active workspace'); return }
+      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(cwd, skill.name, enabled))
+      return
+    }
     if (activePreset === ALL_PRESETS) {
       void runToggle(`skill:${skill.name}`, () => skillApi.setSkillEnabled(skill.name, enabled))
       return
@@ -379,6 +391,12 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   }
 
   const toggleBundle = (bundle: BundleInfo, enabled: boolean): void => {
+    if (level === 'workspace') {
+      const cwd = workspace ?? currentWorkspace
+      if (cwd === null) { pushToast('err', 'no active workspace'); return }
+      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(cwd, bundle.id, enabled))
+      return
+    }
     if (activePreset === ALL_PRESETS) {
       void runToggle(`bundle:${bundle.id}`, () => skillApi.setBundleEnabled(bundle.id, enabled))
       return
@@ -390,7 +408,10 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   }
 
   /** 该预设下被单独关掉的技能（'*' 视图下为空表）。 */
-  const presetOverride = activePreset === ALL_PRESETS ? {} : (overrides[activePreset] ?? {})
+  const effectiveWorkspace = workspace ?? currentWorkspace
+  const presetOverride = level === 'workspace'
+    ? (effectiveWorkspace !== null ? (workspaceOverrides[effectiveWorkspace] ?? {}) : {})
+    : (activePreset === ALL_PRESETS ? {} : (overrides[activePreset] ?? {}))
 
   /**
    * 任一预设下技能的开关值（与 skillEnabledIn 同规则，供左栏分类计数）。
@@ -848,6 +869,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         t={t}
         kind={kind}
         onKind={setKind}
+        level={level}
+        onLevel={setLevel}
         workspaces={workspaces}
         workspaceValue={workspace}
         onWorkspace={setWorkspace}
@@ -915,7 +938,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         {/* ── 主区 ── */}
         <div className={css.hubMain}>
         {kind === 'prompt' ? (
-          <PromptView />
+          <PromptView level={level} workspace={workspace ?? currentWorkspace} />
         ) : kind === 'mcp' ? (
           <McpView
             t={t}
@@ -929,6 +952,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             addOwnOpen={mcpAddOwnOpen}
             onCloseAddOwn={() => { setMcpAddOwnOpen(false) }}
             workspace={workspace ?? currentWorkspace}
+            level={level}
           />
         ) : (
           <SkillsView

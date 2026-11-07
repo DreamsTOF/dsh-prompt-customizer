@@ -80,7 +80,7 @@ export function McpToolChips({ t, serverName, tools, disabledTools, locked, busy
  * 与「该预设专属 Server」（写进该预设组合文件）；「全部 Agent」层只有前者，
  * 开关直接启用/禁用全局条目。
  */
-export function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace }: {
+export function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace, level }: {
   t: (key: string, params?: Record<string, string | number>) => string
   live: LiveMcpStatus
   scope: string
@@ -96,6 +96,8 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   onCloseAddOwn: () => void
   /** 面板当前选中的工作区（null = 跟随当前会话）；工作区级关闭按它记账。 */
   workspace: string | null
+  /** 统一编辑层级：工作区级才显示「本工作区关闭」等按 cwd 记账的控制。 */
+  level: 'preset' | 'workspace'
 }): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -452,7 +454,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                           </span>
                         </span>
                         {/* 工作区级关闭：只影响当前工作区，换工作区照常注入。 */}
-                        {workspace !== null && (
+                        {workspace !== null && level === 'workspace' && (
                           <button
                             type="button"
                             className={css.mcpCardDelete}

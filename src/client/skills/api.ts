@@ -92,6 +92,34 @@ export const skillApi = {
         if (!body.ok) throw new Error(body.error || 'reset failed')
         return body
       }),
+  /** 工作区级开关：全部工作区覆盖（按 cwd）。 */
+  workspaceStatus: (): Promise<{ workspaces: Record<string, Record<string, boolean>> }> =>
+    fetch('/api/skill-toggles/workspaces', { headers: { accept: 'application/json' } })
+      .then((response) => response.json() as Promise<{ workspaces?: Record<string, Record<string, boolean>>; error?: string }>)
+      .then((body) => {
+        if (body.error) throw new Error(body.error)
+        return { workspaces: body.workspaces ?? {} }
+      }),
+  setWorkspaceSkillEnabled: (cwd: string, name: string, enabled: boolean): Promise<{ ok: boolean }> =>
+    fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/skills/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }).then((response) => response.json() as Promise<{ ok: boolean; error?: string }>)
+      .then((body) => {
+        if (!body.ok) throw new Error(body.error || 'toggle failed')
+        return body
+      }),
+  setWorkspaceBundleEnabled: (cwd: string, bundleId: string, enabled: boolean): Promise<{ ok: boolean }> =>
+    fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/bundles/${encodeURIComponent(bundleId)}`, {
+      method: 'PUT',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }).then((response) => response.json() as Promise<{ ok: boolean; error?: string }>)
+      .then((body) => {
+        if (!body.ok) throw new Error(body.error || 'toggle failed')
+        return body
+      }),
   createBundle: (name: string, categories: string[] = []): Promise<Record<string, never>> =>
     skillRequest('/bundles', { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ name, categories }) }),
   renameBundle: (bundleId: string, name: string): Promise<Record<string, never>> =>
