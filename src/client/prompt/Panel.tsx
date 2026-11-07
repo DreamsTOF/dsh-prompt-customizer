@@ -407,6 +407,29 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
   }
+  // 应用快照：按当前层级写入——工作区级写 workspaceOverrides[cwd]，否则写预设级 overrides[target]。
+  const writePatchLayered = (patch: ConfigPatch): void => {
+    if (level === 'workspace') {
+      const cwd = workspace ?? currentWorkspace
+      if (cwd === undefined || cwd === null || cwd === '') { showFlash(t('workspaceRequired'), 'err'); return }
+      fetch(CONFIG_APPLY_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ level: 'workspace', workspace: cwd, patch }),
+      })
+        .then((r) => r.json())
+        .then((body) => {
+          if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
+          setCfg(body.config as Config)
+          if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
+          setError(null)
+          setVersion((n) => n + 1)
+        })
+        .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
+      return
+    }
+    writePatch(patch)
+  }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
 
@@ -763,7 +786,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
                 inv,
                 phases: ep,
                 t,
-                writePatch,
+                writePatch: writePatchLayered,
+                applyLevel: level,
+                applyTargetName: level === 'workspace' ? (workspace ?? currentWorkspace ?? undefined) : target,
                 writeGlobal,
                 // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
                 envBlocklist: cfg.envBlocklist ?? [],

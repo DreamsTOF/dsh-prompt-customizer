@@ -3082,7 +3082,7 @@ function useNotice() {
   };
   return { notice, show };
 }
-function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist }) {
+function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist, applyLevel, applyTargetName }) {
   const presets = cfg.presets ?? [];
   const [name, setName] = (0, import_react6.useState)("");
   const { notice, show } = useNotice();
@@ -3103,7 +3103,7 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
   };
   const applyPreset = (preset) => {
     writePatch(applyPresetData(preset.data, cfg, currentNames));
-    writeGlobal("activePreset", preset.id);
+    if (applyLevel !== "workspace") writeGlobal("activePreset", preset.id);
   };
   const deletePreset = (id) => {
     const next = removePreset(presets, id, cfg.activePreset);
@@ -3167,6 +3167,7 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     (0, import_react6.createElement)("div", { style: s.colScroll }, [
       notice ? (0, import_react6.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.error }, notice.text) : null,
       (0, import_react6.createElement)("div", { style: s.groupHead }, t("libraryTitle")),
+      (0, import_react6.createElement)("div", { style: s.muted }, t(applyLevel === "workspace" ? "applyToWorkspace" : "applyToPreset", { name: applyTargetName ?? "" })),
       (0, import_react6.createElement)("div", { style: s.injectBox }, [
         (0, import_react6.createElement)("div", { style: s.injectRow }, [
           (0, import_react6.createElement)("input", { style: { ...s.input, flex: 1 }, placeholder: t("presetName"), value: name, onChange: (e) => setName(e.target.value) }),
@@ -3622,6 +3623,28 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       setVersion((n) => n + 1);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
+  const writePatchLayered = (patch) => {
+    if (level === "workspace") {
+      const cwd = workspace ?? currentWorkspace;
+      if (cwd === void 0 || cwd === null || cwd === "") {
+        showFlash(t("workspaceRequired"), "err");
+        return;
+      }
+      fetch(CONFIG_APPLY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ level: "workspace", workspace: cwd, patch })
+      }).then((r) => r.json()).then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? "apply failed");
+        setCfg(body.config);
+        if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);
+        setError(null);
+        setVersion((n) => n + 1);
+      }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+      return;
+    }
+    writePatch(patch);
+  };
   const writeGlobal = writeField;
   const zhOn = zhApplied(view, ZH_SECTIONS);
   const poolText = (name, fallback) => {
@@ -3901,7 +3924,9 @@ function Panel({ t, onClose, level = "preset", workspace }) {
           inv,
           phases: ep,
           t,
-          writePatch,
+          writePatch: writePatchLayered,
+          applyLevel: level,
+          applyTargetName: level === "workspace" ? workspace ?? currentWorkspace ?? void 0 : target,
           writeGlobal,
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
@@ -4122,6 +4147,8 @@ var DICT = {
     agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7684\u9884\u89C8\u88C5\u914D\u770B\u4E0D\u5230\u5B83\uFF0C\u4F46\u6BCF\u4E2A\u771F\u5B9E\u4F1A\u8BDD\u7684\u63D0\u793A\u8BCD\u91CC\u90FD\u6709\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u63D0\u793A\u8BCD\u91CC\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F \u2014\u2014 \u60F3\u8BA9\u5B83\u53D8\u4E2D\u6587\uFF0C\u7528\u300C\u4E2D\u6587\u63D0\u793A\u8BCD\u300D\u5F00\u5173\u6216\u624B\u52A8\u66FF\u6362\u90FD\u884C\u3002",
     settingsTitle: "\u5168\u5C40\u8BBE\u7F6E",
     libraryTitle: "\u914D\u7F6E\u5FEB\u7167\u5E93",
+    applyToPreset: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u9884\u8BBE\u7EA7\u300C{name}\u300D",
+    applyToWorkspace: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u5DE5\u4F5C\u533A\u7EA7\u300C{name}\u300D",
     draftBadge: "\u9884\u89C8\u542B\u672A\u4FDD\u5B58\u8349\u7A3F",
     previewSyncFail: "\u5B9E\u65F6\u9884\u89C8\u540C\u6B65\u5931\u8D25\uFF08\u4E0B\u6B21\u7F16\u8F91\u4F1A\u81EA\u52A8\u91CD\u8BD5\uFF0C\u6216\u70B9\u300C\u5237\u65B0\u300D\uFF09"
   },
@@ -4315,6 +4342,8 @@ var DICT = {
     agentScopedHint: "This section is registered by a plugin in the agent\u2019s own scope (it is not in this preset scope\u2019s registry): the panel\u2019s preview assembly cannot see it, but every real session\u2019s prompt has it. It is in the prompt by default, and it can be blocked / replaced / reordered like any other row \u2014 use the \u201CChinese prompt\u201D toggle or a manual replacement to translate it.",
     settingsTitle: "Global settings",
     libraryTitle: "Config snapshots",
+    applyToPreset: 'Apply writes to: preset "{name}"',
+    applyToWorkspace: 'Apply writes to: workspace "{name}"',
     draftBadge: "Preview includes unsaved draft",
     previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)",
     rescanCatalog: "Rescan registry",

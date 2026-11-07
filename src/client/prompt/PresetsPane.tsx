@@ -39,7 +39,7 @@ function useNotice(): { notice: Notice | null; show: (kind: Notice['kind'], text
   return { notice, show }
 }
 
-export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist }: {
+export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist, applyLevel, applyTargetName }: {
   cfg: Config
   inv: Inventory | null
   /** Panel 并行拉取的三阶段装配：快照只捕获当前装配里真实存在的段。 */
@@ -51,6 +51,10 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   writeGlobal: (field: string, value: unknown) => void
   /** 全局环境变量黑名单（永远顶层字段，不分作用域）；导出随行、导入并集。 */
   envBlocklist: string[]
+  /** 应用目标层级：预设级 / 工作区级（与顶部统一切换一致）。 */
+  applyLevel: 'preset' | 'workspace'
+  /** 应用目标显示名（预设 id 或工作区 cwd）。 */
+  applyTargetName?: string
 }): ReactElement {
   const presets = cfg.presets ?? []
   const [name, setName] = useState('')
@@ -86,7 +90,8 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   // 一个补丁写入当前编辑目标；快照库（presets / activePreset）永远保持在全局。
   const applyPreset = (preset: Preset): void => {
     writePatch(applyPresetData(preset.data, cfg, currentNames))
-    writeGlobal('activePreset', preset.id)
+    // 工作区级应用不改「活动预设」这个库概念；仅预设级应用时标记。
+    if (applyLevel !== 'workspace') writeGlobal('activePreset', preset.id)
   }
 
   const deletePreset = (id: string): void => {
@@ -160,6 +165,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
     h('div', { style: s.colScroll }, [
       notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.error }, notice.text) : null,
       h('div', { style: s.groupHead }, t('libraryTitle')),
+      h('div', { style: s.muted }, t(applyLevel === 'workspace' ? 'applyToWorkspace' : 'applyToPreset', { name: applyTargetName ?? '' })),
       h('div', { style: s.injectBox }, [
         h('div', { style: s.injectRow }, [
           h('input', { style: { ...s.input, flex: 1 }, placeholder: t('presetName'), value: name, onChange: (e: ChangeEvent<HTMLInputElement>) => setName(e.target.value) }),
