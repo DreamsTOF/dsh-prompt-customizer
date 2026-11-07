@@ -15,13 +15,15 @@ import { PreviewTools } from './PreviewTools.tsx'
 /** Panel 并行拉取的三阶段装配。 */
 type PhaseViews = Record<PhaseViewKey, Preview | null>
 
-export function PreviewPane({ t, phases, phase, sub }: {
+export function PreviewPane({ t, phases, phase, sub, onToggleContext }: {
   t: Translate
   phases: PhaseViews | null
   /** 当前阶段（状态在 Panel 持有，头部阶段按钮统一切换）。 */
   phase: PhaseViewKey
   /** 提示词 / 工具子视图：跟随顶部模式（无手动切换）。 */
   sub: 'prompt' | 'tools'
+  /** 切换某个运行时上下文的显隐（hide=true 表示隐藏）。 */
+  onToggleContext?: (name: string, hide: boolean) => void
 }): ReactElement {
   const data = phases?.[phase] ?? null
   // 按当前所选阶段判定「段级定制没进最终提示词」：有 complete 段整段接管就说
@@ -61,8 +63,13 @@ export function PreviewPane({ t, phases, phase, sub }: {
               ]),
               h('pre', { style: s.previewText }, data.text || t('empty')),
               h('div', { style: s.rowTitle }, t('runtimeContexts')),
-              ...(data.contexts ?? []).map(context => h('div', { key: context.name }, [
-                h('div', { style: s.muted }, context.name),
+              ...((data.baseContexts ?? (data.contexts ?? []).map(c => ({ name: c.name, text: c.text, blocked: false }))) ).map((context) => h('div', { key: context.name, style: { opacity: context.blocked ? 0.5 : 1 } }, [
+                h('label', { style: { ...s.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: onToggleContext ? 'pointer' : 'default' } }, [
+                  onToggleContext
+                    ? h('input', { type: 'checkbox', checked: !context.blocked, onChange: (e: { currentTarget: { checked: boolean } }) => onToggleContext(context.name, !e.currentTarget.checked) })
+                    : null,
+                  context.name,
+                ]),
                 h('pre', { style: s.previewText }, context.text || t('empty')),
               ])),
             ]

@@ -15,6 +15,10 @@ export const Config = Schema.object({
   // 屏蔽名单。三态互不继承、互不影响 —— 一个阶段的屏蔽不波及另一个阶段。
   sectionsBootstrap: Schema.array(Schema.string()).default([]),
   sectionsCompaction: Schema.array(Schema.string()).default([]),
+  // 运行时上下文（会并入系统提示词的部分）的屏蔽名单：三阶段独立，与段对称。
+  contexts: Schema.array(Schema.string()).default([]),
+  contextsBootstrap: Schema.array(Schema.string()).default([]),
+  contextsCompaction: Schema.array(Schema.string()).default([]),
   // 按名称替换某个段的文本（保持原顺序）。
   replace: Schema.dict(Schema.string()).default({}),
   // 注入 / 覆盖段（按 名称 + 顺序 + 文本）。`custom` 标记本插件生成的段
@@ -101,6 +105,9 @@ export const Config = Schema.object({
     sections: Schema.array(Schema.string()),
     sectionsBootstrap: Schema.array(Schema.string()),
     sectionsCompaction: Schema.array(Schema.string()),
+    contexts: Schema.array(Schema.string()),
+    contextsBootstrap: Schema.array(Schema.string()),
+    contextsCompaction: Schema.array(Schema.string()),
     replace: Schema.dict(Schema.string()),
     inject: Schema.array(Schema.object({
       name: Schema.string().required(),
@@ -134,6 +141,9 @@ export const WorkspaceOverrides = Schema.dict(Schema.object({
   sections: Schema.array(Schema.string()),
   sectionsBootstrap: Schema.array(Schema.string()),
   sectionsCompaction: Schema.array(Schema.string()),
+  contexts: Schema.array(Schema.string()),
+  contextsBootstrap: Schema.array(Schema.string()),
+  contextsCompaction: Schema.array(Schema.string()),
   replace: Schema.dict(Schema.string()),
   inject: Schema.array(Schema.object({
     name: Schema.string().required(),

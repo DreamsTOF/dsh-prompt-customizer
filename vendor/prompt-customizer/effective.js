@@ -40,6 +40,9 @@ export function effectiveConfig(ovr) {
     sections: Array.isArray(ovr?.sections) ? ovr.sections : [],
     sectionsBootstrap: Array.isArray(ovr?.sectionsBootstrap) ? ovr.sectionsBootstrap : [],
     sectionsCompaction: Array.isArray(ovr?.sectionsCompaction) ? ovr.sectionsCompaction : [],
+    contexts: Array.isArray(ovr?.contexts) ? ovr.contexts : [],
+    contextsBootstrap: Array.isArray(ovr?.contextsBootstrap) ? ovr.contextsBootstrap : [],
+    contextsCompaction: Array.isArray(ovr?.contextsCompaction) ? ovr.contextsCompaction : [],
     replace: hasDict(ovr?.replace) ? ovr.replace : {},
     inject: hasList(ovr?.inject) ? ovr.inject : [],
     tools: hasTools(ovr?.tools) ? ovr.tools : {},
@@ -156,6 +159,16 @@ export function pickSectionsForStatus(config, status) {
   const resident = config?.sections
   const compaction = config?.sectionsCompaction
   const bootstrap = config?.sectionsBootstrap
+  if (!status.promoted && status.boundary >= 0) return Array.isArray(compaction) ? compaction : []
+  if (!status.promoted) return Array.isArray(bootstrap) ? bootstrap : []
+  return Array.isArray(resident) ? resident : []
+}
+
+/** 与 pickSectionsForStatus 对称：运行时上下文的三阶段独立屏蔽名单。 */
+export function pickContextsForStatus(config, status) {
+  const resident = config?.contexts
+  const compaction = config?.contextsCompaction
+  const bootstrap = config?.contextsBootstrap
   if (!status.promoted && status.boundary >= 0) return Array.isArray(compaction) ? compaction : []
   if (!status.promoted) return Array.isArray(bootstrap) ? bootstrap : []
   return Array.isArray(resident) ? resident : []

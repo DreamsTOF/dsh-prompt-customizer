@@ -396,6 +396,17 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     }
     writePatch(patch)
   }
+
+  // 运行时上下文显隐：直接落盘（不经草稿）。三态同步开启时三阶段一起写。
+  const toggleContext = (name: string, hide: boolean): void => {
+    const list = ((inv as any)?.contexts ?? []) as Array<{ name: string; active: boolean }>
+    const hidden = new Set<string>(list.filter((c) => !c.active).map((c) => c.name))
+    if (hide) hidden.add(name); else hidden.delete(name)
+    const arr = [...hidden]
+    const phaseKey = phase === 'bootstrap' ? 'contextsBootstrap' : phase === 'compaction' ? 'contextsCompaction' : 'contexts'
+    const patch: any = syncAll ? { contexts: arr, contextsBootstrap: arr, contextsCompaction: arr } : { [phaseKey]: arr }
+    writePatchLayered(patch as ConfigPatch)
+  }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
 
@@ -731,12 +742,12 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       mode === 'sections'
         ? [
             h(SectionsPane, { key: 'sections', cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
-            h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub }),
+            h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext }),
           ]
         : mode === 'tools'
           ? [
               h(ToolsPane, { key: 'tools', cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
-              h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub }),
+              h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext }),
             ]
           : [
               h(PresetsPane, {

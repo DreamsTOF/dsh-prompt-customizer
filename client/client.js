@@ -3321,7 +3321,7 @@ function PreviewTools({ tools, t }) {
 }
 
 // src/client/prompt/PreviewPane.tsx
-function PreviewPane({ t, phases, phase, sub }) {
+function PreviewPane({ t, phases, phase, sub, onToggleContext }) {
   const data = phases?.[phase] ?? null;
   const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
   return (0, import_react8.createElement)("div", { style: s.colRight }, [
@@ -3344,8 +3344,11 @@ function PreviewPane({ t, phases, phase, sub }) {
         ]),
         (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty")),
         (0, import_react8.createElement)("div", { style: s.rowTitle }, t("runtimeContexts")),
-        ...(data.contexts ?? []).map((context) => (0, import_react8.createElement)("div", { key: context.name }, [
-          (0, import_react8.createElement)("div", { style: s.muted }, context.name),
+        ...(data.baseContexts ?? (data.contexts ?? []).map((c) => ({ name: c.name, text: c.text, blocked: false }))).map((context) => (0, import_react8.createElement)("div", { key: context.name, style: { opacity: context.blocked ? 0.5 : 1 } }, [
+          (0, import_react8.createElement)("label", { style: { ...s.muted, display: "flex", alignItems: "center", gap: 6, cursor: onToggleContext ? "pointer" : "default" } }, [
+            onToggleContext ? (0, import_react8.createElement)("input", { type: "checkbox", checked: !context.blocked, onChange: (e) => onToggleContext(context.name, !e.currentTarget.checked) }) : null,
+            context.name
+          ]),
           (0, import_react8.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
         ]))
       ] : null : data ? [
@@ -3620,6 +3623,16 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     writePatch(patch);
   };
+  const toggleContext = (name, hide) => {
+    const list = inv?.contexts ?? [];
+    const hidden = new Set(list.filter((c) => !c.active).map((c) => c.name));
+    if (hide) hidden.add(name);
+    else hidden.delete(name);
+    const arr = [...hidden];
+    const phaseKey = phase === "bootstrap" ? "contextsBootstrap" : phase === "compaction" ? "contextsCompaction" : "contexts";
+    const patch = syncAll ? { contexts: arr, contextsBootstrap: arr, contextsCompaction: arr } : { [phaseKey]: arr };
+    writePatchLayered(patch);
+  };
   const writeGlobal = writeField;
   const zhOn = zhApplied(view, ZH_SECTIONS);
   const poolText = (name, fallback) => {
@@ -3881,10 +3894,10 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       { key: "body", style: s.body },
       mode === "sections" ? [
         (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext })
       ] : mode === "tools" ? [
         (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
+        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext })
       ] : [
         (0, import_react9.createElement)(PresetsPane, {
           key: "presets",

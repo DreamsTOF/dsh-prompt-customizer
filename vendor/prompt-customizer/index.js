@@ -25,7 +25,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { Config, NS, WorkspaceOverrides } from './schema.js'
-import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
+import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, pickContextsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
 import { openDb, allDocs, replaceAllDocs } from './db.js'
@@ -249,6 +249,7 @@ export function apply(ctx, entry = {}) {
     try {
       const { raw, cfg, status } = resolveTarget(context)
       const denied = new Set(pickSectionsForStatus(cfg, status))
+      const deniedContexts = new Set(pickContextsForStatus(cfg, status))
       const replace = cfg.replace ?? {}
       const te = pickToolsFilter(cfg.tools, status)
 
@@ -265,7 +266,13 @@ export function apply(ctx, entry = {}) {
       // 统一实现：瀑布流与 assemble 强制覆盖共用同一份逻辑。
       const sections = applySectionPolicy(baseSections, cfg, status)
 
-      const result = { ...assembled, sections, promptCustomizerSections: sections }
+      const result = {
+        ...assembled,
+        sections,
+        // 真实装配：过滤掉被隐藏的运行时上下文；预览 base 调用保留全部（供面板列全量+置灰）。
+        ...baseView ? {} : { contexts: (Array.isArray(assembled.contexts) ? assembled.contexts : []).filter((c) => !deniedContexts.has(String(c?.name))) },
+        promptCustomizerSections: sections,
+      }
       if (baseView) {
         result.promptCustomizerBaseView = {
           sections: baseSections.map((section) => ({
@@ -281,6 +288,11 @@ export function apply(ctx, entry = {}) {
             name: typeof tool.name === 'string' ? tool.name : String(tool.name),
             description: typeof tool.description === 'string' ? tool.description : '',
             hidden: (te.exclude ?? []).includes(tool.name),
+          })),
+          contexts: (Array.isArray(assembled.contexts) ? assembled.contexts : []).map((c) => ({
+            name: String(c?.name ?? ''),
+            text: String(c?.text ?? ''),
+            blocked: deniedContexts.has(String(c?.name ?? '')),
           })),
         }
         // 预览才探测（运行时装配零额外开销）：有 complete 段时宿主要在水流
@@ -768,7 +780,7 @@ export function apply(ctx, entry = {}) {
 }
 
 /** 配置补丁认得的业务字段（与 UI 编辑域一一对应；含每阶段独立名单）。 */
-const APPLY_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools']
+const APPLY_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'contexts', 'contextsBootstrap', 'contextsCompaction', 'replace', 'inject', 'tools']
 
 /**
  * 把一份补丁叠加到 raw 配置的目标层，返回新对象（不改原对象、不碰磁盘）。
@@ -1149,7 +1161,13 @@ async function buildInventory(ctx, raw, scopeKey, presetId, undefined, preview) 
   const tools = seenTools
     .map((item) => ({ ...item, hidden: isHidden(item.name) }))
 
-  return { sections, tools, config: cfg }
+  const ctxDenied = new Set(pickContextsForStatus(cfg, { promoted: true, boundary: -1 }))
+  const contexts = (Array.isArray(preview.baseContexts) ? preview.baseContexts : []).map((c) => ({
+    name: String(c?.name ?? ''),
+    text: String(c?.text ?? ''),
+    active: !ctxDenied.has(String(c?.name ?? '')),
+  }))
+  return { sections, tools, contexts, config: cfg }
 }
 
 /** Resolve the selected mode without creating, selecting or modifying a conversation. */
@@ -1332,6 +1350,7 @@ async function buildPreview(ctx, rawConfig, target, phase, undefined, patch, pat
     // 独立名单」，被屏蔽 / 被隐藏的条目仍保留在此可反选。
     baseSections,
     baseTools,
+    baseContexts: Array.isArray(baseView.contexts) ? baseView.contexts : [],
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),
     /** 非空 = 左栏已并入该活动会话的 agent 作用域条目（右栏仍是纯预设装配）。 */
@@ -1411,6 +1430,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
     tools: actualTools,
     baseSections,
     baseTools: union.rows,
+    baseContexts: Array.isArray(baseView.contexts) ? baseView.contexts : [],
     registryTools: union.registryTools,
     registryTotal: union.registryTools.length,
     takenOverBy: assembled && typeof assembled === 'object'
