@@ -109,6 +109,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   const [toolBusy, setToolBusy] = useState<string | null>(null)
   /** 全局条目删除确认（null=关闭）。 */
   const [removeReq, setRemoveReq] = useState<string | null>(null)
+  const [editState, setEditState] = useState<{ serverName: string; text: string } | null>(null)
   /** 预设专属行移除确认（null=关闭）。 */
   const [removeOwnReq, setRemoveOwnReq] = useState<string | null>(null)
 
@@ -215,6 +216,19 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
       .finally(() => { setBusy(null) })
   }
+  /** 打开「编辑 MCP」：读取该全局 server 的当前 config 原文，弹窗内编辑。 */
+  const openEdit = (serverName: string): void => {
+    setError(null)
+    void fetch(`/api/triad/mcp-edit?serverName=${encodeURIComponent(serverName)}`, { headers: { accept: 'application/json' } })
+      .then((response) => response.json())
+      .then((body) => {
+        const payload = body as { ok?: boolean; text?: string; error?: string } | null
+        if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? '') })
+        else setError(String(payload?.error ?? 'load mcp config failed'))
+      })
+      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
   const removeGlobal = (serverName: string): void => {
     write(`remove:${serverName}`, '/api/triad/mcp-config', { serverName, action: 'remove' })
   }
@@ -331,6 +345,18 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
 
   return (
     <div className={css.mcpServerMain}>
+      {editState !== null && (
+        <Modal open onClose={() => setEditState(null)} closeLabel={t('close')} title={t('mcpEditTitle')}>
+          <McpPasteAdd
+            t={t}
+            onAdded={() => { setEditState(null); onRefresh() }}
+            onCancel={() => setEditState(null)}
+            editServer={editState.serverName}
+            editText={editState.text}
+            onEdited={() => { setEditState(null); onRefresh() }}
+          />
+        </Modal>
+      )}
       {/* 当前编辑层提示行（与技能页 hintRow 同构） */}
       <div className={css.hintRow}>
         <span className={css.hintRowText}>
@@ -492,6 +518,11 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                             {closedInWorkspace.has(server.serverName) ? t('mcpWorkspaceEnable') : t('mcpWorkspaceDisable')}
                           </button>
                         )}
+                        {scope === '' && server.config.editable ? (
+                          <button type="button" className={css.mcpCardDelete} title={t('mcpEdit')} disabled={busy !== null} onClick={() => { openEdit(server.serverName) }}>
+                            {t('mcpEdit')}
+                          </button>
+                        ) : null}
                         {scope === '' && server.config.editable ? (
                           <button
                             type="button"

@@ -585,9 +585,79 @@ function startWatchdog(): () => void {
   return () => clearInterval(timer)
 }
 
+/* ── MCP 编辑：读取当前 config 原文 / 保存修改（全局 profile patch）────────── */
+const EDIT_ROUTE = '/api/triad/mcp-edit'
+
+/** 取某 patch 条目的 config 子块原文（去掉 serverName 行、按子缩进去缩进）。 */
+function mcpConfigBlockText(serverName: string): string | null {
+  const content = readPatchContent()
+  if (content === '') return null
+  const entry = scanPatchEntries(content).find((item) => item.serverName === serverName)
+  if (entry === undefined) return null
+  const lines = content.split(/\r?\n/)
+  let end = lines.length
+  for (let j = entry.idLine + 1; j < lines.length; j += 1) {
+    const cur = lines[j]
+    if (cur.length === 0 || !/^[ \t]/.test(cur)) { end = j; break }
+  }
+  let cfgLine = -1
+  for (let j = entry.idLine + 1; j < end; j += 1) {
+    if (lines[j].trimStart().startsWith('config:')) { cfgLine = j; break }
+  }
+  if (cfgLine < 0) return null
+  const childIndent = /^[ \t]*/.exec(lines[cfgLine + 1] ?? '')?.[0] ?? '  '
+  return lines
+    .slice(cfgLine + 1, end)
+    .filter((line) => line.trim() !== '' && !line.trimStart().startsWith('serverName:'))
+    .map((line) => (line.startsWith(childIndent) ? line.slice(childIndent.length) : line.trimStart()))
+    .join('\n')
+}
+
+async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const anyReq = req as unknown as { socket?: { remoteAddress?: string }; url?: string; method?: string }
+  const anyRes = res as unknown as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }
+  if (!loopbackAllowed(req)) { anyRes.writeHead(403, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, error: 'loopback-only' })); return }
+  const url = new URL(anyReq.url ?? '/', 'http://localhost')
+  const method = anyReq.method ?? 'GET'
+  try {
+    if (method === 'GET') {
+      const serverName = url.searchParams.get('serverName') ?? ''
+      const text = mcpConfigBlockText(serverName)
+      anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no patch entry for ${serverName}` } : { ok: true, serverName, text }))
+      return
+    }
+    let body = ''
+    for await (const chunk of req as unknown as AsyncIterable<Uint8Array>) body += Buffer.from(chunk).toString('utf8')
+    const parsed = (body === '' ? {} : JSON.parse(body)) as Record<string, unknown>
+    const serverName = typeof parsed.serverName === 'string' ? parsed.serverName : ''
+    if (serverName === '') throw new Error('serverName required')
+    const { format, text } = pasteFieldsOf(parsed)
+    const outcome = parseMcpPaste(format, text)
+    if (outcome.errors.length > 0) { anyRes.writeHead(400, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, errors: outcome.errors })); return }
+    if (outcome.rows.length === 0) throw new Error('未解析出任何 MCP server')
+    const row = outcome.rows[0]
+    const newName = String(row.config.serverName ?? serverName)
+    const removed = removePatchEntry(serverName)
+    if (!removed.ok) throw new Error(removed.error ?? 'remove old entry failed')
+    const next = appendRowsToText(readPatchContent(), rowsToPatchYaml([row]))
+    writeFileSync(patchFilePath(), next, 'utf8')
+    anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+    anyRes.end(JSON.stringify({ ok: true, serverName: newName, reload: parsed.reload === true ? 'attempted' : 'manual' }))
+  } catch (error) {
+    anyRes.writeHead(400, { 'content-type': 'application/json' })
+    anyRes.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }))
+  }
+}
+
 /** 注册 GET /api/triad/mcp-status 与 POST /api/triad/mcp-config。 */
 export function applyMcpStatus(ctx: Context): void {
   resolveActiveProfile(ctx)
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'prefix',
+    path: EDIT_ROUTE,
+    handler: (req: IncomingMessage, res: ServerResponse) => { void handleMcpEdit(ctx, req, res) },
+  }), 'dsh-mcp-edit: routes')
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: STATUS_ROUTE,

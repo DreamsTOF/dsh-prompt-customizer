@@ -90,6 +90,10 @@ export const SKILL_ZH: Record<string, string> = {
   mcpApplyAllHint: '把「全部」视图的 MCP 工具配置覆盖到每个 agent 预设（清空各预设的遮蔽/工具启停覆盖）；工作区级不受影响。',
   mcpApplyAllConfirm: '将把当前「全部」的 MCP 工具配置覆盖到所有 agent 预设（清除各预设原有的遮蔽/工具启停覆盖）。工作区不受影响。确定？',
   mcpApplyAllOk: '已应用到所有预设（清理遮蔽 {masks} / 工具 {tools}）',
+  mcpEdit: '编辑',
+  mcpEditTitle: '编辑 MCP Server',
+  mcpEditReload: '保存后尝试热重载（默认下次会话 / 重启生效）',
+  mcpEditSaved: '已保存修改（下次会话 / 重启生效）',
   // MCP 视图
   mcpServer: 'MCP Server', mcpTools: '工具列表', mcpLog: '连接日志', mcpConfig: '配置模板',
   mcpRecommendMenu: '推荐 MCP Server', mcpRecommendTitle: '推荐 MCP Server', mcpAdd: '添加',

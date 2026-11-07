@@ -11,7 +11,7 @@ import { css } from './styles.js'
  * 先「校验并预览」（宿主解析，带行号报错），确认后写入目标（全局 patch / 预设）。
  * 一次粘贴可含多个 server；已存在的 serverName 自动跳过。
  */
-export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
+export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited }: {
   t: (key: string, params?: Record<string, string | number>) => string
   /** 目标预设；undefined = 全局 profile patch。 */
   presetId?: string
@@ -20,9 +20,16 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
   /** 添加成功回调：带上本次新增的 serverName（面板据此自动等工具注册）。 */
   onAdded: (added: string[]) => void
   onCancel: () => void
+  /** 编辑模式：要编辑的 serverName（全局 profile patch）。 */
+  editServer?: string
+  /** 编辑模式：当前 config 原文（YAML 子块，已去缩进）。 */
+  editText?: string
+  /** 编辑保存成功回调。 */
+  onEdited?: () => void
 }): JSX.Element {
-  const [format, setFormat] = useState<'json' | 'yaml'>('json')
-  const [text, setText] = useState('')
+  const [format, setFormat] = useState<'json' | 'yaml'>(editServer !== undefined ? 'yaml' : 'json')
+  const [text, setText] = useState(editText ?? '')
+  const [reload, setReload] = useState(false)
   const [busy, setBusy] = useState<'preview' | 'add' | null>(null)
   const [preview, setPreview] = useState<{ names: string[]; yaml: string } | null>(null)
   const [errors, setErrors] = useState<string[]>([])
@@ -73,6 +80,20 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
   const addNow = (): void => {
     if (busy !== null || empty) return
     setBusy('add'); reset()
+    // 编辑模式：改全局 profile patch 里该 server 的 config（复用 remove+append，带 .bak）。
+    if (editServer !== undefined) {
+      void call('/api/triad/mcp-edit', { serverName: editServer, format, text, reload })
+        .then((body) => {
+          const list = Array.isArray(body.errors) ? (body.errors as string[]) : []
+          if (list.length > 0) { setErrors(list); return }
+          if (body.ok !== true) { setErrors([String(body.error ?? t('mcpPasteFailed'))]); return }
+          setNotice(t('mcpEditSaved'))
+          onEdited?.()
+        })
+        .catch((error: unknown) => { setErrors([error instanceof Error ? error.message : String(error)]) })
+        .finally(() => { setBusy(null) })
+      return
+    }
     const path = presetId === undefined
       ? '/api/triad/mcp-config'
       : `/api/triad/mcp-presets/${encodeURIComponent(presetId)}/servers`
@@ -121,7 +142,7 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
         </div>
       </div>
       {/* 落点选择：默认全局；选工作区时写该工作区自己的 .mcp.json。 */}
-      {presetId === undefined && typeof workspace === 'string' && workspace !== '' && (
+      {editServer === undefined && presetId === undefined && typeof workspace === 'string' && workspace !== '' && (
         <div className={css.installRow}>
           <div className={css.mcpAddTypeRow} role="group" aria-label={t('addScopeLabel')}>
             {(['global', 'workspace'] as const).map(value => (
@@ -183,6 +204,12 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }: {
         </div>
       )}
       {notice !== null && <p className={css.mcpCopyHint} role="status">{notice}</p>}
+      {editServer !== undefined && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={reload} onChange={(event) => setReload(event.currentTarget.checked)} />
+          {t('mcpEditReload')}
+        </label>
+      )}
       <div className={css.inlineForm}>
         <Button variant="outline" type="button" disabled={busy !== null || empty} onClick={previewNow}>
           {busy === 'preview' ? t('mcpPasteChecking') : t('mcpPasteCheck')}

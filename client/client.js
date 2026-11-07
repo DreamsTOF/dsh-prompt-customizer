@@ -4920,6 +4920,10 @@ var SKILL_ZH = {
   mcpApplyAllHint: "\u628A\u300C\u5168\u90E8\u300D\u89C6\u56FE\u7684 MCP \u5DE5\u5177\u914D\u7F6E\u8986\u76D6\u5230\u6BCF\u4E2A agent \u9884\u8BBE\uFF08\u6E05\u7A7A\u5404\u9884\u8BBE\u7684\u906E\u853D/\u5DE5\u5177\u542F\u505C\u8986\u76D6\uFF09\uFF1B\u5DE5\u4F5C\u533A\u7EA7\u4E0D\u53D7\u5F71\u54CD\u3002",
   mcpApplyAllConfirm: "\u5C06\u628A\u5F53\u524D\u300C\u5168\u90E8\u300D\u7684 MCP \u5DE5\u5177\u914D\u7F6E\u8986\u76D6\u5230\u6240\u6709 agent \u9884\u8BBE\uFF08\u6E05\u9664\u5404\u9884\u8BBE\u539F\u6709\u7684\u906E\u853D/\u5DE5\u5177\u542F\u505C\u8986\u76D6\uFF09\u3002\u5DE5\u4F5C\u533A\u4E0D\u53D7\u5F71\u54CD\u3002\u786E\u5B9A\uFF1F",
   mcpApplyAllOk: "\u5DF2\u5E94\u7528\u5230\u6240\u6709\u9884\u8BBE\uFF08\u6E05\u7406\u906E\u853D {masks} / \u5DE5\u5177 {tools}\uFF09",
+  mcpEdit: "\u7F16\u8F91",
+  mcpEditTitle: "\u7F16\u8F91 MCP Server",
+  mcpEditReload: "\u4FDD\u5B58\u540E\u5C1D\u8BD5\u70ED\u91CD\u8F7D\uFF08\u9ED8\u8BA4\u4E0B\u6B21\u4F1A\u8BDD / \u91CD\u542F\u751F\u6548\uFF09",
+  mcpEditSaved: "\u5DF2\u4FDD\u5B58\u4FEE\u6539\uFF08\u4E0B\u6B21\u4F1A\u8BDD / \u91CD\u542F\u751F\u6548\uFF09",
   // MCP 视图
   mcpServer: "MCP Server",
   mcpTools: "\u5DE5\u5177\u5217\u8868",
@@ -5180,9 +5184,10 @@ function skillT(key, params) {
 var import_react10 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime5 = require("react/jsx-runtime");
-function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
-  const [format, setFormat] = (0, import_react10.useState)("json");
-  const [text, setText] = (0, import_react10.useState)("");
+function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited }) {
+  const [format, setFormat] = (0, import_react10.useState)(editServer !== void 0 ? "yaml" : "json");
+  const [text, setText] = (0, import_react10.useState)(editText ?? "");
+  const [reload, setReload] = (0, import_react10.useState)(false);
   const [busy, setBusy] = (0, import_react10.useState)(null);
   const [preview, setPreview] = (0, import_react10.useState)(null);
   const [errors, setErrors] = (0, import_react10.useState)([]);
@@ -5229,6 +5234,26 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
     if (busy !== null || empty) return;
     setBusy("add");
     reset();
+    if (editServer !== void 0) {
+      void call("/api/triad/mcp-edit", { serverName: editServer, format, text, reload }).then((body) => {
+        const list = Array.isArray(body.errors) ? body.errors : [];
+        if (list.length > 0) {
+          setErrors(list);
+          return;
+        }
+        if (body.ok !== true) {
+          setErrors([String(body.error ?? t("mcpPasteFailed"))]);
+          return;
+        }
+        setNotice(t("mcpEditSaved"));
+        onEdited?.();
+      }).catch((error) => {
+        setErrors([error instanceof Error ? error.message : String(error)]);
+      }).finally(() => {
+        setBusy(null);
+      });
+      return;
+    }
     const path = presetId === void 0 ? "/api/triad/mcp-config" : `/api/triad/mcp-presets/${encodeURIComponent(presetId)}/servers`;
     const toWorkspace = presetId === void 0 && scope === "workspace" && typeof workspace === "string" && workspace !== "";
     const payload = presetId === void 0 ? { action: "add", format, text, ...toWorkspace ? { scope: "workspace", workspace } : {} } : { format, text };
@@ -5274,7 +5299,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
       },
       value
     )) }) }),
-    presetId === void 0 && typeof workspace === "string" && workspace !== "" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("addScopeLabel"), children: ["global", "workspace"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    editServer === void 0 && presetId === void 0 && typeof workspace === "string" && workspace !== "" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("addScopeLabel"), children: ["global", "workspace"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "button",
       {
         type: "button",
@@ -5332,6 +5357,10 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
       }, children: preview.yaml })
     ] }),
     notice !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.mcpCopyHint, role: "status", children: notice }),
+    editServer !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, cursor: "pointer" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("input", { type: "checkbox", checked: reload, onChange: (event) => setReload(event.currentTarget.checked) }),
+      t("mcpEditReload")
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.inlineForm, children: [
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Button, { variant: "outline", type: "button", disabled: busy !== null || empty, onClick: previewNow, children: busy === "preview" ? t("mcpPasteChecking") : t("mcpPasteCheck") }),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_dsh_client_ui_primitives3.Button, { variant: "primary", type: "button", disabled: busy !== null || empty, onClick: addNow, children: busy === "add" ? t("mcpPasteAdding") : t("mcpAddConfirm") }),
@@ -5540,6 +5569,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
   const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
   const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
+  const [editState, setEditState] = (0, import_react13.useState)(null);
   const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
@@ -5618,6 +5648,16 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
       setError(cause instanceof Error ? cause.message : String(cause));
     }).finally(() => {
       setBusy(null);
+    });
+  };
+  const openEdit = (serverName) => {
+    setError(null);
+    void fetch(`/api/triad/mcp-edit?serverName=${encodeURIComponent(serverName)}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+      const payload = body;
+      if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? "") });
+      else setError(String(payload?.error ?? "load mcp config failed"));
+    }).catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
     });
   };
   const removeGlobal = (serverName) => {
@@ -5740,6 +5780,23 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const shownGlobals = globals.filter((server) => (needle === "" || server.serverName.toLowerCase().includes(needle) || server.tools.some((tool) => tool.name.toLowerCase().includes(needle))) && (status === "all" || (scope === "" ? status === "off" ? server.config.disabled : !server.config.disabled : status === "off" ? masked.has(server.serverName) : !masked.has(server.serverName))));
   const shownOwn = ownRows.filter((row) => needle === "" || row.serverName.toLowerCase().includes(needle) || row.summary.toLowerCase().includes(needle));
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpServerMain, children: [
+    editState !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.Modal, { open: true, onClose: () => setEditState(null), closeLabel: t("close"), title: t("mcpEditTitle"), children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      McpPasteAdd,
+      {
+        t,
+        onAdded: () => {
+          setEditState(null);
+          onRefresh();
+        },
+        onCancel: () => setEditState(null),
+        editServer: editState.serverName,
+        editText: editState.text,
+        onEdited: () => {
+          setEditState(null);
+          onRefresh();
+        }
+      }
+    ) }),
     /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.hintRow, children: [
       /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.hintRowText, children: scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
       scope !== "" && masked.size > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.presetReset, disabled: busy !== null, onClick: clearMasks, children: t("presetReset") })
@@ -5856,6 +5913,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                     children: closedInWorkspace.has(server.serverName) ? t("mcpWorkspaceEnable") : t("mcpWorkspaceDisable")
                   }
                 ),
+                scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.mcpCardDelete, title: t("mcpEdit"), disabled: busy !== null, onClick: () => {
+                  openEdit(server.serverName);
+                }, children: t("mcpEdit") }) : null,
                 scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",
                   {
