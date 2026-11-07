@@ -1220,14 +1220,18 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
       ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
     }))
 
-  // 并进累积登记表，再按并集出名单：本 scope 见到的排在前面（顺序更贴近当前
-  // 预设），其它预设见过的追加在后。同名内容后见到者赢，条目只增不减。
+  // 并进累积登记表（供“全部”视图与再扫描使用）。
   if (catalog !== undefined) catalog.observe({ sections: seenSections, tools: seenTools })
+  // 预设隔离：具体预设只列“本预设真实拥有”的段/工具，绝不把别的预设独有项
+  // （如某预设专属的 `tools:ptc-only` 段、专属工具）带进来。只有“全部”视图
+  // （presetId 为空 / `*`）才并集化，用于跨预设总览。
+  const isolate = typeof presetId === 'string' && presetId !== '' && presetId !== '*'
   const pool = catalog === undefined ? { sections: seenSections, tools: seenTools } : catalog.read()
   const seenNames = new Set(seenSections.map((x) => x.name))
-  const sections = [...seenSections, ...pool.sections.filter((x) => !seenNames.has(x.name))]
-    // 统一按宿主规范 order 排（缺失的池条目排到尾部，同序按名字）。不再沿用
-    // 登记表的「追加序」，否则跨预设新见的段会一律挤到列表最后。
+  const sectionSource = isolate
+    ? seenSections
+    : [...seenSections, ...pool.sections.filter((x) => !seenNames.has(x.name))]
+  const sections = sectionSource
     .map((item) => ({
       ...item,
       order: orderOf.get(String(item.name)) ?? Number.MAX_SAFE_INTEGER,
@@ -1236,12 +1240,12 @@ async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
     }))
     .sort((a, b) => a.order - b.order || String(a.name).localeCompare(String(b.name)))
   const seenToolNames = new Set(seenTools.map((x) => x.name))
-  // 工具：当前 scope 的按宿主顺序在前（seenTools 已排好），其它预设只见过的
-  // 追加在后、按名字稳定排序。
-  const poolOnlyTools = pool.tools
-    .filter((x) => !seenToolNames.has(x.name))
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-  const tools = [...seenTools, ...poolOnlyTools]
+  const toolSource = isolate
+    ? seenTools
+    : [...seenTools, ...pool.tools
+      .filter((x) => !seenToolNames.has(x.name))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))]
+  const tools = toolSource
     .map((item) => ({ ...item, hidden: isHidden(item.name) }))
 
   return { sections, tools, config: cfg }

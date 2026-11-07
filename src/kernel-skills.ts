@@ -285,21 +285,19 @@ export async function kernelSkillViews(
     return source.startsWith('project-') || source.startsWith('user-') || source === 'custom'
   })
   const needsFallback = !complete
-  const hidden = hiddenReader === undefined ? undefined : await hiddenReader()
   const views: KernelSkillView[] = []
   if (needsFallback) {
     // 兜底扫到的四个根在前（工作区优先），再把内核独有的条目（bundled / office /
     // 插件 provider —— 它们不在文件系统根里）补在后面，同名不重复。
-    views.push(...await scanWorkspaceSkills(targetCwd, hidden))
+    // 面板要展示“关闭”的技能（置灰而非隐身），因此兜底扫描不再按隐藏账本过滤；
+    // 模型侧仍由闸门 provider 遮挡。
+    views.push(...await scanWorkspaceSkills(targetCwd, undefined))
   }
   for (const summary of summaries) {
     const name = typeof summary?.name === 'string' ? summary.name : ''
     if (name === '') continue
     if (views.some((view) => view.name === name)) continue
-    // 面板显隐由本插件的账本说了算：内核闸门在模型侧遮过一遍，但目录合并
-    // 只按层/rank 去重，同名候选未必每次都压过真实来源，这里再过滤一次，
-    // 保证「关掉的技能既不在面板、也不在模型目录里」。
-    if (hidden?.has(name) === true) continue
+    // 关闭的技能在面板保留（显示为关闭态），不再从面板列表过滤；模型侧由闸门 provider 遮挡。
     // 内核给的是 SKILL.md 的绝对路径；技能目录 = 它的父目录。虚拟技能没有 path。
     const dirPath = typeof summary.path === 'string' && summary.path !== '' ? dirname(summary.path) : undefined
     const source = typeof summary.source === 'string' && summary.source !== '' ? summary.source : 'unknown'
