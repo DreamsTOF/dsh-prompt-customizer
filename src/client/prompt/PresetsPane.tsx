@@ -189,18 +189,12 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   ])
 }
 
-export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }: {
+export function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }: {
   cfg: Config
   inv: Inventory | null
   t: Translate
   /** 全局字段专用写通道（forceSections / envBlocklist，不经草稿）。 */
   writeGlobal: (field: string, value: unknown) => void
-  /** 导出当前编辑目标的定制（只读；不创建预设）。 */
-  onExportPreset: () => void
-  /** 导出在途标记（禁用按钮）。 */
-  exporting: boolean
-  /** 导出目标的显示名（当前编辑目标预设）；undefined = 全局目标。 */
-  exportTarget: string | undefined
   /** 恢复初始状态：清空全部定制并关闭 forceSections（与不装插件等效）。 */
   onReset: () => void
   envBlocklist: string[]
@@ -227,18 +221,7 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporti
   }
 
   return h('div', { style: s.colRight }, [
-    h('div', { style: s.colRightScroll }, [
-      h('div', { style: s.injectBox }, [
-        h('div', { style: s.rowTitle }, t('exportPresetCard')),
-        h('div', { style: s.muted }, t('exportPresetHint', { name: exportTarget ?? t('exportTargetDefault') })),
-        h('div', { style: s.injectRow }, [
-          h('button', {
-            style: s.mini,
-            disabled: exporting,
-            onClick: onExportPreset,
-          }, exporting ? t('exportPresetRunning') : t('exportPreset')),
-        ]),
-      ]),
+    h('div', { style: { ...s.colRightScroll, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12, alignContent: 'start' } }, [
       h('div', { style: s.injectBox }, [
         h('div', { style: s.rowTitle }, t('backupTitle')),
         h('div', { style: s.muted }, t('backupHint')),
@@ -261,7 +244,6 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporti
           }),
         ]),
       ]),
-      h('div', { style: s.groupHead }, t('settingsTitle')),
       h('div', { style: s.injectBox }, [
         h('div', { style: s.rowTitle }, t('forceTitle')),
         h('div', { style: s.muted }, t('forceHint')),

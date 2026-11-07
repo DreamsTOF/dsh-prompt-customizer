@@ -3199,7 +3199,7 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     ])
   ]);
 }
-function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }) {
+function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }) {
   const [blockInput, setBlockInput] = (0, import_react6.useState)("");
   const backupFileRef = (0, import_react6.useRef)(null);
   const removeBlockEntry = (entry) => {
@@ -3212,18 +3212,7 @@ function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exp
     writeGlobal("envBlocklist", [...envBlocklist, entry]);
   };
   return (0, import_react6.createElement)("div", { style: s.colRight }, [
-    (0, import_react6.createElement)("div", { style: s.colRightScroll }, [
-      (0, import_react6.createElement)("div", { style: s.injectBox }, [
-        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("exportPresetCard")),
-        (0, import_react6.createElement)("div", { style: s.muted }, t("exportPresetHint", { name: exportTarget ?? t("exportTargetDefault") })),
-        (0, import_react6.createElement)("div", { style: s.injectRow }, [
-          (0, import_react6.createElement)("button", {
-            style: s.mini,
-            disabled: exporting,
-            onClick: onExportPreset
-          }, exporting ? t("exportPresetRunning") : t("exportPreset"))
-        ])
-      ]),
+    (0, import_react6.createElement)("div", { style: { ...s.colRightScroll, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, alignContent: "start" } }, [
       (0, import_react6.createElement)("div", { style: s.injectBox }, [
         (0, import_react6.createElement)("div", { style: s.rowTitle }, t("backupTitle")),
         (0, import_react6.createElement)("div", { style: s.muted }, t("backupHint")),
@@ -3246,7 +3235,6 @@ function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exp
           })
         ])
       ]),
-      (0, import_react6.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
       (0, import_react6.createElement)("div", { style: s.injectBox }, [
         (0, import_react6.createElement)("div", { style: s.rowTitle }, t("forceTitle")),
         (0, import_react6.createElement)("div", { style: s.muted }, t("forceHint")),
@@ -3924,13 +3912,10 @@ function Panel({ t, onClose, level = "preset", workspace }) {
           inv,
           t,
           writeGlobal,
-          onExportPreset: exportCurrentPreset,
-          exporting,
           onBackupAll: backupAll,
           onRestoreAll: restoreAll,
           backingUp,
           restoring,
-          exportTarget: target ? agentPresets.find((p) => p.id === target)?.name ?? target : void 0,
           onReset: resetAll,
           envBlocklist: cfg.envBlocklist ?? []
         })
