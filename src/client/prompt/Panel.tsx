@@ -27,6 +27,7 @@ import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
+import { SessionView } from './SessionView.tsx'
 import { makeIoEnv } from './preset-io.ts'
 
 const INVENTORY_URL = '/api/prompt-customizer/inventory'
@@ -39,6 +40,7 @@ const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
 const EXPORT_URL = '/api/prompt-customizer/export'
 const CATALOG_RESCAN_URL = '/api/prompt-customizer/catalog/rescan'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
+const SESSION_URL = '/api/prompt-customizer/session'
 
 /** 三阶段预览装配（模型视角）：左栏列表与右栏预览的统一数据源。 */
 type PhaseViews = Record<PhaseViewKey, Preview | null>
@@ -50,7 +52,7 @@ const VIEW_KEYS: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
 const DRAFT_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
 
 /** 面板顶层模式：提示词 / 工具 / 预设（预览常驻右栏，不再是独立模式）。 */
-type PanelMode = 'sections' | 'tools' | 'presets'
+type PanelMode = 'sections' | 'tools' | 'session' | 'presets'
 
 /** 可编辑的配置字段（含每阶段独立段屏蔽名单）。 */
 type EditField = 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools'
@@ -74,6 +76,13 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 三阶段预览装配：模型视角的唯一数据源（加载中为 null）。
   const [phases, setPhases] = useState<PhaseViews | null>(null)
   const [agentPresets, setAgentPresets] = useState<AgentPresetInfo[]>([])
+  const [currentPreset, setCurrentPreset] = useState<string | undefined>(undefined)
+  const [sessionView, setSessionView] = useState<Preview | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(false)
+  // 自定义层级：预设级（overrides[preset]）/ 工作区级（workspaceOverrides[cwd]，覆盖预设级）。
+  const [level, setLevel] = useState<'preset' | 'workspace'>('preset')
+  const [workspaceOverrides, setWorkspaceOverrides] = useState<Record<string, Config>>({})
+  const [currentWorkspace, setCurrentWorkspace] = useState<string | undefined>(undefined)
   const [mode, setMode] = useState<PanelMode>('sections')
   const [error, setError] = useState<string | null>(null)
   // 配置写入计数：每次成功写配置后 +1，驱动预览重载。
@@ -111,6 +120,8 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
       .then((body) => {
         if (body?.ok !== true) throw new Error(body?.error ?? 'config failed')
         setCfg(body.config as Config)
+        setWorkspaceOverrides((body.workspaceOverrides ?? {}) as Record<string, Config>)
+        setCurrentWorkspace(typeof body.currentWorkspace === 'string' && body.currentWorkspace !== '' ? body.currentWorkspace : undefined)
         setError(null)
       })
       .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
@@ -120,6 +131,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 返回 Promise：手动刷新后可以链上草稿补同步（见「刷新」按钮）。
   const refresh = (): Promise<void> => {
     const seq = ++refreshSeq.current
+    setSessionLoading(true)
     const qs = target ? `?scope=${encodeURIComponent(target)}` : ''
     // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。
     const params = (phase: string): string =>
@@ -137,22 +149,36 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
           return null
         })
     // 清单带 scope：当前模式的同名正文优先，其它历史条目只作为池子参考。
+    const grabSession = (): Promise<Preview | null> =>
+      fetch(SESSION_URL + `?t=${Date.now()}`)
+        .then((r) => r.json())
+        .then((body: Preview) => {
+          if (body.ok === false) throw new Error(body.error ?? t('previewFail'))
+          return body
+        })
+        .catch((error: unknown) => {
+          failures.push(`session: ${String(error instanceof Error ? error.message : error)}`)
+          return null
+        })
     return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
       if (body.ok === false) throw new Error(body.error ?? 'inventory failed')
       return body
     }).catch((error: unknown) => {
       failures.push(String(error instanceof Error ? error.message : error))
       return null
-    })])
-      .then(([boot, comp, act, inventoryData]) => {
+    }), grabSession()])
+      .then(([boot, comp, act, inventoryData, sessionData]) => {
         if (seq !== refreshSeq.current) return
         setPhases({ bootstrap: boot, compaction: comp, active: act })
         setInv(inventoryData as Inventory)
+        setSessionView(sessionData)
+        setSessionLoading(false)
         setError(failures.length ? failures.join('\n') : null)
       })
       .catch((e: unknown) => {
         if (seq !== refreshSeq.current) return
         setPhases({ bootstrap: null, compaction: null, active: null })
+        setSessionLoading(false)
         setError(String(e instanceof Error ? e.message : e))
       })
   }
@@ -165,6 +191,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 拉取会覆盖回权威状态。syncSeq 让过期响应（又编辑了 / 已保存）直接丢弃。
   const syncDraftPreview = (): void => {
     if (draft === null || !draft.dirty) return
+    if (level !== 'preset') return // 工作区级草稿预览走保存后重拉，不叠加到预设预览
     const patch: Record<string, unknown> = {}
     const source = draft as unknown as Record<string, unknown>
     for (const field of DRAFT_FIELDS) {
@@ -206,8 +233,11 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   const fetchPresets = (): void => {
     fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`)
       .then((r) => r.json())
-      .then((body) => setAgentPresets(Array.isArray(body?.presets) ? body.presets as AgentPresetInfo[] : []))
-      .catch(() => setAgentPresets([]))
+      .then((body) => {
+        setAgentPresets(Array.isArray(body?.presets) ? body.presets as AgentPresetInfo[] : [])
+        setCurrentPreset(typeof body?.currentPreset === 'string' && body.currentPreset !== '' ? body.currentPreset : undefined)
+      })
+      .catch(() => { setAgentPresets([]); setCurrentPreset(undefined) })
   }
   useEffect(() => { fetchPresets() }, [])
 
@@ -216,10 +246,12 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   useEffect(() => {
     setTarget((current) => {
       if (current !== undefined) return current
+      const live = currentPreset === undefined ? undefined : agentPresets.find((p) => p.id === currentPreset && !p.broken)
+      if (live !== undefined) return live.id
       const first = agentPresets.find((p) => !p.broken) ?? agentPresets[0]
       return first?.id
     })
-  }, [agentPresets])
+  }, [agentPresets, currentPreset])
 
   // 保存成功/失败后的短促闪示消息（3 秒自动消失；err 用红色样式）。
   const showFlash = (text: string, kind: 'ok' | 'err' = 'ok'): void => {
@@ -278,7 +310,13 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 编辑视图：草稿存在时以草稿覆盖对应字段（两栏共享编辑域）。
   // 草稿只含用户实际编辑过的字段，未编辑字段回落基线 —— 绝不把继承值
   // 冻结进 override。
-  const base = editView(cfg, target)
+  // 工作区级：把该工作区的 override 当作编辑源（叠在预设级之上、运行时工作区优先）。
+  const wsKey = currentWorkspace
+  const wsTarget = target ?? '__workspace__'
+  const baseSource = level === 'workspace'
+    ? ({ ...cfg, overrides: { [wsTarget]: (wsKey !== undefined ? workspaceOverrides[wsKey] : undefined) ?? {} } } as Config)
+    : cfg
+  const base = editView(baseSource, level === 'workspace' ? wsTarget : target)
   const view: Config = draft
     ? {
         ...base,
@@ -290,6 +328,10 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
         tools: draft.tools ?? base.tools,
       }
     : base
+  // 工作区级左栏要能列出「会话里全部段 / 工具」，用当前会话视图充当三态基座。
+  const ep: PhaseViews | null = level === 'workspace'
+    ? (sessionView !== null ? { bootstrap: sessionView, compaction: sessionView, active: sessionView } : null)
+    : phases
 
   const writeField = (field: string, value: unknown): void => {
     const url = value === undefined ? CONFIG_UNSET_URL : CONFIG_SET_URL
@@ -323,6 +365,7 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   // 草稿并采纳最新配置。失败时保留草稿（改完可以再试，不会丢）。
   const save = (): void => {
     if (draft === null || saving) return
+    if (level === 'workspace' && wsKey === undefined) { showFlash(t('workspaceRequired'), 'err'); return }
     const EDITED_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
     const patch: Record<string, unknown> = {}
     for (const field of EDITED_FIELDS) {
@@ -332,12 +375,13 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     fetch(CONFIG_APPLY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ target, patch }),
+      body: JSON.stringify(level === 'workspace' ? { level: 'workspace', workspace: wsKey, patch } : { target, patch }),
     })
       .then((r) => r.json())
       .then((body) => {
         if (body?.ok !== true) throw new Error(body?.error ?? 'save failed')
         setCfg(body.config as Config)
+        if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
         clearDraft()
         setError(null)
         setVersion((n) => n + 1)
@@ -382,17 +426,17 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     return typeof zh === 'string' && zh !== '' ? zh : fallback
   }
   const toggleZh = (): void => {
-    if (phases === null || phases.bootstrap === null || phases.active === null || phases.compaction === null) {
+    if (ep === null || ep.bootstrap === null || ep.active === null || ep.compaction === null) {
       showFlash(t('zhNotReady'), 'err')
       return
     }
-    edit('inject', zhOn ? zhRevertInjectEntries(view, phases, ZH_SECTIONS) : zhMergedInjectEntries(view, phases, ZH_SECTIONS))
+    edit('inject', zhOn ? zhRevertInjectEntries(view, ep, ZH_SECTIONS) : zhMergedInjectEntries(view, ep, ZH_SECTIONS))
     showFlash(zhOn ? t('zhReverted') : t('zhApplied'))
   }
 
   /** 该段是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」还是「必须带正文」。 */
   const nativeIn = (key: PhaseViewKey, name: string): boolean | null => {
-    const view = phases?.[key]
+    const view = ep?.[key]
     if (view === undefined || view === null) return null
     return (view.baseSections ?? []).some((sec) => sec.name === name)
   }
@@ -404,11 +448,11 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
   const toggleSyncAll = (on: boolean): void => {
     setSyncAll(on)
     if (!on) return
-    if (phases === null || VIEW_KEYS.some((key) => phases[key] === null)) {
+    if (ep === null || VIEW_KEYS.some((key) => ep[key] === null)) {
       showFlash(t('syncNotReady'), 'err')
       return
     }
-    const rows = mirroredRows(view, phases, nativeIn)
+    const rows = mirroredRows(view, ep, nativeIn)
     if (rows.length === 0) {
       showFlash(t('syncNotReady'), 'err')
       return
@@ -453,6 +497,15 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
     }
     setMode(next)
     setPreviewSub(next === 'tools' ? 'tools' : 'prompt')
+  }
+
+  // 切换自定义层级：预设级 ↔ 工作区级（工作区级作用于当前工作区、覆盖预设级）。
+  const switchLevel = (next: 'preset' | 'workspace'): void => {
+    if (next === level) return
+    if (draft?.dirty && !window.confirm(t('discardConfirm'))) return
+    clearDraft()
+    setLevel(next)
+    if (next === 'workspace') void refresh()
   }
 
   // 切换编辑目标（顶部预设 Tab）：草稿基线随目标变化，脏草稿先经确认再丢弃。
@@ -555,7 +608,20 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
       h('div', { style: s.seg }, [
         modeBtn('sections', t('tabsSections')),
         modeBtn('tools', t('tabsTools')),
+        modeBtn('session', t('tabsSession')),
         modeBtn('presets', t('tabsPresets')),
+      ]),
+      h('div', { style: s.seg }, [
+        h('button', {
+          key: 'lvl-preset',
+          style: level === 'preset' ? s.segBtnActive : s.segBtn,
+          onClick: () => switchLevel('preset'),
+        }, t('levelPreset')),
+        h('button', {
+          key: 'lvl-workspace',
+          style: level === 'workspace' ? s.segBtnActive : s.segBtn,
+          onClick: () => switchLevel('workspace'),
+        }, t('levelWorkspace')),
       ]),
       h('div', { style: s.headActions }, [
         mode === 'sections' || mode === 'tools'
@@ -641,30 +707,41 @@ export function Panel({ t, onClose }: { t: Translate; onClose?: () => void }): R
       target && agentPresets.find((p) => p.id === target)?.broken
         ? h('div', { style: s.error }, t('brokenPreset'))
         : null,
-      inv?.scopeResolved === false && mode !== 'presets'
+      inv?.scopeResolved === false && mode !== 'presets' && mode !== 'session'
         ? h('div', { style: s.noticeWarn }, t('scopeFallback'))
+        : null,
+      level === 'workspace' && currentWorkspace === undefined
+        ? h('div', { style: s.noticeWarn }, t('workspaceNoSession'))
         : null,
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
     h('div', { key: 'body', style: s.body },
-      mode === 'sections'
+      mode === 'session'
+        ? h(SessionView, {
+            data: sessionView,
+            loading: sessionLoading,
+            error,
+            t,
+            onRefresh: () => { void refresh() },
+          })
+        : mode === 'sections'
         ? [
-            h(SectionsPane, { key: 'sections', cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
-            h(PreviewPane, { key: 'preview', t, phases, phase, sub: previewSub }),
+            h(SectionsPane, { key: 'sections', cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
+            h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub }),
           ]
         : mode === 'tools'
           ? [
-              h(ToolsPane, { key: 'tools', cfg: view, inv, phases, phase, syncAll, t, write: edit }),
-              h(PreviewPane, { key: 'preview', t, phases, phase, sub: previewSub }),
+              h(ToolsPane, { key: 'tools', cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
+              h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub }),
             ]
           : [
               h(PresetsPane, {
                 key: 'presets',
                 cfg: view,
                 inv,
-                phases,
+                phases: ep,
                 t,
                 writePatch,
                 writeGlobal,

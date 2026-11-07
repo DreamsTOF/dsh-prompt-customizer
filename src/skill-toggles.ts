@@ -42,6 +42,7 @@
  */
 
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 import { join } from 'node:path'
 import { URL } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -196,10 +197,9 @@ const maskInvalidators = new Set<() => void>()
 
 /** 读账本(首次读盘,之后走内存;文件缺失/损坏视为空账本)。 */
 async function readLedger(): Promise<PresetSkillsFile> {
-  if (ledgerCache !== undefined) return ledgerCache
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(presetLedgerPath(), 'utf8')) as unknown
+    parsed = readPluginDoc('skills/preset-toggles')
   } catch {
     parsed = undefined
   }
@@ -209,11 +209,7 @@ async function readLedger(): Promise<PresetSkillsFile> {
 
 /** 原子写账本 + 刷新内存副本 + 让所有闸门缓存失效。 */
 async function writeLedger(next: PresetSkillsFile): Promise<void> {
-  const target = presetLedgerPath()
-  const temp = `${target}.tmp`
-  await mkdir(managedRoot(), { recursive: true })
-  await writeFile(temp, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-  await rename(temp, target)
+  writePluginDoc('skills/preset-toggles', next)
   ledgerCache = next
   for (const invalidate of maskInvalidators) {
     try { invalidate() } catch { /* 单个 agent 的失效失败不影响其它 */ }
@@ -242,10 +238,9 @@ let hiddenCache: Set<string> | undefined
 
 /** 读全局隐藏集合（文件缺失/损坏视为空集）。 */
 async function readHidden(): Promise<Set<string>> {
-  if (hiddenCache !== undefined) return hiddenCache
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(hiddenLedgerPath(), 'utf8')) as unknown
+    parsed = readPluginDoc('skills/hidden-toggles')
   } catch {
     parsed = undefined
   }
@@ -265,11 +260,7 @@ async function readHidden(): Promise<Set<string>> {
 /** 原子写全局隐藏集合 + 让所有闸门缓存失效。 */
 async function writeHidden(next: Set<string>): Promise<void> {
   const file: HiddenSkillsFile = { version: 1, hidden: [...next].sort() }
-  const target = hiddenLedgerPath()
-  const temp = `${target}.tmp`
-  await mkdir(managedRoot(), { recursive: true })
-  await writeFile(temp, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
-  await rename(temp, target)
+  writePluginDoc('skills/hidden-toggles', file)
   hiddenCache = new Set(file.hidden)
   for (const invalidate of maskInvalidators) {
     try { invalidate() } catch { /* 单个 agent 的失效失败不影响其它 */ }

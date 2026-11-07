@@ -15,6 +15,7 @@
  */
 
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 import { join, resolve } from 'node:path'
 import { agentsHome } from './home-paths.ts'
 
@@ -22,6 +23,7 @@ import { agentsHome } from './home-paths.ts'
 type PluginContext = any
 
 const LEDGER_FILE = '.workspace-mcp.json'
+const LEDGER_KEY = 'mcp/workspace-close'
 const MAX_WORKSPACES = 64
 
 /** 账本形状。 */
@@ -66,10 +68,9 @@ let cache: WorkspaceMcpLedger | undefined
 
 /** 读账本（首次读盘，之后走内存；缺失/损坏视为空）。 */
 async function readLedger(): Promise<WorkspaceMcpLedger> {
-  if (cache !== undefined) return cache
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(ledgerPath(), 'utf8')) as unknown
+    parsed = readPluginDoc(LEDGER_KEY)
   } catch {
     parsed = undefined
   }
@@ -79,23 +80,7 @@ async function readLedger(): Promise<WorkspaceMcpLedger> {
 
 /** 原子写账本。 */
 async function writeLedger(next: WorkspaceMcpLedger): Promise<void> {
-  const target = ledgerPath()
-  const temp = `${target}.tmp`
-  await mkdir(join(agentsHome(), 'skills'), { recursive: true })
-  await writeFile(temp, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-  // Windows：目标被别的句柄短暂占用时 rename 会 EPERM。先删旧文件再改名，
-  // 失败就退化为直接写（内容仍完整，只是失去原子性）。
-  try {
-    await rename(temp, target)
-  } catch {
-    await rm(target, { force: true })
-    try {
-      await rename(temp, target)
-    } catch {
-      await writeFile(target, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-      await rm(temp, { force: true })
-    }
-  }
+  writePluginDoc(LEDGER_KEY, next)
   cache = next
 }
 
@@ -108,6 +93,11 @@ export function closedInWorkspace(ledger: WorkspaceMcpLedger, cwd: string): Set<
     if (state === false) closed.add(serverName)
   }
   return closed
+}
+
+/** 读取账本后返回某工作区被关闭的 server 名单（预览等只读消费方用）。 */
+export async function closedServersInWorkspace(cwd: string): Promise<Set<string>> {
+  return closedInWorkspace(await readLedger(), cwd)
 }
 
 /**

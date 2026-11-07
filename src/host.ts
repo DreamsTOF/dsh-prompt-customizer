@@ -39,8 +39,9 @@ import { applyMcpStatus } from './mcp-status.js'
 import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
-import { applyMcpToolDisable } from './mcp-tool-disable.js'
-import { applyMcpWorkspaceScope } from './mcp-workspace-scope.ts'
+import { applyMcpToolDisable, isToolDisabled, presetOwnsServer, serverOfToolName } from './mcp-tool-disable.js'
+import { applyMcpWorkspaceScope, closedServersInWorkspace } from './mcp-workspace-scope.ts'
+import { maskedServersOf, readMaskLedger } from './mcp-mask-ledger.js'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-prompt-customizer'
@@ -57,6 +58,38 @@ export const inject = [
   'webServer',
   'tools',
 ]
+
+/**
+ * 本插件自己的 MCP 遮蔽（工具级禁用 / 预设遮蔽 / 工作区关闭）在预览里的
+ * 批量判定。vendor 半身通过 `toolMask` 回调消费，不直接 import 这些模块。
+ */
+async function maskedToolsOfPlugin(presetId: string, names: string[], cwd?: string): Promise<Set<string>> {
+  const masked = new Set<string>()
+  if (presetId === '') return masked
+  let maskedServers = new Set<string>()
+  try {
+    maskedServers = maskedServersOf(readMaskLedger(), presetId)
+  } catch { /* 账本不可读：按无遮蔽处理 */ }
+  let closedServers = new Set<string>()
+  if (typeof cwd === 'string' && cwd.trim() !== '') {
+    try {
+      closedServers = await closedServersInWorkspace(cwd)
+    } catch { /* 工作区账本不可读：按无遮蔽处理 */ }
+  }
+  for (const name of names) {
+    try {
+      if (isToolDisabled(name, presetId)) {
+        masked.add(name)
+        continue
+      }
+      const serverName = serverOfToolName(name)
+      if (serverName === undefined) continue
+      if (presetOwnsServer(presetId, serverName)) continue
+      if (maskedServers.has(serverName) || closedServers.has(serverName)) masked.add(name)
+    } catch { /* 单个名字解析失败：跳过 */ }
+  }
+  return masked
+}
 
 export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promise<void> {
   // ── 技能根解析（用户级 + 工作区级，三处消费方共用一份）────────────────
@@ -220,7 +253,10 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
         // 把 entry 的 dataDir 原样传给 vendor 半身：它自己会回落到
         // ~/.dsh/prompt-customizer，但那样的话无法隔离（测试 / 沙箱只能
         // 覆盖同一个真实目录）。缺省时行为不变。
-        applyPromptHost(promptCtx, typeof entry?.dataDir === 'string' ? { dataDir: entry.dataDir } : {})
+        applyPromptHost(promptCtx, {
+          ...(typeof entry?.dataDir === 'string' ? { dataDir: entry.dataDir } : {}),
+          toolMask: maskedToolsOfPlugin,
+        })
         promptCtx.logger?.info?.('[dsh-prompt-customizer] prompt customizer mounted')
       } catch (error) {
         promptCtx.logger?.warn?.(

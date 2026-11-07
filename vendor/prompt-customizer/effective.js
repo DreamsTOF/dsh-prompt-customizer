@@ -47,6 +47,51 @@ export function effectiveConfig(ovr) {
 }
 
 /**
+ * 合并「预设级」与「工作区级」两层 override：工作区级优先。
+ *  - replace / inject 按名字合并（工作区同名条目覆盖预设，其余保留）；
+ *  - tools 的 exclude / add / bootstrap / compaction 按子字段覆盖；
+ *  - 其余字段（三份段屏蔽名单、标量）工作区声明了就整体取代预设。
+ * 返回的仍是「原始 override 形状」，交给 effectiveConfig 归一。
+ */
+export function mergeOverrideLayers(presetOvr, workspaceOvr) {
+  const base = presetOvr !== null && typeof presetOvr === 'object' ? presetOvr : {}
+  const ws = workspaceOvr !== null && typeof workspaceOvr === 'object' ? workspaceOvr : {}
+  const out = { ...base }
+  for (const [key, value] of Object.entries(ws)) {
+    if (value === undefined || value === null) continue
+    if (key === 'replace') { out.replace = { ...(base.replace ?? {}), ...value }; continue }
+    if (key === 'inject') {
+      const byName = new Map()
+      const order = []
+      for (const item of Array.isArray(base.inject) ? base.inject : []) {
+        if (item === null || typeof item !== 'object' || typeof item.name !== 'string') continue
+        if (!byName.has(item.name)) order.push(item.name)
+        byName.set(item.name, item)
+      }
+      for (const item of Array.isArray(value) ? value : []) {
+        if (item === null || typeof item !== 'object' || typeof item.name !== 'string') continue
+        if (!byName.has(item.name)) order.push(item.name)
+        byName.set(item.name, item)
+      }
+      out.inject = order.map((name) => byName.get(name))
+      continue
+    }
+    if (key === 'tools') {
+      const bt = base.tools !== null && typeof base.tools === 'object' ? base.tools : {}
+      const merged = { ...bt }
+      for (const [k, v] of Object.entries(value !== null && typeof value === 'object' ? value : {})) {
+        if (k === 'bootstrap' || k === 'compaction') merged[k] = { ...(bt[k] ?? {}), ...(v ?? {}) }
+        else merged[k] = v
+      }
+      out.tools = merged
+      continue
+    }
+    out[key] = value
+  }
+  return out
+}
+
+/**
  * 选出当前阶段生效的注入段：常驻期注入（`always`）始终注入；其余注入按
  * 阶段模式匹配 —— bootstrap（未晋级）→ `bootstrap`，active（已晋级）→
  * `active`，compact（压缩后仍未晋级）→ `compaction`。每个阶段的注入集

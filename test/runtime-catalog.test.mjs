@@ -98,11 +98,12 @@ async function inventoryOf(routes) {
 test('清单的首屏形状：模式清单不含对话专属段，只跑预览时也不凭空多段', async () => {
   const cases = [
     {
-      label: '模式清单不把已有对话的专属段当作预设定义',
+      label: '模式清单并入同预设活动 agent 的会话级段并打标记',
       run: async (h) => {
         const body = await inventoryOf(h.routes)
         const names = body.sections.map(sec => sec.name)
-        assert.ok(!names.includes(RUNTIME_ONLY.name))
+        assert.ok(names.includes(RUNTIME_ONLY.name))
+        assert.equal(body.sections.find(sec => sec.name === RUNTIME_ONLY.name)?.scope, 'agent')
         assert.ok(names.includes('persona') && names.includes('core'))
       },
     },

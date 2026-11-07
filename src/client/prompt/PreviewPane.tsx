@@ -46,6 +46,9 @@ export function PreviewPane({ t, phases, phase, sub }: {
         ? h('div', { style: s.error }, t('previewFail'))
         : null,
       data ? h('div', { style: s.muted }, t('previewPreset')) : null,
+      data?.sessionOverlay !== undefined
+        ? h('div', { style: s.noticeWarn }, t('previewSessionOverlay'))
+        : null,
       data?.diagnostics?.length ? h('div', { style: s.noticeWarn }, t('previewUnresolved', {
         names: [...new Set(data.diagnostics.map(item => `{{${item.variable}}}`))].join(', '),
       })) : null,

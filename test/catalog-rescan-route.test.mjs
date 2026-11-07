@@ -16,7 +16,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parse } from 'yaml'
+import { openDb, readCatalog, replaceCatalog } from '../vendor/prompt-customizer/db.js'
 import { apply } from '../vendor/prompt-customizer/index.js'
 
 /**
@@ -102,9 +102,11 @@ test('重扫用真实并集整体替换登记表，并清掉历史条目', async
   })
 
   // 先造出积压：一个早就不存在的历史工具
-  fs.mkdirSync(dataDir, { recursive: true })
-  fs.writeFileSync(path.join(dataDir, 'catalog.yaml'),
-    'tools:\n  - name: dsh_browser_replay\n    description: stale\n  - name: bash\n    description: run\nsections:\n  - name: ghost-section\n    text: old\n')
+  const db = openDb(path.join(dataDir, 'prompt-customizer.db'))
+  replaceCatalog(db, {
+    tools: [{ name: 'dsh_browser_replay', description: 'stale' }, { name: 'bash', description: 'run' }],
+    sections: [{ name: 'ghost-section', text: 'old' }],
+  })
 
   const res = await post(routes[RESCAN])
   assert.equal(res.status, 200, JSON.stringify(res.body))
@@ -117,8 +119,8 @@ test('重扫用真实并集整体替换登记表，并清掉历史条目', async
   assert.equal(res.body.report.tools.removed, 1)
   assert.equal(res.body.report.sections.removed, 1)
 
-  // 落盘：重启不会把历史条目捞回来
-  const onDisk = parse(fs.readFileSync(path.join(dataDir, 'catalog.yaml'), 'utf8'))
+  // 落库：重启不会把历史条目捞回来
+  const onDisk = readCatalog(db)
   assert.deepEqual(onDisk.tools.map((t) => t.name).sort(), ['bash', 'edit'])
 })
 
@@ -131,15 +133,14 @@ test('重扫的失败路径：全部失败绝不清空登记表 / 部分失败�
           presets: [{ id: 'a' }, { id: 'b' }],
           broken: ['a', 'b'],
         })
-        fs.mkdirSync(dataDir, { recursive: true })
-        const keep = 'tools:\n  - name: survivor\n    description: still here\n'
-        fs.writeFileSync(path.join(dataDir, 'catalog.yaml'), keep)
+        const db = openDb(path.join(dataDir, 'prompt-customizer.db'))
+        replaceCatalog(db, { tools: [{ name: 'survivor', description: 'still here' }], sections: [] })
 
         const res = await post(routes[RESCAN])
         assert.equal(res.status, 409)
         assert.equal(res.body.ok, false)
         assert.equal(res.body.skipped.length, 2)
-        assert.equal(fs.readFileSync(path.join(dataDir, 'catalog.yaml'), 'utf8'), keep, '登记表必须原封不动')
+        assert.deepEqual(readCatalog(db).tools.map((t) => t.name), ['survivor'], '登记表必须原封不动')
       },
     },
     {

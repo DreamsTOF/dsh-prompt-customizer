@@ -15,17 +15,19 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { parse } from 'yaml'
+import { openDb, getDoc, setDoc } from '../vendor/prompt-customizer/db.js'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 
-/** 装一个带真实 config.yaml 的隔离环境，返回路由表和落盘路径。 */
+/** 装一个带真实配置（SQLite doc('config')）的隔离环境，返回路由表和 DB。 */
 async function harness({ roster, config } = {}) {
   const routes = {}
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-export-'))
   const dataDir = path.join(home, 'prompt-customizer')
   fs.mkdirSync(dataDir, { recursive: true })
-  const configFile = path.join(dataDir, 'config.yaml')
-  if (config !== undefined) fs.writeFileSync(configFile, config)
+  const dbFile = path.join(dataDir, 'prompt-customizer.db')
+  if (config !== undefined) setDoc(openDb(dbFile), 'config', parse(config))
 
   const webServer = { register: (r) => { routes[r.path] = r.handler; return () => {} } }
   const ctx = {
@@ -49,7 +51,7 @@ async function harness({ roster, config } = {}) {
   }
   const mod = await import(pathToFileURL(path.join(ROOT, 'lib/index.js')).href)
   await mod.apply(ctx, { dataDir })
-  return { routes, home, dataDir, configFile }
+  return { routes, home, dataDir, db: openDb(dbFile) }
 }
 
 function get(handler, url) {
@@ -109,12 +111,12 @@ test('不给 scope 时回落到 roster 默认预设', async () => {
   assert.deepEqual(res.body.customization, {})
 })
 
-test('导出是只读的：profile patch 与 config.yaml 一个字都不改', async () => {
-  const { routes, configFile } = await harness({ roster: ROSTER, config: CFG })
-  const before = fs.readFileSync(configFile, 'utf8')
+test('导出是只读的：profile patch 与配置 doc 一个字都不改', async () => {
+  const { routes, db } = await harness({ roster: ROSTER, config: CFG })
+  const before = JSON.stringify(getDoc(db, 'config'))
   await get(routes[EXPORT], `${EXPORT}?scope=standard`)
   await get(routes[EXPORT], `${EXPORT}?scope=minimal`)
-  assert.equal(fs.readFileSync(configFile, 'utf8'), before, 'config.yaml 必须原封不动')
+  assert.equal(JSON.stringify(getDoc(db, 'config')), before, '配置 doc 必须原封不动')
 })
 
 test('组成读不到 / 没有 agentPresets 服务时导出仍成功（定制才是主体）', async () => {

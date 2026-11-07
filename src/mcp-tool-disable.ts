@@ -55,6 +55,7 @@
  * 内存索引是装配过滤的唯一数据源（同步读、零 IO），随写入刷新。
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -264,10 +265,9 @@ let ledgerCache: ToolDisableLedger | undefined
 
 /** 读账本（缓存；`reload` 强制回读磁盘）。 */
 export function readToolLedger(reload = false): ToolDisableLedger {
-  if (ledgerCache !== undefined && !reload) return ledgerCache
   let parsed: unknown
   try {
-    parsed = JSON.parse(readFileSync(toolDisableLedgerPath(), 'utf8')) as unknown
+    parsed = readPluginDoc('mcp/tool-disable')
   } catch {
     parsed = undefined
   }
@@ -278,11 +278,7 @@ export function readToolLedger(reload = false): ToolDisableLedger {
 
 /** 原子写账本 + 刷新内存索引。 */
 export function writeToolLedger(next: ToolDisableLedger): void {
-  const target = toolDisableLedgerPath()
-  mkdirSync(dirname(target), { recursive: true })
-  const temp = `${target}.tmp`
-  writeFileSync(temp, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-  renameSync(temp, target)
+  writePluginDoc('mcp/tool-disable', next)
   ledgerCache = next
   reindex(next)
 }

@@ -39,7 +39,7 @@ All changes go through documented plugin extension points. No DSH source is modi
 
 ## Features
 
-- **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives.
+- **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives; a new read-only "Current session" view shows the real prompt and tool catalog from the active session's own agent scope, including plugin-registered and plugin-masked entries.
 - **Phase and preset layering**: bootstrap, resident and compaction-controlled phases each have their own section lists, ordering space and tool catalog; the top preset selector scopes edits to one agent preset.
 - **Tool catalog**: hide or add back tools per phase, with a "model-visible / registry total" comparison that also handles PTC / Code Mode `run_code` wrapping.
 - **Skill management**: skill bundles, ZIP / folder import, global and preset toggles, skill-root and membership health checks.

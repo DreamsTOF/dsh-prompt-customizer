@@ -10,6 +10,7 @@
  * 落盘：`${DSH_HOME}/mcp/dsh-prompt-customizer/preset-masks.json`（原子写）。
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -136,10 +137,9 @@ let ledgerCache: MaskLedger | undefined
 
 /** 读账本（缓存；`reload` 强制回读磁盘）。 */
 export function readMaskLedger(reload = false): MaskLedger {
-  if (ledgerCache !== undefined && !reload) return ledgerCache
   let parsed: unknown
   try {
-    parsed = JSON.parse(readFileSync(maskLedgerPath(), 'utf8')) as unknown
+    parsed = readPluginDoc('mcp/preset-masks')
   } catch {
     parsed = undefined
   }
@@ -149,10 +149,6 @@ export function readMaskLedger(reload = false): MaskLedger {
 
 /** 原子写账本 + 刷新内存副本。 */
 export function writeMaskLedger(next: MaskLedger): void {
-  const target = maskLedgerPath()
-  mkdirSync(dirname(target), { recursive: true })
-  const temp = `${target}.tmp`
-  writeFileSync(temp, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-  renameSync(temp, target)
+  writePluginDoc('mcp/preset-masks', next)
   ledgerCache = next
 }

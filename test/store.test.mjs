@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse, stringify as yamlStringify } from 'yaml'
 import { createConfigStore, readLegacySection } from '../vendor/prompt-customizer/store.js'
+import { openDb, getDoc, setDoc } from '../vendor/prompt-customizer/db.js'
 import { Config } from '../vendor/prompt-customizer/schema.js'
 import { apply } from '../vendor/prompt-customizer/index.js'
 
@@ -12,85 +13,46 @@ function tmpdir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
 }
 
-// ── store 基础行为 ──────────────────────────────────────────────────────────
+function dbStore(dir, warn) {
+  const db = openDb(path.join(dir, 'prompt-customizer.db'))
+  return { db, store: createConfigStore({ db, key: 'config', schema: Config, warn }) }
+}
 
-test('write then read round-trips through config.yaml with schema defaults', () => {
+// ── store 基础行为（SQLite doc 表）─────────────────────────────────────────
+
+test('DB store：写入读回 + schema 补默认值', () => {
   const dir = tmpdir('pc-store-')
-  const file = path.join(dir, 'config.yaml')
-  const store = createConfigStore({ file, schema: Config })
-
+  const { db, store } = dbStore(dir)
   store.setField('sections', ['a', 'b'])
   assert.deepEqual(store.readResolved().sections, ['a', 'b'])
-  // 缺省字段补默认值
   assert.deepEqual(store.readResolved().tools, { exclude: [], add: [], bootstrap: { exclude: [], add: [] }, compaction: { exclude: [], add: [] } })
-  // 磁盘文件确实是合法 yaml 且只含写入的字段
-  const onDisk = parse(fs.readFileSync(file, 'utf8'))
-  assert.deepEqual(onDisk, { sections: ['a', 'b'] })
+  // 存放在同一 DB 的 doc('config') 里；不再有 config.yaml。
+  assert.deepEqual(getDoc(db, 'config'), { sections: ['a', 'b'] })
+  assert.equal(fs.existsSync(path.join(dir, 'config.yaml')), false)
 })
 
-test('lazy reload picks up external edits by mtime', async () => {
+test('DB store：删除字段（undefined）从文档里移除', () => {
   const dir = tmpdir('pc-store-')
-  const file = path.join(dir, 'config.yaml')
-  const store = createConfigStore({ file, schema: Config })
-
-  store.setField('sections', ['first'])
-  assert.deepEqual(store.readResolved().sections, ['first'])
-  // 外部手工编辑
-  fs.writeFileSync(file, yamlStringify({ sections: ['second'] }))
-  assert.deepEqual(store.readResolved().sections, ['second'])
-})
-
-test('unset removes a field entirely from the file', () => {
-  const dir = tmpdir('pc-store-')
-  const file = path.join(dir, 'config.yaml')
-  const store = createConfigStore({ file, schema: Config })
-
+  const { db, store } = dbStore(dir)
   store.setField('sections', ['a'])
   store.setField('replace', { a: 'x' })
   store.setField('replace', undefined)
-  // 磁盘文件里字段已删除；readResolved 经 schema 后回落默认值 {}
-  assert.deepEqual(parse(fs.readFileSync(file, 'utf8')).replace, undefined)
+  assert.equal(getDoc(db, 'config').replace, undefined)
   assert.deepEqual(store.readResolved().replace, {})
-  assert.deepEqual(parse(fs.readFileSync(file, 'utf8')).sections, ['a'])
+  assert.deepEqual(getDoc(db, 'config').sections, ['a'])
 })
 
-test('坏的磁盘内容（语法坏 / schema 坏）回落到 last-good，修好后恢复', () => {
-  const cases = [
-    {
-      label: 'a corrupt file falls back to last-good resolution',
-      broken: '{ not: [valid',
-      fixed: yamlStringify({ sections: ['fixed'] }),
-    },
-    {
-      label: 'a schema-invalid section falls back to last-good too',
-      // replace 值非字符串是 schemastery 明确拒绝的形状（见 schema.test.mjs）
-      broken: yamlStringify({ replace: { a: 42 } }),
-      fixed: undefined,
-    },
-  ]
-  for (const c of cases) {
-    try {
-      const dir = tmpdir('pc-store-')
-      const file = path.join(dir, 'config.yaml')
-      const store = createConfigStore({ file, schema: Config, warn: () => {} })
-
-      store.setField('sections', ['good'])
-      assert.deepEqual(store.readResolved().sections, ['good'], '写入后读到 good')
-      fs.writeFileSync(file, c.broken)
-      assert.deepEqual(store.readResolved().sections, ['good'], 'last-good')
-      // 修好后恢复（schema 坏的那份测试不覆盖修复路径，保持原样）
-      if (c.fixed !== undefined) {
-        fs.writeFileSync(file, c.fixed)
-        assert.deepEqual(store.readResolved().sections, ['fixed'], '修好后恢复')
-      }
-    } catch (e) {
-      e.message = `[${c.label}] ${e.message}`
-      throw e
-    }
-  }
+test('DB store：坏文档（schema 非法）回落到 last-good', () => {
+  const dir = tmpdir('pc-store-')
+  const { db, store } = dbStore(dir, () => {})
+  store.setField('sections', ['good'])
+  assert.deepEqual(store.readResolved().sections, ['good'])
+  // replace 值非字符串是 schemastery 明确拒绝的形状 → 回落 last-good。
+  setDoc(db, 'config', { replace: { a: 42 } })
+  assert.deepEqual(store.readResolved().sections, ['good'], 'last-good')
 })
 
-// ── 旧版迁移 ────────────────────────────────────────────────────────────────
+// ── readLegacySection：仅排查用（破坏式后不再迁移）─────────────────────────
 
 test('readLegacySection extracts a non-empty object section', () => {
   const dir = tmpdir('pc-migrate-')
@@ -113,46 +75,22 @@ test('readLegacySection tolerates missing/empty/malformed masters', () => {
   assert.equal(readLegacySection(master, 'prompt-customizer'), undefined)
 })
 
-test('apply migrates the legacy section once, then the new file wins', () => {
+// ── 破坏式更新：旧 settings.yaml / config.yaml 一律不读、不迁移 ─────────────
+
+test('破坏式更新：apply 不读取旧 settings.yaml，也不生成 config.yaml', () => {
   const dir = tmpdir('pc-migrate-')
   const master = path.join(dir, 'settings.yaml')
   fs.writeFileSync(master, yamlStringify({ 'prompt-customizer': { sections: ['from-legacy'] } }))
-
-  const handlers = []
-  const ctx = {
-    on: (name, h) => { if (name === 'system-prompt/assemble') handlers.push(h) },
-    inject: () => {},
-    get: (key) => key === 'settings' ? { documentPath: master } : undefined,
-    effect: () => {},
-  }
-  const dataDir = path.join(dir, 'data')
-  apply(ctx, { dataDir })
-
-  // 新文件已生成，内容 = 旧段
-  const configFile = path.join(dataDir, 'config.yaml')
-  assert.deepEqual(parse(fs.readFileSync(configFile, 'utf8')), { sections: ['from-legacy'] })
-
-  // 之后外部改旧文档不再影响新文件（一次性迁移，非双读）
-  fs.writeFileSync(master, yamlStringify({ 'prompt-customizer': { sections: ['changed'] } }))
-  const store = createConfigStore({ file: configFile, schema: Config })
-  assert.deepEqual(store.readResolved().sections, ['from-legacy'])
-})
-
-test('apply does not overwrite an existing config file with the legacy section', () => {
-  const dir = tmpdir('pc-migrate-')
-  const master = path.join(dir, 'settings.yaml')
-  fs.writeFileSync(master, yamlStringify({ 'prompt-customizer': { sections: ['legacy'] } }))
-  const dataDir = path.join(dir, 'data')
-  fs.mkdirSync(dataDir, { recursive: true })
-  fs.writeFileSync(path.join(dataDir, 'config.yaml'), yamlStringify({ sections: ['mine'] }))
-
   const ctx = {
     on: () => {},
     inject: () => {},
-    get: (key) => key === 'settings' ? { documentPath: master } : undefined,
+    get: (key) => (key === 'settings' ? { documentPath: master } : undefined),
     effect: () => {},
   }
+  const dataDir = path.join(dir, 'data')
   apply(ctx, { dataDir })
-  const store = createConfigStore({ file: path.join(dataDir, 'config.yaml'), schema: Config })
-  assert.deepEqual(store.readResolved().sections, ['mine'])
+  // 建的是 DB，不是 config.yaml；旧段没有被迁移。
+  assert.equal(fs.existsSync(path.join(dataDir, 'config.yaml')), false)
+  const { store } = dbStore(dataDir)
+  assert.deepEqual(store.readResolved().sections, [])
 })

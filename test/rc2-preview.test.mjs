@@ -70,11 +70,30 @@ test('preset preview is independent of an existing conversation of the same mode
   const h = harness(t, { live: true })
   const { body } = await h.request('preview?scope=standard&phase=active')
   assert.equal(body.tools.length, 65)
-  assert.equal(body.registryTotal, 65)
+  // 右栏仍是纯预设装配；registryTotal 是「预设注册表 ∪ 当前会话 agent 视图」
+  // 的完整目录数（65 + 20 个只在 agent 作用域出现的工具）。
+  assert.equal(body.registryTotal, 85)
   assert.equal(body.source, 'preset')
   assert.equal(body.sessionId, undefined)
   assert.ok(!body.sections.some(section => section.name === 'live-only'))
-  assert.equal(h.evaluations(), 0)
+  assert.ok(body.baseTools.some(tool => tool.name === 'tool_65' && tool.scope === 'agent'))
+  assert.equal(body.sessionOverlay.id, 'live-standard')
+  // 左栏要显示会话级段，live agent 的 base 装配会求值一次动态段（右栏仍是纯预设）。
+  assert.equal(h.evaluations(), 1)
+  assert.equal(h.released(), 1)
+})
+
+test('当前会话只读视图使用 live agent 的真实作用域', async t => {
+  const h = harness(t, { live: true })
+  const res = await h.request('session')
+  assert.equal(res.status, 200)
+  assert.equal(res.body.source, 'session')
+  assert.equal(res.body.session.id, 'live-standard')
+  assert.equal(res.body.session.presetId, 'standard')
+  assert.equal(res.body.tools.length, 85)
+  assert.ok(res.body.sections.some(section => section.name === 'live-only'))
+  assert.ok(res.body.baseTools.some(tool => tool.name === 'tool_65' && tool.scope === 'agent'))
+  assert.equal(res.body.registryTotal, 85)
   assert.equal(h.released(), 1)
 })
 

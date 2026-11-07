@@ -2,8 +2,20 @@
 
 /** 宿主路由返回的清单载荷：当前生效的提示词段与工具目录。 */
 export interface Inventory {
-  sections: Array<{ name: string; order: number; text?: string; active: boolean; replaced: boolean }>
-  tools: Array<{ name: string; description?: string; hidden: boolean }>
+  sections: Array<{ name: string; order: number; text?: string; active: boolean; replaced: boolean; scope?: 'agent' }>
+  tools: Array<{
+    name: string
+    description?: string
+    hidden: boolean
+    /** 展示状态：可开关 / agent 提供(可开关但锁定徽标) / 执行器锁定 / 被别的插件遮蔽 / 被本插件遮蔽。 */
+    state?: 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own'
+    /** `agent` = 只在 agent 作用域注册；`executor` = 执行器包装（如 PTC run_code）。 */
+    scope?: 'agent' | 'executor'
+    /** true = 被别的插件在 agent 作用域 restrict 掉（本插件无法反向解除）。 */
+    maskedByPlugin?: boolean
+    /** true = 被本插件自己的 MCP 遮蔽账本隐藏（MCP Tab 可恢复）。 */
+    maskedByOwnPlugin?: boolean
+  }>
   /** false = 预设 scope 未能挂载，清单回退到了全局层。 */
   scopeResolved?: boolean
   /** 当前已注册的提示词变量名（内置 + 黑名单过滤后的 env），供引用参考。 */
@@ -55,7 +67,11 @@ export interface OverrideData {
 export interface Preview {
   ok: boolean
   error?: string
-  source?: 'preset'
+  source?: 'preset' | 'session'
+  /** 当前会话视图的会话元数据；预设预览为空。 */
+  session?: { id: string; presetId?: string; phase?: string; createdAt?: number } | null
+  /** 非空 = 预设预览的左栏已并入该活动会话的 agent 作用域条目（右栏仍是纯预设装配）。 */
+  sessionOverlay?: { id: string; presetId?: string }
   diagnostics?: Array<{ name: string; variable: string; kind: 'session-variable' }>
   contexts?: Array<{ name: string; text: string }>
   scope?: unknown
@@ -84,7 +100,15 @@ export interface Preview {
    *  有 —— 预览已把它并进来，UI 据此标「会话级」。 */
   baseSections?: Array<{ name: string; text: string; blocked: boolean; replaced: boolean; scope?: 'agent' }>
   /** 预过滤工具视图：进入本插件过滤前的工具原文 + 该阶段隐藏标记。 */
-  baseTools?: Array<{ name: string; description: string; hidden: boolean }>
+  baseTools?: Array<{
+    name: string
+    description: string
+    hidden: boolean
+    state?: 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own'
+    scope?: 'agent' | 'executor'
+    maskedByPlugin?: boolean
+    maskedByOwnPlugin?: boolean
+  }>
 }
 
 /** 解析后的命名空间配置对象（即作用域中的 value）。 */

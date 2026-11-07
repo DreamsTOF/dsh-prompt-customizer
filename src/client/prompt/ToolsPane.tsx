@@ -88,6 +88,29 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     return new Set(list)
   })()
 
+  type ToolState = 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own'
+  type ToolInfo = { scope?: 'agent' | 'executor'; maskedByPlugin?: boolean; maskedByOwnPlugin?: boolean; state?: ToolState }
+  const stateOf = (tool: ToolInfo): ToolState => tool.state
+    ?? (tool.scope === 'agent' ? 'locked-agent'
+      : tool.scope === 'executor' ? 'locked-executor'
+        : tool.maskedByOwnPlugin === true ? 'masked-own'
+          : tool.maskedByPlugin === true ? 'masked-plugin'
+            : 'controllable')
+  /** 可在阶段里勾选开关：普通预设工具 + agent 作用域工具（后者靠装配后过滤 tools 实现隐藏）。 */
+  const isToggleable = (tool: ToolInfo): boolean => stateOf(tool) === 'controllable' || stateOf(tool) === 'locked-agent'
+  /** 执行器包装（如 PTC run_code）：模型可见但本插件不按阶段删，锁定。 */
+  const isLockedExec = (tool: ToolInfo): boolean => stateOf(tool) === 'locked-executor'
+  /** 只在只读「已遮蔽」池：被别的插件 / 本插件遮蔽，无法反开。 */
+  const isMaskedRow = (tool: ToolInfo): boolean => stateOf(tool) === 'masked-plugin' || stateOf(tool) === 'masked-own'
+  /** 徽标与说明（按状态）。 */
+  const reasonOf = (tool: ToolInfo): { label: string; hint: string } => {
+    const st = stateOf(tool)
+    if (st === 'locked-agent') return { label: t('toolAgentScoped'), hint: t('toolAgentScopedHint') }
+    if (st === 'locked-executor') return { label: t('toolExecutorScoped'), hint: t('toolExecutorScopedHint') }
+    if (st === 'masked-own') return { label: t('toolMaskedByOwnPlugin'), hint: t('toolMaskedByOwnPluginHint') }
+    return { label: t('toolMaskedByPlugin'), hint: t('toolMaskedByPluginHint') }
+  }
+
   // 把一个工具放进某阶段（复制语义，绝不改动其它阶段）：不在该阶段目录里就
   // 加进 add 名单；hidden 决定它在目标阶段是可见还是隐藏。
   const addToPhase = (key: PhaseViewKey, name: string, hidden: boolean): void => {
@@ -101,18 +124,24 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   }
 
   // 阶段分组里的行 = 该阶段进入过滤的目录 ∪ 已加回（但尚未出现在装配里）的工具。
-  const rowsOf = (key: PhaseViewKey): Array<{ name: string; description: string; hidden: boolean; added: boolean }> => {
-    const exclude = excludeOf(key)
-    const catalog = (phases?.[key]?.baseTools ?? []).map((tool) => ({
-      name: tool.name,
-      description: tool.description ?? '',
-      hidden: exclude.includes(tool.name),
-      added: false,
-    }))
+  // 只保留「可按阶段开关」的预设工具；不可控的（agent 作用域 / 执行器 / 被遮蔽）
+  // 一律进只读「完整目录」，不进启用列表。
+  const rowsOf = (key: PhaseViewKey): Array<{ name: string; description: string; hidden: boolean; added: boolean; state?: ToolState; scope?: 'agent' | 'executor' }> => {
+    // 启用列表 = 模型实际可见的工具（可开关 + agent 提供 + 执行器锁定）；被遮蔽项不进这里。
+    const catalog = (phases?.[key]?.baseTools ?? [])
+      .filter((tool) => isToggleable(tool) || isLockedExec(tool))
+      .map((tool) => ({
+        name: tool.name,
+        description: tool.description ?? '',
+        hidden: isLockedExec(tool) ? false : tool.hidden === true,
+        added: false,
+        state: stateOf(tool),
+        ...(tool.scope === 'agent' || tool.scope === 'executor' ? { scope: tool.scope } : {}),
+      }))
     const names = new Set(catalog.map((row) => row.name))
     const added = addOf(key)
       .filter((name) => !names.has(name))
-      .map((name) => ({ name, description: '', hidden: false, added: true }))
+      .map((name) => ({ name, description: '', hidden: false, added: true, state: 'controllable' as ToolState }))
     return [...catalog, ...added]
   }
 
@@ -218,8 +247,9 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   const rowVisible = (row: { hidden: boolean }): boolean =>
     filter === 'all' || (filter === 'on' ? !row.hidden : row.hidden)
 
-  const renderRow = (row: { name: string; description: string; hidden: boolean; added: boolean }): ReactElement | null => {
+  const renderRow = (row: { name: string; description: string; hidden: boolean; added: boolean; state?: ToolState; scope?: 'agent' | 'executor' }): ReactElement | null => {
     if (!rowVisible(row)) return null
+    const locked = isLockedExec(row)
     return h('div', {
       key: row.name,
       style: {
@@ -239,8 +269,8 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框的手势一起吃掉。
       h('span', {
-        draggable: true,
-        title: t('drag'),
+        draggable: !locked,
+        title: locked ? t('toolExecutorScopedHint') : t('drag'),
         style: s.dragHandle,
         onDragStart: (event: ReactDragEvent) => {
           setDragName(row.name)
@@ -250,26 +280,50 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
       }, '⠿'),
       h('input', {
         type: 'checkbox',
-        checked: !row.hidden,
+        checked: locked ? true : !row.hidden,
+        disabled: locked,
         onChange: () => toggleHide(phase, row.name, row.hidden),
-        title: row.hidden ? t('hiddenOn') : t('hiddenOff'),
-        style: { margin: 0, cursor: 'pointer', flex: 'none' },
+        title: locked ? t('toolExecutorScopedHint') : row.hidden ? t('hiddenOn') : t('hiddenOff'),
+        style: { margin: 0, cursor: locked ? 'not-allowed' : 'pointer', flex: 'none' },
       }),
       h('div', { style: s.rowBody }, [
         h('div', { style: s.rowTitle }, [
           h('span', { style: s.code }, row.name),
           row.added ? h('span', { style: s.badgeCustom }, t('toolAddedTag')) : null,
-          row.hidden ? h('span', { style: s.badgeBlocked }, t('hiddenOn')) : null,
+          row.state === 'locked-agent' ? h('span', { style: s.badgeSystem, title: t('toolAgentScopedHint') }, t('toolAgentScoped')) : null,
+          row.state === 'locked-executor' ? h('span', { style: s.badgeSystem, title: t('toolExecutorScopedHint') }, t('toolExecutorScoped')) : null,
+          !locked && row.hidden ? h('span', { style: s.badgeBlocked }, t('hiddenOn')) : null,
         ]),
         row.description !== '' ? h('div', { style: s.preview }, row.description.slice(0, 120)) : null,
       ]),
     ])
   }
 
-  const allTools = (inv?.tools ?? []).map((tool) => ({
-    name: tool.name,
-    description: typeof tool === 'string' ? '' : (tool.description ?? ''),
-  }))
+  // 「本系统全部工具」添加池：只列可开关的预设工具（不可控的进只读「完整目录」）。
+  const allTools = (inv?.tools ?? [])
+    .filter((tool) => isToggleable(tool))
+    .map((tool) => ({ name: tool.name, description: tool.description ?? '' }))
+
+  // 只读「已遮蔽」池：被别的插件遮蔽 / 被本插件 MCP 遮蔽的工具，无法反开。来源 =
+  // 跨预设池 ∪ 当前阶段完整基座，按名字去重。
+  const readOnlyTools = (() => {
+    type RO = { name: string; description: string; state?: ToolState; scope?: 'agent' | 'executor'; maskedByPlugin?: boolean; maskedByOwnPlugin?: boolean }
+    const map = new Map<string, RO>()
+    const consider = (tool: RO): void => {
+      if (typeof tool.name !== 'string' || tool.name === '' || !isMaskedRow(tool) || map.has(tool.name)) return
+      map.set(tool.name, {
+        name: tool.name,
+        description: tool.description ?? '',
+        ...(tool.state === undefined ? {} : { state: tool.state }),
+        ...(tool.scope === 'agent' || tool.scope === 'executor' ? { scope: tool.scope } : {}),
+        ...(tool.maskedByPlugin === true ? { maskedByPlugin: true } : {}),
+        ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
+      })
+    }
+    for (const tool of inv?.tools ?? []) consider(tool)
+    for (const key of PART_ORDER) for (const tool of phases?.[key]?.baseTools ?? []) consider(tool)
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  })()
 
   return h('div', { style: s.colLeft }, [
     h('div', {
@@ -314,9 +368,28 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
         }, [
           h('div', { style: s.rowBody }, [
             h('div', { style: s.rowTitle }, h('span', { style: s.code }, tool.name)),
-            h('div', { style: s.preview }, tool.description.slice(0, 120)),
+            tool.description !== '' ? h('div', { style: s.preview }, tool.description.slice(0, 120)) : null,
           ]),
         ])),
+      ]),
+      // 只读「完整目录」：不可控工具（agent 作用域 / 执行器 / 被别的插件遮蔽 / 被本
+      // 插件遮蔽）集中展示，解释「为什么有的工具在面板里、有的不在」，不可操作。
+      readOnlyTools.length === 0 ? null : h('details', { style: s.injectBox }, [
+        h('summary', { style: { ...s.muted, cursor: 'pointer' } }, `${t('completeCatalogTitle')} (${readOnlyTools.length})`),
+        h('div', { style: s.muted }, t('completeCatalogHint')),
+        readOnlyTools.map((tool) => {
+          const reason = reasonOf(tool)
+          const badge = tool.maskedByOwnPlugin === true || tool.maskedByPlugin === true ? s.badgeReplaced : s.badgeSystem
+          return h('div', { key: tool.name, style: { ...s.row, opacity: 0.8 } }, [
+            h('div', { style: s.rowBody }, [
+              h('div', { style: s.rowTitle }, [
+                h('span', { style: s.code }, tool.name),
+                h('span', { style: badge, title: reason.hint }, reason.label),
+              ]),
+              tool.description !== '' ? h('div', { style: s.preview }, tool.description.slice(0, 120)) : null,
+            ]),
+          ])
+        }),
       ]),
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。

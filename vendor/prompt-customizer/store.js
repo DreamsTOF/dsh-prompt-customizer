@@ -15,14 +15,10 @@
  */
 
 import fs from 'node:fs'
-import path from 'node:path'
-import { parse, stringify } from 'yaml'
+import { parse } from 'yaml'
+import { getDoc, setDoc } from './db.js'
 
-/** 新 yml 文件的头部注释（让手工编辑者知道这是什么）。 */
-const HEADER = '# dsh-prompt-customizer 配置（唯一权威）。\n' +
-  '# 手工编辑即时生效（下次读取时）；删除本文件后重启会从旧版 settings.yaml 迁移。\n'
-
-/** 读主文档（旧版 settings.yaml）里本插件的旧段；主文档缺失或段不存在返回 undefined。 */
+/** 读主文档（旧版 settings.yaml）里本插件的旧段；破坏式更新后仅作排查用。 */
 export function readLegacySection(masterPath, ns) {
   if (!masterPath) return undefined
   let doc
@@ -37,12 +33,14 @@ export function readLegacySection(masterPath, ns) {
     : undefined
 }
 
-/** 创建一个配置存储实例。schema 用于在读取时补默认值并校验；header 可覆盖
- *  文件头注释（派生缓存类文件需要说明自己不是配置）。 */
-export function createConfigStore({ file, schema, warn, header = HEADER } = {}) {
-  if (!file) throw new TypeError('createConfigStore: file is required')
-  /** { stamp, raw, resolved, error } — stamp 为 undefined 表示文件不存在。 */
-  let cache
+/**
+ * DB 驱动的配置存储。API 与旧版文件存储一致（raw / readResolved / writeSection /
+ * setField），但底层是 SQLite 的 `doc` 表（key 默认 `config`），不再写 config.yaml。
+ * schema 用于补默认值并校验；坏数据回落最近一次合法值（进程内 last-good）。
+ */
+export function createConfigStore({ db, key = 'config', schema, warn } = {}) {
+  if (!db) throw new TypeError('createConfigStore: db is required')
+  let lastGood
   let warned = false
   const warnOnce = (message) => {
     if (warned) return
@@ -50,69 +48,32 @@ export function createConfigStore({ file, schema, warn, header = HEADER } = {}) 
     try { warn?.(message) } catch { /* logger 缺席只是不再告警 */ }
   }
 
-  /** 用 schema 解析（补默认值 + 校验）；失败返回 { value: null, error }。 */
   const resolve = (raw) => {
     if (schema === undefined) return { value: raw ?? {}, error: undefined }
     try { return { value: schema(raw ?? {}), error: undefined } } catch (error) { return { value: null, error } }
   }
 
-  /** stat 驱动的懒加载；返回完整缓存条目。 */
   const load = () => {
-    let stamp
-    try { stamp = fs.statSync(file).mtimeMs } catch { stamp = undefined }
-    if (cache && cache.stamp === stamp) return cache
-    if (stamp === undefined) {
-      cache = { stamp, raw: undefined, ...resolve(undefined) }
-      return cache
-    }
-    let raw
-    let error
-    try {
-      raw = parse(fs.readFileSync(file, 'utf8'))
-      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-        raw = undefined
-        error = new Error('config.yaml 的顶层必须是映射')
-      }
-    } catch (e) {
-      raw = undefined
-      error = e
-    }
-    const r = raw === undefined ? { value: null, error } : resolve(raw)
-    // raw 保留磁盘上的真实解析结果（即使 schema 失败）——写合并不应静默丢字段。
-    cache = { stamp, raw, ...r }
-    // 任何一次成功解析（含写入后的校验）都刷新 last-good。
+    const raw = getDoc(db, key)
+    const r = resolve(raw)
     if (r.value !== null) lastGood = r.value
-    return cache
+    return { raw, ...r }
   }
 
-  /** 上一次 schema 校验通过的解析结果（坏文件时的 last-good 回落）。 */
-  let lastGood
-
   return {
-    /** 当前存储的原始用户段（未补默认值）；无文件时 undefined。 */
     raw() {
       return load().raw
     },
-
-    /** 解析后的生效配置（默认值已补；坏文件回落 last-good，再回落纯默认值）。 */
     readResolved() {
       const entry = load()
       if (entry.value !== null) return entry.value
-      warnOnce(`prompt-customizer: 配置文件不可用，回落到最近一次合法配置：${String(entry.error && entry.error.message ? entry.error.message : entry.error)}`)
+      warnOnce(`prompt-customizer: 配置损坏，回落到最近一次合法配置：${String(entry.error && entry.error.message ? entry.error.message : entry.error)}`)
       return lastGood ?? resolve(undefined).value
     },
-
-    /** 原子写入一个完整用户段；写入后立刻刷新缓存。 */
     writeSection(section) {
-      fs.mkdirSync(path.dirname(file), { recursive: true })
-      const tmp = `${file}.${process.pid}.tmp`
-      fs.writeFileSync(tmp, header + stringify(section ?? {}))
-      fs.renameSync(tmp, file)
-      cache = undefined
+      setDoc(db, key, section ?? {})
       return load()
     },
-
-    /** 写单个字段（值 undefined 表示删除）；基于当前权威段合并。 */
     setField(field, value) {
       const base = this.raw()
       const section = { ...(base ?? {}) }

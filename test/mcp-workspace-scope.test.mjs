@@ -12,13 +12,16 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readPluginDoc, closeAllDbs } from '../vendor/prompt-customizer/db.js'
 
 /** 在沙箱里跑，不碰用户真实的 ~/.agents。 */
 function sandbox() {
   const root = mkdtempSync(join(tmpdir(), 'pc-ws-scope-'))
   const agentsHome = join(root, 'agents')
+  const dshHome = join(root, 'dsh')
   mkdirSync(agentsHome, { recursive: true })
-  return { root, agentsHome }
+  mkdirSync(dshHome, { recursive: true })
+  return { root, agentsHome, dshHome }
 }
 
 /** 临时替换 env，结束后还原。 */
@@ -85,7 +88,7 @@ test('工作区级关闭：只影响该工作区，换工作区照常注入', as
     mkdirSync(workspaceA, { recursive: true })
     mkdirSync(workspaceB, { recursive: true })
 
-    await withEnv({ DSH_AGENTS_HOME: box.agentsHome }, async () => {
+    await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
       const scope = await import('../src/mcp-workspace-scope.ts')
       const ctx = fakeCtx()
       scope.applyMcpWorkspaceScope(ctx)
@@ -104,7 +107,7 @@ test('工作区级关闭：只影响该工作区，换工作区照常注入', as
       assert.deepEqual(inB, tools, 'B 工作区照常注入 anysearch，工具集合随工作区变化')
 
       // 账本落盘形状。
-      const ledger = JSON.parse(readFileSync(join(box.agentsHome, 'skills', '.workspace-mcp.json'), 'utf8'))
+      const ledger = readPluginDoc('mcp/workspace-close')
       assert.equal(ledger.version, 1)
       assert.equal(ledger.workspaces[workspaceA].anysearch, false)
       assert.equal(ledger.workspaces[workspaceB], undefined, '未操作的工作区不落账')
@@ -114,10 +117,11 @@ test('工作区级关闭：只影响该工作区，换工作区照常注入', as
       const backInA = await assemble(ctx, workspaceA, tools)
       assert.deepEqual(backInA, tools, '重新启用后 A 工作区恢复注入')
 
-      const after = JSON.parse(readFileSync(join(box.agentsHome, 'skills', '.workspace-mcp.json'), 'utf8'))
+      const after = readPluginDoc('mcp/workspace-close')
       assert.deepEqual(after.workspaces, {}, '账本清空（不留空对象）')
     })
   } finally {
+    closeAllDbs()
     rmSync(box.root, { recursive: true, force: true })
   }
 })
@@ -127,7 +131,7 @@ test('工作区级关闭：通过路由写入并按 cwd 回报状态', async () 
   try {
     const workspace = join(box.root, 'proj')
     mkdirSync(workspace, { recursive: true })
-    await withEnv({ DSH_AGENTS_HOME: box.agentsHome }, async () => {
+    await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
       const scope = await import('../src/mcp-workspace-scope.ts')
       const ctx = fakeCtx()
       scope.applyMcpWorkspaceScope(ctx)
@@ -174,10 +178,11 @@ test('工作区级关闭：通过路由写入并按 cwd 回报状态', async () 
       assert.equal(again.status, 200, '第三次写入同样成功')
       const finalStatus = await call('GET', `/api/triad/mcp-workspace-scope/status?cwd=${encodeURIComponent(workspace)}`)
       assert.deepEqual(finalStatus.body.closed, ['anysearch'], '多次覆盖后账本仍正确')
-      const onDisk = JSON.parse(readFileSync(join(box.agentsHome, 'skills', '.workspace-mcp.json'), 'utf8'))
+      const onDisk = readPluginDoc('mcp/workspace-close')
       assert.equal(onDisk.workspaces[workspace].anysearch, false, '落盘内容与内存一致')
     })
   } finally {
+    closeAllDbs()
     rmSync(box.root, { recursive: true, force: true })
   }
 })

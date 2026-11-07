@@ -31,11 +31,11 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/client/skills/entry.tsx
-var import_react18 = require("react");
+var import_react19 = require("react");
 var import_client = require("react-dom/client");
 
 // src/client/skills/SkillsPanel.tsx
-var import_react15 = require("react");
+var import_react16 = require("react");
 var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/popover-shell.tsx
@@ -325,7 +325,7 @@ function PshBody({ children, className }) {
 }
 
 // src/client/prompt/Panel.tsx
-var import_react9 = require("react");
+var import_react10 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/styles.ts
@@ -2687,6 +2687,17 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     const list = PART_ORDER.map((key) => phases?.[key]?.registryTools).find((x) => Array.isArray(x) && x.length > 0) ?? [];
     return new Set(list);
   })();
+  const stateOf = (tool) => tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
+  const isToggleable = (tool) => stateOf(tool) === "controllable" || stateOf(tool) === "locked-agent";
+  const isLockedExec = (tool) => stateOf(tool) === "locked-executor";
+  const isMaskedRow = (tool) => stateOf(tool) === "masked-plugin" || stateOf(tool) === "masked-own";
+  const reasonOf = (tool) => {
+    const st = stateOf(tool);
+    if (st === "locked-agent") return { label: t("toolAgentScoped"), hint: t("toolAgentScopedHint") };
+    if (st === "locked-executor") return { label: t("toolExecutorScoped"), hint: t("toolExecutorScopedHint") };
+    if (st === "masked-own") return { label: t("toolMaskedByOwnPlugin"), hint: t("toolMaskedByOwnPluginHint") };
+    return { label: t("toolMaskedByPlugin"), hint: t("toolMaskedByPluginHint") };
+  };
   const addToPhase = (key, name, hidden) => {
     let exclude = excludeOf(key);
     let add = addOf(key);
@@ -2695,15 +2706,16 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     writeLists(key, exclude, add);
   };
   const rowsOf = (key) => {
-    const exclude = excludeOf(key);
-    const catalog = (phases?.[key]?.baseTools ?? []).map((tool) => ({
+    const catalog = (phases?.[key]?.baseTools ?? []).filter((tool) => isToggleable(tool) || isLockedExec(tool)).map((tool) => ({
       name: tool.name,
       description: tool.description ?? "",
-      hidden: exclude.includes(tool.name),
-      added: false
+      hidden: isLockedExec(tool) ? false : tool.hidden === true,
+      added: false,
+      state: stateOf(tool),
+      ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {}
     }));
     const names = new Set(catalog.map((row) => row.name));
-    const added = addOf(key).filter((name) => !names.has(name)).map((name) => ({ name, description: "", hidden: false, added: true }));
+    const added = addOf(key).filter((name) => !names.has(name)).map((name) => ({ name, description: "", hidden: false, added: true, state: "controllable" }));
     return [...catalog, ...added];
   };
   const toggleHide = (key, name, currentlyHidden) => {
@@ -2787,6 +2799,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.hidden : row.hidden);
   const renderRow = (row) => {
     if (!rowVisible(row)) return null;
+    const locked = isLockedExec(row);
     return (0, import_react5.createElement)("div", {
       key: row.name,
       style: {
@@ -2806,8 +2819,8 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     }, [
       // 拖拽抓手：整行 draggable 会把勾选框的手势一起吃掉。
       (0, import_react5.createElement)("span", {
-        draggable: true,
-        title: t("drag"),
+        draggable: !locked,
+        title: locked ? t("toolExecutorScopedHint") : t("drag"),
         style: s.dragHandle,
         onDragStart: (event) => {
           setDragName(row.name);
@@ -2821,25 +2834,42 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       }, "\u283F"),
       (0, import_react5.createElement)("input", {
         type: "checkbox",
-        checked: !row.hidden,
+        checked: locked ? true : !row.hidden,
+        disabled: locked,
         onChange: () => toggleHide(phase, row.name, row.hidden),
-        title: row.hidden ? t("hiddenOn") : t("hiddenOff"),
-        style: { margin: 0, cursor: "pointer", flex: "none" }
+        title: locked ? t("toolExecutorScopedHint") : row.hidden ? t("hiddenOn") : t("hiddenOff"),
+        style: { margin: 0, cursor: locked ? "not-allowed" : "pointer", flex: "none" }
       }),
       (0, import_react5.createElement)("div", { style: s.rowBody }, [
         (0, import_react5.createElement)("div", { style: s.rowTitle }, [
           (0, import_react5.createElement)("span", { style: s.code }, row.name),
           row.added ? (0, import_react5.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
-          row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
+          row.state === "locked-agent" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolAgentScopedHint") }, t("toolAgentScoped")) : null,
+          row.state === "locked-executor" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : null,
+          !locked && row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
         ]),
         row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
       ])
     ]);
   };
-  const allTools = (inv?.tools ?? []).map((tool) => ({
-    name: tool.name,
-    description: typeof tool === "string" ? "" : tool.description ?? ""
-  }));
+  const allTools = (inv?.tools ?? []).filter((tool) => isToggleable(tool)).map((tool) => ({ name: tool.name, description: tool.description ?? "" }));
+  const readOnlyTools = (() => {
+    const map = /* @__PURE__ */ new Map();
+    const consider = (tool) => {
+      if (typeof tool.name !== "string" || tool.name === "" || !isMaskedRow(tool) || map.has(tool.name)) return;
+      map.set(tool.name, {
+        name: tool.name,
+        description: tool.description ?? "",
+        ...tool.state === void 0 ? {} : { state: tool.state },
+        ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {},
+        ...tool.maskedByPlugin === true ? { maskedByPlugin: true } : {},
+        ...tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}
+      });
+    };
+    for (const tool of inv?.tools ?? []) consider(tool);
+    for (const key of PART_ORDER) for (const tool of phases?.[key]?.baseTools ?? []) consider(tool);
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  })();
   return (0, import_react5.createElement)("div", { style: s.colLeft }, [
     (0, import_react5.createElement)("div", {
       ref: scrollRef,
@@ -2886,9 +2916,28 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         }, [
           (0, import_react5.createElement)("div", { style: s.rowBody }, [
             (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, tool.name)),
-            (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120))
+            tool.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120)) : null
           ])
         ]))
+      ]),
+      // 只读「完整目录」：不可控工具（agent 作用域 / 执行器 / 被别的插件遮蔽 / 被本
+      // 插件遮蔽）集中展示，解释「为什么有的工具在面板里、有的不在」，不可操作。
+      readOnlyTools.length === 0 ? null : (0, import_react5.createElement)("details", { style: s.injectBox }, [
+        (0, import_react5.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("completeCatalogTitle")} (${readOnlyTools.length})`),
+        (0, import_react5.createElement)("div", { style: s.muted }, t("completeCatalogHint")),
+        readOnlyTools.map((tool) => {
+          const reason = reasonOf(tool);
+          const badge = tool.maskedByOwnPlugin === true || tool.maskedByPlugin === true ? s.badgeReplaced : s.badgeSystem;
+          return (0, import_react5.createElement)("div", { key: tool.name, style: { ...s.row, opacity: 0.8 } }, [
+            (0, import_react5.createElement)("div", { style: s.rowBody }, [
+              (0, import_react5.createElement)("div", { style: s.rowTitle }, [
+                (0, import_react5.createElement)("span", { style: s.code }, tool.name),
+                (0, import_react5.createElement)("span", { style: badge, title: reason.hint }, reason.label)
+              ]),
+              tool.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120)) : null
+            ])
+          ]);
+        })
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。
@@ -3272,6 +3321,7 @@ function PreviewPane({ t, phases, phase, sub }) {
       phases === null ? (0, import_react8.createElement)("div", { style: s.muted }, t("loading")) : null,
       phases !== null && data === null ? (0, import_react8.createElement)("div", { style: s.error }, t("previewFail")) : null,
       data ? (0, import_react8.createElement)("div", { style: s.muted }, t("previewPreset")) : null,
+      data?.sessionOverlay !== void 0 ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("previewSessionOverlay")) : null,
       data?.diagnostics?.length ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("previewUnresolved", {
         names: [...new Set(data.diagnostics.map((item) => `{{${item.variable}}}`))].join(", ")
       })) : null,
@@ -3304,6 +3354,79 @@ function PreviewPane({ t, phases, phase, sub }) {
   ]);
 }
 
+// src/client/prompt/SessionView.tsx
+var import_react9 = require("react");
+function SessionView({ data, loading, error, t, onRefresh }) {
+  const [sub, setSub] = (0, import_react9.useState)("prompt");
+  const session = data?.session ?? null;
+  const phaseLabel = session?.phase === "bootstrap" ? t("phaseStageGuide") : session?.phase === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
+  const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
+  const toolRows = data?.baseTools ?? (data?.tools ?? []).map((tool) => typeof tool === "string" ? { name: tool, description: "", hidden: false } : { name: tool.name, description: tool.description, hidden: false });
+  const visibleNames = new Set((data?.tools ?? []).map((tool) => typeof tool === "string" ? tool : tool.name));
+  return (0, import_react9.createElement)("div", { style: { ...s.colRight, flex: 1 } }, [
+    (0, import_react9.createElement)("div", { style: s.colRightScroll }, [
+      (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+        (0, import_react9.createElement)("span", { style: s.headTitle }, t("tabsSession")),
+        session !== null ? (0, import_react9.createElement)("span", { style: s.orderTag }, `${t("sessionId")}: ${session.id} \xB7 ${t("sessionPreset")}: ${session.presetId ?? "\u2014"} \xB7 ${t("sessionPhase")}: ${phaseLabel}`) : null,
+        (0, import_react9.createElement)("button", { style: { ...s.mini, marginLeft: "auto" }, onClick: onRefresh }, t("refresh"))
+      ]),
+      (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("sessionHint")),
+      error !== null ? (0, import_react9.createElement)("div", { style: s.error }, error) : null,
+      loading && data === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("loading")) : null,
+      !loading && data !== null && session === null ? (0, import_react9.createElement)("div", { style: s.muted }, t("sessionNone")) : null,
+      data !== null && session !== null ? [
+        (0, import_react9.createElement)("div", { style: { ...s.seg, margin: "4px 0 8px" } }, [
+          (0, import_react9.createElement)("button", {
+            style: sub === "prompt" ? s.segBtnActive : s.segBtn,
+            onClick: () => setSub("prompt")
+          }, t("tabsSections")),
+          (0, import_react9.createElement)("button", {
+            style: sub === "tools" ? s.segBtnActive : s.segBtn,
+            onClick: () => setSub("tools")
+          }, t("tabsTools"))
+        ]),
+        lossNote !== null ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, lossNote) : null,
+        data.diagnostics?.length ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("previewUnresolved", {
+          names: [...new Set(data.diagnostics.map((item) => `{{${item.variable}}}`))].join(", ")
+        })) : null,
+        sub === "prompt" ? [
+          (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+            (0, import_react9.createElement)("span", { style: s.muted }, t("sessionPromptTitle")),
+            (0, import_react9.createElement)("span", { style: s.orderTag }, `${data.sections.length} ${t("previewSections")}`)
+          ]),
+          (0, import_react9.createElement)("pre", { style: s.previewText }, data.text || t("empty")),
+          (0, import_react9.createElement)("div", { style: s.rowTitle }, t("runtimeContexts")),
+          ...(data.contexts ?? []).map((context) => (0, import_react9.createElement)("div", { key: context.name }, [
+            (0, import_react9.createElement)("div", { style: s.muted }, context.name),
+            (0, import_react9.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
+          ]))
+        ] : [
+          (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+            (0, import_react9.createElement)("span", { style: s.muted }, t("sessionToolsTitle")),
+            (0, import_react9.createElement)(
+              "span",
+              { style: s.orderTag },
+              `${data.tools.length} ${t("sessionToolsVisible")} / ${data.registryTotal ?? toolRows.length} ${t("sessionToolsTotal")}`
+            )
+          ]),
+          (0, import_react9.createElement)("div", { style: s.list }, toolRows.map((tool) => (0, import_react9.createElement)("div", {
+            key: `${tool.name}:${tool.state ?? tool.scope ?? ""}`,
+            style: s.row
+          }, [
+            (0, import_react9.createElement)("div", { style: s.rowBody }, [
+              (0, import_react9.createElement)("div", { style: s.rowTitle }, [
+                (0, import_react9.createElement)("span", { style: s.code }, tool.name),
+                tool.maskedByOwnPlugin === true ? (0, import_react9.createElement)("span", { style: s.badgeBlocked, title: t("toolMaskedByOwnPluginHint") }, t("toolMaskedByOwnPlugin")) : tool.maskedByPlugin === true ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("toolMaskedByPluginHint") }, t("toolMaskedByPlugin")) : tool.scope === "agent" ? (0, import_react9.createElement)("span", { style: s.badgeSystem, title: t("toolAgentScopedHint") }, t("toolAgentScoped")) : tool.scope === "executor" ? (0, import_react9.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : tool.hidden === true ? (0, import_react9.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : visibleNames.has(tool.name) ? null : (0, import_react9.createElement)("span", { style: s.badgeReplaced }, t("hiddenOn"))
+              ]),
+              tool.description !== "" ? (0, import_react9.createElement)("div", { style: s.preview }, tool.description.slice(0, 140)) : null
+            ])
+          ])))
+        ]
+      ] : null
+    ])
+  ]);
+}
+
 // src/client/prompt/Panel.tsx
 var INVENTORY_URL = "/api/prompt-customizer/inventory";
 var AGENT_PRESETS_URL = "/api/prompt-customizer/agent-presets";
@@ -3315,40 +3438,50 @@ var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
 var EXPORT_URL = "/api/prompt-customizer/export";
 var CATALOG_RESCAN_URL = "/api/prompt-customizer/catalog/rescan";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
+var SESSION_URL = "/api/prompt-customizer/session";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
 function Panel({ t, onClose }) {
-  const [cfg, setCfg] = (0, import_react9.useState)(null);
-  const [inv, setInv] = (0, import_react9.useState)(null);
-  const [phases, setPhases] = (0, import_react9.useState)(null);
-  const [agentPresets, setAgentPresets] = (0, import_react9.useState)([]);
-  const [mode, setMode] = (0, import_react9.useState)("sections");
-  const [error, setError] = (0, import_react9.useState)(null);
-  const [version, setVersion] = (0, import_react9.useState)(0);
-  const [phase, setPhase] = (0, import_react9.useState)("bootstrap");
-  const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
-  const syncSeq = (0, import_react9.useRef)(0);
-  const refreshSeq = (0, import_react9.useRef)(0);
-  const [target, setTarget] = (0, import_react9.useState)(void 0);
-  const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
-  const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
-  const [draft, setDraft] = (0, import_react9.useState)(null);
-  const [saving, setSaving] = (0, import_react9.useState)(false);
-  const [flash, setFlash] = (0, import_react9.useState)(null);
-  const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
-  const [rescanning, setRescanning] = (0, import_react9.useState)(false);
-  const [exporting, setExporting] = (0, import_react9.useState)(false);
-  const flashTimer = (0, import_react9.useRef)(null);
+  const [cfg, setCfg] = (0, import_react10.useState)(null);
+  const [inv, setInv] = (0, import_react10.useState)(null);
+  const [phases, setPhases] = (0, import_react10.useState)(null);
+  const [agentPresets, setAgentPresets] = (0, import_react10.useState)([]);
+  const [currentPreset, setCurrentPreset] = (0, import_react10.useState)(void 0);
+  const [sessionView, setSessionView] = (0, import_react10.useState)(null);
+  const [sessionLoading, setSessionLoading] = (0, import_react10.useState)(false);
+  const [level, setLevel] = (0, import_react10.useState)("preset");
+  const [workspaceOverrides, setWorkspaceOverrides] = (0, import_react10.useState)({});
+  const [currentWorkspace, setCurrentWorkspace] = (0, import_react10.useState)(void 0);
+  const [mode, setMode] = (0, import_react10.useState)("sections");
+  const [error, setError] = (0, import_react10.useState)(null);
+  const [version, setVersion] = (0, import_react10.useState)(0);
+  const [phase, setPhase] = (0, import_react10.useState)("bootstrap");
+  const [dropPhase, setDropPhase] = (0, import_react10.useState)(null);
+  const syncSeq = (0, import_react10.useRef)(0);
+  const refreshSeq = (0, import_react10.useRef)(0);
+  const [target, setTarget] = (0, import_react10.useState)(void 0);
+  const [syncAll, setSyncAll] = (0, import_react10.useState)(false);
+  const [previewSub, setPreviewSub] = (0, import_react10.useState)("prompt");
+  const [draft, setDraft] = (0, import_react10.useState)(null);
+  const [saving, setSaving] = (0, import_react10.useState)(false);
+  const [flash, setFlash] = (0, import_react10.useState)(null);
+  const [flashKind, setFlashKind] = (0, import_react10.useState)("ok");
+  const [rescanning, setRescanning] = (0, import_react10.useState)(false);
+  const [exporting, setExporting] = (0, import_react10.useState)(false);
+  const flashTimer = (0, import_react10.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
       setCfg(body.config);
+      setWorkspaceOverrides(body.workspaceOverrides ?? {});
+      setCurrentWorkspace(typeof body.currentWorkspace === "string" && body.currentWorkspace !== "" ? body.currentWorkspace : void 0);
       setError(null);
     }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   };
-  (0, import_react9.useEffect)(load, []);
+  (0, import_react10.useEffect)(load, []);
   const refresh = () => {
     const seq = ++refreshSeq.current;
+    setSessionLoading(true);
     const qs = target ? `?scope=${encodeURIComponent(target)}` : "";
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
     const failures = [];
@@ -3359,28 +3492,39 @@ function Panel({ t, onClose }) {
       failures.push(`${phase2}: ${String(error2 instanceof Error ? error2.message : error2)}`);
       return null;
     });
+    const grabSession = () => fetch(SESSION_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
+      if (body.ok === false) throw new Error(body.error ?? t("previewFail"));
+      return body;
+    }).catch((error2) => {
+      failures.push(`session: ${String(error2 instanceof Error ? error2.message : error2)}`);
+      return null;
+    });
     return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
       if (body.ok === false) throw new Error(body.error ?? "inventory failed");
       return body;
     }).catch((error2) => {
       failures.push(String(error2 instanceof Error ? error2.message : error2));
       return null;
-    })]).then(([boot, comp, act, inventoryData]) => {
+    }), grabSession()]).then(([boot, comp, act, inventoryData, sessionData]) => {
       if (seq !== refreshSeq.current) return;
       setPhases({ bootstrap: boot, compaction: comp, active: act });
       setInv(inventoryData);
+      setSessionView(sessionData);
+      setSessionLoading(false);
       setError(failures.length ? failures.join("\n") : null);
     }).catch((e) => {
       if (seq !== refreshSeq.current) return;
       setPhases({ bootstrap: null, compaction: null, active: null });
+      setSessionLoading(false);
       setError(String(e instanceof Error ? e.message : e));
     });
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     void refresh();
   }, [target, version]);
   const syncDraftPreview = () => {
     if (draft === null || !draft.dirty) return;
+    if (level !== "preset") return;
     const patch = {};
     const source = draft;
     for (const field of DRAFT_FIELDS) {
@@ -3402,7 +3546,7 @@ function Panel({ t, onClose }) {
       setError(`${t("previewSyncFail")}\uFF1A${e instanceof Error ? e.message : String(e)}`);
     });
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     if (draft === null || !draft.dirty) return void 0;
     const timer = setTimeout(syncDraftPreview, 600);
     return () => {
@@ -3410,18 +3554,26 @@ function Panel({ t, onClose }) {
     };
   }, [draft, phase, target]);
   const fetchPresets = () => {
-    fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => setAgentPresets(Array.isArray(body?.presets) ? body.presets : [])).catch(() => setAgentPresets([]));
+    fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
+      setAgentPresets(Array.isArray(body?.presets) ? body.presets : []);
+      setCurrentPreset(typeof body?.currentPreset === "string" && body.currentPreset !== "" ? body.currentPreset : void 0);
+    }).catch(() => {
+      setAgentPresets([]);
+      setCurrentPreset(void 0);
+    });
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     fetchPresets();
   }, []);
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     setTarget((current2) => {
       if (current2 !== void 0) return current2;
+      const live = currentPreset === void 0 ? void 0 : agentPresets.find((p) => p.id === currentPreset && !p.broken);
+      if (live !== void 0) return live.id;
       const first = agentPresets.find((p) => !p.broken) ?? agentPresets[0];
       return first?.id;
     });
-  }, [agentPresets]);
+  }, [agentPresets, currentPreset]);
   const showFlash = (text, kind = "ok") => {
     if (flashTimer.current !== null) clearTimeout(flashTimer.current);
     setFlash(text);
@@ -3457,9 +3609,12 @@ function Panel({ t, onClose }) {
     setDraft(null);
   };
   if (cfg === null) {
-    return (0, import_react9.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
+    return (0, import_react10.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
   }
-  const base = editView(cfg, target);
+  const wsKey = currentWorkspace;
+  const wsTarget = target ?? "__workspace__";
+  const baseSource = level === "workspace" ? { ...cfg, overrides: { [wsTarget]: (wsKey !== void 0 ? workspaceOverrides[wsKey] : void 0) ?? {} } } : cfg;
+  const base = editView(baseSource, level === "workspace" ? wsTarget : target);
   const view = draft ? {
     ...base,
     sections: draft.sections ?? base.sections,
@@ -3469,6 +3624,7 @@ function Panel({ t, onClose }) {
     inject: draft.inject ?? base.inject,
     tools: draft.tools ?? base.tools
   } : base;
+  const ep = level === "workspace" ? sessionView !== null ? { bootstrap: sessionView, compaction: sessionView, active: sessionView } : null : phases;
   const writeField = (field, value) => {
     const url = value === void 0 ? CONFIG_UNSET_URL : CONFIG_SET_URL;
     fetch(url, {
@@ -3491,6 +3647,10 @@ function Panel({ t, onClose }) {
   };
   const save = () => {
     if (draft === null || saving) return;
+    if (level === "workspace" && wsKey === void 0) {
+      showFlash(t("workspaceRequired"), "err");
+      return;
+    }
     const EDITED_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
     const patch = {};
     for (const field of EDITED_FIELDS) {
@@ -3500,10 +3660,11 @@ function Panel({ t, onClose }) {
     fetch(CONFIG_APPLY_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ target, patch })
+      body: JSON.stringify(level === "workspace" ? { level: "workspace", workspace: wsKey, patch } : { target, patch })
     }).then((r) => r.json()).then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? "save failed");
       setCfg(body.config);
+      if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);
       clearDraft();
       setError(null);
       setVersion((n) => n + 1);
@@ -3531,26 +3692,26 @@ function Panel({ t, onClose }) {
     return typeof zh === "string" && zh !== "" ? zh : fallback;
   };
   const toggleZh = () => {
-    if (phases === null || phases.bootstrap === null || phases.active === null || phases.compaction === null) {
+    if (ep === null || ep.bootstrap === null || ep.active === null || ep.compaction === null) {
       showFlash(t("zhNotReady"), "err");
       return;
     }
-    edit("inject", zhOn ? zhRevertInjectEntries(view, phases, ZH_SECTIONS) : zhMergedInjectEntries(view, phases, ZH_SECTIONS));
+    edit("inject", zhOn ? zhRevertInjectEntries(view, ep, ZH_SECTIONS) : zhMergedInjectEntries(view, ep, ZH_SECTIONS));
     showFlash(zhOn ? t("zhReverted") : t("zhApplied"));
   };
   const nativeIn = (key, name) => {
-    const view2 = phases?.[key];
+    const view2 = ep?.[key];
     if (view2 === void 0 || view2 === null) return null;
     return (view2.baseSections ?? []).some((sec) => sec.name === name);
   };
   const toggleSyncAll = (on) => {
     setSyncAll(on);
     if (!on) return;
-    if (phases === null || VIEW_KEYS.some((key) => phases[key] === null)) {
+    if (ep === null || VIEW_KEYS.some((key) => ep[key] === null)) {
       showFlash(t("syncNotReady"), "err");
       return;
     }
-    const rows = mirroredRows(view, phases, nativeIn);
+    const rows = mirroredRows(view, ep, nativeIn);
     if (rows.length === 0) {
       showFlash(t("syncNotReady"), "err");
       return;
@@ -3585,6 +3746,13 @@ function Panel({ t, onClose }) {
     setMode(next);
     setPreviewSub(next === "tools" ? "tools" : "prompt");
   };
+  const switchLevel = (next) => {
+    if (next === level) return;
+    if (draft?.dirty && !window.confirm(t("discardConfirm"))) return;
+    clearDraft();
+    setLevel(next);
+    if (next === "workspace") void refresh();
+  };
   const switchTarget = (next) => {
     if (draft?.dirty && !window.confirm(t("discardConfirm"))) return;
     clearDraft();
@@ -3607,14 +3775,14 @@ function Panel({ t, onClose }) {
       });
     }).catch((e) => showFlash(`${t("exportPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setExporting(false));
   };
-  const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
+  const modeBtn = (key, label) => (0, import_react10.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
   const draftDirty = draft?.dirty === true;
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
     const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length;
-    return (0, import_react9.createElement)("button", {
+    return (0, import_react10.createElement)("button", {
       key: id,
       type: "button",
       className: css.catItem,
@@ -3622,43 +3790,56 @@ function Panel({ t, onClose }) {
       onClick: () => switchTarget(id),
       title: bad ? `${label} \u2014 ${t("broken")}` : customized > 0 ? `${label} \xB7 ${t("targetCustomized", { n: customized })}` : label
     }, [
-      (0, import_react9.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
-      (0, import_react9.createElement)("span", { className: css.catLabel }, label),
-      bad ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
-      !bad && customized > 0 ? (0, import_react9.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
+      (0, import_react10.createElement)("span", { className: css.catIcon, "data-active": active || void 0 }, icon),
+      (0, import_react10.createElement)("span", { className: css.catLabel }, label),
+      bad ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, t("broken")) : null,
+      !bad && customized > 0 ? (0, import_react10.createElement)("span", { className: css.catCount, "data-warn": true }, String(customized)) : null
     ]);
   };
-  return (0, import_react9.createElement)("div", { style: s.pRoot }, [
+  return (0, import_react10.createElement)("div", { style: s.pRoot }, [
     // ── 第一行：agent 预设（编辑目标）──
     // 与 SKILL / MCP 顶栏同款 chips 行（同一套类名 + 图标 + 计数），且排在
     // 定制面板自己的头部之上：三个 tab 的「预设在上」节奏一致。
     // 0.9.0 起「全部 Agent」入口移除：提示词必须按具体预设修改，无全局目标。
-    (0, import_react9.createElement)("div", { key: "targets", className: css.topbar }, [
-      (0, import_react9.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
-        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react9.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
+    (0, import_react10.createElement)("div", { key: "targets", className: css.topbar }, [
+      (0, import_react10.createElement)("div", { className: css.chipRow, role: "group", "aria-label": t("targetLabel") }, [
+        ...agentPresets.map((p) => targetChip(p.id, p.name, (0, import_react10.createElement)(import_dsh_client_ui_primitives.IconAgentPresetOutlineRegular, { size: 15 }), p.broken))
       ])
     ]),
     // ── 第二行：标题 + 模式切换 + （阶段切换 + 开关） + 工具栏 ──
     // 阶段按钮合并放在三态同步选择框左侧：左栏列表与右栏预览跟着同一个
     // 阶段状态走，一处切换两边联动。仅在提示词 / 工具两个模式显示。
-    (0, import_react9.createElement)("div", { style: s.head }, [
-      (0, import_react9.createElement)("span", { style: s.headTitle }, [
-        (0, import_react9.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
-          (0, import_react9.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          (0, import_react9.createElement)("path", { d: "M14 2v6h6" }),
-          (0, import_react9.createElement)("path", { d: "M16 13H8" }),
-          (0, import_react9.createElement)("path", { d: "M16 17H8" }),
-          (0, import_react9.createElement)("path", { d: "M10 9H8" })
+    (0, import_react10.createElement)("div", { style: s.head }, [
+      (0, import_react10.createElement)("span", { style: s.headTitle }, [
+        (0, import_react10.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } }, [
+          (0, import_react10.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+          (0, import_react10.createElement)("path", { d: "M14 2v6h6" }),
+          (0, import_react10.createElement)("path", { d: "M16 13H8" }),
+          (0, import_react10.createElement)("path", { d: "M16 17H8" }),
+          (0, import_react10.createElement)("path", { d: "M10 9H8" })
         ]),
         t("nav")
       ]),
-      (0, import_react9.createElement)("div", { style: s.seg }, [
+      (0, import_react10.createElement)("div", { style: s.seg }, [
         modeBtn("sections", t("tabsSections")),
         modeBtn("tools", t("tabsTools")),
+        modeBtn("session", t("tabsSession")),
         modeBtn("presets", t("tabsPresets"))
       ]),
-      (0, import_react9.createElement)("div", { style: s.headActions }, [
-        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react9.createElement)("button", {
+      (0, import_react10.createElement)("div", { style: s.seg }, [
+        (0, import_react10.createElement)("button", {
+          key: "lvl-preset",
+          style: level === "preset" ? s.segBtnActive : s.segBtn,
+          onClick: () => switchLevel("preset")
+        }, t("levelPreset")),
+        (0, import_react10.createElement)("button", {
+          key: "lvl-workspace",
+          style: level === "workspace" ? s.segBtnActive : s.segBtn,
+          onClick: () => switchLevel("workspace")
+        }, t("levelWorkspace"))
+      ]),
+      (0, import_react10.createElement)("div", { style: s.headActions }, [
+        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react10.createElement)("button", {
           key,
           style: dropPhase === key ? phase === key ? s.segBtnDropActive : s.segBtnDrop : phase === key ? s.segBtnActive : s.segBtn,
           onClick: () => setPhase(key),
@@ -3677,12 +3858,12 @@ function Panel({ t, onClose }) {
             dropOnPhase(key, payload);
           }
         }, stageLabel(key)))) : null,
-        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react9.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
-        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("label", {
+        draftDirty && (mode === "sections" || mode === "tools") ? (0, import_react10.createElement)("span", { style: s.badgeReplaced, title: t("draftBadge") }, t("draftBadge")) : null,
+        mode === "sections" || mode === "tools" ? (0, import_react10.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("syncAllPhasesHint")
         }, [
-          (0, import_react9.createElement)("input", {
+          (0, import_react10.createElement)("input", {
             type: "checkbox",
             checked: syncAll,
             onChange: (e) => toggleSyncAll(e.target.checked),
@@ -3690,11 +3871,11 @@ function Panel({ t, onClose }) {
           }),
           t("syncAllPhases")
         ]) : null,
-        mode === "sections" ? (0, import_react9.createElement)("label", {
+        mode === "sections" ? (0, import_react10.createElement)("label", {
           style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
           title: t("zhHint")
         }, [
-          (0, import_react9.createElement)("input", {
+          (0, import_react10.createElement)("input", {
             type: "checkbox",
             checked: zhOn,
             onChange: toggleZh,
@@ -3702,65 +3883,74 @@ function Panel({ t, onClose }) {
           }),
           t("zhSwitch")
         ]) : null,
-        (0, import_react9.createElement)("button", {
+        (0, import_react10.createElement)("button", {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
           disabled: !draft?.dirty || saving,
           onClick: save
         }, t("save")),
         // 刷新 = GET 磁盘权威状态；有脏草稿时再补一次当前阶段的草稿叠加预览，
         // 避免预览短暂回退到「上次保存」的状态。
-        (0, import_react9.createElement)("button", { style: s.saveBtn, onClick: () => {
+        (0, import_react10.createElement)("button", { style: s.saveBtn, onClick: () => {
           void refresh().then(() => syncDraftPreview());
         } }, t("refresh")),
         // 重扫登记表：只有它能把「已不存在但仍留在列表里、还能被拖动」的历史条目清掉。
-        (0, import_react9.createElement)("button", {
+        (0, import_react10.createElement)("button", {
           style: s.saveBtn,
           disabled: rescanning,
           title: t("rescanCatalogHint"),
           onClick: rescanCatalog
         }, rescanning ? t("rescanCatalogRunning") : t("rescanCatalog")),
         // 关闭按钮只在独立开窗时给出（onClose 缺省 = 由外层 tab 承载，不需要它）。
-        onClose === void 0 ? null : (0, import_react9.createElement)(
+        onClose === void 0 ? null : (0, import_react10.createElement)(
           "button",
           { style: s.iconBtn, onClick: onClose, "aria-label": t("close"), title: t("close") },
-          (0, import_react9.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
-            (0, import_react9.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
+          (0, import_react10.createElement)("svg", { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" }, [
+            (0, import_react10.createElement)("path", { d: "M4 4l8 8M12 4l-8 8", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" })
           ])
         )
       ])
     ]),
     // ── 消息条（错误 / 闪示 / 目标异常警示） ──
-    (0, import_react9.createElement)("div", { style: { padding: "0 14px" } }, [
-      error ? (0, import_react9.createElement)("div", { style: s.error }, String(error)) : null,
-      flash ? (0, import_react9.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
-      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react9.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
-      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null
+    (0, import_react10.createElement)("div", { style: { padding: "0 14px" } }, [
+      error ? (0, import_react10.createElement)("div", { style: s.error }, String(error)) : null,
+      flash ? (0, import_react10.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
+      target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react10.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
+      inv?.scopeResolved === false && mode !== "presets" && mode !== "session" ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
+      level === "workspace" && currentWorkspace === void 0 ? (0, import_react10.createElement)("div", { style: s.noticeWarn }, t("workspaceNoSession")) : null
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
     // 顶部选「提示词」= 提示词编辑 + 提示词预览；选「工具」= 工具编辑 +
     // 工具预览（previewSub 跟随模式，无手动切换）。阶段由头部统一控制。
-    (0, import_react9.createElement)(
+    (0, import_react10.createElement)(
       "div",
       { key: "body", style: s.body },
-      mode === "sections" ? [
-        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases, phase, syncAll, t, poolText, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+      mode === "session" ? (0, import_react10.createElement)(SessionView, {
+        data: sessionView,
+        loading: sessionLoading,
+        error,
+        t,
+        onRefresh: () => {
+          void refresh();
+        }
+      }) : mode === "sections" ? [
+        (0, import_react10.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
+        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
       ] : mode === "tools" ? [
-        (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases, phase, syncAll, t, write: edit }),
-        (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases, phase, sub: previewSub })
+        (0, import_react10.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
+        (0, import_react10.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub })
       ] : [
-        (0, import_react9.createElement)(PresetsPane, {
+        (0, import_react10.createElement)(PresetsPane, {
           key: "presets",
           cfg: view,
           inv,
-          phases,
+          phases: ep,
           t,
           writePatch,
           writeGlobal,
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
         }),
-        (0, import_react9.createElement)(SettingsPane, {
+        (0, import_react10.createElement)(SettingsPane, {
           key: "settings",
           cfg: view,
           inv,
@@ -3788,6 +3978,7 @@ var DICT = {
     unavailable: "\u5F53\u524D\u73AF\u5883\u672A\u542F\u7528\u672C\u547D\u540D\u7A7A\u95F4\u3002",
     tabsSections: "\u63D0\u793A\u8BCD",
     tabsTools: "\u5DE5\u5177",
+    tabsSession: "\u5F53\u524D\u4F1A\u8BDD",
     tabsPresets: "\u914D\u7F6E",
     tabsPreview: "\u9884\u89C8",
     refresh: "\u5237\u65B0",
@@ -3926,6 +4117,30 @@ var DICT = {
     phaseVisible: "\u9636\u6BB5\u53EF\u89C1",
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
+    previewSessionOverlay: "\u5DE6\u680F\u5DF2\u5E76\u5165\u5F53\u524D\u4F1A\u8BDD\u7684\u4F1A\u8BDD\u7EA7\u6761\u76EE\uFF1B\u53F3\u680F\u4ECD\u662F\u7F16\u8F91\u76EE\u6807\u9884\u8BBE\u7684\u7EAF\u88C5\u914D\uFF0C\u771F\u5B9E\u4F1A\u8BDD\u7684\u5B8C\u6574\u89C6\u56FE\u89C1\u300C\u5F53\u524D\u4F1A\u8BDD\u300D\u3002",
+    sessionHint: "\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF08\u53EA\u8BFB\uFF09\uFF1A\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u6765\u81EA\u6700\u65B0\u6D3B\u52A8\u6839\u4F1A\u8BDD\u81EA\u5DF1\u7684 agent \u4F5C\u7528\u57DF\u3002",
+    sessionNone: "\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF1B\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u8FD9\u91CC\u4F1A\u663E\u793A\u6A21\u578B\u771F\u5B9E\u770B\u5230\u7684\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u3002",
+    sessionPromptTitle: "\u6700\u7EC8\u7CFB\u7EDF\u63D0\u793A\u8BCD\uFF08\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF09",
+    sessionToolsTitle: "\u5DE5\u5177\u76EE\u5F55\uFF08\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u89C6\u56FE\uFF09",
+    sessionToolsVisible: "\u6A21\u578B\u53EF\u89C1",
+    sessionToolsTotal: "\u5B8C\u6574\u76EE\u5F55",
+    sessionPhase: "\u9636\u6BB5",
+    sessionPreset: "\u9884\u8BBE",
+    sessionId: "\u4F1A\u8BDD",
+    toolAgentScoped: "\u4F1A\u8BDD\u7EA7",
+    toolAgentScopedHint: "\u8BE5\u5DE5\u5177\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u6CE8\u518C\uFF08\u4E0D\u662F\u9884\u8BBE\u6CE8\u518C\u8868\u9879\uFF09\uFF1B\u672C\u63D2\u4EF6\u7684\u9636\u6BB5\u8FC7\u6EE4\u65E0\u6CD5\u62D2\u7EDD\u4F5C\u7528\u57DF\u5185\u540D\u5B57\uFF0C\u56E0\u6B64\u53EA\u80FD\u67E5\u770B\u3002",
+    toolExecutorScoped: "\u6267\u884C\u5668\u5305\u88C5",
+    toolExecutorScopedHint: "\u8BE5\u5DE5\u5177\u662F\u6267\u884C\u5668\u63D0\u4F9B\u7ED9\u6A21\u578B\u7684\u5305\u88C5\u9879\uFF08\u5982 PTC \u7684 run_code\uFF09\uFF0C\u4E0D\u662F\u666E\u901A\u6CE8\u518C\u8868\u5DE5\u5177\uFF1B\u4E0D\u80FD\u6309\u9636\u6BB5\u52FE\u9009\u3002",
+    toolMaskedByPlugin: "\u63D2\u4EF6\u906E\u853D",
+    toolMaskedByPluginHint: "\u8BE5\u5DE5\u5177\u5728\u9884\u8BBE\u6CE8\u518C\u8868\u91CC\u6709\uFF0C\u4F46\u88AB\u5176\u5B83\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF restrict \u6389\u4E86\uFF1B\u672C\u63D2\u4EF6\u65E0\u6CD5\u53CD\u5411\u89E3\u9664\u3002",
+    toolMaskedByOwnPlugin: "\u672C\u63D2\u4EF6\u906E\u853D",
+    toolMaskedByOwnPluginHint: "\u8BE5\u5DE5\u5177\u88AB\u672C\u63D2\u4EF6\u7684 MCP \u5DE5\u5177\u7EA7\u7981\u7528 / \u9884\u8BBE\u906E\u853D / \u5DE5\u4F5C\u533A\u5173\u95ED\u9690\u85CF\uFF0C\u53EF\u5728 MCP Tab \u6062\u590D\u3002",
+    completeCatalogTitle: "\u5B8C\u6574\u76EE\u5F55 / \u5DF2\u906E\u853D\uFF08\u53EA\u8BFB\uFF09",
+    completeCatalogHint: "\u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u65E0\u6CD5\u6309\u9636\u6BB5\u5F00\u5173\u7684\u5DE5\u5177\uFF1Aagent \u4F5C\u7528\u57DF\u6CE8\u518C\u3001\u6267\u884C\u5668\u5305\u88C5\u3001\u88AB\u522B\u7684\u63D2\u4EF6 restrict\u3001\u88AB\u672C\u63D2\u4EF6 MCP \u906E\u853D\u3002\u5B83\u4EEC\u4E0D\u4F1A\u51FA\u73B0\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u91CC\u3002",
+    levelPreset: "\u9884\u8BBE\u7EA7",
+    levelWorkspace: "\u5DE5\u4F5C\u533A\u7EA7",
+    workspaceRequired: "\u5DE5\u4F5C\u533A\u7EA7\u4FDD\u5B58\u9700\u8981\u5F53\u524D\u5DE5\u4F5C\u533A\uFF08\u6D3B\u52A8\u4F1A\u8BDD\u7684 cwd\uFF09",
+    workspaceNoSession: "\u5DE5\u4F5C\u533A\u7EA7\uFF1A\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF0C\u53D6\u4E0D\u5230\u5DE5\u4F5C\u533A\u8DEF\u5F84\uFF1B\u5F00\u4F1A\u8BDD\u540E\u518D\u7F16\u8F91\u5DE5\u4F5C\u533A\u7EA7\u3002",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
     navShort: "\u63D0\u793A\u8BCD",
     close: "\u5173\u95ED",
@@ -3950,6 +4165,7 @@ var DICT = {
     unavailable: "Namespace unavailable in this environment.",
     tabsSections: "Sections",
     tabsTools: "Tools",
+    tabsSession: "Current session",
     tabsPresets: "Presets",
     tabsPreview: "Preview",
     refresh: "Refresh",
@@ -4082,6 +4298,30 @@ var DICT = {
     phaseVisible: "visible in phase",
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
+    previewSessionOverlay: 'The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset. See "Current session" for the real view.',
+    sessionHint: "Real assembly of the current session (read-only): prompt sections and tools come from the newest active root session's own agent scope.",
+    sessionNone: "No active session right now. Start a conversation and this view will show exactly what the model sees.",
+    sessionPromptTitle: "Final system prompt (real current-session assembly)",
+    sessionToolsTitle: "Tool catalog (real current-session view)",
+    sessionToolsVisible: "model-visible",
+    sessionToolsTotal: "complete catalog",
+    sessionPhase: "Phase",
+    sessionPreset: "Preset",
+    sessionId: "Session",
+    toolAgentScoped: "session-level",
+    toolAgentScopedHint: "Registered by a plugin in the agent's own scope (not a preset registry entry); this plugin's phase filter cannot deny scope-local names, so this row is read-only.",
+    toolExecutorScoped: "executor wrapper",
+    toolExecutorScopedHint: "Provided by the tool executor as a model-facing wrapper (such as PTC run_code), not an ordinary registry tool; it cannot be toggled per phase.",
+    toolMaskedByPlugin: "plugin-masked",
+    toolMaskedByPluginHint: "Present in the preset registry but restricted away by another plugin in the agent scope; this plugin cannot lift that restriction.",
+    toolMaskedByOwnPlugin: "masked by this plugin",
+    toolMaskedByOwnPluginHint: "Hidden by this plugin's MCP tool disable / preset mask / workspace close ledger; re-enable it in the MCP tab.",
+    completeCatalogTitle: "Complete catalog / masked (read-only)",
+    completeCatalogHint: "Tools this plugin cannot toggle per phase: agent-scope registrations, executor wrappers, tools restricted by other plugins, and tools masked by this plugin's MCP ledgers. They never appear in the enabled list above.",
+    levelPreset: "Preset",
+    levelWorkspace: "Workspace",
+    workspaceRequired: "Saving workspace-level requires a current workspace (active session cwd).",
+    workspaceNoSession: "Workspace level: no active session, so the workspace path is unknown; open a session first.",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
     navShort: "Prompts",
     close: "Close",
@@ -4895,18 +5135,18 @@ function skillT(key, params) {
 }
 
 // src/client/skills/McpAddModal.tsx
-var import_react10 = require("react");
+var import_react11 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime5 = require("react/jsx-runtime");
 function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace }) {
-  const [format, setFormat] = (0, import_react10.useState)("json");
-  const [text, setText] = (0, import_react10.useState)("");
-  const [busy, setBusy] = (0, import_react10.useState)(null);
-  const [preview, setPreview] = (0, import_react10.useState)(null);
-  const [errors, setErrors] = (0, import_react10.useState)([]);
-  const [warnings, setWarnings] = (0, import_react10.useState)([]);
-  const [notice, setNotice] = (0, import_react10.useState)(null);
-  const [scope, setScope] = (0, import_react10.useState)("global");
+  const [format, setFormat] = (0, import_react11.useState)("json");
+  const [text, setText] = (0, import_react11.useState)("");
+  const [busy, setBusy] = (0, import_react11.useState)(null);
+  const [preview, setPreview] = (0, import_react11.useState)(null);
+  const [errors, setErrors] = (0, import_react11.useState)([]);
+  const [warnings, setWarnings] = (0, import_react11.useState)([]);
+  const [notice, setNotice] = (0, import_react11.useState)(null);
+  const [scope, setScope] = (0, import_react11.useState)("global");
   const target = presetId === void 0 ? "global" : "preset";
   const placeholder = format === "json" ? '{ "mcpServers": { "my-server": { "command": "npx", "args": ["-y", "@scope/mcp-server"] } } }' : 'mcpServers:\n  my-server:\n    command: npx\n    args: ["-y", "@scope/mcp-server"]';
   const empty = text.trim() === "";
@@ -5062,11 +5302,11 @@ function McpAddModal({ t, open, onClose, onAdded }) {
 }
 
 // src/client/skills/McpView.tsx
-var import_react13 = require("react");
+var import_react14 = require("react");
 var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/confirm-dialog.tsx
-var import_react11 = require("react");
+var import_react12 = require("react");
 var import_react_dom3 = require("react-dom");
 var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime6 = require("react/jsx-runtime");
@@ -5129,7 +5369,7 @@ function ConfirmDialog({
   ensureModalAnimStyles();
   ensureDialogStyles();
   const { closing, requestClose } = useModalClose(open, onClose);
-  (0, import_react11.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     if (!open) return void 0;
     const onKey = (event) => {
       if (event.key === "Escape") requestClose();
@@ -5174,7 +5414,7 @@ function ConfirmDialog({
 }
 
 // src/client/skills/mcp-live.ts
-var import_react12 = require("react");
+var import_react13 = require("react");
 var MCP_TOOL_WATCH_INTERVAL_MS = 2e3;
 var MCP_TOOL_WATCH_TIMEOUT_MS = 15e4;
 function mcpRegisteredToolCountOf(data, serverName) {
@@ -5189,7 +5429,7 @@ function isToolRegistrationPending(registered, listed) {
   return registered === 0 && listed > 0;
 }
 function useMcpLiveState() {
-  const [status, setStatus] = (0, import_react12.useState)({ state: "loading", data: null });
+  const [status, setStatus] = (0, import_react13.useState)({ state: "loading", data: null });
   const load = () => {
     setStatus((current2) => current2.state === "ready" ? current2 : { state: "loading", data: null });
     void fetch("/api/triad/mcp-status", { headers: { accept: "application/json" } }).then((response) => {
@@ -5203,7 +5443,7 @@ function useMcpLiveState() {
       setStatus({ state: "unavailable", data: null });
     });
   };
-  (0, import_react12.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     load();
   }, []);
   return [status, load];
@@ -5252,13 +5492,13 @@ ${description}`}`,
   }) });
 }
 function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWatchTools, addOwnOpen, onCloseAddOwn, workspace }) {
-  const [busy, setBusy] = (0, import_react13.useState)(null);
-  const [error, setError] = (0, import_react13.useState)(null);
-  const [globalOpen, setGlobalOpen] = (0, import_react13.useState)(true);
-  const [ownOpen, setOwnOpen] = (0, import_react13.useState)(true);
-  const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
-  const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
-  const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
+  const [busy, setBusy] = (0, import_react14.useState)(null);
+  const [error, setError] = (0, import_react14.useState)(null);
+  const [globalOpen, setGlobalOpen] = (0, import_react14.useState)(true);
+  const [ownOpen, setOwnOpen] = (0, import_react14.useState)(true);
+  const [toolBusy, setToolBusy] = (0, import_react14.useState)(null);
+  const [removeReq, setRemoveReq] = (0, import_react14.useState)(null);
+  const [removeOwnReq, setRemoveOwnReq] = (0, import_react14.useState)(null);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
   const closedInWorkspace = new Set(
@@ -5728,7 +5968,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
 }
 
 // src/client/skills/SkillCard.tsx
-var import_react14 = require("react");
+var import_react15 = require("react");
 var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/skills/types.ts
@@ -5743,7 +5983,7 @@ var ALL_PRESETS = "*";
 // src/client/skills/SkillCard.tsx
 var import_jsx_runtime8 = require("react/jsx-runtime");
 function CategoryEditor({ value, onChange, label }) {
-  const [draft, setDraft] = (0, import_react14.useState)("");
+  const [draft, setDraft] = (0, import_react15.useState)("");
   const full = value.length >= MAX_BUNDLE_CATEGORIES;
   const add = (raw) => {
     const name = raw.trim().slice(0, 24);
@@ -5809,9 +6049,9 @@ function CategoryEditor({ value, onChange, label }) {
 function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLabel, index, onToggle, onView, onAssign, onRemove, onDelete }) {
   const files = Array.isArray(skill.files) ? skill.files : [];
   const description = skill.description ?? "";
-  const [copied, setCopied] = (0, import_react14.useState)(false);
-  const copiedTimer = (0, import_react14.useRef)(null);
-  (0, import_react14.useEffect)(() => () => {
+  const [copied, setCopied] = (0, import_react15.useState)(false);
+  const copiedTimer = (0, import_react15.useRef)(null);
+  (0, import_react15.useEffect)(() => () => {
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
   }, []);
   const flashCopied = () => {
@@ -7032,37 +7272,37 @@ function frontmatterName(text) {
 }
 function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter, onCardMouseLeave }) {
   ensureStyles();
-  const [state, setState] = (0, import_react15.useState)({ status: "loading" });
-  const [reload, setReload] = (0, import_react15.useState)(0);
-  const [workspace, setWorkspace] = (0, import_react15.useState)(null);
-  const [workspaces, setWorkspaces] = (0, import_react15.useState)([]);
-  const [currentWorkspace, setCurrentWorkspace] = (0, import_react15.useState)(null);
-  const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
-  const [looseOpen, setLooseExpanded] = (0, import_react15.useState)(false);
-  const [viewer, setViewer] = (0, import_react15.useState)(null);
-  const [viewerFont, setViewerFont] = (0, import_react15.useState)(() => readViewerPrefs().font);
-  const [viewerFull, setViewerFull] = (0, import_react15.useState)(() => readViewerPrefs().full);
-  const [assignTarget, setAssignTarget] = (0, import_react15.useState)(null);
-  const [newBundleOpen, setNewBundleOpen] = (0, import_react15.useState)(false);
-  const [newBundleName, setNewBundleName] = (0, import_react15.useState)("");
-  const [newBundleCats, setNewBundleCats] = (0, import_react15.useState)([]);
-  const [creatingBundle, setCreatingBundle] = (0, import_react15.useState)(false);
-  const [renameTarget, setRenameTarget] = (0, import_react15.useState)(null);
-  const [renaming, setRenaming] = (0, import_react15.useState)(false);
-  const [renamedFlash, setRenamedFlash] = (0, import_react15.useState)(null);
-  const renamedTimer = (0, import_react15.useRef)(null);
-  const [confirm, setConfirm] = (0, import_react15.useState)(null);
-  const [confirming, setConfirming] = (0, import_react15.useState)(false);
-  const [install, setInstall] = (0, import_react15.useState)(null);
-  const [addOpen, setAddOpen] = (0, import_react15.useState)(false);
-  const [installName, setInstallName] = (0, import_react15.useState)("");
-  const [installDescription, setInstallDescription] = (0, import_react15.useState)("");
-  const [installScope, setInstallScope] = (0, import_react15.useState)("global");
-  const [installBundleId, setInstallBundleId] = (0, import_react15.useState)(void 0);
-  const [installing, setInstalling] = (0, import_react15.useState)(false);
-  const [installError, setInstallError] = (0, import_react15.useState)(null);
-  const [toasts, setToasts] = (0, import_react15.useState)([]);
-  const toastTimers = (0, import_react15.useRef)([]);
+  const [state, setState] = (0, import_react16.useState)({ status: "loading" });
+  const [reload, setReload] = (0, import_react16.useState)(0);
+  const [workspace, setWorkspace] = (0, import_react16.useState)(null);
+  const [workspaces, setWorkspaces] = (0, import_react16.useState)([]);
+  const [currentWorkspace, setCurrentWorkspace] = (0, import_react16.useState)(null);
+  const [expanded, setExpanded] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
+  const [looseOpen, setLooseExpanded] = (0, import_react16.useState)(false);
+  const [viewer, setViewer] = (0, import_react16.useState)(null);
+  const [viewerFont, setViewerFont] = (0, import_react16.useState)(() => readViewerPrefs().font);
+  const [viewerFull, setViewerFull] = (0, import_react16.useState)(() => readViewerPrefs().full);
+  const [assignTarget, setAssignTarget] = (0, import_react16.useState)(null);
+  const [newBundleOpen, setNewBundleOpen] = (0, import_react16.useState)(false);
+  const [newBundleName, setNewBundleName] = (0, import_react16.useState)("");
+  const [newBundleCats, setNewBundleCats] = (0, import_react16.useState)([]);
+  const [creatingBundle, setCreatingBundle] = (0, import_react16.useState)(false);
+  const [renameTarget, setRenameTarget] = (0, import_react16.useState)(null);
+  const [renaming, setRenaming] = (0, import_react16.useState)(false);
+  const [renamedFlash, setRenamedFlash] = (0, import_react16.useState)(null);
+  const renamedTimer = (0, import_react16.useRef)(null);
+  const [confirm, setConfirm] = (0, import_react16.useState)(null);
+  const [confirming, setConfirming] = (0, import_react16.useState)(false);
+  const [install, setInstall] = (0, import_react16.useState)(null);
+  const [addOpen, setAddOpen] = (0, import_react16.useState)(false);
+  const [installName, setInstallName] = (0, import_react16.useState)("");
+  const [installDescription, setInstallDescription] = (0, import_react16.useState)("");
+  const [installScope, setInstallScope] = (0, import_react16.useState)("global");
+  const [installBundleId, setInstallBundleId] = (0, import_react16.useState)(void 0);
+  const [installing, setInstalling] = (0, import_react16.useState)(false);
+  const [installError, setInstallError] = (0, import_react16.useState)(null);
+  const [toasts, setToasts] = (0, import_react16.useState)([]);
+  const toastTimers = (0, import_react16.useRef)([]);
   const pushToast = (tone, text) => {
     const id = Date.now() + Math.random();
     setToasts((current2) => [...current2.slice(-2), { id, tone, text }]);
@@ -7074,8 +7314,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const failToast = (label, error) => {
     pushToast("err", skillT("opFailed", { label, message: error instanceof Error ? error.message : String(error) }));
   };
-  const [installMetaName, setInstallMetaName] = (0, import_react15.useState)(null);
-  (0, import_react15.useEffect)(() => {
+  const [installMetaName, setInstallMetaName] = (0, import_react16.useState)(null);
+  (0, import_react16.useEffect)(() => {
     if (install === null || install.archive === true) {
       setInstallMetaName(null);
       return void 0;
@@ -7096,36 +7336,36 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [install]);
-  const [dropActive, setDropActive] = (0, import_react15.useState)(false);
-  const fileInput = (0, import_react15.useRef)(null);
-  const [toggles, setToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
-  const [toggling, setToggling] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
-  const [presets, setPresets] = (0, import_react15.useState)([]);
-  const [overrides, setOverrides] = (0, import_react15.useState)({});
-  const [activePreset, setActivePreset] = (0, import_react15.useState)(ALL_PRESETS);
-  const [query, setQuery] = (0, import_react15.useState)("");
-  const [sourceFilter, setSourceFilter] = (0, import_react15.useState)("all");
-  const [sortAsc, setSortAsc] = (0, import_react15.useState)(true);
-  const [viewMode] = (0, import_react15.useState)("grid");
-  const [statusFilter, setStatusFilter] = (0, import_react15.useState)("all");
-  const [catFilter, setCatFilter] = (0, import_react15.useState)(null);
-  const [catTarget, setCatTarget] = (0, import_react15.useState)(null);
-  const [catDraft, setCatDraft] = (0, import_react15.useState)([]);
-  const [savingCats, setSavingCats] = (0, import_react15.useState)(false);
-  const [openMenu, setOpenMenu] = (0, import_react15.useState)(null);
-  const [health, setHealth] = (0, import_react15.useState)({ state: "loading" });
-  const [guideOpen, setGuideOpen] = (0, import_react15.useState)(false);
-  const [kind, setKind] = (0, import_react15.useState)("skill");
-  const [mcpScope, setMcpScope] = (0, import_react15.useState)("");
-  const [mcpQuery, setMcpQuery] = (0, import_react15.useState)("");
-  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react15.useState)("all");
+  const [dropActive, setDropActive] = (0, import_react16.useState)(false);
+  const fileInput = (0, import_react16.useRef)(null);
+  const [toggles, setToggles] = (0, import_react16.useState)({ skills: {}, bundles: {} });
+  const [toggling, setToggling] = (0, import_react16.useState)(/* @__PURE__ */ new Set());
+  const [presets, setPresets] = (0, import_react16.useState)([]);
+  const [overrides, setOverrides] = (0, import_react16.useState)({});
+  const [activePreset, setActivePreset] = (0, import_react16.useState)(ALL_PRESETS);
+  const [query, setQuery] = (0, import_react16.useState)("");
+  const [sourceFilter, setSourceFilter] = (0, import_react16.useState)("all");
+  const [sortAsc, setSortAsc] = (0, import_react16.useState)(true);
+  const [viewMode] = (0, import_react16.useState)("grid");
+  const [statusFilter, setStatusFilter] = (0, import_react16.useState)("all");
+  const [catFilter, setCatFilter] = (0, import_react16.useState)(null);
+  const [catTarget, setCatTarget] = (0, import_react16.useState)(null);
+  const [catDraft, setCatDraft] = (0, import_react16.useState)([]);
+  const [savingCats, setSavingCats] = (0, import_react16.useState)(false);
+  const [openMenu, setOpenMenu] = (0, import_react16.useState)(null);
+  const [health, setHealth] = (0, import_react16.useState)({ state: "loading" });
+  const [guideOpen, setGuideOpen] = (0, import_react16.useState)(false);
+  const [kind, setKind] = (0, import_react16.useState)("skill");
+  const [mcpScope, setMcpScope] = (0, import_react16.useState)("");
+  const [mcpQuery, setMcpQuery] = (0, import_react16.useState)("");
+  const [mcpStatusFilter, setMcpStatusFilter] = (0, import_react16.useState)("all");
   const [mcpLive, mcpRefreshLive] = useMcpLiveState();
-  const [mcpAddOpen, setMcpAddOpen] = (0, import_react15.useState)(false);
-  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react15.useState)(false);
-  const mcpWatchTimer = (0, import_react15.useRef)(null);
-  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react15.useState)([]);
-  const mcpLiveRef = (0, import_react15.useRef)(mcpLive);
-  (0, import_react15.useEffect)(() => {
+  const [mcpAddOpen, setMcpAddOpen] = (0, import_react16.useState)(false);
+  const [mcpAddOwnOpen, setMcpAddOwnOpen] = (0, import_react16.useState)(false);
+  const mcpWatchTimer = (0, import_react16.useRef)(null);
+  const [mcpWaitingTools, setMcpWaitingTools] = (0, import_react16.useState)([]);
+  const mcpLiveRef = (0, import_react16.useRef)(mcpLive);
+  (0, import_react16.useEffect)(() => {
     mcpLiveRef.current = mcpLive;
   }, [mcpLive]);
   const stopMcpWatch = () => {
@@ -7189,7 +7429,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       }
     );
   };
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     const timer = window.setInterval(silentSync, 3e4);
     const onVis = () => {
       if (document.visibilityState === "visible") silentSync();
@@ -7221,7 +7461,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     );
   };
   const t = skillT;
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     let current2 = true;
     setState({ status: "loading" });
     void skillApi.list(workspace).then(
@@ -7262,7 +7502,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload, workspace]);
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     let current2 = true;
     void skillApi.workspaces().then(
       (result) => {
@@ -7278,13 +7518,13 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       current2 = false;
     };
   }, [reload]);
-  (0, import_react15.useEffect)(() => () => {
+  (0, import_react16.useEffect)(() => () => {
     if (renamedTimer.current !== null) window.clearTimeout(renamedTimer.current);
     if (mcpWatchTimer.current !== null) window.clearInterval(mcpWatchTimer.current);
     for (const timer of toastTimers.current) window.clearTimeout(timer);
   }, []);
-  const [guidePos, setGuidePos] = (0, import_react15.useState)(null);
-  (0, import_react15.useEffect)(() => {
+  const [guidePos, setGuidePos] = (0, import_react16.useState)(null);
+  (0, import_react16.useEffect)(() => {
     if (!guideOpen) return;
     const marker = document.querySelector("[data-skm-panel-marker]");
     const card = marker?.closest(".psh-card");
@@ -7386,7 +7626,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const toggleViewerFull = () => {
     setViewerFull((current2) => !current2);
   };
-  (0, import_react15.useEffect)(() => {
+  (0, import_react16.useEffect)(() => {
     writeViewerPrefs({ font: viewerFont, full: viewerFull });
   }, [viewerFont, viewerFull]);
   const selectViewerFile = (filePath) => {
@@ -8132,8 +8372,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
 }
 
 // src/client/error-boundary.tsx
-var import_react16 = require("react");
-var ErrorBoundary = class extends import_react16.Component {
+var import_react17 = require("react");
+var ErrorBoundary = class extends import_react17.Component {
   constructor() {
     super(...arguments);
     __publicField(this, "state", { error: null });
@@ -8156,7 +8396,7 @@ var ErrorBoundary = class extends import_react16.Component {
 };
 
 // src/client/sidebar-nav.tsx
-var import_react17 = require("react");
+var import_react18 = require("react");
 var import_react_dom4 = require("react-dom");
 var import_jsx_runtime13 = require("react/jsx-runtime");
 var HOST_ID = "dsh-prompt-customizer-nav-host";
@@ -8227,8 +8467,8 @@ function ensureNavMount() {
   };
 }
 function useNavSlot(name) {
-  const [slot, setSlot] = (0, import_react17.useState)(null);
-  (0, import_react17.useEffect)(() => {
+  const [slot, setSlot] = (0, import_react18.useState)(null);
+  (0, import_react18.useEffect)(() => {
     let timer = 0;
     let tries = 0;
     const poll = () => {
@@ -8246,8 +8486,8 @@ function useNavSlot(name) {
   return slot;
 }
 function useRail() {
-  const [rail, setRail] = (0, import_react17.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
-  (0, import_react17.useEffect)(() => {
+  const [rail, setRail] = (0, import_react18.useState)(() => document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
+  (0, import_react18.useEffect)(() => {
     const read = () => {
       setRail(document.querySelector(FRAME_SELECTOR)?.hasAttribute("data-sidebar-collapsed") ?? false);
     };
@@ -8331,11 +8571,11 @@ function clickInSidebar(target) {
   return false;
 }
 function usePanelAutoClose(name, open, requestClose) {
-  (0, import_react17.useEffect)(() => {
+  (0, import_react18.useEffect)(() => {
     if (!open) return;
     window.dispatchEvent(new CustomEvent(PANEL_OPEN_EVENT, { detail: name }));
   }, [open, name]);
-  (0, import_react17.useEffect)(() => {
+  (0, import_react18.useEffect)(() => {
     if (!open) return void 0;
     const onSiblingOpen = (event) => {
       if (event.detail !== name) requestClose();
@@ -8371,9 +8611,9 @@ function anchorFromEvent(e) {
 function SkillsEntry() {
   ensureModalAnimStyles();
   ensureShellStyles();
-  const [open, setOpen] = (0, import_react18.useState)(false);
-  const [anchor, setAnchor] = (0, import_react18.useState)(null);
-  const onClose = (0, import_react18.useCallback)(() => {
+  const [open, setOpen] = (0, import_react19.useState)(false);
+  const [anchor, setAnchor] = (0, import_react19.useState)(null);
+  const onClose = (0, import_react19.useCallback)(() => {
     setOpen(false);
   }, []);
   const { closing, requestClose } = useModalClose(open, onClose);

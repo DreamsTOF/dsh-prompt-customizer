@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { openDb, getDoc, setDoc } from '../vendor/prompt-customizer/db.js'
 import { apply } from '../vendor/prompt-customizer/index.js'
 
 /** Minimal Cordis ctx：webServer + 已认证的 connection mock，其余服务缺席（可选获取）。 */
@@ -56,16 +57,11 @@ test('reset 的结果（有既有文件 / 无既有文件）', async () => {
     {
       label: 'reset 清空全部定制并关闭 forceSections',
       prepare: (dataDir) => {
-        const configFile = path.join(dataDir, 'config.yaml')
-        fs.mkdirSync(dataDir, { recursive: true })
-        fs.writeFileSync(configFile,
-          'forceSections: true\n' +
-          'sections: [a]\n' +
-          'replace: { b: B }\n' +
-          'overrides:\n  liangshen:\n    sections: [c]\n')
-        return configFile
+        const db = openDb(path.join(dataDir, 'prompt-customizer.db'))
+        setDoc(db, 'config', { forceSections: true, sections: ['a'], replace: { b: 'B' }, overrides: { liangshen: { sections: ['c'] } } })
+        return db
       },
-      check: (res, configFile) => {
+      check: (res, db) => {
         assert.equal(res.status, 200)
         assert.equal(res.body.ok, true)
         // 只剩 forceSections: false —— 其余全部清空
@@ -73,10 +69,11 @@ test('reset 的结果（有既有文件 / 无既有文件）', async () => {
         assert.deepEqual(res.body.config.replace, {})
         assert.deepEqual(res.body.config.overrides, {})
         assert.equal(res.body.config.forceSections, false)
-        // 磁盘上的文件也确实是这份最小状态（不依赖内存缓存）
-        const onDisk = fs.readFileSync(configFile, 'utf8')
-        assert.match(onDisk, /forceSections: false/)
-        assert.ok(!onDisk.includes('sections: [a]'))
+        // DB 里的文档也确实是这份最小状态（不依赖内存缓存）
+        const doc = getDoc(db, 'config')
+        assert.equal(doc.forceSections, false)
+        assert.equal(doc.sections, undefined)
+        assert.equal(doc.overrides, undefined)
       },
     },
     {
@@ -92,10 +89,10 @@ test('reset 的结果（有既有文件 / 无既有文件）', async () => {
   for (const c of cases) {
     try {
       const { ctx, routes, dataDir } = makeCtx()
-      const configFile = c.prepare(dataDir)
+      const db = c.prepare(dataDir)
       apply(ctx, { dataDir })
       const res = await call(routes[RESET])
-      c.check(res, configFile)
+      c.check(res, db)
     } catch (e) {
       e.message = `[${c.label}] ${e.message}`
       throw e

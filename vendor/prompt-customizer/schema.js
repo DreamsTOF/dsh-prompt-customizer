@@ -123,3 +123,35 @@ export const Config = Schema.object({
     }),
   })).default({}),
 })
+
+/**
+ * 工作区级 override：`{ "<工作区绝对 cwd>": <与 overrides 值同形状> }`。
+ * 与预设级区别：预设级按 agent 预设 id 存、只覆盖该预设作用域可见项；工作区级按
+ * 工作区 cwd 存，作用于该工作区所有会话、可覆盖会话里全部段/工具，且在合并时
+ * 覆盖预设级（同名后者胜）。
+ */
+export const WorkspaceOverrides = Schema.dict(Schema.object({
+  sections: Schema.array(Schema.string()),
+  sectionsBootstrap: Schema.array(Schema.string()),
+  sectionsCompaction: Schema.array(Schema.string()),
+  replace: Schema.dict(Schema.string()),
+  inject: Schema.array(Schema.object({
+    name: Schema.string().required(),
+    order: Schema.number().default(120),
+    text: Schema.string().required(),
+    phase: Schema.string().default('always'),
+    custom: Schema.boolean().default(false),
+  })),
+  tools: Schema.object({
+    exclude: Schema.array(Schema.string()),
+    add: Schema.array(Schema.string()),
+    bootstrap: Schema.object({
+      exclude: Schema.array(Schema.string()),
+      add: Schema.array(Schema.string()),
+    }),
+    compaction: Schema.object({
+      exclude: Schema.array(Schema.string()),
+      add: Schema.array(Schema.string()),
+    }),
+  }),
+}))
