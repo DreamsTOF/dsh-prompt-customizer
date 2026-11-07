@@ -28,8 +28,7 @@ import { Config, NS, WorkspaceOverrides } from './schema.js'
 import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
-import { openDb, allDocs, replaceAllDocs, readCatalog, replaceCatalog } from './db.js'
-import { createCatalog } from './catalog.js'
+import { openDb, allDocs, replaceAllDocs } from './db.js'
 import { registerVariables, listVariableNames } from './vars.js'
 import { createPhaseToolVisibility } from './tool-visibility.js'
 
@@ -129,11 +128,6 @@ export function apply(ctx, entry = {}) {
     warn: (message) => { try { ctx.logger?.warn?.(message) } catch { /* logger 缺席 */ } },
   })
   const read = () => store.readResolved()
-  // 「本系统全部提示词 / 全部工具」的累积登记表：落在同一 DB 的 catalog_* 表。
-  const catalog = createCatalog({
-    db,
-    warn: (message) => { try { ctx.logger?.warn?.(message) } catch { /* logger 缺席 */ } },
-  })
   // 工作区级 override（破坏式后与 config 同库、独立 doc）：按工作区绝对 cwd 存一份，
   // 运行时叠加在预设级之上（工作区优先）。
   const wsStore = createConfigStore({
@@ -407,8 +401,8 @@ export function apply(ctx, entry = {}) {
           const target = await acquireTarget(ctx, id)
           try {
             syncVariables()
-            const preview = await buildPreview(ctx, read(), target, 'active', catalog, undefined, undefined, toolMask)
-            const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, catalog, preview)
+            const preview = await buildPreview(ctx, read(), target, 'active', undefined, undefined, undefined, toolMask)
+            const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, undefined, preview)
             writeJson(res, 200, { ...inventory, scopeResolved: target.scopeResolved, variables: listVariableNames(read().envBlocklist ?? []) })
           } finally {
             await target.release()
@@ -446,7 +440,7 @@ export function apply(ctx, entry = {}) {
               && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
               ? body.patch : undefined
             const patchTarget = typeof body?.target === 'string' && body.target.length > 0 ? body.target : undefined
-            const preview = await buildPreview(ctx, read(), target, target.phase, catalog, patch, patchTarget, toolMask)
+            const preview = await buildPreview(ctx, read(), target, target.phase, undefined, patch, patchTarget, toolMask)
             writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved, phase: target.phase, source: target.source })
           } finally {
             await target.release()
@@ -492,7 +486,7 @@ export function apply(ctx, entry = {}) {
           target = await acquireTarget(ctx, presetId)
           syncVariables()
           const status = statusOf(phaseHandle ?? ctx.get('sessionProjections'), live)
-          const preview = await buildSessionPreview(ctx, read(), target.scopeKey, { agent: live, presetId }, status, catalog, toolMask, workspaceOverrideFor(live?.session?.header?.cwd))
+          const preview = await buildSessionPreview(ctx, read(), target.scopeKey, { agent: live, presetId }, status, undefined, toolMask, workspaceOverrideFor(live?.session?.header?.cwd))
           writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
@@ -603,7 +597,6 @@ export function apply(ctx, entry = {}) {
             format: 'dsh-prompt-customizer/backup@1',
             exportedAt: new Date().toISOString(),
             docs: allDocs(db),
-            catalog: readCatalog(db),
           })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
@@ -624,10 +617,6 @@ export function apply(ctx, entry = {}) {
             return
           }
           replaceAllDocs(db, docs)
-          if (body.catalog !== null && typeof body.catalog === 'object') {
-            replaceCatalog(db, body.catalog)
-            try { catalog.reload?.() } catch { /* 目录池刷新失败不影响恢复 */ }
-          }
           toolVisibility.syncAll()
           writeJson(res, 200, { ok: true, config: read(), workspaceOverrides: readWorkspaceOverrides() })
         } catch (error) {
@@ -1118,7 +1107,7 @@ function mergeAgentScopedSections(presetSections, liveSections, denied, replace,
 }
 
 /** 枚举当前生效的段与工具，并附上各自的屏蔽 / 隐藏标记。 */
-async function buildInventory(ctx, raw, scopeKey, presetId, catalog, preview) {
+async function buildInventory(ctx, raw, scopeKey, presetId, undefined, preview) {
   // 生效配置：目标 agent 预设的 override（0.9.0 起无全局基底）。
   const cfg = effectiveConfig(raw.overrides?.[presetId])
   const denied = new Set(cfg.sections ?? [])
@@ -1208,7 +1197,7 @@ async function collectScopeBase(ctx, scopeKey, presetId) {
   }
 }
 
-async function buildPreview(ctx, rawConfig, target, phase, catalog, patch, patchTarget, toolMask) {
+async function buildPreview(ctx, rawConfig, target, phase, undefined, patch, patchTarget, toolMask) {
   const scopeKey = target?.scopeKey
   const hintId = target?.hintId
   const liveAgent = liveAgentForPreset(ctx, hintId)
@@ -1358,7 +1347,7 @@ async function buildPreview(ctx, rawConfig, target, phase, catalog, patch, patch
  * 工具取该 agent 的完整可见集（含 agent 作用域注册与所有 restrict），
  * 段保留 agent 作用域标记，base 列表再补预设注册表里被其它插件遮蔽的工具。
  */
-async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, catalog, toolMask, workspaceOvr) {
+async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, undefined, toolMask, workspaceOvr) {
   const agent = live.agent
   const presetId = live.presetId
   const hint = { scope: agent, agent, promptCustomizerBase: true }

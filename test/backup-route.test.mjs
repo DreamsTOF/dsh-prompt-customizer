@@ -1,5 +1,5 @@
 /**
- * /api/prompt-customizer/backup 与 /restore：整库（docs + catalog）导出 / 恢复。
+ * /api/prompt-customizer/backup 与 /restore：整库 docs 导出 / 恢复。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { apply } from '../vendor/prompt-customizer/index.js'
-import { openDb, getDoc, setDoc, readCatalog, replaceCatalog } from '../vendor/prompt-customizer/db.js'
+import { openDb, getDoc, setDoc } from '../vendor/prompt-customizer/db.js'
 
 function makeCtx() {
   const routes = {}
@@ -33,11 +33,10 @@ function call(handler, method, url, body) {
   })
 }
 
-test('整库备份导出全部 docs + catalog，恢复能整体还原', async () => {
+test('整库备份导出全部 docs，恢复能整体还原', async () => {
   const { routes, db } = makeCtx()
   setDoc(db, 'config', { forceSections: true, overrides: { standard: { sections: ['x'] } } })
   setDoc(db, 'workspace-overrides', { '/ws': { sections: ['y'] } })
-  replaceCatalog(db, { sections: [{ name: 's1', text: 'body' }], tools: [{ name: 'bash', description: 'run' }] })
 
   const backup = await call(routes['/api/prompt-customizer/backup'], 'GET', '/api/prompt-customizer/backup')
   assert.equal(backup.status, 200, JSON.stringify(backup.body))
@@ -45,21 +44,15 @@ test('整库备份导出全部 docs + catalog，恢复能整体还原', async ()
   assert.equal(backup.body.format, 'dsh-prompt-customizer/backup@1')
   assert.deepEqual(backup.body.docs.config.overrides.standard.sections, ['x'])
   assert.deepEqual(backup.body.docs['workspace-overrides']['/ws'].sections, ['y'])
-  assert.deepEqual(backup.body.catalog.tools.map((t) => t.name), ['bash'])
-  assert.deepEqual(backup.body.catalog.sections.map((s) => s.name), ['s1'])
 
   // 破坏当前数据后恢复
   setDoc(db, 'config', { forceSections: false, overrides: {} })
-  replaceCatalog(db, { sections: [], tools: [] })
 
   const restored = await call(routes['/api/prompt-customizer/restore'], 'POST', '/api/prompt-customizer/restore', backup.body)
   assert.equal(restored.status, 200, JSON.stringify(restored.body))
   assert.equal(restored.body.ok, true)
   assert.equal(getDoc(db, 'config').forceSections, true)
   assert.deepEqual(getDoc(db, 'workspace-overrides')['/ws'].sections, ['y'])
-  const catalog = readCatalog(db)
-  assert.deepEqual(catalog.tools.map((t) => t.name), ['bash'])
-  assert.deepEqual(catalog.sections.map((s) => s.name), ['s1'])
 })
 
 test('恢复缺少 docs 时报 400', async () => {
