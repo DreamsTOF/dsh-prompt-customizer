@@ -109,6 +109,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
   const [rescanning, setRescanning] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = (): void => {
@@ -537,6 +539,55 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       .finally(() => setExporting(false))
   }
 
+  // 全量备份：整库（全部提示词配置 + 工作区 override + 目录池 + 账本）导出为 JSON。
+  const backupAll = (): void => {
+    if (backingUp) return
+    setBackingUp(true)
+    fetch('/api/prompt-customizer/backup')
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'backup failed')
+        const filename = `dsh-prompt-customizer-backup-${new Date().toISOString().slice(0, 10)}.json`
+        const text = JSON.stringify(body, null, 2)
+        const io = makeIoEnv()
+        void io.saveText(filename, text).then((outcome) => {
+          if (outcome.kind === 'saved') showFlash(t('backupOk', { name: filename }), 'ok')
+          else if (outcome.kind === 'unavailable') { io.download(filename, text); showFlash(t('backupOk', { name: filename }), 'ok') }
+        })
+      })
+      .catch((e: unknown) => showFlash(`${t('backupFail')}：${String(e instanceof Error ? e.message : e)}`, 'err'))
+      .finally(() => setBackingUp(false))
+  }
+
+  // 恢复：解析备份 JSON → 二次确认 → 整库替换。
+  const restoreAll = (text: string): void => {
+    let parsed: { format?: unknown; docs?: unknown; catalog?: unknown }
+    try { parsed = JSON.parse(text) } catch { showFlash(t('restoreBadFormat'), 'err'); return }
+    if (parsed?.format !== 'dsh-prompt-customizer/backup@1' || parsed.docs === null || typeof parsed.docs !== 'object') {
+      showFlash(t('restoreBadFormat'), 'err')
+      return
+    }
+    if (!window.confirm(t('restoreConfirm'))) return
+    setRestoring(true)
+    fetch('/api/prompt-customizer/restore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(parsed),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'restore failed')
+        setCfg(body.config as Config)
+        if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
+        clearDraft()
+        setError(null)
+        setVersion((n) => n + 1)
+        showFlash(t('restoreOk'), 'ok')
+      })
+      .catch((e: unknown) => setError(`${t('restoreFail')}: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => setRestoring(false))
+  }
+
   const modeBtn = (key: PanelMode, label: string): ReactElement =>
     h('button', { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label)
 
@@ -725,6 +776,10 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
                 writeGlobal,
                 onExportPreset: exportCurrentPreset,
                 exporting,
+                onBackupAll: backupAll,
+                onRestoreAll: restoreAll,
+                backingUp,
+                restoring,
                 exportTarget: target ? (agentPresets.find((p) => p.id === target)?.name ?? target) : undefined,
                 onReset: resetAll,
                 envBlocklist: cfg.envBlocklist ?? [],

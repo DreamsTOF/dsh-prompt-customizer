@@ -189,7 +189,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   ])
 }
 
-export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist }: {
+export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }: {
   cfg: Config
   inv: Inventory | null
   t: Translate
@@ -204,9 +204,16 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporti
   /** 恢复初始状态：清空全部定制并关闭 forceSections（与不装插件等效）。 */
   onReset: () => void
   envBlocklist: string[]
+  /** 全量备份（整库：全部提示词 + 工具 + 工作区 + 账本）。 */
+  onBackupAll: () => void
+  /** 恢复备份（传入备份 JSON 文本）。 */
+  onRestoreAll: (text: string) => void
+  backingUp: boolean
+  restoring: boolean
 }): ReactElement {
   // 黑名单「添加」输入框的暂存值。
   const [blockInput, setBlockInput] = useState('')
+  const backupFileRef = useRef<HTMLInputElement | null>(null)
 
   // 环境变量黑名单：全局字段，改动即写（与 forceSections 同一通道，不经草稿）。
   const removeBlockEntry = (entry: string): void => {
@@ -230,6 +237,28 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporti
             disabled: exporting,
             onClick: onExportPreset,
           }, exporting ? t('exportPresetRunning') : t('exportPreset')),
+        ]),
+      ]),
+      h('div', { style: s.injectBox }, [
+        h('div', { style: s.rowTitle }, t('backupTitle')),
+        h('div', { style: s.muted }, t('backupHint')),
+        h('div', { style: s.injectRow }, [
+          h('button', { style: s.mini, disabled: backingUp, onClick: onBackupAll }, backingUp ? t('backupExportRunning') : t('backupExport')),
+          h('button', { style: s.mini, disabled: restoring, onClick: () => backupFileRef.current?.click() }, restoring ? t('backupRestoreRunning') : t('backupRestore')),
+          h('input', {
+            ref: backupFileRef,
+            type: 'file',
+            accept: '.json,application/json',
+            style: { display: 'none' },
+            onChange: (e: ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = () => onRestoreAll(String(reader.result))
+              reader.readAsText(file)
+            },
+          }),
         ]),
       ]),
       h('div', { style: s.groupHead }, t('settingsTitle')),

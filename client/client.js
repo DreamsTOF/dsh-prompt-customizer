@@ -3199,8 +3199,9 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     ])
   ]);
 }
-function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist }) {
+function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exportTarget, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }) {
   const [blockInput, setBlockInput] = (0, import_react6.useState)("");
+  const backupFileRef = (0, import_react6.useRef)(null);
   const removeBlockEntry = (entry) => {
     writeGlobal("envBlocklist", envBlocklist.filter((e) => e !== entry));
   };
@@ -3221,6 +3222,28 @@ function SettingsPane({ cfg, inv, t, writeGlobal, onExportPreset, exporting, exp
             disabled: exporting,
             onClick: onExportPreset
           }, exporting ? t("exportPresetRunning") : t("exportPreset"))
+        ])
+      ]),
+      (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("backupTitle")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("backupHint")),
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("button", { style: s.mini, disabled: backingUp, onClick: onBackupAll }, backingUp ? t("backupExportRunning") : t("backupExport")),
+          (0, import_react6.createElement)("button", { style: s.mini, disabled: restoring, onClick: () => backupFileRef.current?.click() }, restoring ? t("backupRestoreRunning") : t("backupRestore")),
+          (0, import_react6.createElement)("input", {
+            ref: backupFileRef,
+            type: "file",
+            accept: ".json,application/json",
+            style: { display: "none" },
+            onChange: (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => onRestoreAll(String(reader.result));
+              reader.readAsText(file);
+            }
+          })
         ])
       ]),
       (0, import_react6.createElement)("div", { style: s.groupHead }, t("settingsTitle")),
@@ -3394,6 +3417,8 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
   const [rescanning, setRescanning] = (0, import_react9.useState)(false);
   const [exporting, setExporting] = (0, import_react9.useState)(false);
+  const [backingUp, setBackingUp] = (0, import_react9.useState)(false);
+  const [restoring, setRestoring] = (0, import_react9.useState)(false);
   const flashTimer = (0, import_react9.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
@@ -3694,6 +3719,51 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       });
     }).catch((e) => showFlash(`${t("exportPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setExporting(false));
   };
+  const backupAll = () => {
+    if (backingUp) return;
+    setBackingUp(true);
+    fetch("/api/prompt-customizer/backup").then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? "backup failed");
+      const filename = `dsh-prompt-customizer-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
+      const text = JSON.stringify(body, null, 2);
+      const io = makeIoEnv();
+      void io.saveText(filename, text).then((outcome) => {
+        if (outcome.kind === "saved") showFlash(t("backupOk", { name: filename }), "ok");
+        else if (outcome.kind === "unavailable") {
+          io.download(filename, text);
+          showFlash(t("backupOk", { name: filename }), "ok");
+        }
+      });
+    }).catch((e) => showFlash(`${t("backupFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setBackingUp(false));
+  };
+  const restoreAll = (text) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      showFlash(t("restoreBadFormat"), "err");
+      return;
+    }
+    if (parsed?.format !== "dsh-prompt-customizer/backup@1" || parsed.docs === null || typeof parsed.docs !== "object") {
+      showFlash(t("restoreBadFormat"), "err");
+      return;
+    }
+    if (!window.confirm(t("restoreConfirm"))) return;
+    setRestoring(true);
+    fetch("/api/prompt-customizer/restore", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed)
+    }).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? "restore failed");
+      setCfg(body.config);
+      if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);
+      clearDraft();
+      setError(null);
+      setVersion((n) => n + 1);
+      showFlash(t("restoreOk"), "ok");
+    }).catch((e) => setError(`${t("restoreFail")}: ${e instanceof Error ? e.message : String(e)}`)).finally(() => setRestoring(false));
+  };
   const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
   const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
   const draftDirty = draft?.dirty === true;
@@ -3856,6 +3926,10 @@ function Panel({ t, onClose, level = "preset", workspace }) {
           writeGlobal,
           onExportPreset: exportCurrentPreset,
           exporting,
+          onBackupAll: backupAll,
+          onRestoreAll: restoreAll,
+          backingUp,
+          restoring,
           exportTarget: target ? agentPresets.find((p) => p.id === target)?.name ?? target : void 0,
           onReset: resetAll,
           envBlocklist: cfg.envBlocklist ?? []
@@ -3910,6 +3984,18 @@ var DICT = {
     savePreset: "\u4FDD\u5B58\u5F53\u524D\u914D\u7F6E",
     presetName: "\u914D\u7F6E\u540D\u79F0",
     exportPresetCard: "\u5BFC\u51FA\u5F53\u524D\u9884\u8BBE\u914D\u7F6E",
+    backupTitle: "\u5B8C\u6574\u5907\u4EFD\uFF08\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177\uFF09",
+    backupHint: "\u6574\u5E93\u5BFC\u51FA\uFF1A\u6240\u6709\u9884\u8BBE\u4E0E\u5DE5\u4F5C\u533A\u7684\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u76EE\u5F55\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\u3001MCP/\u6280\u80FD\u8D26\u672C\uFF0C\u4E00\u4E2A JSON\u3002\u6062\u590D\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u6570\u636E\u3002",
+    backupExport: "\u5BFC\u51FA\u5B8C\u6574\u5907\u4EFD",
+    backupExportRunning: "\u5BFC\u51FA\u4E2D\u2026",
+    backupRestore: "\u6062\u590D\u5907\u4EFD",
+    backupRestoreRunning: "\u6062\u590D\u4E2D\u2026",
+    backupOk: "\u5DF2\u5BFC\u51FA {name}",
+    backupFail: "\u5BFC\u51FA\u5907\u4EFD\u5931\u8D25",
+    restoreOk: "\u5DF2\u6062\u590D\u5907\u4EFD",
+    restoreFail: "\u6062\u590D\u5907\u4EFD\u5931\u8D25",
+    restoreBadFormat: "\u4E0D\u662F\u6709\u6548\u7684\u5907\u4EFD\u6587\u4EF6\uFF08\u683C\u5F0F\u4E0D\u5339\u914D\uFF09",
+    restoreConfirm: "\u6062\u590D\u5907\u4EFD\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177 / \u5DE5\u4F5C\u533A / \u8D26\u672C\u6570\u636E\uFF0C\u786E\u5B9A\u7EE7\u7EED\uFF1F",
     exportPresetHint: "\u628A\u300C{name}\u300D\u5728\u672C\u63D2\u4EF6\u91CC\u7684\u5168\u90E8\u5B9A\u5236\uFF08\u6BB5\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165\u3001\u4E09\u9636\u6BB5\u5DE5\u5177\u76EE\u5F55\u3001forceSections\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF09\u8FDE\u540C\u8BE5\u9884\u8BBE\u7684\u7EC4\u6210\u58F0\u660E\u5BFC\u51FA\u4E3A JSON\u3002\u53EA\u8BFB\u5BFC\u51FA\uFF0C\u4E0D\u6539\u52A8 DSH \u914D\u7F6E\uFF1B\u8981\u653E\u8FDB DSH \u8BF7\u81EA\u884C\u5E76\u5165 cordis \u914D\u7F6E\u3002",
     exportPreset: "\u5BFC\u51FA",
     exportPresetRunning: "\u5BFC\u51FA\u4E2D\u2026",
@@ -4097,6 +4183,18 @@ var DICT = {
     savePreset: "Save current config",
     presetName: "Config name",
     exportPresetCard: "Export this preset's configuration",
+    backupTitle: "Full backup (all prompts / tools)",
+    backupHint: "Whole-DB export: prompts, tool catalog, env blocklist, and MCP/skill ledgers across every preset and workspace, in one JSON. Restore overwrites current data.",
+    backupExport: "Export full backup",
+    backupExportRunning: "Exporting\u2026",
+    backupRestore: "Restore backup",
+    backupRestoreRunning: "Restoring\u2026",
+    backupOk: "Exported {name}",
+    backupFail: "Backup export failed",
+    restoreOk: "Backup restored",
+    restoreFail: "Restore failed",
+    restoreBadFormat: "Not a valid backup file (format mismatch)",
+    restoreConfirm: "Restoring will overwrite ALL current prompt / tool / workspace / ledger data. Continue?",
     exportPresetHint: "Export everything this plugin customizes for '{name}' (section blocking / replacement / injection, per-phase tool catalogs, forceSections, env blocklist) plus that preset's composition declaration, as JSON. Read-only: it never touches your DSH configuration \u2014 merge it into your cordis config yourself.",
     exportPreset: "Export",
     exportPresetRunning: "Exporting\u2026",

@@ -28,7 +28,7 @@ import { Config, NS, WorkspaceOverrides } from './schema.js'
 import { effectiveConfig, pickToolsFilter, pickSectionsForStatus, applySectionPolicy, mergeOverrideLayers } from './effective.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
-import { openDb } from './db.js'
+import { openDb, allDocs, replaceAllDocs, readCatalog, replaceCatalog } from './db.js'
 import { createCatalog } from './catalog.js'
 import { registerVariables, listVariableNames } from './vars.js'
 import { createPhaseToolVisibility } from './tool-visibility.js'
@@ -664,6 +664,51 @@ export function apply(ctx, entry = {}) {
       },
     })
     ctx.effect(() => disposeExport, 'prompt-customizer: export route')
+
+    // 全量备份 / 恢复：整库（全部提示词配置 + 工作区 override + 目录池 + MCP/技能账本）一次导出/导入。
+    const disposeBackup = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/backup',
+      handler: async (_req, res) => {
+        try {
+          writeJson(res, 200, {
+            ok: true,
+            format: 'dsh-prompt-customizer/backup@1',
+            exportedAt: new Date().toISOString(),
+            docs: allDocs(db),
+            catalog: readCatalog(db),
+          })
+        } catch (error) {
+          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeBackup, 'prompt-customizer: backup route')
+
+    const disposeRestore = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/restore',
+      handler: async (req, res) => {
+        try {
+          const body = await readJsonBody(req)
+          const docs = body?.docs
+          if (docs === null || typeof docs !== 'object' || Array.isArray(docs)) {
+            writeJson(res, 400, { ok: false, error: 'backup.docs object is required' })
+            return
+          }
+          replaceAllDocs(db, docs)
+          if (body.catalog !== null && typeof body.catalog === 'object') {
+            replaceCatalog(db, body.catalog)
+            try { catalog.reload?.() } catch { /* 目录池刷新失败不影响恢复 */ }
+          }
+          toolVisibility.syncAll()
+          writeJson(res, 200, { ok: true, config: read(), workspaceOverrides: readWorkspaceOverrides() })
+        } catch (error) {
+          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeRestore, 'prompt-customizer: restore route')
 
 
     // 配置读写路由（插件自有 config.yaml 的前端通道）：

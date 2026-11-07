@@ -85,6 +85,30 @@ export function delDoc(db, key) {
   db.prepare('DELETE FROM doc WHERE key = ?').run(key)
 }
 
+/** 导出全部文档（整库备份用）。返回 `{ key: value }`。 */
+export function allDocs(db) {
+  const rows = db.prepare('SELECT key, json FROM doc').all()
+  const out = {}
+  for (const row of rows) {
+    try { out[row.key] = JSON.parse(row.json) } catch { /* 跳过坏 JSON */ }
+  }
+  return out
+}
+
+/** 用一份文档集整体替换 doc 表（恢复备份用；事务内完成）。 */
+export function replaceAllDocs(db, docs) {
+  const entries = docs !== null && typeof docs === 'object' ? Object.entries(docs) : []
+  db.exec('BEGIN')
+  try {
+    db.prepare('DELETE FROM doc').run()
+    for (const [key, value] of entries) setDoc(db, key, value)
+    db.exec('COMMIT')
+  } catch (error) {
+    try { db.exec('ROLLBACK') } catch { /* ignore */ }
+    throw error
+  }
+}
+
 /**
  * 本插件单文件 DB 的默认路径：`$DSH_HOME/prompt-customizer/prompt-customizer.db`
  * （与 vendor 半身 `dshHome()/NS` 的默认 dataDir 一致），供 src 侧各账本共用。
