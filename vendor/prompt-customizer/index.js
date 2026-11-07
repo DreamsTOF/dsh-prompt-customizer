@@ -830,15 +830,32 @@ async function acquireTarget(ctx, id) {
  * @param {object|undefined} scopeKey - agent 预设 scope key。
  * @returns {Array<{name: string, description?: string}>} 工具 schema 列表。
  */
-function toolSchemasOf(ctx, scopeKey) {
-  const scopes = scopeKey === undefined ? [undefined] : [scopeKey, undefined]
-  for (const scope of scopes) {
-    try {
-      const schemas = ctx.tools?.schemas?.(scope) ?? []
-      if (Array.isArray(schemas) && schemas.length > 0) return schemas
-    } catch { /* scope 尚未就绪：尝试下一层 */ }
+function toolSchemasOf(ctx, scopeKey, mergeGlobal = false) {
+  // mergeGlobal：预设 scope 的专属工具 ∪ 全局工具（去重，预设优先）——避免“预设 scope 非空就
+  // 丢掉全局工具”。agent scope 不合并全局（否则检测不到被 restrict 掉的工具）。
+  if (!mergeGlobal) {
+    const scopes = scopeKey === undefined ? [undefined] : [scopeKey, undefined]
+    for (const scope of scopes) {
+      try {
+        const schemas = ctx.tools?.schemas?.(scope) ?? []
+        if (Array.isArray(schemas) && schemas.length > 0) return schemas
+      } catch { /* 未就绪 */ }
+    }
+    return []
   }
-  return []
+  const byName = new Map()
+  const order = []
+  const absorb = (list) => {
+    for (const tool of Array.isArray(list) ? list : []) {
+      const name = String(tool?.name ?? '')
+      if (name === '' || byName.has(name)) continue
+      byName.set(name, tool)
+      order.push(name)
+    }
+  }
+  if (scopeKey !== undefined) { try { absorb(ctx.tools?.schemas?.(scopeKey)) } catch { /* 未就绪 */ } }
+  try { absorb(ctx.tools?.schemas?.(undefined)) } catch { /* 未就绪 */ }
+  return order.map((name) => byName.get(name))
 }
 
 /** 该 agent 的预设 id：0.2.2 的 presetForSession 优先，旧宿主回落到 header / 投影。 */
@@ -956,19 +973,35 @@ async function ownMaskedToolNames(toolMask, presetId, names, cwd) {
  * 时是**不同对象**。旧宿主 / 测试没有 `tools.definitions` 时返回 null，调用方退化
  * 为「同名即同一工具」。
  */
-function toolDefsOf(ctx, scopeKey) {
+function toolDefsOf(ctx, scopeKey, mergeGlobal = false) {
   if (typeof ctx.tools?.definitions !== 'function') return null
-  const scopes = scopeKey === undefined ? [undefined] : [scopeKey, undefined]
-  for (const scope of scopes) {
+  const mapOf = (defs) => {
+    const map = new Map()
+    for (const def of Array.isArray(defs) ? defs : []) if (def?.name !== undefined) map.set(String(def.name), def)
+    return map
+  }
+  if (!mergeGlobal) {
+    const scopes = scopeKey === undefined ? [undefined] : [scopeKey, undefined]
+    for (const scope of scopes) {
+      let defs = []
+      try { defs = ctx.tools.definitions(scope) ?? [] } catch { defs = [] }
+      if (Array.isArray(defs) && defs.length > 0) return mapOf(defs)
+    }
+    return null
+  }
+  const map = new Map()
+  const absorb = (scope, override) => {
     let defs = []
     try { defs = ctx.tools.definitions(scope) ?? [] } catch { defs = [] }
-    if (Array.isArray(defs) && defs.length > 0) {
-      const map = new Map()
-      for (const def of defs) if (def?.name !== undefined) map.set(String(def.name), def)
-      return map
+    for (const def of Array.isArray(defs) ? defs : []) {
+      if (def?.name === undefined) continue
+      const name = String(def.name)
+      if (override || !map.has(name)) map.set(name, def)
     }
   }
-  return null
+  if (scopeKey !== undefined) absorb(scopeKey, true)
+  absorb(undefined, false)
+  return map.size > 0 ? map : null
 }
 
 /**
@@ -984,10 +1017,10 @@ function toolDefsOf(ctx, scopeKey) {
  * 不允许本插件反向解除，UI 据此置灰。
  */
 async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, options = {}) {
-  const presetTools = toolSchemasOf(ctx, presetScopeKey)
+  const presetTools = toolSchemasOf(ctx, presetScopeKey, true)
   const liveTools = liveAgent === undefined ? [] : toolSchemasOf(ctx, liveAgent)
   const extraTools = Array.isArray(options.extraTools) ? options.extraTools : []
-  const presetDefs = toolDefsOf(ctx, presetScopeKey)
+  const presetDefs = toolDefsOf(ctx, presetScopeKey, true)
   const liveDefs = liveAgent === undefined ? null : toolDefsOf(ctx, liveAgent)
   const hasLive = liveAgent !== undefined
   const presetByName = new Map()
