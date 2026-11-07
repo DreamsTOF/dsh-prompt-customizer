@@ -5433,11 +5433,18 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const ownNames = new Set(ownRows.map((row) => row.serverName));
   const globalOff = ready?.toolDisabled ?? {};
   const presetTables = ready?.toolDisabledByPreset ?? {};
+  const workspaceDisabledTools = new Set(workspace !== null ? ready?.workspaceToolDisabled?.[workspace] ?? [] : []);
   const offOf = (serverName, owner) => {
     const entry = presetTables[scope]?.[serverName];
-    if (owner === "own") return entry?.own ?? [];
-    if (scope === "") return globalOff[serverName] ?? [];
-    return [.../* @__PURE__ */ new Set([...globalOff[serverName] ?? [], ...entry?.inherit ?? []])];
+    let base;
+    if (owner === "own") base = entry?.own ?? [];
+    else if (scope === "") base = globalOff[serverName] ?? [];
+    else base = [.../* @__PURE__ */ new Set([...globalOff[serverName] ?? [], ...entry?.inherit ?? []])];
+    if (level === "workspace") {
+      const prefix = `mcp__${serverName}__`;
+      base = [.../* @__PURE__ */ new Set([...base, ...[...workspaceDisabledTools].filter((n) => n.startsWith(prefix))])];
+    }
+    return base;
   };
   const lockedOf = (serverName) => new Set(scope === "" ? [] : globalOff[serverName] ?? []);
   const maskInstall = ready?.maskInstall?.[scope];
@@ -5539,6 +5546,32 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
     });
   };
   const toggleTool = (serverName, fullName, enabled, source) => {
+    if (level === "workspace") {
+      if (workspace === null) {
+        setError("no active workspace");
+        return;
+      }
+      if (toolBusy !== null || busy !== null) return;
+      setToolBusy(fullName);
+      setError(null);
+      void fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, {
+        method: "PUT",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ name: fullName, enabled })
+      }).then(async (response) => {
+        const body = await response.json().catch(() => null);
+        if (response.ok && body?.ok === true) {
+          onRefresh();
+          return;
+        }
+        throw new Error(body?.error ?? String(response.status));
+      }).catch((cause) => {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }).finally(() => {
+        setToolBusy(null);
+      });
+      return;
+    }
     putTools(serverName, [fullName], enabled, source);
   };
   const removeOwn = (serverName) => {

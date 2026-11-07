@@ -40,7 +40,7 @@ import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
 import { applyMcpToolDisable, isToolDisabled, presetOwnsServer, serverOfToolName } from './mcp-tool-disable.js'
-import { applyMcpWorkspaceScope, closedServersInWorkspace } from './mcp-workspace-scope.ts'
+import { applyMcpWorkspaceScope, closedServersInWorkspace, disabledToolsInWorkspace } from './mcp-workspace-scope.ts'
 import { maskedServersOf, readMaskLedger } from './mcp-mask-ledger.js'
 
 /** Stable Cordis plugin name. */
@@ -76,8 +76,18 @@ async function maskedToolsOfPlugin(presetId: string, names: string[], cwd?: stri
       closedServers = await closedServersInWorkspace(cwd)
     } catch { /* 工作区账本不可读：按无遮蔽处理 */ }
   }
+  let workspaceDisabled = new Set<string>()
+  if (typeof cwd === 'string' && cwd.trim() !== '') {
+    try {
+      workspaceDisabled = await disabledToolsInWorkspace(cwd)
+    } catch { /* 工作区工具禁用账本不可读：按无禁用处理 */ }
+  }
   for (const name of names) {
     try {
+      if (workspaceDisabled.has(name)) {
+        masked.add(name)
+        continue
+      }
       if (isToolDisabled(name, presetId)) {
         masked.add(name)
         continue

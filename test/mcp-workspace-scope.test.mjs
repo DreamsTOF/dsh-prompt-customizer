@@ -11,7 +11,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { readPluginDoc, closeAllDbs } from '../vendor/prompt-customizer/db.js'
 
 /** 在沙箱里跑，不碰用户真实的 ~/.agents。 */
@@ -180,6 +180,51 @@ test('工作区级关闭：通过路由写入并按 cwd 回报状态', async () 
       assert.deepEqual(finalStatus.body.closed, ['anysearch'], '多次覆盖后账本仍正确')
       const onDisk = readPluginDoc('mcp/workspace-close')
       assert.equal(onDisk.workspaces[workspace].anysearch, false, '落盘内容与内存一致')
+    })
+  } finally {
+    closeAllDbs()
+    rmSync(box.root, { recursive: true, force: true })
+  }
+})
+
+test('工作区级工具禁用：路由写入 + 装配剔除 + 别的工作区不受影响', async () => {
+  const box = sandbox()
+  try {
+    const workspace = join(box.root, 'proj')
+    mkdirSync(workspace, { recursive: true })
+    await withEnv({ DSH_AGENTS_HOME: box.agentsHome, DSH_HOME: box.dshHome }, async () => {
+      const scope = await import('../src/mcp-workspace-scope.ts')
+      const ctx = fakeCtx()
+      scope.applyMcpWorkspaceScope(ctx)
+      await new Promise((done) => setTimeout(done, 10))
+      const route = ctx.routes.find((item) => item.path === '/api/triad/mcp-workspace-scope')
+      assert.ok(route !== undefined, '路由已挂载')
+      const call = (method, url, body) => new Promise((resolveCall, reject) => {
+        const req = {
+          method,
+          url,
+          socket: { remoteAddress: '127.0.0.1' },
+          [Symbol.asyncIterator]: async function* iterate() {
+            if (body !== undefined) yield Buffer.from(JSON.stringify(body))
+          },
+        }
+        const res = {
+          statusCode: 0,
+          payload: '',
+          writeHead(code) { this.statusCode = code; return this },
+          end(chunk) { this.payload = chunk ?? ''; resolveCall({ status: this.statusCode, body: JSON.parse(this.payload || '{}') }) },
+        }
+        try { route.handler(req, res) } catch (error) { reject(error) }
+      })
+      const tools = ['mcp__anysearch__search', 'mcp__anysearch__score']
+      const put = await call('PUT', `/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, { name: 'mcp__anysearch__search', enabled: false })
+      assert.equal(put.status, 200, JSON.stringify(put.body))
+      const ledger = readPluginDoc('mcp/workspace-tool-disable')
+      assert.deepEqual(ledger.workspaces[resolve(workspace)], ['mcp__anysearch__search'], '落库形状正确')
+      const inWs = await assemble(ctx, workspace, tools)
+      assert.deepEqual(inWs, ['mcp__anysearch__score'], '被工作区禁用的工具在装配里被剔除')
+      const other = await assemble(ctx, join(box.root, 'other'), tools)
+      assert.deepEqual(other, tools, '别的工作区不受影响')
     })
   } finally {
     closeAllDbs()

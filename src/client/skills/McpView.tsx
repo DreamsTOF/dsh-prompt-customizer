@@ -135,6 +135,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
    * 预设自带的卡只看预设层 —— 与继承来的全局 Server 彻底分离（不同名前缀也不会互相牵连）。 */
   const globalOff = ready?.toolDisabled ?? {}
   const presetTables = ready?.toolDisabledByPreset ?? {}
+  const workspaceDisabledTools = new Set<string>(workspace !== null ? (ready?.workspaceToolDisabled?.[workspace] ?? []) : [])
   /**
    * 某条「行」的有效禁用集合（同名也彻底独立）：
    *   inherit（继承的全局行）= 全局层 ∪ inherit 条目；own（预设自带行）= 仅 own 条目。
@@ -142,9 +143,15 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
    */
   const offOf = (serverName: string, owner: 'own' | 'inherit'): string[] => {
     const entry = presetTables[scope]?.[serverName]
-    if (owner === 'own') return entry?.own ?? []
-    if (scope === '') return globalOff[serverName] ?? []
-    return [...new Set([...(globalOff[serverName] ?? []), ...(entry?.inherit ?? [])])]
+    let base: string[]
+    if (owner === 'own') base = entry?.own ?? []
+    else if (scope === '') base = globalOff[serverName] ?? []
+    else base = [...new Set([...(globalOff[serverName] ?? []), ...(entry?.inherit ?? [])])]
+    if (level === 'workspace') {
+      const prefix = `mcp__${serverName}__`
+      base = [...new Set([...base, ...[...workspaceDisabledTools].filter(n => n.startsWith(prefix))])]
+    }
+    return base
   }
   /** 全局层已禁用的名字：继承行无法在预设层打开它（与技能面板同模型）。 */
   const lockedOf = (serverName: string): Set<string> => new Set(scope === '' ? [] : globalOff[serverName] ?? [])
@@ -251,6 +258,25 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       .finally(() => { setToolBusy(null) })
   }
   const toggleTool = (serverName: string, fullName: string, enabled: boolean, source: 'own' | 'inherit'): void => {
+    if (level === 'workspace') {
+      if (workspace === null) { setError('no active workspace'); return }
+      if (toolBusy !== null || busy !== null) return
+      setToolBusy(fullName)
+      setError(null)
+      void fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ name: fullName, enabled }),
+      })
+        .then(async (response) => {
+          const body = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null
+          if (response.ok && body?.ok === true) { onRefresh(); return }
+          throw new Error(body?.error ?? String(response.status))
+        })
+        .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
+        .finally(() => { setToolBusy(null) })
+      return
+    }
     putTools(serverName, [fullName], enabled, source)
   }
   const removeOwn = (serverName: string): void => {

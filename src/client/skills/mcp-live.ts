@@ -49,6 +49,8 @@ export interface LiveMcpState {
    * 只影响该工作区的会话；换工作区照常注入（因此工具集合随工作区变化）。
    */
   workspaceClosed?: Record<string, Record<string, boolean>>
+  /** 工作区级工具禁用账本：`{ 工作区绝对路径: mcp__ 工具全名[] }`。 */
+  workspaceToolDisabled?: Record<string, string[]>
   /** 工具级禁用·全局层镜像：serverName → 禁用工具全名（所有预设生效）。 */
   toolDisabled?: Record<string, string[]>
   /** 工具级禁用·预设层镜像（按「行」分账）：presetId → serverName → { own, inherit }。 */

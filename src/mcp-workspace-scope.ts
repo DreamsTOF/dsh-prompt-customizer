@@ -121,6 +121,65 @@ export async function setWorkspaceServer(cwd: string, serverName: string, enable
   return next
 }
 
+/** 工作区级工具禁用账本：`{ version: 1, workspaces: { <cwd>: string[] } }`（存被禁用的工具全名）。 */
+export interface WorkspaceToolDisableLedger { version: 1; workspaces: Record<string, string[]> }
+const TOOL_LEDGER_KEY = 'mcp/workspace-tool-disable'
+
+function normalizeToolDisable(input: unknown): WorkspaceToolDisableLedger {
+  const workspaces: Record<string, string[]> = {}
+  const raw = (input !== null && typeof input === 'object' ? (input as Record<string, unknown>).workspaces : undefined)
+  if (raw !== null && typeof raw === 'object') {
+    for (const [cwd, list] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof cwd !== 'string' || cwd.trim() === '') continue
+      if (!Array.isArray(list)) continue
+      const names = [...new Set(list.filter((n): n is string => typeof n === 'string' && n.startsWith('mcp__') && n.length > 5))]
+      workspaces[resolve(cwd)] = names
+    }
+  }
+  return { version: 1, workspaces }
+}
+
+let toolCache: WorkspaceToolDisableLedger | undefined
+
+async function readToolDisableLedger(): Promise<WorkspaceToolDisableLedger> {
+  let parsed: unknown
+  try { parsed = readPluginDoc(TOOL_LEDGER_KEY) } catch { parsed = undefined }
+  toolCache = normalizeToolDisable(parsed)
+  return toolCache
+}
+
+async function writeToolDisableLedger(next: WorkspaceToolDisableLedger): Promise<void> {
+  writePluginDoc(TOOL_LEDGER_KEY, next)
+  toolCache = next
+}
+
+/** 同步读取当前内存镜像（状态接口用）。 */
+export function workspaceToolDisabledLedger(): WorkspaceToolDisableLedger {
+  return toolCache ?? { version: 1, workspaces: {} }
+}
+
+/** 某工作区被禁用的工具全名集合（预览等只读消费方用）。 */
+export async function disabledToolsInWorkspace(cwd: string): Promise<Set<string>> {
+  const ledger = toolCache ?? await readToolDisableLedger()
+  return new Set(ledger.workspaces[resolve(cwd)] ?? [])
+}
+
+/** 设置「某工作区 × 某工具」的启用/禁用；enabled=true 移除（回落）。 */
+export async function setWorkspaceToolDisabled(cwd: string, fullName: string, enabled: boolean): Promise<WorkspaceToolDisableLedger> {
+  if (typeof fullName !== 'string' || !fullName.startsWith('mcp__')) throw new Error('fullName must be an mcp__ tool name')
+  const ledger = await readToolDisableLedger()
+  const key = resolve(cwd)
+  const current = new Set(ledger.workspaces[key] ?? [])
+  if (enabled) current.delete(fullName)
+  else current.add(fullName)
+  const workspaces = { ...ledger.workspaces }
+  if (current.size === 0) delete workspaces[key]
+  else workspaces[key] = [...current]
+  const next: WorkspaceToolDisableLedger = { version: 1, workspaces }
+  await writeToolDisableLedger(next)
+  return next
+}
+
 /** 从工具全名解析 serverName（`mcp__<server>__<tool>`）。 */
 function serverOfToolName(fullName: string): string | undefined {
   if (!fullName.startsWith('mcp__')) return undefined
@@ -164,17 +223,19 @@ function installAgentRestrictions(ctx: PluginContext): () => void {
     if (stopped || agent === null || typeof agent !== 'object' || agent.ctx === undefined) return
     const ledger = cache
     const cwd = agent?.session?.header?.cwd
-    const closed = ledger !== undefined && typeof cwd === 'string' && cwd.trim() !== ''
-      ? closedInWorkspace(ledger, cwd)
+    const hasCwd = typeof cwd === 'string' && cwd.trim() !== ''
+    const closed = ledger !== undefined && hasCwd ? closedInWorkspace(ledger, cwd) : new Set<string>()
+    const disabledTools = hasCwd
+      ? new Set<string>((toolCache ?? { version: 1, workspaces: {} }).workspaces[resolve(cwd)] ?? [])
       : new Set<string>()
     const tools = agent.ctx.get?.('tools')
     if (typeof tools?.restrict !== 'function') return
     const names = globalNames()
-    const deny = closed.size === 0
+    const deny = closed.size === 0 && disabledTools.size === 0
       ? []
       : [...names].filter((name) => {
           const serverName = serverOfToolName(name)
-          return serverName !== undefined && closed.has(serverName)
+          return disabledTools.has(name) || (serverName !== undefined && closed.has(serverName))
         })
     const key = deny.join('\u0000')
     const current = installed.get(agent)
@@ -255,19 +316,23 @@ function installAssembleFilter(ctx: PluginContext): void {
       next: () => Promise<unknown>,
     ): Promise<unknown> => {
       const ledger = cache
+      const toolLedger = toolCache
+      const noClose = ledger === undefined || Object.keys(ledger.workspaces).length === 0
+      const noTools = toolLedger === undefined || Object.keys(toolLedger.workspaces).length === 0
       // 快通道：没有任何工作区记录时零开销放行。
-      if (ledger === undefined || Object.keys(ledger.workspaces).length === 0 || !Array.isArray(assembly?.tools)) {
+      if ((noClose && noTools) || !Array.isArray(assembly?.tools)) {
         return next()
       }
       const cwd = assemblyCwd(context)
       if (cwd === undefined) return next()
       const closed = closedInWorkspace(ledger, cwd)
-      if (closed.size === 0) return next()
+      const disabledTools = new Set<string>((toolLedger ?? { version: 1, workspaces: {} }).workspaces[cwd] ?? [])
+      if (closed.size === 0 && disabledTools.size === 0) return next()
       for (let index = assembly.tools.length - 1; index >= 0; index -= 1) {
         const name = assembly.tools[index]?.name
         if (typeof name !== 'string') continue
         const serverName = serverOfToolName(name)
-        if (serverName !== undefined && closed.has(serverName)) assembly.tools.splice(index, 1)
+        if (disabledTools.has(name) || (serverName !== undefined && closed.has(serverName))) assembly.tools.splice(index, 1)
       }
       return next()
     },
@@ -318,10 +383,15 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
     if (method === 'GET' && (rest === '' || rest === '/status')) {
       const ledger = await readLedger()
       const cwd = url.searchParams.get('cwd')
+      const toolLedger = toolCache ?? { version: 1, workspaces: {} }
       json(res, 200, {
         ok: true,
         workspaces: ledger.workspaces,
-        ...cwd === null || cwd.trim() === '' ? {} : { closed: [...closedInWorkspace(ledger, cwd.trim())] },
+        workspaceToolDisabled: toolLedger.workspaces,
+        ...cwd === null || cwd.trim() === '' ? {} : {
+          closed: [...closedInWorkspace(ledger, cwd.trim())],
+          toolDisabled: [...(toolLedger.workspaces[resolve(cwd.trim())] ?? [])],
+        },
       })
       return
     }
@@ -336,6 +406,19 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
       const ledger = await setWorkspaceServer(cwd, serverName, enabled)
       onChanged?.()
       json(res, 200, { ok: true, cwd: resolve(cwd), serverName, enabled, workspaces: ledger.workspaces })
+      return
+    }
+    const matchTools = /^\/workspace\/(.+)\/tools$/.exec(rest)
+    if (method === 'PUT' && matchTools !== null) {
+      const cwd = decodeURIComponent(matchTools[1]!)
+      const body = await readBody(req)
+      const fullName = body.name
+      const enabled = body.enabled
+      if (typeof fullName !== 'string') throw new Error('name (mcp__ tool) is required')
+      if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
+      const next = await setWorkspaceToolDisabled(cwd, fullName, enabled)
+      onChanged?.()
+      json(res, 200, { ok: true, cwd: resolve(cwd), name: fullName, enabled, workspaceToolDisabled: next.workspaces })
       return
     }
     json(res, 404, { error: `no route for ${method} ${rest}` })
@@ -356,7 +439,7 @@ export function applyMcpWorkspaceScope(ctx: PluginContext): void {
     handler: (req: any, res: any) => { void handle(ctx, req, res, syncAgents) },
   }), 'triad: mcp workspace scope routes')
   // 先把账本读进内存，装配 / restrict 的快通道才成立（第一次读盘放在挂载期）。
-  void readLedger().then(() => syncAgents()).catch(() => {})
+  void Promise.all([readLedger(), readToolDisableLedger()]).then(() => syncAgents()).catch(() => {})
   installAssembleFilter(ctx)
   installWorkspaceRows(ctx)
 }
