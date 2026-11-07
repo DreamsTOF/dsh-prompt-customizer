@@ -80,3 +80,19 @@
 ## 未纳入自动化（说明）
 - 技能包安装/删除、MCP 添加专属 Server 会写真实文件系统（技能根、profile patch），E2E 不做破坏性文件操作，仅单测/手动覆盖。
 - `codegraph` 依赖本机 `codegraph` 命令；某些启动环境 PATH 缺失时该 Server 显示「等待注册」，属环境问题，不影响插件逻辑。
+
+## H. 行为级验证（真的生效，非只看接口 200）
+脚本：`scripts/verify-effect.mjs`（对比宿主**真实装配**前后：`/preview` 的最终 `text`+`tools`、`/session` 活动会话真实视图；写入前备份、测后恢复）。
+
+结果（web profile，活动会话 cwd=`D:\dsh-pulgn`）：**13/13 通过**。
+
+| 场景 | 观测 | 结果 |
+|---|---|---|
+| 预设级·隐藏段 | `/preview(active)` 最终 `sections` 去除该段；`text` 13522→13472 | PASS |
+| 预设级·替换段文本 | 最终 `text` 含替换标记 `__E2E_MODIFIED_TEXT__` | PASS |
+| 预设级·隐藏工具（MCP 工具级） | `/preview.tools`（=宿主交给模型的工具声明）不再含 `mcp__anysearch__batch_search` | PASS |
+| 工作区级·隐藏段 | 活动会话 `/session` 最终 `sections` 27→26；`text` 15714→15664 | PASS |
+| 工作区级·隐藏工具 | 活动会话 `/session.tools` 不再含该 MCP 工具 | PASS |
+| 以上各项还原 | 隐藏/替换撤销后，段与工具均回到最终装配/会话视图 | PASS |
+
+> 结论：在工作区隐藏/修改提示词、隐藏/启用工具，**确实改变了模型最终收到的系统提示词与工具声明**（隐藏即从最终装配移除；替换即进入最终文本；再次放回即恢复）。
