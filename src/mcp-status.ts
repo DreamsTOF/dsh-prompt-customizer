@@ -29,7 +29,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
 import { readMaskLedger } from './mcp-mask-ledger.ts'
 import { maskInstallReport } from './mcp-preset-mask.ts'
-import { collectPresetServers } from './mcp-presets.ts'
+import { collectPresetServers, presetRowOf, writePresetPlugins } from './mcp-presets.ts'
 import { appendRowsToText, parseMcpPaste, pasteFieldsOf, rowsToPatchYaml } from './mcp-paste.ts'
 import {
   knownToolsOf,
@@ -613,15 +613,65 @@ function mcpConfigBlockText(serverName: string): string | null {
     .join('\n')
 }
 
+const MCP_CLIENT_NAME_EDIT = '@deepseek-ai/dsh-mcp-client'
+function findPresetServerConfig(plugins: unknown, serverName: string): Record<string, unknown> | null {
+  let found: Record<string, unknown> | null = null
+  const walk = (list: unknown): void => {
+    for (const item of Array.isArray(list) ? list : []) {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) continue
+      const row = item as Record<string, unknown>
+      if (row.name === MCP_CLIENT_NAME_EDIT) {
+        const cfg = row.config !== null && typeof row.config === 'object' && !Array.isArray(row.config) ? row.config as Record<string, unknown> : {}
+        if (cfg.serverName === serverName) { found = cfg; return }
+      }
+      if (Array.isArray(row.config)) walk(row.config)
+    }
+  }
+  walk(plugins)
+  return found
+}
+function replacePresetServerConfig(plugins: unknown, serverName: string, config: Record<string, unknown>): { plugins: unknown[]; changed: boolean } {
+  let changed = false
+  const mapList = (list: unknown[]): unknown[] => list.map((item) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return item
+    const row = { ...(item as Record<string, unknown>) }
+    if (row.name === MCP_CLIENT_NAME_EDIT) {
+      const cfg = row.config !== null && typeof row.config === 'object' && !Array.isArray(row.config) ? row.config as Record<string, unknown> : {}
+      if (cfg.serverName === serverName) { row.config = config; changed = true; return row }
+    }
+    if (Array.isArray(row.config)) row.config = mapList(row.config)
+    return row
+  })
+  return { plugins: mapList(Array.isArray(plugins) ? plugins : []), changed }
+}
+
 async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const anyReq = req as unknown as { socket?: { remoteAddress?: string }; url?: string; method?: string }
   const anyRes = res as unknown as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }
   if (!loopbackAllowed(req)) { anyRes.writeHead(403, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, error: 'loopback-only' })); return }
   const url = new URL(anyReq.url ?? '/', 'http://localhost')
   const method = anyReq.method ?? 'GET'
+  const source = url.searchParams.get('source') ?? 'global'
   try {
     if (method === 'GET') {
       const serverName = url.searchParams.get('serverName') ?? ''
+      if (source === 'preset' || source === 'workspace') {
+        let text: string | null = null
+        if (source === 'preset') {
+          const preset = url.searchParams.get('preset') ?? ''
+          const ref = presetRowOf(ctx, preset)
+          if (ref !== undefined) { const cfg = findPresetServerConfig(ref.config.plugins, serverName); if (cfg !== null) text = JSON.stringify(cfg, null, 2) }
+        } else {
+          const ws = url.searchParams.get('workspace') ?? ''
+          if (ws !== '') {
+            const p = join(ws, '.mcp.json')
+            if (existsSync(p)) { try { const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>; const cfg = doc?.mcpServers?.[serverName]; if (cfg !== undefined) text = JSON.stringify(cfg, null, 2) } catch { /* bad json */ } }
+          }
+        }
+        anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+        anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no ${source} config for ${serverName}` } : { ok: true, source, serverName, text }))
+        return
+      }
       const text = mcpConfigBlockText(serverName)
       anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no patch entry for ${serverName}` } : { ok: true, serverName, text }))
@@ -632,6 +682,42 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
     const parsed = (body === '' ? {} : JSON.parse(body)) as Record<string, unknown>
     const serverName = typeof parsed.serverName === 'string' ? parsed.serverName : ''
     if (serverName === '') throw new Error('serverName required')
+    const effSource = typeof parsed.source === 'string' ? parsed.source : source
+    if (effSource === 'preset') {
+      const preset = typeof parsed.preset === 'string' ? parsed.preset : ''
+      if (preset === '') throw new Error('preset required')
+      const ref = presetRowOf(ctx, preset)
+      if (ref === undefined) throw new Error('preset not found')
+      if (ref.editor === undefined) throw new Error('preset not editable')
+      const cfg = JSON.parse(String(parsed.text ?? '')) as Record<string, unknown>
+      if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('config object required')
+      if (typeof cfg.serverName !== 'string' || cfg.serverName === '') cfg.serverName = serverName
+      const result = replacePresetServerConfig(ref.config.plugins, serverName, cfg)
+      if (!result.changed) throw new Error('server not found in preset')
+      await writePresetPlugins(ref, result.plugins)
+      anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+      anyRes.end(JSON.stringify({ ok: true, source: 'preset', serverName, preset, reload: 'live' }))
+      return
+    }
+    if (effSource === 'workspace') {
+      const ws = typeof parsed.workspace === 'string' ? parsed.workspace.trim() : ''
+      if (ws === '') throw new Error('workspace required')
+      const p = join(ws, '.mcp.json')
+      if (!existsSync(p)) throw new Error('.mcp.json not found')
+      let doc: Record<string, any>
+      try { doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any> } catch { throw new Error('invalid .mcp.json') }
+      if (doc === null || typeof doc !== 'object') throw new Error('invalid .mcp.json')
+      doc.mcpServers = doc.mcpServers !== null && typeof doc.mcpServers === 'object' ? doc.mcpServers : {}
+      if (!(serverName in doc.mcpServers)) throw new Error('server not found in workspace .mcp.json')
+      const cfg = JSON.parse(String(parsed.text ?? '')) as Record<string, unknown>
+      if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('config object required')
+      doc.mcpServers[serverName] = cfg
+      copyFileSync(p, `${p}${BACKUP_SUFFIX}`)
+      writeFileSync(p, `${JSON.stringify(doc, null, 2)}\n`, 'utf8')
+      anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+      anyRes.end(JSON.stringify({ ok: true, source: 'workspace', serverName, workspace: ws, reload: 'manual' }))
+      return
+    }
     const { format, text } = pasteFieldsOf(parsed)
     const outcome = parseMcpPaste(format, text)
     if (outcome.errors.length > 0) { anyRes.writeHead(400, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, errors: outcome.errors })); return }
@@ -642,6 +728,9 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
     if (!removed.ok) throw new Error(removed.error ?? 'remove old entry failed')
     const next = appendRowsToText(readPatchContent(), rowsToPatchYaml([row]))
     writeFileSync(patchFilePath(), next, 'utf8')
+    if (parsed.reload === true) {
+      try { togglePatchEntry(newName, true); togglePatchEntry(newName, false) } catch { /* 热重载尽力而为 */ }
+    }
     anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     anyRes.end(JSON.stringify({ ok: true, serverName: newName, reload: parsed.reload === true ? 'attempted' : 'manual' }))
   } catch (error) {

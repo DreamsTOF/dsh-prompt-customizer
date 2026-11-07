@@ -5184,8 +5184,8 @@ function skillT(key, params) {
 var import_react10 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var import_jsx_runtime5 = require("react/jsx-runtime");
-function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited }) {
-  const [format, setFormat] = (0, import_react10.useState)(editServer !== void 0 ? "yaml" : "json");
+function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat }) {
+  const [format, setFormat] = (0, import_react10.useState)(editServer !== void 0 ? editFormat ?? "yaml" : "json");
   const [text, setText] = (0, import_react10.useState)(editText ?? "");
   const [reload, setReload] = (0, import_react10.useState)(false);
   const [busy, setBusy] = (0, import_react10.useState)(null);
@@ -5235,7 +5235,8 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
     setBusy("add");
     reset();
     if (editServer !== void 0) {
-      void call("/api/triad/mcp-edit", { serverName: editServer, format, text, reload }).then((body) => {
+      const payload2 = editSource === "preset" ? { source: "preset", preset: editPreset, serverName: editServer, format: "json", text, reload } : editSource === "workspace" ? { source: "workspace", workspace: editWorkspace, serverName: editServer, format: "json", text, reload } : { serverName: editServer, format, text, reload };
+      void call("/api/triad/mcp-edit", payload2).then((body) => {
         const list = Array.isArray(body.errors) ? body.errors : [];
         if (list.length > 0) {
           setErrors(list);
@@ -5650,11 +5651,14 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
       setBusy(null);
     });
   };
-  const openEdit = (serverName) => {
+  const openEdit = (serverName, source = "global", extra) => {
     setError(null);
-    void fetch(`/api/triad/mcp-edit?serverName=${encodeURIComponent(serverName)}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+    const qs = new URLSearchParams({ source, serverName });
+    if (extra?.preset !== void 0) qs.set("preset", extra.preset);
+    if (extra?.workspace !== void 0) qs.set("workspace", extra.workspace);
+    void fetch(`/api/triad/mcp-edit?${qs.toString()}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
       const payload = body;
-      if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? "") });
+      if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? ""), source, preset: extra?.preset, workspace: extra?.workspace });
       else setError(String(payload?.error ?? "load mcp config failed"));
     }).catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -5791,6 +5795,10 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         onCancel: () => setEditState(null),
         editServer: editState.serverName,
         editText: editState.text,
+        editSource: editState.source,
+        editPreset: editState.preset,
+        editWorkspace: editState.workspace,
+        editFormat: editState.source === "global" ? "yaml" : "json",
         onEdited: () => {
           setEditState(null);
           onRefresh();
@@ -6018,6 +6026,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               ),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: t("mcpPresetNewSession") }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.mcpCardDelete, title: t("mcpEdit"), disabled: busy !== null, onClick: () => {
+                  openEdit(row.serverName, "preset", { preset: scope });
+                }, children: t("mcpEdit") }),
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",
                   {

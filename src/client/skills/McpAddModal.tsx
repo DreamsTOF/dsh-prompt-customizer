@@ -11,7 +11,7 @@ import { css } from './styles.js'
  * 先「校验并预览」（宿主解析，带行号报错），确认后写入目标（全局 patch / 预设）。
  * 一次粘贴可含多个 server；已存在的 serverName 自动跳过。
  */
-export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited }: {
+export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat }: {
   t: (key: string, params?: Record<string, string | number>) => string
   /** 目标预设；undefined = 全局 profile patch。 */
   presetId?: string
@@ -26,8 +26,14 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
   editText?: string
   /** 编辑保存成功回调。 */
   onEdited?: () => void
+  /** 编辑来源：global / preset / workspace。 */
+  editSource?: 'global' | 'preset' | 'workspace'
+  editPreset?: string
+  editWorkspace?: string
+  /** 编辑回显格式：global 用 yaml（保留 !!js），preset/workspace 用 json。 */
+  editFormat?: 'json' | 'yaml'
 }): JSX.Element {
-  const [format, setFormat] = useState<'json' | 'yaml'>(editServer !== undefined ? 'yaml' : 'json')
+  const [format, setFormat] = useState<'json' | 'yaml'>(editServer !== undefined ? (editFormat ?? 'yaml') : 'json')
   const [text, setText] = useState(editText ?? '')
   const [reload, setReload] = useState(false)
   const [busy, setBusy] = useState<'preview' | 'add' | null>(null)
@@ -82,7 +88,12 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
     setBusy('add'); reset()
     // 编辑模式：改全局 profile patch 里该 server 的 config（复用 remove+append，带 .bak）。
     if (editServer !== undefined) {
-      void call('/api/triad/mcp-edit', { serverName: editServer, format, text, reload })
+      const payload = editSource === 'preset'
+        ? { source: 'preset', preset: editPreset, serverName: editServer, format: 'json' as const, text, reload }
+        : editSource === 'workspace'
+          ? { source: 'workspace', workspace: editWorkspace, serverName: editServer, format: 'json' as const, text, reload }
+          : { serverName: editServer, format, text, reload }
+      void call('/api/triad/mcp-edit', payload)
         .then((body) => {
           const list = Array.isArray(body.errors) ? (body.errors as string[]) : []
           if (list.length > 0) { setErrors(list); return }

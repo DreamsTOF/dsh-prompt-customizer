@@ -432,7 +432,7 @@ function configFromBody(body: Record<string, unknown>): { ok: true; value: McpSe
  * Loader 协调与失败回滚，并保证「没有 home patch / 命令行 overlay 覆盖这条行」
  * 才落盘（否则抛错，调用方原样转给面板）。
  */
-async function writePresetPlugins(ref: PresetRowRef, plugins: unknown[]): Promise<void> {
+export async function writePresetPlugins(ref: PresetRowRef, plugins: unknown[]): Promise<void> {
   const editor = ref.editor
   if (editor === undefined) throw new Error('preset row is not writable in this composition')
   await editor.edit(ref.entry, current => ({ ...current, plugins }))

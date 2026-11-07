@@ -109,7 +109,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   const [toolBusy, setToolBusy] = useState<string | null>(null)
   /** 全局条目删除确认（null=关闭）。 */
   const [removeReq, setRemoveReq] = useState<string | null>(null)
-  const [editState, setEditState] = useState<{ serverName: string; text: string } | null>(null)
+  const [editState, setEditState] = useState<{ serverName: string; text: string; source: 'global' | 'preset' | 'workspace'; preset?: string; workspace?: string } | null>(null)
   /** 预设专属行移除确认（null=关闭）。 */
   const [removeOwnReq, setRemoveOwnReq] = useState<string | null>(null)
 
@@ -217,13 +217,16 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       .finally(() => { setBusy(null) })
   }
   /** 打开「编辑 MCP」：读取该全局 server 的当前 config 原文，弹窗内编辑。 */
-  const openEdit = (serverName: string): void => {
+  const openEdit = (serverName: string, source: 'global' | 'preset' | 'workspace' = 'global', extra?: { preset?: string; workspace?: string }): void => {
     setError(null)
-    void fetch(`/api/triad/mcp-edit?serverName=${encodeURIComponent(serverName)}`, { headers: { accept: 'application/json' } })
+    const qs = new URLSearchParams({ source, serverName })
+    if (extra?.preset !== undefined) qs.set('preset', extra.preset)
+    if (extra?.workspace !== undefined) qs.set('workspace', extra.workspace)
+    void fetch(`/api/triad/mcp-edit?${qs.toString()}`, { headers: { accept: 'application/json' } })
       .then((response) => response.json())
       .then((body) => {
         const payload = body as { ok?: boolean; text?: string; error?: string } | null
-        if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? '') })
+        if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? ''), source, preset: extra?.preset, workspace: extra?.workspace })
         else setError(String(payload?.error ?? 'load mcp config failed'))
       })
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
@@ -353,6 +356,10 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
             onCancel={() => setEditState(null)}
             editServer={editState.serverName}
             editText={editState.text}
+            editSource={editState.source}
+            editPreset={editState.preset}
+            editWorkspace={editState.workspace}
+            editFormat={editState.source === 'global' ? 'yaml' : 'json'}
             onEdited={() => { setEditState(null); onRefresh() }}
           />
         </Modal>
@@ -635,6 +642,9 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                         <span className={css.mcpCardItem}>
                           <span className={css.mcpCardItemLabel}>{t('mcpPresetNewSession')}</span>
                         </span>
+                        <button type="button" className={css.mcpCardDelete} title={t('mcpEdit')} disabled={busy !== null} onClick={() => { openEdit(row.serverName, 'preset', { preset: scope }) }}>
+                          {t('mcpEdit')}
+                        </button>
                         <button
                           type="button"
                           className={css.mcpCardDelete}
