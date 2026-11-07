@@ -655,6 +655,17 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
   try {
     if (method === 'GET') {
       const serverName = url.searchParams.get('serverName') ?? ''
+      if (source === 'workspace' && serverName === '') {
+        const ws = url.searchParams.get('workspace') ?? ''
+        let names: string[] = []
+        if (ws !== '') {
+          const p = join(ws, '.mcp.json')
+          if (existsSync(p)) { try { const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>; names = doc?.mcpServers !== null && typeof doc?.mcpServers === 'object' ? Object.keys(doc.mcpServers) : [] } catch { /* bad json */ } }
+        }
+        anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+        anyRes.end(JSON.stringify({ ok: true, source: 'workspace', names }))
+        return
+      }
       if (source === 'preset' || source === 'workspace') {
         let text: string | null = null
         if (source === 'preset') {
@@ -672,7 +683,9 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
         anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no ${source} config for ${serverName}` } : { ok: true, source, serverName, text }))
         return
       }
-      const text = mcpConfigBlockText(serverName)
+      const block = mcpConfigBlockText(serverName)
+      let text: string | null = null
+      if (block !== null) { const ind = block.split(/\r?\n/).map((line) => `    ${line}`).join('\n'); text = `mcpServers:\n  ${serverName}:\n${ind}\n` }
       anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no patch entry for ${serverName}` } : { ok: true, serverName, text }))
       return

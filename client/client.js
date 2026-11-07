@@ -5211,6 +5211,26 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
     setNotice(null);
     setPreview(null);
   };
+  const switchFormat = (next) => {
+    if (next === format) return;
+    if (text.trim() === "") {
+      setFormat(next);
+      reset();
+      return;
+    }
+    setBusy("preview");
+    void call("/api/triad/mcp-format", { format, text, to: next }).then((body) => {
+      if (body.ok === true && typeof body.text === "string") {
+        setText(body.text);
+        setFormat(next);
+        reset();
+      } else setErrors(Array.isArray(body.errors) ? body.errors : [String(body.error ?? "format convert failed")]);
+    }).catch((error) => {
+      setErrors([error instanceof Error ? error.message : String(error)]);
+    }).finally(() => {
+      setBusy(null);
+    });
+  };
   const previewNow = () => {
     if (busy !== null || empty) return;
     setBusy("preview");
@@ -5282,7 +5302,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
   };
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.mcpAddForm, children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.installHint, children: t("mcpPasteHint", { scope: presetId === void 0 ? t("mcpPasteScopeGlobal") : `${t("mcpPasteScopePreset")} \u201C${presetId}\u201D` }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: ["json", "yaml"].map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: ["json", "yaml"].filter((value) => !(editServer !== void 0 && (editSource === "preset" || editSource === "workspace") && value === "yaml")).map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "button",
       {
         type: "button",
@@ -5290,8 +5310,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
         "data-active": format === value || void 0,
         "aria-pressed": format === value,
         onClick: () => {
-          setFormat(value);
-          reset();
+          switchFormat(value);
         },
         children: [
           value.toUpperCase(),
@@ -5571,7 +5590,23 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const [toolBusy, setToolBusy] = (0, import_react13.useState)(null);
   const [removeReq, setRemoveReq] = (0, import_react13.useState)(null);
   const [editState, setEditState] = (0, import_react13.useState)(null);
+  const [wsNames, setWsNames] = (0, import_react13.useState)([]);
   const [removeOwnReq, setRemoveOwnReq] = (0, import_react13.useState)(null);
+  (0, import_react13.useEffect)(() => {
+    if (workspace === null || workspace === "") {
+      setWsNames([]);
+      return;
+    }
+    let alive = true;
+    void fetch(`/api/triad/mcp-edit?source=workspace&workspace=${encodeURIComponent(workspace)}&serverName=`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+      const payload = body;
+      if (alive && payload?.ok === true && Array.isArray(payload.names)) setWsNames(payload.names.map(String));
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, [workspace]);
   const ready = live.state === "ready" ? live.data : null;
   const globals = ready?.servers ?? [];
   const closedInWorkspace = new Set(
@@ -5923,6 +5958,9 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                 ),
                 scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.mcpCardDelete, title: t("mcpEdit"), disabled: busy !== null, onClick: () => {
                   openEdit(server.serverName);
+                }, children: t("mcpEdit") }) : null,
+                scope === "" && !server.config.editable && workspace !== null && wsNames.includes(server.serverName) ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.mcpCardDelete, title: t("mcpEdit"), disabled: busy !== null, onClick: () => {
+                  openEdit(server.serverName, "workspace", { workspace: workspace ?? void 0 });
                 }, children: t("mcpEdit") }) : null,
                 scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                   "button",

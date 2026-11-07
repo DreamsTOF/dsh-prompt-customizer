@@ -412,6 +412,50 @@ export function rowsToPatchYaml(rows: readonly McpRowConfig[]): string {
 }
 
 /** 在 YAML 文本末尾追加行块（保留既有内容与行尾风格；空文本则只留块）。 */
+function configForJson(config: Record<string, unknown>): Record<string, unknown> {
+  const { serverName: _serverName, transport, ...rest } = config as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  if (typeof transport === 'string' && transport !== '') out.type = transport
+  for (const key of ['command', 'args', 'env', 'cwd', 'url', 'headers']) if (rest[key] !== undefined) out[key] = rest[key]
+  return out
+}
+/** 行 → `.mcp.json` 形态 JSON 文本（用于编辑弹窗 JSON 视图）。 */
+export function rowsToJsonText(rows: readonly McpRowConfig[]): string {
+  const servers: Record<string, unknown> = {}
+  for (const row of rows) servers[String(row.config.serverName ?? '')] = configForJson(row.config)
+  return `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`
+}
+/** 行 → `.mcp.json` 形态 YAML 文本（用于编辑弹窗 YAML 视图）。 */
+export function rowsToMcpServersYaml(rows: readonly McpRowConfig[]): string {
+  const lines: string[] = ['mcpServers:']
+  for (const row of rows) { lines.push(`  ${String(row.config.serverName ?? '')}:`); lines.push(...emitYaml(configForJson(row.config), '    ')) }
+  return `${lines.join('\n')}\n`
+}
+const FORMAT_ROUTE = '/api/triad/mcp-format'
+/** 注册 POST /api/triad/mcp-format：在 JSON / YAML（`.mcp.json` 形态）间转换，用于弹窗切换格式时实时改写文本。 */
+export function applyMcpFormatRoute(ctx: Context): void {
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'prefix',
+    path: FORMAT_ROUTE,
+    handler: (req: IncomingMessage, res: ServerResponse) => {
+      void (async () => {
+        if (!loopbackAllowed(req)) { writeJsonResponse(res, 403, { error: 'loopback-only' }); return }
+        try {
+          const body = await readJsonBody(req)
+          const { format, text } = pasteFieldsOf(body)
+          const to = body.to === 'yaml' ? 'yaml' : 'json'
+          const outcome = parseMcpPaste(format, text)
+          if (outcome.errors.length > 0) { writeJsonResponse(res, 400, { ok: false, errors: outcome.errors }); return }
+          writeJsonResponse(res, 200, { ok: true, text: to === 'json' ? rowsToJsonText(outcome.rows) : rowsToMcpServersYaml(outcome.rows) })
+        } catch (error) {
+          writeJsonResponse(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+        }
+      })()
+    },
+  }), 'triad: mcp-format route')
+}
+
+/** 在 YAML 文本末尾追加行块（保留既有内容与行尾风格；空文本则只留块）。 */
 export function appendRowsToText(content: string, block: string): string {
   const eol = content.includes('\r\n') ? '\r\n' : '\n'
   const trimmed = content.replace(/[\r\n\s]+$/, '')

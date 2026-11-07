@@ -5,7 +5,7 @@
  * 两个列表块：「继承的全局 Server」（预设层开关 = 遮蔽）与「该预设专属 Server」，
  * 每张卡片带工具级 chips（绿 = 启用、灰 = 禁用，点一下即切换）。
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   IconAgentPresetOutlineRegular, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconTrashOutlineRegular, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -110,8 +110,19 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   /** 全局条目删除确认（null=关闭）。 */
   const [removeReq, setRemoveReq] = useState<string | null>(null)
   const [editState, setEditState] = useState<{ serverName: string; text: string; source: 'global' | 'preset' | 'workspace'; preset?: string; workspace?: string } | null>(null)
+  const [wsNames, setWsNames] = useState<string[]>([])
   /** 预设专属行移除确认（null=关闭）。 */
   const [removeOwnReq, setRemoveOwnReq] = useState<string | null>(null)
+  // 当前工作区 .mcp.json 里的 server 名（用于给工作区条目显示“编辑”按钮）。
+  useEffect(() => {
+    if (workspace === null || workspace === '') { setWsNames([]); return }
+    let alive = true
+    void fetch(`/api/triad/mcp-edit?source=workspace&workspace=${encodeURIComponent(workspace)}&serverName=`, { headers: { accept: 'application/json' } })
+      .then((response) => response.json())
+      .then((body) => { const payload = body as { ok?: boolean; names?: unknown } | null; if (alive && payload?.ok === true && Array.isArray(payload.names)) setWsNames((payload.names as unknown[]).map(String)) })
+      .catch(() => { /* ignore */ })
+    return () => { alive = false }
+  }, [workspace])
 
   const ready = live.state === 'ready' ? live.data : null
   const globals = ready?.servers ?? []
@@ -527,6 +538,11 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                         )}
                         {scope === '' && server.config.editable ? (
                           <button type="button" className={css.mcpCardDelete} title={t('mcpEdit')} disabled={busy !== null} onClick={() => { openEdit(server.serverName) }}>
+                            {t('mcpEdit')}
+                          </button>
+                        ) : null}
+                        {scope === '' && !server.config.editable && workspace !== null && wsNames.includes(server.serverName) ? (
+                          <button type="button" className={css.mcpCardDelete} title={t('mcpEdit')} disabled={busy !== null} onClick={() => { openEdit(server.serverName, 'workspace', { workspace: workspace ?? undefined }) }}>
                             {t('mcpEdit')}
                           </button>
                         ) : null}

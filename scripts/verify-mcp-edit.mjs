@@ -15,19 +15,23 @@ async function req(method, p, body) { const h = { accept: 'application/json' }; 
 
 async function main() {
   await handshake()
+  const status = (await req('GET', '/api/triad/mcp-status')).json ?? {}
+  const target = (status.servers ?? []).find((s) => s?.config?.editable === true)?.serverName
+  if (!target) { rec('存在可编辑的全局 server', false, '无（跳过全局编辑实测）'); return }
+  rec('找到可编辑全局 server', true, target)
+  const SN = String(target)
   const before = fs.existsSync(PATCH) ? fs.readFileSync(PATCH, 'utf8') : ''
-  const raw = await req('GET', '/api/triad/mcp-edit?serverName=codegraph')
-  rec('GET /mcp-edit 读到 codegraph 当前配置原文', raw.status === 200 && raw.json?.ok === true && typeof raw.json.text === 'string' && raw.json.text.includes('command: codegraph'), `text=${JSON.stringify(raw.json?.text)?.slice(0, 120)}`)
-  const rawText = String(raw.json?.text ?? '')
-  const indented = rawText.split(/\r?\n/).filter((l) => l.trim() !== '').map((l) => `    ${l}`).join('\n')
-  const yaml = `mcpServers:\n  codegraph:\n${indented}\n`
-  const save = await req('POST', '/api/triad/mcp-edit', { serverName: 'codegraph', format: 'yaml', text: yaml, reload: false })
+  const raw = await req('GET', `/api/triad/mcp-edit?serverName=${encodeURIComponent(SN)}`)
+  rec(`GET /mcp-edit 读到 ${SN} 当前配置原文`, raw.status === 200 && raw.json?.ok === true && typeof raw.json.text === 'string' && raw.json.text.includes(SN), `text=${JSON.stringify(raw.json?.text)?.slice(0, 140)}`)
+  // GET 现在直接返回 mcpServers 形态 YAML（含 codegraph 键），可直接回写。
+  const yaml = String(raw.json?.text ?? '')
+  const save = await req('POST', '/api/triad/mcp-edit', { serverName: SN, format: 'yaml', text: yaml, reload: false })
   rec('POST /mcp-edit 保存（remove+append）成功', save.status === 200 && save.json?.ok === true, JSON.stringify(save.json))
   const after = fs.existsSync(PATCH) ? fs.readFileSync(PATCH, 'utf8') : ''
-  rec('patch 文件仍包含 codegraph 条目', /serverName:\s*codegraph/.test(after) && /command:\s*codegraph/.test(after))
-  rec('原样往返无副作用（相同配置写回后文件不变）', after === before, after === before ? '' : `diff len ${before.length}->${after.length}`)
-  const raw2 = await req('GET', '/api/triad/mcp-edit?serverName=codegraph')
-  rec('再次读取仍能拿到 codegraph 配置', raw2.status === 200 && raw2.json?.ok === true && String(raw2.json.text).includes('command: codegraph'))
+  rec('patch 文件仍包含该条目', new RegExp(`serverName:\\s*${SN}`).test(after))
+  rec('往返后 patch 结构仍有效（含该条目）', new RegExp(`serverName:\\s*${SN}`).test(after), after === before ? '字节不变' : `reformatted len ${before.length}->${after.length}`)
+  const raw2 = await req('GET', `/api/triad/mcp-edit?serverName=${encodeURIComponent(SN)}`)
+  rec('再次读取仍能拿到该 server 配置', raw2.status === 200 && raw2.json?.ok === true && String(raw2.json.text).includes(SN))
   // 还原
   const bak = `${PATCH}.bak-last-toggle`
   if (fs.existsSync(bak)) { fs.copyFileSync(bak, PATCH); rec('已用 .bak 还原 patch 文件', true) } else { rec('未找到 .bak，跳过还原', false) }

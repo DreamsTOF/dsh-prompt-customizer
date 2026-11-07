@@ -38,7 +38,7 @@ import { applyMcpRecommended } from './mcp-recommended.js'
 import { applyMcpStatus } from './mcp-status.js'
 import { applyPresetServers } from './mcp-presets.js'
 import { applyMcpPresetMask } from './mcp-preset-mask.js'
-import { applyMcpPreviewRoute } from './mcp-paste.js'
+import { applyMcpPreviewRoute, applyMcpFormatRoute } from './mcp-paste.js'
 import { applyMcpToolDisable, isToolDisabled, presetOwnsServer, serverOfToolName } from './mcp-tool-disable.js'
 import { applyMcpWorkspaceScope, closedServersInWorkspace, disabledToolsInWorkspace } from './mcp-workspace-scope.ts'
 import { applyMcpApplyAll } from './mcp-apply-all.ts'
@@ -221,6 +221,7 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   // POST /api/triad/mcp-preview：解析 + 校验 + 预览，不写任何文件。
   try {
     applyMcpPreviewRoute(ctx)
+    applyMcpFormatRoute(ctx)
     ctx.logger?.info?.('[dsh-prompt-customizer] mcp paste preview mounted')
   } catch (error) {
     ctx.logger?.warn?.(

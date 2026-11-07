@@ -65,6 +65,20 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
 
   const reset = (): void => { setErrors([]); setWarnings([]); setNotice(null); setPreview(null) }
 
+  // 切换 JSON / YAML：把当前文本按目标格式实际改写（调用宿主 /mcp-format 互转），而不是只改标签。
+  const switchFormat = (next: 'json' | 'yaml'): void => {
+    if (next === format) return
+    if (text.trim() === '') { setFormat(next); reset(); return }
+    setBusy('preview')
+    void call('/api/triad/mcp-format', { format, text, to: next })
+      .then((body) => {
+        if (body.ok === true && typeof body.text === 'string') { setText(body.text); setFormat(next); reset() }
+        else setErrors(Array.isArray(body.errors) ? (body.errors as string[]) : [String(body.error ?? 'format convert failed')])
+      })
+      .catch((error: unknown) => { setErrors([error instanceof Error ? error.message : String(error)]) })
+      .finally(() => { setBusy(null) })
+  }
+
   const previewNow = (): void => {
     if (busy !== null || empty) return
     setBusy('preview'); reset()
@@ -138,14 +152,14 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
       </p>
       <div className={css.installRow}>
         <div className={css.mcpAddTypeRow} role="group" aria-label={t('mcpPasteFormat')}>
-          {(['json', 'yaml'] as const).map(value => (
+          {(['json', 'yaml'] as const).filter((value) => !(editServer !== undefined && (editSource === 'preset' || editSource === 'workspace') && value === 'yaml')).map(value => (
             <button
               key={value}
               type="button"
               className={`${css.mcpAddTypeBtn} ${format === value ? css.mcpAddTypeActive : ''}`}
               data-active={format === value || undefined}
               aria-pressed={format === value}
-              onClick={() => { setFormat(value); reset() }}
+              onClick={() => { switchFormat(value) }}
             >
               {value.toUpperCase()}{value === 'yaml' ? ` · ${t('mcpPasteNative')}` : ''}
             </button>
