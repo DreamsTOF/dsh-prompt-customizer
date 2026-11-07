@@ -82,6 +82,14 @@ export const SKILL_ZH: Record<string, string> = {
   // SKILL / MCP 顶层 tab
   kindSkill: 'SKILL', kindPrompt: '提示词', kindMcp: 'MCP',
   levelPreset: '预设级', levelWorkspace: '工作区级', levelAria: '预设级 / 工作区级',
+  applyAll: '应用到所有预设',
+  applyAllHint: '把「全部」视图的技能启停覆盖到每个 agent 预设（清空各预设的单独开关，令其全部继承全部/全局）。',
+  applyAllConfirm: '将把当前「全部」的技能启停覆盖到所有 agent 预设（清除各预设原有的单独开关）。确定？',
+  applyAllOk: '已应用到 {n} 个预设',
+  mcpApplyAll: '应用到所有预设（MCP）',
+  mcpApplyAllHint: '把「全部」视图的 MCP 工具配置覆盖到每个 agent 预设（清空各预设的遮蔽/工具启停覆盖）；工作区级不受影响。',
+  mcpApplyAllConfirm: '将把当前「全部」的 MCP 工具配置覆盖到所有 agent 预设（清除各预设原有的遮蔽/工具启停覆盖）。工作区不受影响。确定？',
+  mcpApplyAllOk: '已应用到所有预设（清理遮蔽 {masks} / 工具 {tools}）',
   // MCP 视图
   mcpServer: 'MCP Server', mcpTools: '工具列表', mcpLog: '连接日志', mcpConfig: '配置模板',
   mcpRecommendMenu: '推荐 MCP Server', mcpRecommendTitle: '推荐 MCP Server', mcpAdd: '添加',

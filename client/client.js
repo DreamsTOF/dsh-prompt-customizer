@@ -4912,6 +4912,14 @@ var SKILL_ZH = {
   levelPreset: "\u9884\u8BBE\u7EA7",
   levelWorkspace: "\u5DE5\u4F5C\u533A\u7EA7",
   levelAria: "\u9884\u8BBE\u7EA7 / \u5DE5\u4F5C\u533A\u7EA7",
+  applyAll: "\u5E94\u7528\u5230\u6240\u6709\u9884\u8BBE",
+  applyAllHint: "\u628A\u300C\u5168\u90E8\u300D\u89C6\u56FE\u7684\u6280\u80FD\u542F\u505C\u8986\u76D6\u5230\u6BCF\u4E2A agent \u9884\u8BBE\uFF08\u6E05\u7A7A\u5404\u9884\u8BBE\u7684\u5355\u72EC\u5F00\u5173\uFF0C\u4EE4\u5176\u5168\u90E8\u7EE7\u627F\u5168\u90E8/\u5168\u5C40\uFF09\u3002",
+  applyAllConfirm: "\u5C06\u628A\u5F53\u524D\u300C\u5168\u90E8\u300D\u7684\u6280\u80FD\u542F\u505C\u8986\u76D6\u5230\u6240\u6709 agent \u9884\u8BBE\uFF08\u6E05\u9664\u5404\u9884\u8BBE\u539F\u6709\u7684\u5355\u72EC\u5F00\u5173\uFF09\u3002\u786E\u5B9A\uFF1F",
+  applyAllOk: "\u5DF2\u5E94\u7528\u5230 {n} \u4E2A\u9884\u8BBE",
+  mcpApplyAll: "\u5E94\u7528\u5230\u6240\u6709\u9884\u8BBE\uFF08MCP\uFF09",
+  mcpApplyAllHint: "\u628A\u300C\u5168\u90E8\u300D\u89C6\u56FE\u7684 MCP \u5DE5\u5177\u914D\u7F6E\u8986\u76D6\u5230\u6BCF\u4E2A agent \u9884\u8BBE\uFF08\u6E05\u7A7A\u5404\u9884\u8BBE\u7684\u906E\u853D/\u5DE5\u5177\u542F\u505C\u8986\u76D6\uFF09\uFF1B\u5DE5\u4F5C\u533A\u7EA7\u4E0D\u53D7\u5F71\u54CD\u3002",
+  mcpApplyAllConfirm: "\u5C06\u628A\u5F53\u524D\u300C\u5168\u90E8\u300D\u7684 MCP \u5DE5\u5177\u914D\u7F6E\u8986\u76D6\u5230\u6240\u6709 agent \u9884\u8BBE\uFF08\u6E05\u9664\u5404\u9884\u8BBE\u539F\u6709\u7684\u906E\u853D/\u5DE5\u5177\u542F\u505C\u8986\u76D6\uFF09\u3002\u5DE5\u4F5C\u533A\u4E0D\u53D7\u5F71\u54CD\u3002\u786E\u5B9A\uFF1F",
+  mcpApplyAllOk: "\u5DF2\u5E94\u7528\u5230\u6240\u6709\u9884\u8BBE\uFF08\u6E05\u7406\u906E\u853D {masks} / \u5DE5\u5177 {tools}\uFF09",
   // MCP 视图
   mcpServer: "MCP Server",
   mcpTools: "\u5DE5\u5177\u5217\u8868",
@@ -7707,6 +7715,32 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     if (activePreset === ALL_PRESETS) return;
     void runToggle(`reset:${activePreset}`, () => skillApi.resetPreset(activePreset));
   };
+  const applySkillsToAllPresets = async () => {
+    if (!window.confirm(t("applyAllConfirm"))) return;
+    try {
+      const status = await skillApi.presetStatus();
+      const ids = status.presets.map((p) => p.id);
+      for (const id of ids) {
+        await skillApi.resetPreset(id);
+      }
+      refreshTogglesOnly();
+      pushToast("ok", t("applyAllOk", { n: ids.length }));
+    } catch (error) {
+      pushToast("err", `${t("applyAll")}\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const applyMcpToAllPresets = async () => {
+    if (!window.confirm(t("mcpApplyAllConfirm"))) return;
+    try {
+      const res = await fetch("/api/triad/mcp-apply-all", { method: "POST", headers: { accept: "application/json" } });
+      const body = await res.json().catch(() => null);
+      if (!(res.ok && body?.ok === true)) throw new Error(body?.error ?? String(res.status));
+      mcpRefreshLive();
+      pushToast("ok", t("mcpApplyAllOk", { masks: body.clearedMasks ?? 0, tools: body.clearedTools ?? 0 }));
+    } catch (error) {
+      pushToast("err", `${t("mcpApplyAll")}\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
   const toggleExpanded = (bundleId) => {
     setExpanded((current2) => {
       const next = new Set(current2);
@@ -8115,72 +8149,80 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.hubMain, children: kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, { level, workspace: workspace ?? currentWorkspace }) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              McpView,
-              {
-                t,
-                live: mcpLive,
-                scope: mcpScope,
-                query: mcpQuery,
-                status: mcpStatusFilter,
-                onRefresh: () => {
-                  mcpRefreshLive();
-                },
-                waitingTools: mcpWaitingTools,
-                onWatchTools: (names) => {
-                  watchMcpTools(names);
-                },
-                addOwnOpen: mcpAddOwnOpen,
-                onCloseAddOwn: () => {
-                  setMcpAddOwnOpen(false);
-                },
-                workspace: workspace ?? currentWorkspace,
-                level
-              }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              SkillsView,
-              {
-                t,
-                state,
-                health,
-                activePreset,
-                presets,
-                presetOverride,
-                resetActivePreset,
-                openMenu,
-                setOpenMenu,
-                refresh,
-                noResults,
-                visibleBundleAll,
-                expanded,
-                renameTarget,
-                setRenameTarget,
-                renaming,
-                submitRename,
-                bundleEnabledIn,
-                toggling,
-                viewMode,
-                setCatFilter,
-                activeCat,
-                toggleExpanded,
-                renamedFlash,
-                openInstallFor,
-                skillEnabledIn,
-                skillLockedReason,
-                scopeLabel,
-                toggleSkill,
-                toggleBundle,
-                openViewer,
-                removeFromBundle,
-                pruneBundle,
-                openCatEditor,
-                setConfirm,
-                setAssignTarget,
-                looseOpen,
-                setLooseExpanded,
-                visibleLooseAll
-              }
-            ) })
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.hubMain, children: [
+              kind === "skill" && activePreset === ALL_PRESETS ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("applyAllHint"), onClick: () => {
+                void applySkillsToAllPresets();
+              }, children: t("applyAll") }) }) : null,
+              kind === "mcp" && mcpScope === "" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("mcpApplyAllHint"), onClick: () => {
+                void applyMcpToAllPresets();
+              }, children: t("mcpApplyAll") }) }) : null,
+              kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, { level, workspace: workspace ?? currentWorkspace }) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+                McpView,
+                {
+                  t,
+                  live: mcpLive,
+                  scope: mcpScope,
+                  query: mcpQuery,
+                  status: mcpStatusFilter,
+                  onRefresh: () => {
+                    mcpRefreshLive();
+                  },
+                  waitingTools: mcpWaitingTools,
+                  onWatchTools: (names) => {
+                    watchMcpTools(names);
+                  },
+                  addOwnOpen: mcpAddOwnOpen,
+                  onCloseAddOwn: () => {
+                    setMcpAddOwnOpen(false);
+                  },
+                  workspace: workspace ?? currentWorkspace,
+                  level
+                }
+              ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+                SkillsView,
+                {
+                  t,
+                  state,
+                  health,
+                  activePreset,
+                  presets,
+                  presetOverride,
+                  resetActivePreset,
+                  openMenu,
+                  setOpenMenu,
+                  refresh,
+                  noResults,
+                  visibleBundleAll,
+                  expanded,
+                  renameTarget,
+                  setRenameTarget,
+                  renaming,
+                  submitRename,
+                  bundleEnabledIn,
+                  toggling,
+                  viewMode,
+                  setCatFilter,
+                  activeCat,
+                  toggleExpanded,
+                  renamedFlash,
+                  openInstallFor,
+                  skillEnabledIn,
+                  skillLockedReason,
+                  scopeLabel,
+                  toggleSkill,
+                  toggleBundle,
+                  openViewer,
+                  removeFromBundle,
+                  pruneBundle,
+                  openCatEditor,
+                  setConfirm,
+                  setAssignTarget,
+                  looseOpen,
+                  setLooseExpanded,
+                  visibleLooseAll
+                }
+              )
+            ] })
           ] })
         ] }),
         toasts.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: css.toastStack, role: "status", "aria-live": "polite", children: toasts.map((item) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: `${css.toast} ${item.tone === "err" ? css.toastErr : css.toastOk}`, "data-tone": item.tone, children: [

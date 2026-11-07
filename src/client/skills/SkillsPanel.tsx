@@ -457,6 +457,33 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     void runToggle(`reset:${activePreset}`, () => skillApi.resetPreset(activePreset))
   }
 
+  // 「应用到所有预设」：把「全部」视图的技能启停覆盖到每个预设（清空各预设 per-preset 覆盖，令其全部继承全部/全局）。
+  const applySkillsToAllPresets = async (): Promise<void> => {
+    if (!window.confirm(t('applyAllConfirm'))) return
+    try {
+      const status = await skillApi.presetStatus()
+      const ids = status.presets.map((p) => p.id)
+      for (const id of ids) { await skillApi.resetPreset(id) }
+      refreshTogglesOnly()
+      pushToast('ok', t('applyAllOk', { n: ids.length }))
+    } catch (error) {
+      pushToast('err', `${t('applyAll')}：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  // 「应用到所有预设」：把 MCP 的按预设工具配置覆盖为「全部/全局」（清空各预设 masks + 工具级启停覆盖）。工作区不受影响。
+  const applyMcpToAllPresets = async (): Promise<void> => {
+    if (!window.confirm(t('mcpApplyAllConfirm'))) return
+    try {
+      const res = await fetch('/api/triad/mcp-apply-all', { method: 'POST', headers: { accept: 'application/json' } })
+      const body = await res.json().catch(() => null) as { ok?: boolean; error?: string; clearedMasks?: number; clearedTools?: number } | null
+      if (!(res.ok && body?.ok === true)) throw new Error(body?.error ?? String(res.status))
+      mcpRefreshLive()
+      pushToast('ok', t('mcpApplyAllOk', { masks: body.clearedMasks ?? 0, tools: body.clearedTools ?? 0 }))
+    } catch (error) {
+      pushToast('err', `${t('mcpApplyAll')}：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   const toggleExpanded = (bundleId: string): void => {
     setExpanded((current) => {
       const next = new Set(current)
@@ -937,6 +964,16 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
 
         {/* ── 主区 ── */}
         <div className={css.hubMain}>
+        {kind === 'skill' && activePreset === ALL_PRESETS ? (
+          <div style={{ padding: '4px 12px 0' }}>
+            <button type="button" className={css.toolButton} title={t('applyAllHint')} onClick={() => { void applySkillsToAllPresets() }}>{t('applyAll')}</button>
+          </div>
+        ) : null}
+        {kind === 'mcp' && mcpScope === '' ? (
+          <div style={{ padding: '4px 12px 0' }}>
+            <button type="button" className={css.toolButton} title={t('mcpApplyAllHint')} onClick={() => { void applyMcpToAllPresets() }}>{t('mcpApplyAll')}</button>
+          </div>
+        ) : null}
         {kind === 'prompt' ? (
           <PromptView level={level} workspace={workspace ?? currentWorkspace} />
         ) : kind === 'mcp' ? (

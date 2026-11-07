@@ -41,6 +41,7 @@ import { applyMcpPresetMask } from './mcp-preset-mask.js'
 import { applyMcpPreviewRoute } from './mcp-paste.js'
 import { applyMcpToolDisable, isToolDisabled, presetOwnsServer, serverOfToolName } from './mcp-tool-disable.js'
 import { applyMcpWorkspaceScope, closedServersInWorkspace, disabledToolsInWorkspace } from './mcp-workspace-scope.ts'
+import { applyMcpApplyAll } from './mcp-apply-all.ts'
 import { maskedServersOf, readMaskLedger } from './mcp-mask-ledger.js'
 
 /** Stable Cordis plugin name. */
@@ -247,6 +248,7 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   // 所以工具集合随工作区变化。
   try {
     applyMcpWorkspaceScope(ctx)
+    applyMcpApplyAll(ctx)
     ctx.logger?.info?.('[dsh-prompt-customizer] mcp workspace scope mounted')
   } catch (error) {
     ctx.logger?.warn?.(
