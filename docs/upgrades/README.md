@@ -4,11 +4,18 @@
 
 ## 当前兼容版本
 
-- 插件 **0.12.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）。
+- 插件 **1.0.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）。
 - 0.2.2-rc.1 的完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
 - 更早的 0.2.1-rc.2 适配记录见 [rc2-migration.md](rc2-migration.md)。
 
 ## 版本历史
+
+## 1.0.0：破坏式 —— 存储迁移 SQLite + 预设/工作区两级自定义
+
+- **存储统一到单文件 SQLite**（`~/.dsh/prompt-customizer/prompt-customizer.db`，WAL，`node:sqlite`，无外部依赖）：`config`、`catalog`、工作区 override、MCP `preset-masks` / `tool-disable` / `workspace-close`、技能 `preset-toggles` / `hidden-toggles` 全部入 DB；宿主配置（`cordis.patch.yml` / `.mcp.json`）与技能根 `.bundles.json` 保持文件。
+- **破坏式**：旧 `config.yaml` / `catalog.yaml` 与各 JSON 账本不再读取、不迁移（文件原样保留），升级后需重新配置。详见 [1.0.0-sqlite-breaking.md](1.0.0-sqlite-breaking.md)。
+- **两级自定义**：新增工作区级 override（`workspaceOverrides[cwd]`），运行时按同名覆盖预设级；`/config/apply` 增 `level=workspace`；面板顶部加「预设级 / 工作区级」切换，工作区级可控制会话里全部段/工具。
+- 段与工具按宿主规范顺序排列；同名工具拆分显示（插件提供=启用锁定、原生=遮蔽池）；`assemble` 后按阶段过滤 `assembly.tools`，作用域内注册的工具也能真正隐藏。
 
 ## 0.12.0：适配 DSH 0.2.2-rc.1
 

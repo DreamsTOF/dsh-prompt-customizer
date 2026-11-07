@@ -41,6 +41,7 @@ All changes go through documented plugin extension points. No DSH source is modi
 
 - **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives; a new read-only "Current session" view shows the real prompt and tool catalog from the active session's own agent scope, including plugin-registered and plugin-masked entries.
 - **Phase and preset layering**: bootstrap, resident and compaction-controlled phases each have their own section lists, ordering space and tool catalog; the top preset selector scopes edits to one agent preset.
+- **Two customization levels (1.0.0)**: **preset-level** (per agent preset, covering that preset's visible items) and **workspace-level** (per workspace cwd, applying to all sessions in that workspace, able to control every section/tool the session sees, and **overriding preset-level**); switch between them at the top of the Prompts tab.
 - **Tool catalog**: hide or add back tools per phase, with a "model-visible / registry total" comparison that also handles PTC / Code Mode `run_code` wrapping.
 - **Skill management**: skill bundles, ZIP / folder import, global and preset toggles, skill-root and membership health checks.
 - **MCP management**: paste JSON / YAML to connect, preset-owned server rows, global / preset masking, per-tool enable/disable, recommended templates.
@@ -74,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release targets **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **1.0.0** (breaking: storage moved to SQLite, new workspace-level customization), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 
@@ -86,9 +87,8 @@ Prompt sections and tools can be configured separately for the bootstrap, compac
 
 ## Where the configuration lives
 
-- `~/.dsh/prompt-customizer/config.yaml`: prompt customization and per-phase tool catalog.
-- `~/.dsh/prompt-customizer/catalog.yaml`: cross-preset section / tool catalog cache (derived; safe to delete).
-- Skill and MCP ledgers live under the plugin's directory in `$DSH_HOME` and the relevant workspace directories.
+- **A single SQLite file**: `~/.dsh/prompt-customizer/prompt-customizer.db` (WAL, using the built-in `node:sqlite`, no external dependency). Prompt config, the cross-preset catalog pool, workspace-level overrides, and the MCP / skill ledgers all live in this one DB; host config files (`cordis.patch.yml` / `.mcp.json`) and per-skill-root `.bundles.json` remain files.
+- **Breaking change (1.0.0)**: the old `config.yaml` / `catalog.yaml` and JSON ledgers are **no longer read or migrated** (files are left untouched); upgrading to 1.0.0 requires **re-configuring**. See [docs/upgrades/1.0.0-sqlite-breaking.md](docs/upgrades/1.0.0-sqlite-breaking.md).
 
 ## Development
 
