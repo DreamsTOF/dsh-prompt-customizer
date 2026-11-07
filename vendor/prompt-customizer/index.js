@@ -1119,7 +1119,7 @@ function mergeAgentScopedSections(presetSections, liveSections, denied, replace,
 }
 
 /** 枚举当前生效的段与工具，并附上各自的屏蔽 / 隐藏标记。 */
-async function buildInventory(ctx, raw, scopeKey, presetId, undefined, preview) {
+async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
   // 生效配置：目标 agent 预设的 override（0.9.0 起无全局基底）。
   const cfg = effectiveConfig(raw.overrides?.[presetId])
   const denied = new Set(cfg.sections ?? [])
@@ -1215,7 +1215,7 @@ async function collectScopeBase(ctx, scopeKey, presetId) {
   }
 }
 
-async function buildPreview(ctx, rawConfig, target, phase, undefined, patch, patchTarget, toolMask) {
+async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patchTarget, toolMask) {
   const scopeKey = target?.scopeKey
   const hintId = target?.hintId
   const liveAgent = liveAgentForPreset(ctx, hintId)
@@ -1366,7 +1366,7 @@ async function buildPreview(ctx, rawConfig, target, phase, undefined, patch, pat
  * 工具取该 agent 的完整可见集（含 agent 作用域注册与所有 restrict），
  * 段保留 agent 作用域标记，base 列表再补预设注册表里被其它插件遮蔽的工具。
  */
-async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, undefined, toolMask, workspaceOvr) {
+async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, _catalog, toolMask, workspaceOvr) {
   const agent = live.agent
   const presetId = live.presetId
   const hint = { scope: agent, agent, promptCustomizerBase: true }

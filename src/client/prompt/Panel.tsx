@@ -399,8 +399,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
 
   // 运行时上下文显隐：直接落盘（不经草稿）。三态同步开启时三阶段一起写。
   const toggleContext = (name: string, hide: boolean): void => {
-    const list = ((inv as any)?.contexts ?? []) as Array<{ name: string; active: boolean }>
-    const hidden = new Set<string>(list.filter((c) => !c.active).map((c) => c.name))
+    // 只按“当前阶段”真实存在的上下文计算：只在引导期注入的，另两态不显示/不写。
+    const rows = ((((phases as any)?.[phase]?.baseContexts) ?? ((inv as any)?.contexts ?? []))) as Array<{ name: string; blocked?: boolean; active?: boolean }>
+    const hidden = new Set<string>(rows.filter((c) => c.blocked === true || c.active === false).map((c) => c.name))
     if (hide) hidden.add(name); else hidden.delete(name)
     const arr = [...hidden]
     const phaseKey = phase === 'bootstrap' ? 'contextsBootstrap' : phase === 'compaction' ? 'contextsCompaction' : 'contexts'

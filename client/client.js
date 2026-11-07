@@ -3624,8 +3624,8 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     writePatch(patch);
   };
   const toggleContext = (name, hide) => {
-    const list = inv?.contexts ?? [];
-    const hidden = new Set(list.filter((c) => !c.active).map((c) => c.name));
+    const rows = phases?.[phase]?.baseContexts ?? (inv?.contexts ?? []);
+    const hidden = new Set(rows.filter((c) => c.blocked === true || c.active === false).map((c) => c.name));
     if (hide) hidden.add(name);
     else hidden.delete(name);
     const arr = [...hidden];
