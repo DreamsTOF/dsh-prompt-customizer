@@ -1,0 +1,221 @@
+{
+  "when": "2026-11-07T13:07:27.619Z",
+  "url": "http://127.0.0.1:3134",
+  "destructive": true,
+  "passed": 43,
+  "failed": 0,
+  "results": [
+    {
+      "name": "握手 /?token 获取 auth cookie",
+      "ok": true,
+      "detail": "status=303 cookie=dsh-auth-ofppdFcJozve_bX…"
+    },
+    {
+      "name": "inventory 清单",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/inventory status=200"
+    },
+    {
+      "name": "config 配置",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/config status=200"
+    },
+    {
+      "name": "agent-presets 预设名单",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/agent-presets status=200"
+    },
+    {
+      "name": "preview 三阶段(bootstrap)",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/preview?phase=bootstrap status=200"
+    },
+    {
+      "name": "session 当前会话",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/session status=200"
+    },
+    {
+      "name": "skill-manager list",
+      "ok": true,
+      "detail": "GET /api/skill-manager/list status=200"
+    },
+    {
+      "name": "skill-toggles status",
+      "ok": true,
+      "detail": "GET /api/skill-toggles/status status=200"
+    },
+    {
+      "name": "skill-toggles presets",
+      "ok": true,
+      "detail": "GET /api/skill-toggles/presets status=200"
+    },
+    {
+      "name": "skill-toggles workspaces",
+      "ok": true,
+      "detail": "GET /api/skill-toggles/workspaces status=200"
+    },
+    {
+      "name": "skill-health",
+      "ok": true,
+      "detail": "GET /api/skill-health status=200"
+    },
+    {
+      "name": "MCP status",
+      "ok": true,
+      "detail": "GET /api/triad/mcp-status status=200"
+    },
+    {
+      "name": "MCP workspace scope status",
+      "ok": true,
+      "detail": "GET /api/triad/mcp-workspace-scope/status?cwd=C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU status=200"
+    },
+    {
+      "name": "MCP 已注册 Server 数 >= 1",
+      "ok": true,
+      "detail": "servers=anysearch, codegraph"
+    },
+    {
+      "name": "MCP Server 存在: anysearch",
+      "ok": true,
+      "detail": "tools=5"
+    },
+    {
+      "name": "MCP Server 存在: codegraph",
+      "ok": true,
+      "detail": "tools=1"
+    },
+    {
+      "name": "备份整库 /backup",
+      "ok": true,
+      "detail": "docs keys=mcp/tool-disable"
+    },
+    {
+      "name": "config/apply 预设级写入",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/apply status=200"
+    },
+    {
+      "name": "config 反映预设级 sections=__e2e_probe__",
+      "ok": true,
+      "detail": "sections=[\"__e2e_probe__\"]"
+    },
+    {
+      "name": "config/apply 预设级还原",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/apply status=200"
+    },
+    {
+      "name": "config/apply 工作区级写入",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/apply status=200"
+    },
+    {
+      "name": "config 反映工作区级 workspaceOverrides",
+      "ok": true,
+      "detail": "ws=[\"__e2e_ws__\"]"
+    },
+    {
+      "name": "config/apply 工作区级还原",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/apply status=200"
+    },
+    {
+      "name": "config/set forceSections=false",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/set status=200"
+    },
+    {
+      "name": "config 反映 forceSections=false",
+      "ok": true
+    },
+    {
+      "name": "config/unset forceSections",
+      "ok": true,
+      "detail": "POST /api/prompt-customizer/config/unset status=200"
+    },
+    {
+      "name": "export 当前预设定制",
+      "ok": true,
+      "detail": "GET /api/prompt-customizer/export?scope=standard status=200"
+    },
+    {
+      "name": "SKILL 工作区级关闭 diagnose-windows-sandbox-acl",
+      "ok": true,
+      "detail": "PUT /api/skill-toggles/workspaces/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/skills/diagnose-windows-sandbox-acl status=200"
+    },
+    {
+      "name": "SKILL workspaces 反映关闭",
+      "ok": true
+    },
+    {
+      "name": "SKILL 工作区级还原 diagnose-windows-sandbox-acl",
+      "ok": true,
+      "detail": "PUT /api/skill-toggles/workspaces/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/skills/diagnose-windows-sandbox-acl status=200"
+    },
+    {
+      "name": "SKILL 预设级关闭 diagnose-windows-sandbox-acl@standard",
+      "ok": true,
+      "detail": "PUT /api/skill-toggles/presets/standard/skills/diagnose-windows-sandbox-acl status=200"
+    },
+    {
+      "name": "SKILL 预设级还原 diagnose-windows-sandbox-acl@standard",
+      "ok": true,
+      "detail": "PUT /api/skill-toggles/presets/standard/skills/diagnose-windows-sandbox-acl status=200"
+    },
+    {
+      "name": "MCP 工作区级工具禁用 mcp__anysearch__batch_search",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-workspace-scope/workspace/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/tools status=200"
+    },
+    {
+      "name": "MCP status 反映工具禁用",
+      "ok": true,
+      "detail": "toolDisabled=[\"mcp__anysearch__batch_search\"]"
+    },
+    {
+      "name": "MCP 工作区级工具还原 mcp__anysearch__batch_search",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-workspace-scope/workspace/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/tools status=200"
+    },
+    {
+      "name": "MCP 工作区级关闭 server anysearch",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-workspace-scope/workspace/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/servers/anysearch status=200"
+    },
+    {
+      "name": "MCP status 反映 server 关闭",
+      "ok": true
+    },
+    {
+      "name": "MCP 工作区级启用 server anysearch",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-workspace-scope/workspace/C%3A%5CUsers%5CADMINI~1%5CAppData%5CLocal%5CTemp%5Cpc-e2e-ws-YJLVdU/servers/anysearch status=200"
+    },
+    {
+      "name": "MCP 预设级遮蔽 anysearch@standard",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-masks/standard/anysearch status=200"
+    },
+    {
+      "name": "MCP 预设级遮蔽还原 anysearch@standard",
+      "ok": true,
+      "detail": "PUT /api/triad/mcp-masks/standard/anysearch status=200"
+    },
+    {
+      "name": "catalog/rescan 可调用",
+      "ok": true,
+      "detail": "status=200 "
+    },
+    {
+      "name": "恢复整库 /restore",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "恢复后 overrides 与备份一致",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
