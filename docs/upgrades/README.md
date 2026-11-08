@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.17：解除屏蔽来源修复
+
+- 修复解除工具屏蔽后旧 agent source 条目仍命中导致的持续隐藏。
+- 完整记录见 [2.0.17-unhide-source.md](2.0.17-unhide-source.md)。
+
 ## 2.0.16：回归清理
 
 - 屏蔽池、workspace 技能状态、provider 摘要、同名 tool source、配置写队列和静默轮询竞态补齐。

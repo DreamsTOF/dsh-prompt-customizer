@@ -1595,6 +1595,9 @@ function entryKey(entry) {
   return normalized === void 0 ? "" : `${normalized.name}\0${sourceKey(normalized.source)}`;
 }
 function sameEntry(left, right) {
+  const aEntry = normalizeEntry(left);
+  const bEntry = normalizeEntry(right);
+  if (aEntry?.source?.kind === "agent" && bEntry?.source?.kind === "agent" && aEntry.name === bEntry.name) return true;
   const a = entryKey(left);
   return a !== "" && a === entryKey(right);
 }

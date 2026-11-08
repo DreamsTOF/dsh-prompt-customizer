@@ -105,6 +105,11 @@ export function entryKey(entry: EntryRef | string | null | undefined): string {
 
 /** 两个条目是否同一身份。 */
 export function sameEntry(left: EntryRef | string | null | undefined, right: EntryRef | string | null | undefined): boolean {
+  const aEntry = normalizeEntry(left)
+  const bEntry = normalizeEntry(right)
+  // 预设配置里的 agent 工具不能绑定某个 session id：解除屏蔽时即使当前
+  // 会话已经换了，也应按 kind + name 命中并删除旧条目。
+  if (aEntry?.source?.kind === 'agent' && bEntry?.source?.kind === 'agent' && aEntry.name === bEntry.name) return true
   const a = entryKey(left)
   return a !== '' && a === entryKey(right)
 }

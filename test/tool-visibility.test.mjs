@@ -175,3 +175,19 @@ test('tools/pre-execute 对配置中的任意工具做运行时拦截', async ()
   assert.equal(decisions[0].kind, 'deny')
   assert.equal(decisions[0].reason.includes('bash'), true)
 })
+
+test('解除屏蔽后释放 restrict，不继续隐藏', () => {
+  const h = harness()
+  let excluded = [{ name: 'bash' }]
+  const visibility = createPhaseToolVisibility({
+    ctx: h.ctx,
+    readConfig: () => ({ overrides: { standard: { tools: { exclude: excluded } } } }),
+    phaseOf: () => ({ promoted: true, boundary: -1 }),
+    presetOf: () => 'standard',
+  })
+  visibility.sync(h.agent)
+  assert.deepEqual(h.restricts, [['bash']])
+  excluded = []
+  visibility.sync(h.agent)
+  assert.deepEqual(h.disposals, [['bash']], '解屏蔽必须释放旧 deny')
+})
