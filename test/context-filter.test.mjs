@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { filterRuntimeContexts } from '../vendor/prompt-customizer/index.js'
+import { filterEmptyOptionalContexts } from '../vendor/prompt-customizer/index.js'
 
-test('工具级 depth 上下文：空文本或对应工具缺席时不显示', () => {
+test('空的非 required 运行时上下文不显示，required 空上下文保留', () => {
   const contexts = [
     { name: 'tool:subagent:depth', text: '' },
     { name: 'tool:subagent_fork:depth', text: '' },
@@ -10,9 +10,23 @@ test('工具级 depth 上下文：空文本或对应工具缺席时不显示', (
     { name: 'tool:missing:depth', text: 'should disappear' },
     { name: 'working-directory:current', text: '' },
   ]
-  const tools = [{ name: 'subagent' }, { name: 'subagent_fork' }, { name: 'read' }]
+  const ctx = {
+    systemPrompt: {
+      layers: {
+        merge: () => new Map([
+          ['working-directory:current', { required: true }],
+          ['tool:subagent:depth', { required: false }],
+        ]),
+      },
+    },
+  }
   assert.deepEqual(
-    filterRuntimeContexts(contexts, tools).map((item) => item.name),
-    ['tool:read:depth', 'working-directory:current'],
+    filterEmptyOptionalContexts(contexts, ctx, 'scope').map((item) => item.name),
+    ['tool:read:depth', 'tool:missing:depth', 'working-directory:current'],
   )
+})
+
+test('宿主没有 layers 时不按名字过滤，保持原样', () => {
+  const contexts = [{ name: 'tool:subagent:depth', text: '' }]
+  assert.deepEqual(filterEmptyOptionalContexts(contexts, {}, 'scope'), contexts)
 })

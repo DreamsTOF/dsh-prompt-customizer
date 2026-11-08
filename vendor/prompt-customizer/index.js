@@ -85,19 +85,31 @@ function matchesAny(entries, candidate) {
 }
 
 /**
- * 过滤工具自己注册的运行时上下文：`tool:<name>:depth` 只有在对应工具仍在
- * 当前候选目录且上下文当前有实际文本时才显示。工具/提供方被移除后，宿主的
- * 空文本注册项不再污染面板。
+ * 通用过滤空的非 required 运行时上下文。宿主 PromptContext 公开了 `required`
+ * 标记：required（如 working-directory:current）即使当前文本为空也保留；
+ * 其它可选上下文为空时不进入 UI（不按名字特判任何插件）。
+ * 读不到 layers（测试 / 旧宿主）时不做过滤，保持原样。
  */
-export function filterRuntimeContexts(contexts, tools = []) {
-  const names = new Set((Array.isArray(tools) ? tools : []).map((item) => String(item?.name ?? item?.tool ?? '')))
-  return (Array.isArray(contexts) ? contexts : []).filter((context) => {
-    const name = String(context?.name ?? '')
-    const match = /^tool:(.+):depth$/.exec(name)
-    if (match === null) return true
-    const toolName = match[1]
-    return toolName !== '' && names.has(toolName) && String(context?.text ?? '') !== ''
-  })
+function requiredContextNames(ctx, scope) {
+  try {
+    const layers = ctx?.systemPrompt?.layers
+    if (!layers || typeof layers.merge !== 'function') return undefined
+    const entries = layers.merge(scope, (layer) => layer.contexts)
+    const names = new Set()
+    for (const [name, context] of entries) {
+      if (context?.required === true) names.add(String(name))
+    }
+    return names
+  } catch {
+    return undefined
+  }
+}
+
+export function filterEmptyOptionalContexts(contexts, ctx, scope) {
+  const required = requiredContextNames(ctx, scope)
+  const list = Array.isArray(contexts) ? contexts : []
+  if (required === undefined) return list
+  return list.filter((context) => String(context?.text ?? '') !== '' || required.has(String(context?.name ?? '')))
 }
 
 /** 会话 id：source {kind:'agent'} 的 id。 */
@@ -1613,7 +1625,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   return {
     ok: true,
     config: previewCfg,
-    contexts: filterRuntimeContexts(assembled.contexts ?? [], baseTools)
+    contexts: filterEmptyOptionalContexts(assembled.contexts ?? [], ctx, scopeKey)
       .filter((item) => !matchesAny(previewContextsDenied, item))
       .map(context => ({
         name: context.name,
@@ -1663,7 +1675,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     // 独立名单」，被屏蔽 / 被隐藏的条目仍保留在此可反选。
     baseSections,
     baseTools,
-    baseContexts: filterRuntimeContexts(baseView.contexts, baseTools),
+    baseContexts: filterEmptyOptionalContexts(baseView.contexts, ctx, scopeKey),
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),
   }
@@ -1761,7 +1773,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       phase,
       createdAt: typeof agent.session?.header?.createdAt === 'number' ? agent.session.header.createdAt : undefined,
     },
-    contexts: filterRuntimeContexts(assembled.contexts ?? [], actualTools).map(context => ({
+    contexts: filterEmptyOptionalContexts(assembled.contexts ?? [], ctx, agent).map(context => ({
       name: context.name,
       text: renderSection(context, assembled.variables ?? {}, diagnostics),
       ...(context.source === undefined ? {} : { source: context.source }),
@@ -1772,7 +1784,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
     tools: actualTools,
     baseSections,
     baseTools: union.rows,
-    baseContexts: filterRuntimeContexts(baseView.contexts, actualTools),
+    baseContexts: filterEmptyOptionalContexts(baseView.contexts, ctx, agent),
     registryTools: union.registryTools,
     registryTotal: union.registryTools.length,
     takenOverBy: assembled && typeof assembled === 'object'

@@ -87,7 +87,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-当前版本 **2.0.1**（单预设编辑；修复工具级运行时上下文残留过滤与上下文草稿显隐）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+当前版本 **2.0.2**（单预设编辑；运行时上下文按宿主 required 契约通用过滤空可选上下文，显隐走草稿保存）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 

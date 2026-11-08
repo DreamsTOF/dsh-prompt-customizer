@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.2：通用运行时上下文过滤
+
+- 按宿主 `PromptContext.required` 通用过滤空的可选上下文，不做名字特判。
+- 完整记录见 [2.0.2-generic-context-filter.md](2.0.2-generic-context-filter.md)。
+
 ## 2.0.1：运行时上下文残留过滤与草稿显隐
 
 - 过滤工具拥有的空 `tool:<name>:depth` 上下文；上下文显隐改为保存时落盘。
