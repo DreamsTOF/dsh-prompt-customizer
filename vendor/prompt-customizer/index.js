@@ -132,11 +132,7 @@ function agentSourceOf(agent) {
 /** 预设工具目录也要看到 agent 作用域工具；取最新根会话仅用于 catalog，不参与段装配。 */
 function latestRootAgent(ctx) {
   try {
-    const agents = ctx?.get?.('agents')
-    const roots = typeof agents?.roots === 'function'
-      ? agents.roots()
-      : typeof agents?.list === 'function' ? agents.list() : []
-    return Array.isArray(roots) ? roots[0] : undefined
+    return listRootAgents(ctx)[0]
   } catch {
     return undefined
   }
@@ -1424,8 +1420,8 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     return ''
   }
   const rows = []
-  const emit = (name, state, description, keySuffix) => {
-    const source = state === 'locked-executor'
+  const emit = (name, state, description, keySuffix, sourceOverride) => {
+    const source = sourceOverride ?? (state === 'locked-executor'
       ? { kind: 'executor' }
       : state === 'locked-agent'
         ? agentSourceOf(liveAgent)
@@ -1434,7 +1430,7 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
           presetId: options.presetId,
           agent: liveAgent,
           presetScopeKey,
-        })
+        }))
     rows.push({
       name,
       description,
@@ -1577,6 +1573,7 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
       ...(typeof tool.state === 'string' ? { state: tool.state } : {}),
       ...(tool.scope === 'agent' || tool.scope === 'executor' ? { scope: tool.scope } : {}),
       ...(tool.source === undefined ? {} : { source: tool.source }),
+      ...(tool.keySuffix === undefined ? {} : { keySuffix: tool.keySuffix }),
       ...(tool.maskedByPlugin === true ? { maskedByPlugin: true } : {}),
       ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
     }))

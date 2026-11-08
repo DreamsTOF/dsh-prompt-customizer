@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { apply } from '../vendor/prompt-customizer/index.js'
+import { entryMatches } from '../vendor/prompt-customizer/model.js'
 import { openDb, setDoc } from '../vendor/prompt-customizer/db.js'
 
 const PRESET_KEY = { preset: 'standard' }
@@ -157,4 +158,14 @@ test('未知阶段：预览查询返回 400 并记录，不静默当 active', as
   const res = await h.request('preview?scope=standard&phase=nope')
   assert.equal(res.status, 400)
   assert.match(res.body.error, /unknown phase/)
+})
+
+test('agent 来源按 kind 匹配，不绑定旧会话 id', () => {
+  assert.equal(
+    entryMatches(
+      { name: 'any-tool', source: { kind: 'agent', id: 'session-old' } },
+      { name: 'any-tool', source: { kind: 'agent', id: 'session-new' } },
+    ),
+    true,
+  )
 })

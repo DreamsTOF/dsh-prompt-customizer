@@ -6,13 +6,16 @@ import { createPhaseToolVisibility } from '../vendor/prompt-customizer/tool-visi
  * 0.2.2-rc.1 的回归：装配瀑布流不再携带 tools，阶段化工具目录必须落到
  * agent 作用域 restrict 上，并随会话事件切换阶段。
  */
-function harness() {
+function harness({ restrictableNames = ['bash', 'edit', 'read'] } = {}) {
   const handlers = new Map()
   const restricts = []
   const disposals = []
   const tools = {
     schemas: () => [{ name: 'bash' }, { name: 'edit' }, { name: 'read' }],
     restrict: (filter) => {
+      for (const name of filter.deny ?? []) {
+        if (!restrictableNames.includes(name)) throw new Error(`unknown global tool "${name}"`)
+      }
       restricts.push([...filter.deny])
       const dispose = () => disposals.push([...filter.deny])
       return dispose
@@ -126,8 +129,8 @@ test('阶段化工具目录：readConfig 返回已合并的生效配置（工作
 })
 
 test('阶段化工具目录：任意数量工具泛化进入 restrict，且 restrict 后同步不撤销', () => {
-  const h = harness()
   const generated = Array.from({ length: 24 }, (_, index) => `generated-tool-${String(index).padStart(2, '0')}`)
+  const h = harness({ restrictableNames: generated })
   h.tools.schemas = () => generated.map((name) => ({ name }))
   let phase = { promoted: true, boundary: -1 }
   const visibility = createPhaseToolVisibility({

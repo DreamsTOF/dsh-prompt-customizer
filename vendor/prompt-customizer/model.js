@@ -70,6 +70,9 @@ export function entryMatches(entry, candidate) {
   if (wanted === undefined) return false
   if (wanted.name !== String(candidate?.name ?? '')) return false
   if (wanted.source === undefined) return true
+  // 预设配置不能绑定某个 agent 的 session id：同一预设在下一个会话里
+  // agent 作用域工具会有新的 id，必须按 source.kind 匹配 agent 来源。
+  if (wanted.source.kind === 'agent' && candidate?.source?.kind === 'agent') return true
   return sourceKey(wanted.source) === sourceKey(candidate?.source)
 }
 

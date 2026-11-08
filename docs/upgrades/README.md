@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.13：DSH 运行时契约对齐
+
+- 工具目录/来源/restrict 按 DSH 运行时契约泛化，不绑定具体工具名；同名遮蔽保留 keySuffix。
+- 完整记录见 [2.0.13-runtime-contract.md](2.0.13-runtime-contract.md)。
+
 ## 2.0.12：工具泛例测试
 
 - 工具目录与 restrict 改为生成式 N 工具测试，不依赖具体工具名。
