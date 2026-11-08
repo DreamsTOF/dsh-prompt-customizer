@@ -39,7 +39,7 @@ function harness() {
   const emit = (event, ...args) => {
     for (const handler of handlers.get(event) ?? []) handler(...args)
   }
-  return { ctx, agent, restricts, disposals, emit }
+  return { ctx, agent, tools, restricts, disposals, emit }
 }
 
 test('阶段化工具目录：bootstrap / active 各自安装 restrict', () => {
@@ -123,4 +123,36 @@ test('阶段化工具目录：readConfig 返回已合并的生效配置（工作
   })
   visibility.sync(h.agent)
   assert.deepEqual(h.restricts, [['edit']], '工作区级 tools.exclude 通过 restrict 收窄')
+})
+
+test('阶段化工具目录：任意数量工具泛化进入 restrict，且 restrict 后同步不撤销', () => {
+  const h = harness()
+  const generated = Array.from({ length: 24 }, (_, index) => `generated-tool-${String(index).padStart(2, '0')}`)
+  h.tools.schemas = () => generated.map((name) => ({ name }))
+  let phase = { promoted: true, boundary: -1 }
+  const visibility = createPhaseToolVisibility({
+    ctx: h.ctx,
+    readConfig: () => ({
+      overrides: {
+        standard: {
+          tools: {
+            exclude: generated.map((name, index) => ({
+              name,
+              source: { kind: ['preset', 'agent', 'global'][index % 3] },
+            })),
+          },
+        },
+      },
+    }),
+    phaseOf: () => phase,
+    presetOf: () => 'standard',
+  })
+  visibility.sync(h.agent)
+  assert.deepEqual(h.restricts, [generated], '所有生成工具都应进入 deny')
+  // 模拟 restrict 生效后可见 schemas 缩小：再次同步不能撤销 deny。
+  h.tools.schemas = () => []
+  phase = { promoted: true, boundary: -1 }
+  h.emit('session/event', h.agent.session, { type: 'turn/start' })
+  assert.deepEqual(h.restricts, [generated], '相同 deny 不应重复安装')
+  assert.deepEqual(h.disposals, [], '不能释放仍在生效的 restrict')
 })
