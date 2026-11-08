@@ -1585,7 +1585,12 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   // 预过滤视图（base）：段来自装配 base 视图；工具目录 0.2.2 起改从注册表读。
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
   const phaseStatus = statusOfPhase(phase === undefined ? 'active' : phase) ?? statusOfPhase('active')
-  const previewCfg = effectiveConfig(rawConfig?.overrides?.[configTargetId])
+  // 草稿预览必须和 /config/apply 共用同一套 overlayPatch 语义；否则工具目录
+  // 仍按磁盘值算，勾选工具后左侧/右侧/计数都不会反映未保存状态。
+  const previewRaw = patch !== undefined
+    ? overlayPatch({ ...(rawConfig ?? {}) }, patchTarget ?? configTargetId, patch)
+    : rawConfig
+  const previewCfg = effectiveConfig(previewRaw?.overrides?.[configTargetId])
   const previewToolFilter = pickToolsFilter(previewCfg.tools, phaseStatus)
   const previewDenied = pickSectionsForStatus(previewCfg, phaseStatus)
   const previewContextsDenied = pickContextsForStatus(previewCfg, phaseStatus)
