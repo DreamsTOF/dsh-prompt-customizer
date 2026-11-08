@@ -3544,7 +3544,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     inject: draft.inject ?? base.inject,
     tools: draft.tools ?? base.tools
   } : base;
-  const ep = level === "workspace" ? sessionView !== null ? { bootstrap: sessionView, compaction: sessionView, active: sessionView } : null : phases;
+  const ep = phases;
   const writeField = (field, value) => {
     const url = value === void 0 ? CONFIG_UNSET_URL : CONFIG_SET_URL;
     fetch(url, {

@@ -295,10 +295,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
         tools: draft.tools ?? base.tools,
       }
     : base
-  // 工作区级左栏要能列出「会话里全部段 / 工具」，用当前会话视图充当三态基座。
-  const ep: PhaseViews | null = level === 'workspace'
-    ? (sessionView !== null ? { bootstrap: sessionView, compaction: sessionView, active: sessionView } : null)
-    : phases
+  // 三态基座始终用「所选预设」的逐阶段装配（预设超集）。工作区级不能拿当前会话
+  // 视图顶替：会话可能属于别的预设，会把该预设的专属段/工具漏掉（如 ptc 的 tools:ptc-only）。
+  const ep: PhaseViews | null = phases
 
   const writeField = (field: string, value: unknown): void => {
     const url = value === undefined ? CONFIG_UNSET_URL : CONFIG_SET_URL
