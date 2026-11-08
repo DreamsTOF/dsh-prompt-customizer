@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.5** (single-preset editing; preset tool catalogs include agent-scope tools such as `apply_patch`; schema validation for import/restore, workspace polling, serialized writes, skill-health and context prechecks), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.0.6** (single-preset editing; fixes preset tool masking not applying to new sessions, includes agent-scope tools in the preset catalog, plus import validation, workspace polling, serialized writes and skill-health fixes), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 

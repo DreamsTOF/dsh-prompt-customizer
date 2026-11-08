@@ -25,10 +25,11 @@ const RELEVANT_EVENTS = new Set([
   'agent-preset/selected',
 ])
 
-/** 全局可收窄工具名（root 视图；条件工具也算，restrict 允许未执行的声明名）。 */
-function globalToolNames(ctx) {
+/** 当前 agent 可收窄工具名（agent 视图包含 preset/祖先层；条件工具也算）。 */
+function visibleToolNames(ctx, agent) {
   try {
-    const schemas = ctx.get?.('tools')?.schemas?.() ?? []
+    const service = ctx.get?.('tools')
+    const schemas = service?.schemas?.(agent) ?? agent?.ctx?.tools?.schemas?.(agent) ?? []
     return new Set(
       (Array.isArray(schemas) ? schemas : [])
         .map(tool => (typeof tool?.name === 'string' ? tool.name : undefined))
@@ -42,7 +43,10 @@ function globalToolNames(ctx) {
 /** 当前活动 agent 列表（服务缺席时为空）。 */
 function activeAgents(ctx) {
   try {
-    const list = ctx.get?.('agents')?.list?.()
+    const agents = ctx.get?.('agents')
+    const list = typeof agents?.roots === 'function'
+      ? agents.roots()
+      : agents?.list?.()
     return Array.isArray(list) ? list.filter(agent => agent && typeof agent === 'object') : []
   } catch {
     return []
@@ -90,23 +94,18 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
       cfg = effectiveConfig(presetId === undefined || presetId === '' ? undefined : cfg.overrides?.[presetId])
     }
     const filter = pickToolsFilter(cfg.tools, phaseOf(agent))
-    const names = globalToolNames(ctx)
+    const names = visibleToolNames(ctx, agent)
     return [...new Set(
       (Array.isArray(filter.exclude) ? filter.exclude : [])
         .map((entry) => normalizeEntry(entry))
-        .filter((entry) => entry !== undefined
-          && names.has(entry.name)
-          && (entry.source === undefined
-            || entry.source.kind === 'global'
-            || entry.source.kind === 'workspace'
-            || entry.source.kind === 'provider'))
+        .filter((entry) => entry !== undefined && names.has(entry.name))
         .map((entry) => entry.name),
     )]
   }
 
   const sync = (agent) => {
     if (stopped || agent === null || typeof agent !== 'object') return
-    const tools = agent.ctx?.get?.('tools')
+    const tools = agent.ctx?.tools ?? agent.ctx?.get?.('tools')
     if (typeof tools?.restrict !== 'function') return
     let deny
     try {
