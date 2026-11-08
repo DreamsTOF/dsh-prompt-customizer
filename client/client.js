@@ -3596,7 +3596,12 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     setWorkspaceOverrides(body.workspaceOverrides ?? {});
     setCurrentWorkspace(typeof body.currentWorkspace === "string" && body.currentWorkspace !== "" ? body.currentWorkspace : void 0);
     setError(null);
-  }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+    return null;
+  }).catch((e) => {
+    const error2 = e instanceof Error ? e : new Error(String(e));
+    setError(error2.message);
+    return error2;
+  });
   const load = () => {
     void loadConfig();
   };
@@ -3639,7 +3644,8 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       });
       setPhases(views);
       setInv(inventoryData);
-      setError(failures.length ? failures.join("\n") : null);
+      const configError = responses[0];
+      setError(configError !== null ? configError.message : failures.length ? failures.join("\n") : null);
     }).catch((e) => {
       if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return;
       const empty = {};

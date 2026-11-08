@@ -19,6 +19,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { kernelSkillSummaries } from './kernel-skills.ts'
+import { isSkillMaskStub } from './skill-mask-provider.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 import { isSkillName } from './ids.ts'
 import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
@@ -150,6 +151,7 @@ export async function healthCheck(ctx?: Context): Promise<HealthReport> {
     const summaries = await kernelSkillSummaries(ctx as never)
     for (const summary of summaries) {
       if (typeof summary?.name !== 'string' || summary.name === '') continue
+      if (isSkillMaskStub(summary)) continue
       if (!nameSet.has(summary.name)) kernelHealthy += 1
       nameSet.add(summary.name)
     }
@@ -200,7 +202,11 @@ export function applySkillHealth(ctx: Context): void {
         }
         const url = new URL(req.url ?? '/', 'http://localhost')
         if (url.pathname === ROUTE_PATH || url.pathname === `${ROUTE_PATH}/`) {
-          json(res, 200, await healthCheck(ctx))
+          try {
+            json(res, 200, await healthCheck(ctx))
+          } catch (error) {
+            json(res, 500, { error: String(error instanceof Error ? error.message : error) })
+          }
           return
         }
         json(res, 404, { error: `no route for ${req.method ?? 'GET'} ${url.pathname}` })

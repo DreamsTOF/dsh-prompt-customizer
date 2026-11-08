@@ -105,6 +105,9 @@ test('skill-toggles：/status 按 workspace > preset > global 计算有效状态
     const presets = await request(route, 'GET', '/api/skill-toggles/presets')
     assert.equal(presets.status, 200)
     assert.equal(presets.body.presets[0].broken, 'row failed', 'broken 必须透传')
+    const presetsWithWorkspace = await request(route, 'GET', `/api/skill-toggles/presets?workspace=${encodeURIComponent(workspace)}`)
+    assert.equal(presetsWithWorkspace.status, 200)
+    assert.equal(presetsWithWorkspace.body.skills.alpha, false, 'preset 级状态只能返回全局基底，不能被 workspace 覆盖')
   } finally {
     closeAllDbs()
     for (const [key, value] of Object.entries(saved)) {

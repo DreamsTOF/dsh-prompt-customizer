@@ -128,7 +128,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [cleaning, setCleaning] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const loadConfig = (): Promise<void> => fetch(CONFIG_URL + `?t=${Date.now()}`)
+  const loadConfig = (): Promise<Error | null> => fetch(CONFIG_URL + `?t=${Date.now()}`)
     .then((r) => r.json())
     .then((body) => {
       if (body?.ok !== true) throw new Error(body?.error ?? 'config failed')
@@ -136,8 +136,13 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       setWorkspaceOverrides((body.workspaceOverrides ?? {}) as Record<string, Config>)
       setCurrentWorkspace(typeof body.currentWorkspace === 'string' && body.currentWorkspace !== '' ? body.currentWorkspace : undefined)
       setError(null)
+      return null
     })
-    .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
+    .catch((e: unknown) => {
+      const error = e instanceof Error ? e : new Error(String(e))
+      setError(error.message)
+      return error
+    })
   const load = (): void => { void loadConfig() }
   useEffect(load, [])
 
@@ -190,7 +195,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
         PHASE_KEYS.forEach((key, index) => { views[key] = responses[index + 1] as Preview | null })
         setPhases(views)
         setInv(inventoryData as Inventory)
-        setError(failures.length ? failures.join('\n') : null)
+        const configError = responses[0] as unknown as Error | null
+        setError(configError !== null ? configError.message : failures.length ? failures.join('\n') : null)
       })
       .catch((e: unknown) => {
         if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return

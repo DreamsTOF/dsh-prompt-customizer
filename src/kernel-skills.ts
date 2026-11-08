@@ -108,6 +108,8 @@ export interface KernelSkillView {
 interface SessionCandidate {
   agent: any
   id: string
+  /** Agent 预设 id：同一预设的不同会话共用技能摘要缓存。 */
+  presetId?: string
   cwd: string
   createdAt: number
 }
@@ -131,7 +133,17 @@ function sessionCandidates(ctx: PluginContext): SessionCandidate[] {
     if (typeof cwd !== 'string' || cwd.trim() === '') continue
     if (typeof id !== 'string' || id === '') continue
     const createdAt = typeof header?.createdAt === 'number' ? header.createdAt : 0
-    out.push({ agent, id, cwd: normalizeCwd(cwd), createdAt })
+    let presetId = typeof header?.agentPreset === 'string' && header.agentPreset !== ''
+      ? header.agentPreset
+      : typeof header?.presetId === 'string' && header.presetId !== '' ? header.presetId : undefined
+    if (presetId === undefined) {
+      try {
+        const presets = agent?.ctx?.get?.('agentPresets')
+        const composed = typeof presets?.composedPreset === 'function' ? presets.composedPreset(agent.ctx) : undefined
+        if (typeof composed === 'string' && composed !== '') presetId = composed
+      } catch { /* projection 未就绪 */ }
+    }
+    out.push({ agent, id, presetId, cwd: normalizeCwd(cwd), createdAt })
   }
   out.sort((left, right) => right.createdAt - left.createdAt)
   return out
@@ -306,7 +318,7 @@ export async function kernelSkillViews(
   const targetCwd = cwd !== undefined && cwd !== ''
     ? normalizeCwd(cwd)
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
-  const cacheScope = candidate === undefined ? 'global' : String(candidate.id)
+  const cacheScope = candidate === undefined ? 'global' : String(candidate.presetId ?? candidate.id)
   const cacheKeyOf = (name: string): string => `${cacheScope}\u0000${targetCwd}\u0000${name}`
   let cacheDirty = false
   for (const summary of summaries) {
