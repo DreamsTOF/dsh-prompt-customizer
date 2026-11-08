@@ -46,6 +46,7 @@ import { makeIoEnv } from './preset-io.ts'
 const INVENTORY_URL = '/api/prompt-customizer/inventory'
 const AGENT_PRESETS_URL = '/api/prompt-customizer/agent-presets'
 const CONFIG_URL = '/api/prompt-customizer/config'
+const CONFIG_BATCH_URL = '/api/prompt-customizer/config/batch'
 const CONFIG_SET_URL = '/api/prompt-customizer/config/set'
 const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
@@ -327,6 +328,25 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       })
       const body = await response.json()
       if (body?.ok !== true) throw new Error(body?.error ?? 'write failed')
+      setCfg(body.config as Config)
+      setError(null)
+      setVersion((n) => n + 1)
+      return true
+    }).catch((e: unknown) => {
+      setError(String(e instanceof Error ? e.message : e))
+      return false
+    })
+  }
+
+  const writeGlobalBatch = (fields: Record<string, unknown>): Promise<boolean> => {
+    return enqueueWrite(async () => {
+      const response = await fetch(CONFIG_BATCH_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      })
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'batch write failed')
       setCfg(body.config as Config)
       setError(null)
       setVersion((n) => n + 1)
@@ -781,6 +801,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
                 applyLevel: level,
                 applyTargetName: level === 'workspace' ? (workspace ?? currentWorkspace ?? undefined) : target,
                 writeGlobal,
+                writeGlobalBatch,
                 // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
                 envBlocklist: cfg.envBlocklist ?? [],
               }),

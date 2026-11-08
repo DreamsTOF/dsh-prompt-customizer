@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.9** (single-preset editing; stable preset tool masking, same-preset session catalog, hidden-tool re-toggle preservation, workspace skill status and serialized saves), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.0.10** (single-preset editing; stable preset tool masking, same-preset session catalog, hidden-tool re-toggle preservation, atomic preset import, persisted skill summaries and skill-health counts), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 

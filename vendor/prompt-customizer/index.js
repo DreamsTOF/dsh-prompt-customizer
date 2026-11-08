@@ -915,6 +915,39 @@ export function apply(ctx, entry = {}) {
     })
     ctx.effect(() => disposeConfig, 'prompt-customizer: config route')
 
+    // 全局字段批量写入：导入预设时 envBlocklist + presets 必须一次落盘，
+    // 避免第一个字段成功、第二个字段失败留下半套配置。
+    const BATCH_GLOBAL_FIELDS = new Set(['presets', 'activePreset', 'envBlocklist', 'forceSections'])
+    const disposeConfigBatch = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/config/batch',
+      handler: async (req, res) => {
+        try {
+          const body = await readJsonBody(req)
+          const fields = body?.fields
+          if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) {
+            writeJson(res, 400, { ok: false, error: 'fields object is required' })
+            return
+          }
+          const next = { ...(store.raw() ?? {}) }
+          for (const [field, value] of Object.entries(fields)) {
+            if (!BATCH_GLOBAL_FIELDS.has(field)) {
+              writeJson(res, 400, { ok: false, error: `field '${field}' is not a global batch field` })
+              return
+            }
+            if (value === undefined) delete next[field]
+            else next[field] = value
+          }
+          store.writeSection(next)
+          toolVisibility.syncAll()
+          writeJson(res, 200, { ok: true, config: read() })
+        } catch (error) {
+          writeJson(res, 400, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeConfigBatch, 'prompt-customizer: config batch route')
+
     // 0.9.0 起六个提示词字段（sections/sectionsBootstrap/sectionsCompaction/
     // replace/inject/tools）属于已停用的全局层，set/unset 直接 400 —— 提示词
     // 定制必须走 /config/apply + target（写 overrides[id]）。历史数据保留在

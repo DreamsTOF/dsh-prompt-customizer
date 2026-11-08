@@ -24,6 +24,7 @@ import { currentRootPaths, userSkillRoots, workspaceSkillRoots } from './skill-r
 import { isSkillMaskStub } from './skill-mask-provider.ts'
 import { normalizeCwd } from './home-paths.ts'
 import { isSkillName } from './ids.ts'
+import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 
 /** 运行时上下文在类型上放宽（与其它 host 模块同惯例）。 */
 type PluginContext = any
@@ -54,6 +55,32 @@ interface KernelSkillSummary {
 
 /** 进程内真实摘要缓存：全局 mask 可能先于 UI 列表遮蔽，保留启用时的原摘要。 */
 const summaryCache = new Map<string, KernelSkillSummary>()
+const SUMMARY_CACHE_DOC = 'skills/summary-metadata'
+let summaryCacheLoaded = false
+
+function loadSummaryCache(): void {
+  if (summaryCacheLoaded) return
+  summaryCacheLoaded = true
+  try {
+    const raw = readPluginDoc(SUMMARY_CACHE_DOC)
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return
+    for (const [key, value] of Object.entries(raw)) {
+      if (value !== null && typeof value === 'object' && typeof (value as KernelSkillSummary).name === 'string') {
+        summaryCache.set(key, value as KernelSkillSummary)
+      }
+    }
+  } catch {
+    /* 测试 / 无插件 DB：保持进程内缓存 */
+  }
+}
+
+function saveSummaryCache(): void {
+  try {
+    writePluginDoc(SUMMARY_CACHE_DOC, Object.fromEntries(summaryCache))
+  } catch {
+    /* 测试 / 无插件 DB：忽略持久化失败 */
+  }
+}
 
 /** vendor 技能管理器消费的视图（字段名与 `vendor/skill-manager/skills-host.js` 对齐）。 */
 export interface KernelSkillView {
@@ -273,6 +300,7 @@ export async function kernelSkillViews(
   sessionId?: string,
   cwd?: string,
 ): Promise<KernelSkillView[]> {
+  loadSummaryCache()
   const candidate = resolveViewSession(ctx, sessionId)
   const summaries = await listKernelSkills(ctx, candidate, cwd)
   const targetCwd = cwd !== undefined && cwd !== ''
@@ -280,11 +308,15 @@ export async function kernelSkillViews(
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   const cacheScope = candidate === undefined ? 'global' : String(candidate.id)
   const cacheKeyOf = (name: string): string => `${cacheScope}\u0000${targetCwd}\u0000${name}`
+  let cacheDirty = false
   for (const summary of summaries) {
     if (typeof summary?.name === 'string' && summary.name !== '' && !isSkillMaskStub(summary)) {
-      summaryCache.set(cacheKeyOf(summary.name), summary)
+      const key = cacheKeyOf(summary.name)
+      if (summaryCache.get(key) === undefined) cacheDirty = true
+      summaryCache.set(key, summary)
     }
   }
+  if (cacheDirty) saveSummaryCache()
   // 内核目录只在「有会话 + scope 命中预设层」时才完整（filesystem/office provider
   // 挂在预设行里）。面板要能配置任意工作区，因此内核给不出条目时按同一套根规则
   // 兜底扫描 —— 目标工作区明确时也走兜底，避免拿到别的会话的项目根。

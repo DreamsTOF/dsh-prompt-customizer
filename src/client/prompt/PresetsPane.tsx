@@ -39,7 +39,7 @@ function useNotice(): { notice: Notice | null; show: (kind: Notice['kind'], text
   return { notice, show }
 }
 
-export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist, applyLevel, applyTargetName }: {
+export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, writeGlobalBatch, envBlocklist, applyLevel, applyTargetName }: {
   cfg: Config
   inv: Inventory | null
   /** Panel 并行拉取的三阶段装配。 */
@@ -49,6 +49,8 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   writePatch: (patch: ConfigPatch) => Promise<boolean>
   /** 预设库专用：永远写在全局字段（presets / activePreset 不分作用域）。 */
   writeGlobal: (field: string, value: unknown) => Promise<boolean>
+  /** 多个全局字段一次写入（导入预设的 envBlocklist + presets 原子化）。 */
+  writeGlobalBatch: (fields: Record<string, unknown>) => Promise<boolean>
   /** 全局环境变量黑名单（永远顶层字段，不分作用域）；导出随行、导入并集。 */
   envBlocklist: string[]
   /** 应用目标层级：预设级 / 工作区级（与顶部统一切换一致）。 */
@@ -126,13 +128,16 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
         ? ((parsed as { envBlocklist?: unknown[] }).envBlocklist ?? []).filter((e): e is string => typeof e === 'string')
         : []
       const fresh = fileBlock.filter((e) => !envBlocklist.includes(e))
-      if (fresh.length > 0) await writeGlobal('envBlocklist', [...envBlocklist, ...fresh])
       const mergedNote = fresh.length > 0 ? t('importBlockMerge', { count: fresh.length }) : ''
       if (added <= 0) show('ok', t('importNone') + mergedNote)
-      else {
-        await writeGlobal('presets', next)
-        show('ok', `${t('importOk')} (+${added})${mergedNote}`)
+      const fields: Record<string, unknown> = {}
+      if (fresh.length > 0) fields.envBlocklist = [...envBlocklist, ...fresh]
+      if (added > 0) fields.presets = next
+      if (Object.keys(fields).length > 0) {
+        const written = await writeGlobalBatch(fields)
+        if (!written) return
       }
+      if (added > 0) show('ok', `${t('importOk')} (+${added})${mergedNote}`)
     } catch (e) {
       show('error', `${t('importFail')}: ${e instanceof Error ? e.message : String(e)}`)
     }

@@ -3203,7 +3203,7 @@ function useNotice() {
   };
   return { notice, show };
 }
-function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist, applyLevel, applyTargetName }) {
+function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, writeGlobalBatch, envBlocklist, applyLevel, applyTargetName }) {
   const presets = cfg.presets ?? [];
   const [name, setName] = (0, import_react6.useState)("");
   const { notice, show } = useNotice();
@@ -3250,13 +3250,16 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
       const added = next.length - presets.length;
       const fileBlock = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.envBlocklist) ? (parsed.envBlocklist ?? []).filter((e) => typeof e === "string") : [];
       const fresh = fileBlock.filter((e) => !envBlocklist.includes(e));
-      if (fresh.length > 0) await writeGlobal("envBlocklist", [...envBlocklist, ...fresh]);
       const mergedNote = fresh.length > 0 ? t("importBlockMerge", { count: fresh.length }) : "";
       if (added <= 0) show("ok", t("importNone") + mergedNote);
-      else {
-        await writeGlobal("presets", next);
-        show("ok", `${t("importOk")} (+${added})${mergedNote}`);
+      const fields = {};
+      if (fresh.length > 0) fields.envBlocklist = [...envBlocklist, ...fresh];
+      if (added > 0) fields.presets = next;
+      if (Object.keys(fields).length > 0) {
+        const written = await writeGlobalBatch(fields);
+        if (!written) return;
       }
+      if (added > 0) show("ok", `${t("importOk")} (+${added})${mergedNote}`);
     } catch (e) {
       show("error", `${t("importFail")}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -3542,6 +3545,7 @@ function PreviewPane({ t, phases, phase, sub, onToggleContext }) {
 var INVENTORY_URL = "/api/prompt-customizer/inventory";
 var AGENT_PRESETS_URL = "/api/prompt-customizer/agent-presets";
 var CONFIG_URL = "/api/prompt-customizer/config";
+var CONFIG_BATCH_URL = "/api/prompt-customizer/config/batch";
 var CONFIG_SET_URL = "/api/prompt-customizer/config/set";
 var CONFIG_UNSET_URL = "/api/prompt-customizer/config/unset";
 var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
@@ -3739,6 +3743,24 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       });
       const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "write failed");
+      setCfg(body.config);
+      setError(null);
+      setVersion((n) => n + 1);
+      return true;
+    }).catch((e) => {
+      setError(String(e instanceof Error ? e.message : e));
+      return false;
+    });
+  };
+  const writeGlobalBatch = (fields) => {
+    return enqueueWrite(async () => {
+      const response = await fetch(CONFIG_BATCH_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fields })
+      });
+      const body = await response.json();
+      if (body?.ok !== true) throw new Error(body?.error ?? "batch write failed");
       setCfg(body.config);
       setError(null);
       setVersion((n) => n + 1);
@@ -4132,6 +4154,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
           applyLevel: level,
           applyTargetName: level === "workspace" ? workspace ?? currentWorkspace ?? void 0 : target,
           writeGlobal,
+          writeGlobalBatch,
           // 黑名单永远是全局字段：取原始配置（不经 editView 的目标叠加）。
           envBlocklist: cfg.envBlocklist ?? []
         }),

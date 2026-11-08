@@ -145,12 +145,16 @@ export async function healthCheck(ctx?: Context): Promise<HealthReport> {
     issues.push(...scanned.issues)
   }
   // bundle 成员不一定是文件系统技能：bundled / office / 插件注册技能也要算存在。
+  let kernelHealthy = 0
   if (ctx !== undefined) {
     const summaries = await kernelSkillSummaries(ctx as never)
     for (const summary of summaries) {
-      if (typeof summary?.name === 'string' && summary.name !== '') nameSet.add(summary.name)
+      if (typeof summary?.name !== 'string' || summary.name === '') continue
+      if (!nameSet.has(summary.name)) kernelHealthy += 1
+      nameSet.add(summary.name)
     }
   }
+  healthy += kernelHealthy
 
   // bundle 账本悬挂引用：引用了所有根目录里都不存在的技能。
   const ledger = await readBundles(ledgerRoot())

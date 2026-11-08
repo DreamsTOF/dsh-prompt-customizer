@@ -64,3 +64,24 @@ test('config/set 拒绝非法字段值，不落盘', async () => {
   assert.equal(res.body.ok, false)
   assert.equal(getDoc(db, 'config'), undefined)
 })
+
+test('config/batch 一次写入多个全局字段', async () => {
+  const { routes, db } = harness()
+  const res = await call(routes['/api/prompt-customizer/config/batch'], {
+    fields: { envBlocklist: ['SECRET'], presets: [] },
+  })
+  assert.equal(res.status, 200)
+  assert.deepEqual(getDoc(db, 'config'), { envBlocklist: ['SECRET'], presets: [] })
+})
+
+test('config/batch 校验失败时两个字段都不落盘', async () => {
+  const { routes, db } = harness()
+  const res = await call(routes['/api/prompt-customizer/config/batch'], {
+    fields: {
+      envBlocklist: ['SECRET'],
+      presets: [{ id: 'bad', name: 'Bad', data: { sections: 'bad' } }],
+    },
+  })
+  assert.equal(res.status, 400)
+  assert.equal(getDoc(db, 'config'), undefined)
+})
