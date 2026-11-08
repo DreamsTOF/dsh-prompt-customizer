@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.15：工具屏蔽池恢复
+
+- 修复完整目录过滤把 `masked-plugin`/`masked-own` 行一并吞掉导致屏蔽池消失。
+- 完整记录见 [2.0.15-mask-pool-regression.md](2.0.15-mask-pool-regression.md)。
+
 ## 2.0.14：工具执行前门禁
 
 - 通过 `tools/pre-execute` 对 restrict 无法触及的 agent 作用域工具执行运行时拒绝。

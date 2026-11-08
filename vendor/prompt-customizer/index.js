@@ -1691,8 +1691,9 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const baseToolNames = new Set(baseTools.map((tool) => tool.name))
   const catalogTools = [...baseTools, ...catalogRows.filter((tool) => !baseToolNames.has(tool.name)
     // 同名但 agent 实际可见的遮蔽行必须保留（keySuffix=live）；同名
-    // masked-plugin 行只是 base 预设行的另一面，不能重复塞进目录。
-    || tool.state === 'locked-agent')]
+    // masked-plugin / masked-own 行必须保留给只读「已遮蔽」池，不能因
+    // base 同名就丢掉，否则工具屏蔽池会整块消失。
+    || tool.state === 'locked-agent' || tool.state === 'masked-plugin' || tool.state === 'masked-own')]
   const toolSourceByName = new Map(baseTools.map((row) => [row.name, row.source]))
   const toolCandidate = (tool) => {
     const name = typeof tool?.name === 'string' ? tool.name : String(tool?.name)

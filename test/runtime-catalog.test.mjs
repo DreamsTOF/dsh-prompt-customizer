@@ -183,6 +183,17 @@ test('预设清单按当前 agent 工具集合泛化扫描，不依赖具体工�
   }
 })
 
+test('工具屏蔽池保留同名 masked-plugin 行，不会被 base 行吞掉', async () => {
+  const allTools = [{ name: 'always-tool' }, { name: 'masked-tool' }]
+  const { ctx, routes, dataDir } = makeCtx({
+    toolsByScope: (scope) => scope === AGENT ? [{ name: 'always-tool' }] : allTools,
+  })
+  apply(ctx, { dataDir })
+  const body = await inventoryOf(routes)
+  const masked = body.tools.filter((tool) => tool.state === 'masked-plugin').map((tool) => tool.name)
+  assert.deepEqual(masked, ['masked-tool'])
+})
+
 test('两条路径并存时同名只出现一次（并集去重）', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
