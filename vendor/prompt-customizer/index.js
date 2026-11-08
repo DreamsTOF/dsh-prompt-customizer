@@ -1649,13 +1649,17 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     extraTools: finalTools,
   })
   const baseTools = union.rows
-  const catalogTools = catalogAgent === undefined
-    ? baseTools
+  const catalogRows = catalogAgent === undefined
+    ? []
     : (await buildToolUnion(ctx, scopeKey, catalogAgent, previewCfg, phaseStatus, {
         toolMask,
         presetId: configTargetId,
         extraTools: finalTools,
       })).rows
+  // 只补 agent 独有的工具；同名预设工具必须保留 base 行的 hidden/controllable
+  // 状态，否则本插件 restrict 后的隐藏工具会被误标成 masked-plugin，用户无法反选。
+  const baseToolNames = new Set(baseTools.map((tool) => tool.name))
+  const catalogTools = [...baseTools, ...catalogRows.filter((tool) => !baseToolNames.has(tool.name))]
   const toolSourceByName = new Map(baseTools.map((row) => [row.name, row.source]))
   const toolCandidate = (tool) => {
     const name = typeof tool?.name === 'string' ? tool.name : String(tool?.name)
