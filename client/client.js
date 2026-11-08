@@ -2724,7 +2724,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     }
     if (changed) write("tools", tools);
   };
-  const catalogOf = (key) => phases?.[key]?.baseTools ?? [];
+  const catalogOf = (key) => phases?.[key]?.catalogTools ?? phases?.[key]?.baseTools ?? [];
   const isInCatalog = (key, entry) => catalogOf(key).some((tool) => sameEntry(tool, entry));
   const registry = (() => {
     const out = [];
@@ -3220,17 +3220,18 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
   const saveCurrent = () => {
     const presetName = name.trim() || `${t("preset")} ${presets.length + 1}`;
     const data = buildPresetData(cfg, merged);
-    writeGlobal("presets", [...presets, { id: genId(), name: presetName, data }]);
+    void writeGlobal("presets", [...presets, { id: genId(), name: presetName, data }]);
     setName("");
   };
-  const applyPreset = (preset) => {
-    writePatch(applyPresetData(preset.data, cfg, currentEntries));
-    if (applyLevel !== "workspace") writeGlobal("activePreset", preset.id);
+  const applyPreset = async (preset) => {
+    const applied = await writePatch(applyPresetData(preset.data, cfg, currentEntries));
+    if (!applied) return;
+    if (applyLevel !== "workspace") await writeGlobal("activePreset", preset.id);
   };
-  const deletePreset = (id) => {
+  const deletePreset = async (id) => {
     const next = removePreset(presets, id, cfg.activePreset);
-    writeGlobal("presets", next.presets);
-    if (next.activeId === void 0 && cfg.activePreset === id) writeGlobal("activePreset", void 0);
+    const deleted = await writeGlobal("presets", next.presets);
+    if (deleted && next.activeId === void 0 && cfg.activePreset === id) await writeGlobal("activePreset", void 0);
   };
   const exportPreset = async (preset) => {
     try {
@@ -3242,18 +3243,18 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
       show("error", `${t("exportFail")}: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  const importParsed = (text) => {
+  const importParsed = async (text) => {
     try {
       const parsed = decodePresetExport(text);
       const next = addImportedPresets(presets, parsed, genId);
       const added = next.length - presets.length;
       const fileBlock = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.envBlocklist) ? (parsed.envBlocklist ?? []).filter((e) => typeof e === "string") : [];
       const fresh = fileBlock.filter((e) => !envBlocklist.includes(e));
-      if (fresh.length > 0) writeGlobal("envBlocklist", [...envBlocklist, ...fresh]);
+      if (fresh.length > 0) await writeGlobal("envBlocklist", [...envBlocklist, ...fresh]);
       const mergedNote = fresh.length > 0 ? t("importBlockMerge", { count: fresh.length }) : "";
       if (added <= 0) show("ok", t("importNone") + mergedNote);
       else {
-        writeGlobal("presets", next);
+        await writeGlobal("presets", next);
         show("ok", `${t("importOk")} (+${added})${mergedNote}`);
       }
     } catch (e) {
@@ -3264,7 +3265,7 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     try {
       const res = await importPresetFile();
       if (res.kind === "text") {
-        importParsed(res.text);
+        void importParsed(res.text);
         return;
       }
       if (res.kind === "cancelled") {
@@ -3281,7 +3282,9 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     e.target.value = "";
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => importParsed(String(reader.result));
+    reader.onload = () => {
+      void importParsed(String(reader.result));
+    };
     reader.onerror = () => show("error", t("importFail"));
     reader.readAsText(file);
   };
@@ -3571,23 +3574,31 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
   const [draft, setDraft] = (0, import_react9.useState)(null);
   const [saving, setSaving] = (0, import_react9.useState)(false);
+  const writeChain = (0, import_react9.useRef)(Promise.resolve());
+  const enqueueWrite = (operation) => {
+    const next = writeChain.current.then(operation, operation);
+    writeChain.current = next.then(() => void 0, () => void 0);
+    return next;
+  };
   const [flash, setFlash] = (0, import_react9.useState)(null);
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
   const [backingUp, setBackingUp] = (0, import_react9.useState)(false);
   const [restoring, setRestoring] = (0, import_react9.useState)(false);
   const [cleaning, setCleaning] = (0, import_react9.useState)(false);
   const flashTimer = (0, import_react9.useRef)(null);
+  const loadConfig = () => fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
+    if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
+    setCfg(body.config);
+    setWorkspaceOverrides(body.workspaceOverrides ?? {});
+    setCurrentWorkspace(typeof body.currentWorkspace === "string" && body.currentWorkspace !== "" ? body.currentWorkspace : void 0);
+    setError(null);
+  }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
   const load = () => {
-    fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
-      if (body?.ok !== true) throw new Error(body?.error ?? "config failed");
-      setCfg(body.config);
-      setWorkspaceOverrides(body.workspaceOverrides ?? {});
-      setCurrentWorkspace(typeof body.currentWorkspace === "string" && body.currentWorkspace !== "" ? body.currentWorkspace : void 0);
-      setError(null);
-    }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+    void loadConfig();
   };
   (0, import_react9.useEffect)(load, []);
   const refresh = () => {
+    const configReady = loadConfig();
     const seq = ++refreshSeq.current;
     const scopeKey = `${level}\0${target ?? ""}\0${level === "workspace" ? workspace ?? currentWorkspace ?? "" : ""}`;
     scopeKeyRef.current = scopeKey;
@@ -3609,7 +3620,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       failures.push(`${phase2}: ${String(error2 instanceof Error ? error2.message : error2)}`);
       return null;
     });
-    return Promise.all([...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
+    return Promise.all([configReady, ...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
       if (body.ok === false) throw new Error(body.error ?? "inventory failed");
       return body;
     }).catch((error2) => {
@@ -3620,7 +3631,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return;
       const views = { ...{} };
       PHASE_KEYS.forEach((key, index) => {
-        views[key] = responses[index];
+        views[key] = responses[index + 1];
       });
       setPhases(views);
       setInv(inventoryData);
@@ -3720,16 +3731,22 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const ep = phases;
   const writeField = (field, value) => {
     const url = value === void 0 ? CONFIG_UNSET_URL : CONFIG_SET_URL;
-    fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ field, value })
-    }).then((r) => r.json()).then((body) => {
+    return enqueueWrite(async () => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ field, value })
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "write failed");
       setCfg(body.config);
       setError(null);
       setVersion((n) => n + 1);
-    }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+      return true;
+    }).catch((e) => {
+      setError(String(e instanceof Error ? e.message : e));
+      return false;
+    });
   };
   const edit = (field, value) => {
     setDraft((d) => ({
@@ -3765,48 +3782,58 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }).catch((e) => setError(`${t("saveFail")}: ${e instanceof Error ? e.message : String(e)}`)).finally(() => setSaving(false));
   };
   const writePatch = (patch) => {
-    fetch(CONFIG_APPLY_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ target, patch })
-    }).then((r) => r.json()).then((body) => {
+    return enqueueWrite(async () => {
+      const response = await fetch(CONFIG_APPLY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, patch })
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "apply failed");
       setCfg(body.config);
       setError(null);
       setVersion((n) => n + 1);
-    }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+      return true;
+    }).catch((e) => {
+      setError(String(e instanceof Error ? e.message : e));
+      return false;
+    });
   };
   const writePatchLayered = (patch) => {
     if (level === "workspace") {
       const cwd = workspace ?? currentWorkspace;
       if (cwd === void 0 || cwd === null || cwd === "") {
         showFlash(t("workspaceRequired"), "err");
-        return;
+        return Promise.resolve(false);
       }
-      fetch(CONFIG_APPLY_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ level: "workspace", workspace: cwd, patch })
-      }).then((r) => r.json()).then((body) => {
+      return enqueueWrite(async () => {
+        const response = await fetch(CONFIG_APPLY_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ level: "workspace", workspace: cwd, patch })
+        });
+        const body = await response.json();
         if (body?.ok !== true) throw new Error(body?.error ?? "apply failed");
         setCfg(body.config);
         if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);
         setError(null);
         setVersion((n) => n + 1);
-      }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
-      return;
+        return true;
+      }).catch((e) => {
+        setError(String(e instanceof Error ? e.message : e));
+        return false;
+      });
     }
-    writePatch(patch);
+    return writePatch(patch);
   };
   const toggleContext = (entry, hide) => {
     const keys = syncAll ? PHASE_KEYS : [phase];
-    for (const key of keys) {
-      const phaseView = phases?.[key];
-      const base2 = phaseView?.baseContexts;
-      if (phaseView === null || phaseView === void 0 || !Array.isArray(base2)) {
-        showFlash(t("contextsNotReady"), "err");
-        return;
-      }
+    const targets = keys.map((key) => ({ key, view: phases?.[key] }));
+    if (targets.some(({ view: view2 }) => view2 === null || view2 === void 0 || !Array.isArray(view2.baseContexts))) {
+      showFlash(t("contextsNotReady"), "err");
+      return;
+    }
+    for (const { key } of targets) {
       const patch = contextPatch(view, key, entry, hide);
       for (const [field, value] of Object.entries(patch)) edit(field, value);
     }
@@ -3818,8 +3845,10 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     return (view2.baseSections ?? []).some((section) => sameEntry(section, entry));
   };
   const toggleSyncAll = (on) => {
-    setSyncAll(on);
-    if (!on) return;
+    if (!on) {
+      setSyncAll(false);
+      return;
+    }
     if (ep === null || PHASE_KEYS.some((key) => ep[key] === null)) {
       showFlash(t("syncNotReady"), "err");
       return;
@@ -3829,6 +3858,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       showFlash(t("syncNotReady"), "err");
       return;
     }
+    setSyncAll(true);
     edit("inject", mirrorPhaseInjectEntries(view, rows, nativeIn));
     const denied = mirroredDeniedLists(rows);
     for (const descriptor of PHASES) edit(descriptor.sectionField, denied[descriptor.sectionField]);
@@ -4579,7 +4609,7 @@ var skillApi = {
   ),
   /** 可选工作区清单（面板顶栏选择器）。 */
   workspaces: () => skillRequest("/workspaces", { headers: { accept: "application/json" } }),
-  toggleStatus: () => fetch("/api/skill-toggles/status", { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+  toggleStatus: (cwd) => fetch(cwd === void 0 || cwd === null || cwd === "" ? "/api/skill-toggles/status" : `/api/skill-toggles/status?workspace=${encodeURIComponent(cwd)}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
     if (typeof body !== "object" || body === null || body.skills === void 0) {
       throw new Error("toggle status unavailable");
     }
@@ -4602,7 +4632,7 @@ var skillApi = {
     return body;
   }),
   /** 预设名单 + 各预设覆盖 + 全局层状态(一次拉齐)。 */
-  presetStatus: () => fetch("/api/skill-toggles/presets", { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
+  presetStatus: (cwd) => fetch(cwd === void 0 || cwd === null || cwd === "" ? "/api/skill-toggles/presets" : `/api/skill-toggles/presets?workspace=${encodeURIComponent(cwd)}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
     if (typeof body !== "object" || body === null || !Array.isArray(body.presets)) {
       throw new Error("preset status unavailable");
     }
@@ -7604,6 +7634,10 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const [state, setState] = (0, import_react15.useState)({ status: "loading" });
   const [reload, setReload] = (0, import_react15.useState)(0);
   const [workspace, setWorkspace] = (0, import_react15.useState)(null);
+  const workspaceRef = (0, import_react15.useRef)(workspace);
+  (0, import_react15.useEffect)(() => {
+    workspaceRef.current = workspace;
+  }, [workspace]);
   const [workspaces, setWorkspaces] = (0, import_react15.useState)([]);
   const [currentWorkspace, setCurrentWorkspace] = (0, import_react15.useState)(null);
   const [expanded, setExpanded] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
@@ -7734,11 +7768,11 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     setReload((value) => value + 1);
   };
   const silentSync = () => {
-    void skillApi.list().then((snapshot) => {
+    void skillApi.list(workspaceRef.current).then((snapshot) => {
       setState((current2) => current2.status === "error" ? current2 : { status: "ready", snapshot });
     }, () => {
     });
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles });
         setOverrides(status.overrides);
@@ -7747,7 +7781,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         });
       },
       () => {
-        void skillApi.toggleStatus().then((status) => {
+        void skillApi.toggleStatus(workspaceRef.current).then((status) => {
           setToggles(status);
         }, () => {
         });
@@ -7778,7 +7812,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     };
   }, []);
   const refreshTogglesOnly = () => {
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles });
         setOverrides(status.overrides);
@@ -7787,7 +7821,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         });
       },
       () => {
-        void skillApi.toggleStatus().then((status) => {
+        void skillApi.toggleStatus(workspaceRef.current).then((status) => {
           setToggles(status);
         }, () => {
         });
@@ -7806,7 +7840,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         if (current2) setState({ status: "error" });
       }
     );
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspace).then(
       (status) => {
         if (!current2) return;
         setToggles({ skills: status.skills, bundles: status.bundles });
@@ -7816,7 +7850,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
         });
       },
       () => {
-        void skillApi.toggleStatus().then(
+        void skillApi.toggleStatus(workspace).then(
           (status) => {
             if (current2) setToggles(status);
           },

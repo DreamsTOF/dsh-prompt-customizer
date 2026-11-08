@@ -60,6 +60,9 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
    * 一眼看清「我现在改的是哪个工作区」。
    */
   const [workspace, setWorkspace] = useState<string | null>(null)
+  /** 定时器/焦点回调里读取最新选择，避免空依赖闭包把工作区切回“跟随当前会话”。 */
+  const workspaceRef = useRef<string | null>(workspace)
+  useEffect(() => { workspaceRef.current = workspace }, [workspace])
   /** 可选工作区清单（宿主按活动会话 cwd ∪ 启动目录给出）。 */
   const [workspaces, setWorkspaces] = useState<string[]>([])
   /**
@@ -224,12 +227,12 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
 
   /** 静默同步：不置 loading，直接替换数据（自动同步机制用）。 */
   const silentSync = (): void => {
-    void skillApi.list().then((snapshot) => {
+    void skillApi.list(workspaceRef.current).then((snapshot) => {
       setState((current) => current.status === 'error'
         ? current
         : { status: 'ready', snapshot })
     }, () => { /* 保持当前显示 */ })
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles })
         setOverrides(status.overrides)
@@ -237,7 +240,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
       },
       () => {
-        void skillApi.toggleStatus().then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
+        void skillApi.toggleStatus(workspaceRef.current).then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
       },
     )
     void skillApi.health().then(
@@ -263,7 +266,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
 
   /** 开关切换后静默同步:只重拉开关状态,不重载整个面板(避免闪烁)。 */
   const refreshTogglesOnly = (): void => {
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles })
         setOverrides(status.overrides)
@@ -272,7 +275,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
       },
       () => {
         // 预设接口不可用（老 host）时退回只读全局层状态。
-        void skillApi.toggleStatus().then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
+        void skillApi.toggleStatus(workspaceRef.current).then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
       },
     )
   }
@@ -290,7 +293,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         if (current) setState({ status: 'error' })
       },
     )
-    void skillApi.presetStatus().then(
+    void skillApi.presetStatus(workspace).then(
       (status) => {
         if (!current) return
         setToggles({ skills: status.skills, bundles: status.bundles })
@@ -300,7 +303,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
       },
       () => {
         // 预设接口不可用时退化为「只有全局层」：圆球条只剩「全部 Agent」。
-        void skillApi.toggleStatus().then(
+        void skillApi.toggleStatus(workspace).then(
           (status) => { if (current) setToggles(status) },
           () => { /* 开关接口也不可用时保持空状态（开关仍可操作,失败会提示）。 */ },
         )

@@ -33,8 +33,10 @@ export const skillApi = {
   /** 可选工作区清单（面板顶栏选择器）。 */
   workspaces: (): Promise<{ workspaces: string[]; current?: string | null }> =>
     skillRequest<{ workspaces: string[]; current?: string | null }>('/workspaces', { headers: { accept: 'application/json' } }),
-  toggleStatus: (): Promise<ToggleStatus> =>
-    fetch('/api/skill-toggles/status', { headers: { accept: 'application/json' } })
+  toggleStatus: (cwd?: string | null): Promise<ToggleStatus> =>
+    fetch(cwd === undefined || cwd === null || cwd === ''
+      ? '/api/skill-toggles/status'
+      : `/api/skill-toggles/status?workspace=${encodeURIComponent(cwd)}`, { headers: { accept: 'application/json' } })
       .then((response) => response.json() as Promise<ToggleStatus & { error?: string }>)
       .then((body) => {
         if (typeof body !== 'object' || body === null || body.skills === undefined) {
@@ -63,8 +65,10 @@ export const skillApi = {
         return body
       }),
   /** 预设名单 + 各预设覆盖 + 全局层状态(一次拉齐)。 */
-  presetStatus: (): Promise<PresetStatus> =>
-    fetch('/api/skill-toggles/presets', { headers: { accept: 'application/json' } })
+  presetStatus: (cwd?: string | null): Promise<PresetStatus> =>
+    fetch(cwd === undefined || cwd === null || cwd === ''
+      ? '/api/skill-toggles/presets'
+      : `/api/skill-toggles/presets?workspace=${encodeURIComponent(cwd)}`, { headers: { accept: 'application/json' } })
       .then((response) => response.json() as Promise<PresetStatus & { error?: string }>)
       .then((body) => {
         if (typeof body !== 'object' || body === null || !Array.isArray(body.presets)) {

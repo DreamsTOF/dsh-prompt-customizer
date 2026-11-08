@@ -129,6 +129,19 @@ function agentSourceOf(agent) {
   return id === undefined ? { kind: 'agent' } : { kind: 'agent', id }
 }
 
+/** 预设工具目录也要看到 agent 作用域工具；取最新根会话仅用于 catalog，不参与段装配。 */
+function latestRootAgent(ctx) {
+  try {
+    const agents = ctx?.get?.('agents')
+    const roots = typeof agents?.roots === 'function'
+      ? agents.roots()
+      : typeof agents?.list === 'function' ? agents.list() : []
+    return Array.isArray(roots) ? roots[0] : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** 读某个 scope 层的注册表成员（宿主没有 layers / peek 时返回 undefined）。 */
 function layerHas(ctx, scope, table, name) {
   try {
@@ -809,6 +822,14 @@ export function apply(ctx, entry = {}) {
           const customization = overrides[targetId] !== null && typeof overrides[targetId] === 'object'
             ? overrides[targetId]
             : {}
+          if (overrides[targetId] !== undefined) {
+            try {
+              Config({ overrides: { __probe: customization } })
+            } catch (error) {
+              writeJson(res, 400, { ok: false, error: `invalid customization in config: ${String(error && error.message ? error.message : error)}` })
+              return
+            }
+          }
           writeJson(res, 200, {
             ok: true,
             format: 'dsh-prompt-customizer/export@1',
@@ -859,6 +880,14 @@ export function apply(ctx, entry = {}) {
           }
           const restored = { ...docs }
           delete restored['workspace-overrides']
+          if (restored.config !== undefined) {
+            try {
+              Config(restored.config ?? {})
+            } catch (error) {
+              writeJson(res, 400, { ok: false, error: `invalid config in backup: ${String(error && error.message ? error.message : error)}` })
+              return
+            }
+          }
           // 休眠数据不进入备份，但恢复备份也不应删除它。
           const dormantWorkspaceOverrides = allDocs(db)['workspace-overrides']
           replaceAllDocs(db, restored)
@@ -1006,6 +1035,12 @@ export function apply(ctx, entry = {}) {
           const customization = body?.customization
           if (target === undefined || customization === null || typeof customization !== 'object' || Array.isArray(customization)) {
             writeJson(res, 400, { ok: false, error: 'target and customization object are required' })
+            return
+          }
+          try {
+            Config({ overrides: { __probe: customization } })
+          } catch (error) {
+            writeJson(res, 400, { ok: false, error: `invalid customization: ${String(error && error.message ? error.message : error)}` })
             return
           }
           const raw = store.raw() ?? {}
@@ -1501,7 +1536,8 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
   // 工具来自预览的完整目录（预设注册表 ∪ 当前会话 agent 视图）：既包含被
   // 其它插件 restrict 掉、仍应可解释的条目，也包含只在 agent 作用域注册的
   // 工具。scope / masked 标记原样透出，供左栏置灰与徽标使用。
-  const seenTools = (Array.isArray(preview.baseTools) ? preview.baseTools : [])
+  const seenCatalog = preview.catalogTools ?? preview.baseTools
+  const seenTools = (Array.isArray(seenCatalog) ? seenCatalog : [])
     .map((tool) => ({
       name: String(tool.name),
       description: typeof tool.description === 'string' ? tool.description : '',
@@ -1600,12 +1636,22 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const sectionOrder = sectionOrderMap(ctx, [scopeKey])
   const baseSections = mergeAgentScopedSections(baseView.sections ?? [], [], previewDenied, previewReplacements, sectionOrder)
   const finalTools = Array.isArray(assembled.tools) ? assembled.tools : []
+  // 预设预览不做 live 段混合；工具目录例外：agent 作用域注册的工具（如
+  // apply_patch / 客户端工具）也必须出现在“完整目录/遮蔽池”，否则会被误认为消失。
+  const catalogAgent = latestRootAgent(ctx)
   const union = await buildToolUnion(ctx, scopeKey, undefined, previewCfg, phaseStatus, {
     toolMask,
     presetId: configTargetId,
     extraTools: finalTools,
   })
   const baseTools = union.rows
+  const catalogTools = catalogAgent === undefined
+    ? baseTools
+    : (await buildToolUnion(ctx, scopeKey, catalogAgent, previewCfg, phaseStatus, {
+        toolMask,
+        presetId: configTargetId,
+        extraTools: finalTools,
+      })).rows
   const toolSourceByName = new Map(baseTools.map((row) => [row.name, row.source]))
   const toolCandidate = (tool) => {
     const name = typeof tool?.name === 'string' ? tool.name : String(tool?.name)
@@ -1680,6 +1726,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     // 独立名单」，被屏蔽 / 被隐藏的条目仍保留在此可反选。
     baseSections,
     baseTools,
+    catalogTools,
     baseContexts: filterEmptyOptionalContexts(baseView.contexts, ctx, scopeKey),
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),

@@ -112,6 +112,14 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 切到预设模式或切换编辑目标时丢弃（脏草稿先经确认）。
   const [draft, setDraft] = useState<EditDraft | null>(null)
   const [saving, setSaving] = useState(false)
+  // 所有配置写入串行化：预设应用/删除/导入会先后写多个字段，避免两个
+  // read-modify-write 请求乱序把前一个字段覆盖掉。
+  const writeChain = useRef<Promise<unknown>>(Promise.resolve())
+  const enqueueWrite = <T,>(operation: () => Promise<T>): Promise<T> => {
+    const next = writeChain.current.then(operation, operation)
+    writeChain.current = next.then(() => undefined, () => undefined)
+    return next
+  }
   const [flash, setFlash] = useState<string | null>(null)
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
   const [backingUp, setBackingUp] = useState(false)
@@ -119,22 +127,24 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [cleaning, setCleaning] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = (): void => {
-    fetch(CONFIG_URL + `?t=${Date.now()}`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'config failed')
-        setCfg(body.config as Config)
-        setWorkspaceOverrides((body.workspaceOverrides ?? {}) as Record<string, Config>)
-        setCurrentWorkspace(typeof body.currentWorkspace === 'string' && body.currentWorkspace !== '' ? body.currentWorkspace : undefined)
-        setError(null)
-      })
-      .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
-  }
+  const loadConfig = (): Promise<void> => fetch(CONFIG_URL + `?t=${Date.now()}`)
+    .then((r) => r.json())
+    .then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? 'config failed')
+      setCfg(body.config as Config)
+      setWorkspaceOverrides((body.workspaceOverrides ?? {}) as Record<string, Config>)
+      setCurrentWorkspace(typeof body.currentWorkspace === 'string' && body.currentWorkspace !== '' ? body.currentWorkspace : undefined)
+      setError(null)
+    })
+    .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
+  const load = (): void => { void loadConfig() }
   useEffect(load, [])
 
   // 返回 Promise：手动刷新后可以链上草稿补同步（见「刷新」按钮）。
   const refresh = (): Promise<void> => {
+    // 刷新按钮必须重读 /config：只刷新 preview 会让 editView 仍基于旧
+    // overrides，之后再次保存可能把外部修改覆盖掉。
+    const configReady = loadConfig()
     const seq = ++refreshSeq.current
     // scope 键 = 层级 + 预设 + 工作区：响应回来时若已切换目标，整包丢弃。
     const scopeKey = `${level}\u0000${target ?? ''}\u0000${level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''}`
@@ -165,7 +175,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
           failures.push(`${phase}: ${String(error instanceof Error ? error.message : error)}`)
           return null
         })
-    return Promise.all([...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
+    return Promise.all([configReady, ...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
       if (body.ok === false) throw new Error(body.error ?? 'inventory failed')
       return body
     }).catch((error: unknown) => {
@@ -176,7 +186,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
         const inventoryData = responses[responses.length - 1] as unknown as Inventory | null
         if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return
         const views = { ...({} as PhaseViews) }
-        PHASE_KEYS.forEach((key, index) => { views[key] = responses[index] as Preview | null })
+        PHASE_KEYS.forEach((key, index) => { views[key] = responses[index + 1] as Preview | null })
         setPhases(views)
         setInv(inventoryData as Inventory)
         setError(failures.length ? failures.join('\n') : null)
@@ -307,21 +317,24 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 视图顶替：会话可能属于别的预设，会把该预设的专属段/工具漏掉（如 ptc 的 tools:ptc-only）。
   const ep: PhaseViews | null = phases
 
-  const writeField = (field: string, value: unknown): void => {
+  const writeField = (field: string, value: unknown): Promise<boolean> => {
     const url = value === undefined ? CONFIG_UNSET_URL : CONFIG_SET_URL
-    fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ field, value }),
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'write failed')
-        setCfg(body.config as Config)
-        setError(null)
-        setVersion((n) => n + 1)
+    return enqueueWrite(async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ field, value }),
       })
-      .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'write failed')
+      setCfg(body.config as Config)
+      setError(null)
+      setVersion((n) => n + 1)
+      return true
+    }).catch((e: unknown) => {
+      setError(String(e instanceof Error ? e.message : e))
+      return false
+    })
   }
 
   // 两栏的写入：只改内存草稿，不落盘。草稿只记录被编辑的这一字段 —— 保存时
@@ -367,43 +380,48 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
 
   // 预设模式的「应用」：显式意图直接落盘（不经草稿），完整补丁一次写入当前
   // 编辑目标。调用点已在离开编辑域时清空草稿，不会有并发草稿写盘。
-  const writePatch = (patch: ConfigPatch): void => {
-    fetch(CONFIG_APPLY_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ target, patch }),
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
-        setCfg(body.config as Config)
-        setError(null)
-        setVersion((n) => n + 1)
-      })
-      .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
-  }
-  // 应用快照：按当前层级写入——工作区级写 workspaceOverrides[cwd]，否则写预设级 overrides[target]。
-  const writePatchLayered = (patch: ConfigPatch): void => {
-    if (level === 'workspace') {
-      const cwd = workspace ?? currentWorkspace
-      if (cwd === undefined || cwd === null || cwd === '') { showFlash(t('workspaceRequired'), 'err'); return }
-      fetch(CONFIG_APPLY_URL, {
+  const writePatch = (patch: ConfigPatch): Promise<boolean> => {
+    return enqueueWrite(async () => {
+      const response = await fetch(CONFIG_APPLY_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ level: 'workspace', workspace: cwd, patch }),
+        body: JSON.stringify({ target, patch }),
       })
-        .then((r) => r.json())
-        .then((body) => {
-          if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
-          setCfg(body.config as Config)
-          if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
-          setError(null)
-          setVersion((n) => n + 1)
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
+      setCfg(body.config as Config)
+      setError(null)
+      setVersion((n) => n + 1)
+      return true
+    }).catch((e: unknown) => {
+      setError(String(e instanceof Error ? e.message : e))
+      return false
+    })
+  }
+  // 应用快照：按当前层级写入——工作区级写 workspaceOverrides[cwd]，否则写预设级 overrides[target]。
+  const writePatchLayered = (patch: ConfigPatch): Promise<boolean> => {
+    if (level === 'workspace') {
+      const cwd = workspace ?? currentWorkspace
+      if (cwd === undefined || cwd === null || cwd === '') { showFlash(t('workspaceRequired'), 'err'); return Promise.resolve(false) }
+      return enqueueWrite(async () => {
+        const response = await fetch(CONFIG_APPLY_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ level: 'workspace', workspace: cwd, patch }),
         })
-        .catch((e: unknown) => setError(String(e instanceof Error ? e.message : e)))
-      return
+        const body = await response.json()
+        if (body?.ok !== true) throw new Error(body?.error ?? 'apply failed')
+        setCfg(body.config as Config)
+        if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
+        setError(null)
+        setVersion((n) => n + 1)
+        return true
+      }).catch((e: unknown) => {
+        setError(String(e instanceof Error ? e.message : e))
+        return false
+      })
     }
-    writePatch(patch)
+    return writePatch(patch)
   }
 
   // 运行时上下文显隐：和提示词/工具一样进草稿，统一保存时一次落盘；不立即刷新。
@@ -411,13 +429,12 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // （缺一态绝不把该阶段当空集写掉）。
   const toggleContext = (entry: EntryRef, hide: boolean): void => {
     const keys = syncAll ? PHASE_KEYS : [phase]
-    for (const key of keys) {
-      const phaseView = phases?.[key]
-      const base = phaseView?.baseContexts
-      if (phaseView === null || phaseView === undefined || !Array.isArray(base)) {
-        showFlash(t('contextsNotReady'), 'err')
-        return
-      }
+    const targets = keys.map((key) => ({ key, view: phases?.[key] }))
+    if (targets.some(({ view }) => view === null || view === undefined || !Array.isArray(view.baseContexts))) {
+      showFlash(t('contextsNotReady'), 'err')
+      return
+    }
+    for (const { key } of targets) {
       const patch = contextPatch(view, key, entry, hide)
       for (const [field, value] of Object.entries(patch)) edit(field as ContextField, value)
     }
@@ -437,8 +454,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 增删 / 排序 / 勾选 / 文本编辑都一次写全三个阶段（见 SectionsPane 的 persistMirror）。
   // 三阶段装配未就绪（或为空）时拒绝执行 —— 缺一态会把该阶段当空集写掉。
   const toggleSyncAll = (on: boolean): void => {
-    setSyncAll(on)
-    if (!on) return
+    if (!on) { setSyncAll(false); return }
     if (ep === null || PHASE_KEYS.some((key) => ep[key] === null)) {
       showFlash(t('syncNotReady'), 'err')
       return
@@ -448,6 +464,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       showFlash(t('syncNotReady'), 'err')
       return
     }
+    setSyncAll(true)
     edit('inject', mirrorPhaseInjectEntries(view, rows, nativeIn))
     const denied = mirroredDeniedLists(rows)
     for (const descriptor of PHASES) edit(descriptor.sectionField, denied[descriptor.sectionField])

@@ -141,7 +141,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   }
 
   // 该阶段的装配目录（进入本插件过滤的工具原文）与该预设注册表（能加回的来源）。
-  const catalogOf = (key: PhaseKey): BaseTool[] => phases?.[key]?.baseTools ?? []
+  const catalogOf = (key: PhaseKey): BaseTool[] => phases?.[key]?.catalogTools ?? phases?.[key]?.baseTools ?? []
   const isInCatalog = (key: PhaseKey, entry: EntryRef): boolean => catalogOf(key).some((tool) => sameEntry(tool, entry))
   // 注册表三个阶段共享同一 scope：取三阶段并集（不是第一个非空），同名同源去重。
   const registry: EntryRef[] = (() => {

@@ -36,20 +36,20 @@ function anyInclude(node) {
 
 test('启动即剥掉 tools / 阶段目录 / overrides / 预设快照里的 include', () => {
   const h = boot({
-    tools: { exclude: ['t1'], include: ['t2'], bootstrap: { exclude: [], include: ['b'] }, compaction: { include: ['c'] } },
+    tools: { exclude: [{ name: 't1' }], include: [{ name: 't2' }], bootstrap: { exclude: [], include: [{ name: 'b' }] }, compaction: { include: [{ name: 'c' }] } },
     overrides: {
-      'some-preset': { tools: { exclude: [], include: ['x'] } },
-      clean: { sections: ['s'] },
+      'some-preset': { tools: { exclude: [], include: [{ name: 'x' }] } },
+      clean: { sections: [{ name: 's' }] },
     },
-    presets: [{ id: 'p1', name: 'P', data: { tools: { exclude: ['e'], include: ['i'] } } }],
+    presets: [{ id: 'p1', name: 'P', data: { tools: { exclude: [{ name: 'e' }], include: [{ name: 'i' }] } } }],
   })
   const doc = h.read()
   assert.equal(anyInclude(doc), false, `清理后不应残留 include：${JSON.stringify(doc)}`)
-  assert.deepEqual(doc.tools.exclude, ['t1'])
+  assert.deepEqual(doc.tools.exclude, [{ name: 't1' }])
   assert.deepEqual(doc.tools.bootstrap, { exclude: [] })
   assert.deepEqual(doc.overrides['some-preset'], { tools: { exclude: [] } })
-  assert.deepEqual(doc.overrides.clean, { sections: ['s'] })
-  assert.deepEqual(doc.presets[0].data.tools, { exclude: ['e'] })
+  assert.deepEqual(doc.overrides.clean, { sections: [{ name: 's' }] })
+  assert.deepEqual(doc.presets[0].data.tools, { exclude: [{ name: 'e' }] })
   assert.ok(h.logs.some((m) => /include/.test(m) && /5 处/.test(m)), `应记一条含数量的日志：${h.logs.join(' | ')}`)
 })
 
@@ -65,7 +65,7 @@ test('清理是幂等的：没有 include 就不改文档、不记日志', () =>
 })
 
 test('空 include 也一并清掉（不留无意义字段）', () => {
-  const h = boot({ tools: { exclude: ['t1'], include: [] } })
-  assert.deepEqual(h.read().tools, { exclude: ['t1'] })
+  const h = boot({ tools: { exclude: [{ name: 't1' }], include: [] } })
+  assert.deepEqual(h.read().tools, { exclude: [{ name: 't1' }] })
   assert.equal(h.logs.length, 0, '空 include 无信息量，不该惊动日志')
 })

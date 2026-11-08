@@ -847,14 +847,16 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
 
     // ── 预设层 ────────────────────────────────────────────────────────────
     if (method === 'GET' && rest === '/presets') {
+      const workspace = url.searchParams.get('workspace') ?? undefined
       const [roster, global, ledger] = await Promise.all([
         readPresetRoster(ctx), status(ctx), readLedger(),
       ])
+      const effective = workspace === undefined ? global : await effectiveStatus(ctx, undefined, workspace)
       json(res, 200, {
         presets: roster,
         overrides: ledger.presets,
-        skills: global.skills,
-        bundles: global.bundles,
+        skills: effective.skills,
+        bundles: effective.bundles,
       })
       return
     }

@@ -75,10 +75,10 @@ const CFG = [
   'overrides:',
   '  standard:',
   '    sections:',
-  '      - guidelines',
+  '      - name: guidelines',
   '    tools:',
   '      exclude:',
-  '        - bash',
+  '        - name: bash',
   '',
 ].join('\n')
 
@@ -96,7 +96,7 @@ test('导出该目标的定制 + 全局字段（不包含宿主预设组成）',
   assert.equal(res.body.ok, true)
   assert.equal(res.body.format, 'dsh-prompt-customizer/export@1')
   assert.equal(res.body.target, 'standard')
-  assert.deepEqual(res.body.customization, { sections: ['guidelines'], tools: { exclude: ['bash'] } })
+  assert.deepEqual(res.body.customization, { sections: [{ name: 'guidelines' }], tools: { exclude: [{ name: 'bash' }] } })
   assert.equal(res.body.forceSections, true)
   assert.deepEqual(res.body.envBlocklist, ['SECRET_TOKEN'])
   assert.equal(res.body.composition, undefined, '宿主预设定义不属于插件导出')
@@ -139,7 +139,7 @@ test('组成读不到 / 没有 agentPresets 服务时导出仍成功（定制才
       const res = await get(routes[EXPORT], `${EXPORT}?scope=standard`)
       assert.equal(res.status, 200)
       assert.equal(res.body.composition, undefined)
-      assert.deepEqual(res.body.customization.sections, ['guidelines'])
+      assert.deepEqual(res.body.customization.sections, [{ name: 'guidelines' }])
     } catch (e) {
       if (e instanceof Error) e.message = `[${scene.label}] ${e.message}`
       throw e

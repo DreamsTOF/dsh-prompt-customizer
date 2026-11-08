@@ -280,6 +280,8 @@ export interface Preview {
   tools: Array<PreviewTool | string>
   baseSections?: BaseSection[]
   baseTools?: BaseTool[]
+  /** 预设预览里额外扫描到的 agent 作用域工具（只供完整目录/遮蔽池，不参与纯预设装配）。 */
+  catalogTools?: BaseTool[]
   baseContexts?: BaseContext[]
   /** 生效配置（清单路由用）。 */
   config?: OverrideData

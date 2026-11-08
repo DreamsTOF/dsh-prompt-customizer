@@ -35,7 +35,7 @@ const RUNTIME_ONLY = {
 }
 
 /** 最小 Cordis ctx：作用域相关的注册表 + assemble 瀑布流 mock。 */
-function makeCtx({ liveAgent = true } = {}) {
+function makeCtx({ liveAgent = true, toolsByScope } = {}) {
   const routes = {}
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-runtime-catalog-'))
   let assembleHandler
@@ -69,7 +69,7 @@ function makeCtx({ liveAgent = true } = {}) {
       return undefined
     },
     systemPrompt: sp,
-    tools: { schemas: () => [] },
+    tools: { schemas: (scope) => typeof toolsByScope === 'function' ? toolsByScope(scope) : [] },
     effect: () => {},
   }
   return { ctx, routes, dataDir }
@@ -164,6 +164,18 @@ test('真实 agent 预览列出会话级段，诊断预览不混入其它 agent'
   assert.equal(row.text, RUNTIME_ONLY.text)
   assert.equal(row.blocked, false)
   assert.ok(preview.sections.some(section => section.name === RUNTIME_ONLY.name))
+})
+
+test('预设清单也扫描当前 agent 作用域的工具（如 apply_patch）', async () => {
+  const { ctx, routes, dataDir } = makeCtx({
+    toolsByScope: (scope) => scope === AGENT ? [{ name: 'apply_patch', description: 'Edit files' }] : [],
+  })
+  apply(ctx, { dataDir })
+  const body = await inventoryOf(routes)
+  const row = body.tools.find((tool) => tool.name === 'apply_patch')
+  assert.ok(row)
+  assert.equal(row.state, 'locked-agent')
+  assert.equal(row.scope, 'agent')
 })
 
 test('两条路径并存时同名只出现一次（并集去重）', async () => {

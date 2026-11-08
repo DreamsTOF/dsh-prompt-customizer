@@ -46,9 +46,9 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   phases: PhaseViews | null
   t: Translate
   /** 应用预设：完整补丁一次落盘（显式意图，不经草稿）。 */
-  writePatch: (patch: ConfigPatch) => void
+  writePatch: (patch: ConfigPatch) => Promise<boolean>
   /** 预设库专用：永远写在全局字段（presets / activePreset 不分作用域）。 */
-  writeGlobal: (field: string, value: unknown) => void
+  writeGlobal: (field: string, value: unknown) => Promise<boolean>
   /** 全局环境变量黑名单（永远顶层字段，不分作用域）；导出随行、导入并集。 */
   envBlocklist: string[]
   /** 应用目标层级：预设级 / 工作区级（与顶部统一切换一致）。 */
@@ -81,23 +81,24 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   const saveCurrent = (): void => {
     const presetName = name.trim() || `${t('preset')} ${presets.length + 1}`
     const data = buildPresetData(cfg, merged)
-    writeGlobal('presets', [...presets, { id: genId(), name: presetName, data }])
+    void writeGlobal('presets', [...presets, { id: genId(), name: presetName, data }])
     setName('')
   }
 
   // 应用预设。补丁由纯函数助手计算（同名段覆盖、匹配不上的跳过、不在预设
   // 列表中的当前段被屏蔽、只有预设的「激活段」被解除屏蔽）。四个定制字段以
   // 一个补丁写入当前编辑目标；快照库（presets / activePreset）永远保持在全局。
-  const applyPreset = (preset: Preset): void => {
-    writePatch(applyPresetData(preset.data, cfg, currentEntries))
+  const applyPreset = async (preset: Preset): Promise<void> => {
+    const applied = await writePatch(applyPresetData(preset.data, cfg, currentEntries))
+    if (!applied) return
     // 工作区级应用不改「活动预设」这个库概念；仅预设级应用时标记。
-    if (applyLevel !== 'workspace') writeGlobal('activePreset', preset.id)
+    if (applyLevel !== 'workspace') await writeGlobal('activePreset', preset.id)
   }
 
-  const deletePreset = (id: string): void => {
+  const deletePreset = async (id: string): Promise<void> => {
     const next = removePreset(presets, id, cfg.activePreset)
-    writeGlobal('presets', next.presets)
-    if (next.activeId === undefined && cfg.activePreset === id) writeGlobal('activePreset', undefined)
+    const deleted = await writeGlobal('presets', next.presets)
+    if (deleted && next.activeId === undefined && cfg.activePreset === id) await writeGlobal('activePreset', undefined)
   }
 
   // 导出一个预设：Tauri 桌面走原生保存对话框，Web（或 tauri 插件不可用
@@ -115,7 +116,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
 
   // 解析导入文本 → 去重追加 → 提示新增数量。解析失败提示错误。
   // 单对象格式的文件还可能随行携带全局环境变量黑名单：与当前名单并集合并。
-  const importParsed = (text: string): void => {
+  const importParsed = async (text: string): Promise<void> => {
     try {
       const parsed = decodePresetExport(text)
       const next = addImportedPresets(presets, parsed, genId)
@@ -125,11 +126,11 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
         ? ((parsed as { envBlocklist?: unknown[] }).envBlocklist ?? []).filter((e): e is string => typeof e === 'string')
         : []
       const fresh = fileBlock.filter((e) => !envBlocklist.includes(e))
-      if (fresh.length > 0) writeGlobal('envBlocklist', [...envBlocklist, ...fresh])
+      if (fresh.length > 0) await writeGlobal('envBlocklist', [...envBlocklist, ...fresh])
       const mergedNote = fresh.length > 0 ? t('importBlockMerge', { count: fresh.length }) : ''
       if (added <= 0) show('ok', t('importNone') + mergedNote)
       else {
-        writeGlobal('presets', next)
+        await writeGlobal('presets', next)
         show('ok', `${t('importOk')} (+${added})${mergedNote}`)
       }
     } catch (e) {
@@ -142,7 +143,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   const importPreset = async (): Promise<void> => {
     try {
       const res = await importPresetFile()
-      if (res.kind === 'text') { importParsed(res.text); return }
+      if (res.kind === 'text') { void importParsed(res.text); return }
       if (res.kind === 'cancelled') { show('ok', t('importCancel')); return }
       fileRef.current?.click()
     } catch (e) {
@@ -156,7 +157,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
     e.target.value = ''
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => importParsed(String(reader.result))
+    reader.onload = () => { void importParsed(String(reader.result)) }
     reader.onerror = () => show('error', t('importFail'))
     reader.readAsText(file)
   }

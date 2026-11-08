@@ -275,21 +275,22 @@ export async function kernelSkillViews(
 ): Promise<KernelSkillView[]> {
   const candidate = resolveViewSession(ctx, sessionId)
   const summaries = await listKernelSkills(ctx, candidate, cwd)
-  const globalSummariesForCache = await listKernelSkills(ctx, undefined, cwd)
-  for (const summary of [...summaries, ...globalSummariesForCache]) {
+  const targetCwd = cwd !== undefined && cwd !== ''
+    ? normalizeCwd(cwd)
+    : candidate === undefined ? launchCwd(ctx) : candidate.cwd
+  const cacheScope = candidate === undefined ? 'global' : String(candidate.id)
+  const cacheKeyOf = (name: string): string => `${cacheScope}\u0000${targetCwd}\u0000${name}`
+  for (const summary of summaries) {
     if (typeof summary?.name === 'string' && summary.name !== '' && !isSkillMaskStub(summary)) {
-      summaryCache.set(summary.name, summary)
+      summaryCache.set(cacheKeyOf(summary.name), summary)
     }
   }
   // 内核目录只在「有会话 + scope 命中预设层」时才完整（filesystem/office provider
   // 挂在预设行里）。面板要能配置任意工作区，因此内核给不出条目时按同一套根规则
   // 兜底扫描 —— 目标工作区明确时也走兜底，避免拿到别的会话的项目根。
-  const targetCwd = cwd !== undefined && cwd !== ''
-    ? normalizeCwd(cwd)
-    : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   // 预设层禁用桩会遮住真实 summary；全局层单独读一次，按名字回填原摘要
   // （预设层 mask 不应改变卡片描述，只改变启用状态）。
-  const globalSummaries = candidate === undefined ? [] : await listKernelSkills(ctx, undefined, targetCwd)
+  const globalSummaries = candidate === undefined ? summaries : await listKernelSkills(ctx, undefined, targetCwd)
   const globalByName = new Map(
     globalSummaries
       .filter((summary) => typeof summary?.name === 'string' && !isSkillMaskStub(summary))
@@ -300,59 +301,49 @@ export async function kernelSkillViews(
   // 面板要展示“关闭”的技能（置灰而非隐身）：兜底扫描不按隐藏账本过滤。
   // 同时用它给“禁用桩条目”回填真实元数据（描述/路径/文件数/正文）。
   const scanned = await scanWorkspaceSkills(targetCwd, undefined)
-  const scannedByName = new Map(scanned.map((view) => [view.name, view]))
   const views: KernelSkillView[] = []
-  // 扫描到的四个根在前（工作区优先），再把内核独有的条目（bundled / office /
-  // 插件 provider —— 它们不在文件系统根里）补在后面，同名不重复。
-  // 面板要展示“关闭”的技能（置灰而非隐身），因此扫描不按隐藏账本过滤；
-  // 模型侧仍由闸门 provider 遮挡。
-  views.push(...scanned)
-  for (const summary of summaries) {
-    const name = typeof summary?.name === 'string' ? summary.name : ''
-    if (name === '') continue
-    if (views.some((view) => view.name === name)) continue
-    // 关闭的技能在面板保留（显示为关闭态），不再从面板列表过滤；模型侧由闸门 provider 遮挡。
-    // 若该条是闸门返回的“禁用桩”，用兜底扫描到的真实技能元数据回填，使卡片与启用时一致。
-    const isDisabledStub = isSkillMaskStub(summary)
-    if (isDisabledStub) {
-      const real = scannedByName.get(name)
-      if (real !== undefined) { views.push({ ...real }); continue }
-      const meta = globalByName.get(name) ?? summaryCache.get(name)
-      if (meta !== undefined) {
-        const dirPath = typeof meta.path === 'string' && meta.path !== '' ? dirname(meta.path) : undefined
-        const source = typeof meta.source === 'string' && meta.source !== '' ? meta.source : 'unknown'
-        views.push({
-          name,
-          dir: dirPath === undefined ? name : basename(dirPath),
-          description: typeof meta.description === 'string' ? meta.description : '',
-          compatibility: '',
-          fileCount: 0,
-          files: [],
-          root: source,
-          ...dirPath === undefined ? {} : { dirPath },
-          deletable: isWritableDir(dirPath),
-          ...typeof meta.invocation?.modelInvocable === 'boolean' ? { modelInvocable: meta.invocation.modelInvocable } : {},
-          ...typeof meta.invocation?.userInvocable === 'boolean' ? { userInvocable: meta.invocation.userInvocable } : {},
-        })
-        continue
-      }
-    }
-    // 内核给的是 SKILL.md 的绝对路径；技能目录 = 它的父目录。虚拟技能没有 path。
-    const dirPath = typeof summary.path === 'string' && summary.path !== '' ? dirname(summary.path) : undefined
-    const source = typeof summary.source === 'string' && summary.source !== '' ? summary.source : 'unknown'
-    views.push({
+  const summaryView = (summary: KernelSkillSummary, existing?: KernelSkillView): KernelSkillView => {
+    const name = summary.name
+    const dirPath = typeof summary.path === 'string' && summary.path !== ''
+      ? dirname(summary.path)
+      : existing?.dirPath
+    const source = typeof summary.source === 'string' && summary.source !== '' ? summary.source : existing?.root ?? 'unknown'
+    return {
       name,
       dir: dirPath === undefined ? name : basename(dirPath),
-      description: isDisabledStub ? '' : (typeof summary.description === 'string' ? summary.description : ''),
-      compatibility: '',
-      fileCount: 0,
-      files: [],
+      description: typeof summary.description === 'string' ? summary.description : '',
+      compatibility: existing?.compatibility ?? '',
+      fileCount: existing?.fileCount ?? 0,
+      files: existing?.files ?? [],
       root: source,
       ...dirPath === undefined ? {} : { dirPath },
       deletable: isWritableDir(dirPath),
       ...typeof summary.invocation?.modelInvocable === 'boolean' ? { modelInvocable: summary.invocation.modelInvocable } : {},
       ...typeof summary.invocation?.userInvocable === 'boolean' ? { userInvocable: summary.invocation.userInvocable } : {},
-    })
+    }
+  }
+  // 扫描到的四个根作为兜底目录；内核 summary 按宿主 rank 优先覆盖同名项，
+  // 避免文件系统扫描抢在 runtime/bundled provider 前面返回错误来源。
+  views.push(...scanned)
+  for (const summary of summaries) {
+    const name = typeof summary?.name === 'string' ? summary.name : ''
+    if (name === '') continue
+    const existingIndex = views.findIndex((view) => view.name === name)
+    const existing = existingIndex >= 0 ? views[existingIndex] : undefined
+    // 关闭的技能在面板保留（显示为关闭态），不再从面板列表过滤；模型侧由闸门 provider 遮挡。
+    // 若该条是闸门返回的“禁用桩”，用兜底扫描到的真实技能元数据回填，使卡片与启用时一致。
+    const isDisabledStub = isSkillMaskStub(summary)
+    if (isDisabledStub) {
+      if (existing !== undefined) continue
+      const meta = summaryCache.get(cacheKeyOf(name)) ?? globalByName.get(name)
+      const view = summaryView(meta ?? summary, undefined)
+      if (meta === undefined) view.description = ''
+      views.push(view)
+      continue
+    }
+    const view = summaryView(summary, existing)
+    if (existingIndex >= 0) views[existingIndex] = view
+    else views.push(view)
   }
   return views
 }

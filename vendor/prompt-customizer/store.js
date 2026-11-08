@@ -71,7 +71,15 @@ export function createConfigStore({ db, key = 'config', schema, warn } = {}) {
       return lastGood ?? resolve(undefined).value
     },
     writeSection(section) {
-      setDoc(db, key, section ?? {})
+      const next = section ?? {}
+      if (schema !== undefined) {
+        try {
+          schema(next)
+        } catch (error) {
+          throw new Error(`invalid config: ${String(error && error.message ? error.message : error)}`)
+        }
+      }
+      setDoc(db, key, next)
       return load()
     },
     setField(field, value) {

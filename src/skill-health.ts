@@ -18,6 +18,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import { kernelSkillSummaries } from './kernel-skills.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 import { isSkillName } from './ids.ts'
 import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
@@ -133,7 +134,7 @@ async function scanRoot(root: string, nameSet: Set<string>): Promise<{ healthy: 
 }
 
 /** 执行完整健康检查（只读）。 */
-export async function healthCheck(): Promise<HealthReport> {
+export async function healthCheck(ctx?: Context): Promise<HealthReport> {
   const issues: HealthIssue[] = []
   const nameSet = new Set<string>()
   // 根集合由宿主注入（含工作区级根），三处消费方共用同一份。
@@ -142,6 +143,13 @@ export async function healthCheck(): Promise<HealthReport> {
     const scanned = await scanRoot(root, nameSet)
     healthy += scanned.healthy
     issues.push(...scanned.issues)
+  }
+  // bundle 成员不一定是文件系统技能：bundled / office / 插件注册技能也要算存在。
+  if (ctx !== undefined) {
+    const summaries = await kernelSkillSummaries(ctx as never)
+    for (const summary of summaries) {
+      if (typeof summary?.name === 'string' && summary.name !== '') nameSet.add(summary.name)
+    }
   }
 
   // bundle 账本悬挂引用：引用了所有根目录里都不存在的技能。
@@ -188,7 +196,7 @@ export function applySkillHealth(ctx: Context): void {
         }
         const url = new URL(req.url ?? '/', 'http://localhost')
         if (url.pathname === ROUTE_PATH || url.pathname === `${ROUTE_PATH}/`) {
-          json(res, 200, await healthCheck())
+          json(res, 200, await healthCheck(ctx))
           return
         }
         json(res, 404, { error: `no route for ${req.method ?? 'GET'} ${url.pathname}` })
