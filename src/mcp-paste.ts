@@ -36,7 +36,7 @@ export const MCP_CLIENT_NAME = '@deepseek-ai/dsh-mcp-client'
 /** serverName 约束（与 dsh-mcp-client 一致）。 */
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
 /** `${VAR}` 环境变量占位。 */
-const ENV_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g
+const ENV_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g
 
 /** `!!js` 表达式占位：原样保留，写回时重新加标签。 */
 export interface JsExpr {
@@ -333,10 +333,13 @@ function describeScalar(value: unknown): string {
 
 /* ── 序列化（写回 YAML）：行 → 预设组合形态 / patch 形态 ─────────────────── */
 
-/** 含 `${VAR}` 的字符串 → `!!js` 模板表达式体（`${VAR}` → `${process.env.VAR}`）。 */
+/** 含 `${VAR}` / `${VAR:-default}` 的字符串 → `!!js` 模板表达式体。 */
 function toJsTemplate(value: string): string {
   const escaped = value.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/'/g, "\\'")
-  const withEnv = escaped.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, '${process.env.$1}')
+  const withEnv = escaped.replace(ENV_REF, (_, name: string, fallback: string | undefined) =>
+    fallback === undefined
+      ? `\${process.env.${name}}`
+      : `\${process.env.${name} ?? ${JSON.stringify(fallback)}}`)
   return `\`${withEnv}\``
 }
 

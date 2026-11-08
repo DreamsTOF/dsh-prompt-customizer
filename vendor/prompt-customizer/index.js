@@ -218,6 +218,18 @@ function assertKnownPhases(patch) {
   }
 }
 
+/** 读取路径：记录配置里未知 phase 的条目（运行时忽略，不静默当 always）。 */
+function reportInvalidPhases(layer, warn) {
+  if (layer === null || typeof layer !== 'object') return
+  for (const field of ['inject', 'replacements']) {
+    for (const item of Array.isArray(layer[field]) ? layer[field] : []) {
+      if (item === null || typeof item !== 'object') continue
+      if (item.phase === undefined || item.phase === 'always' || phaseOf(item.phase) !== undefined) continue
+      warn(`prompt-customizer: 忽略 ${field} 中未知阶段 "${String(item.phase)}" 的条目`)
+    }
+  }
+}
+
 /**
  * 一次性清理遗留的 include（白名单）设置：过滤只剩 exclude 黑名单，服务端不再
  * 读取 include，界面也不再写它。
@@ -386,6 +398,8 @@ export function apply(ctx, entry = {}) {
       ? context.promptCustomizerWorkspace
       : context?.agent?.session?.header?.cwd
     const workspaceOvr = workspaceOverrideFor(workspaceCwd)
+    reportInvalidPhases(base.overrides?.[id], warnOnce)
+    reportInvalidPhases(workspaceOvr, warnOnce)
     const cfg = effectiveConfig(mergeOverrideLayers(base.overrides?.[id], workspaceOvr))
     const phaseHint = typeof context?.promptCustomizerPhase === 'string'
       ? context.promptCustomizerPhase
