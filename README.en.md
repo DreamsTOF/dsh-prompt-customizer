@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.13** (single-preset editing; tool and prompt takeover follows DSH runtime `definitions` / `restrict` / `system-prompt` contracts without hardcoded tool names), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.0.14** (single-preset editing; tool and prompt takeover follows DSH runtime `definitions` / `restrict` / `tools/pre-execute` / `system-prompt` contracts without hardcoded tool names), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 

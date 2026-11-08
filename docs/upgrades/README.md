@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.14：工具执行前门禁
+
+- 通过 `tools/pre-execute` 对 restrict 无法触及的 agent 作用域工具执行运行时拒绝。
+- 完整记录见 [2.0.14-tool-execution-guard.md](2.0.14-tool-execution-guard.md)。
+
 ## 2.0.13：DSH 运行时契约对齐
 
 - 工具目录/来源/restrict 按 DSH 运行时契约泛化，不绑定具体工具名；同名遮蔽保留 keySuffix。

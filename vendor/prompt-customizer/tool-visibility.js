@@ -87,7 +87,7 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
     }
   }
 
-  const desiredDeny = (agent) => {
+  const desiredEntries = (agent) => {
     let cfg
     try { cfg = readConfig(agent) } catch { return [] }
     // 兼容两种读取口：返回整份 Config（含 overrides）时先按预设取 override；
@@ -100,13 +100,16 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
       cfg = effectiveConfig(presetId === undefined || presetId === '' ? undefined : cfg.overrides?.[presetId])
     }
     const filter = pickToolsFilter(cfg.tools, phaseOf(agent))
+    return (Array.isArray(filter.exclude) ? filter.exclude : [])
+      .map((entry) => normalizeEntry(entry))
+      .filter((entry) => entry !== undefined)
+  }
+
+  const desiredDeny = (agent) => {
     const names = rememberToolNames(ctx, agent)
-    return [...new Set(
-      (Array.isArray(filter.exclude) ? filter.exclude : [])
-        .map((entry) => normalizeEntry(entry))
-        .filter((entry) => entry !== undefined && names.has(entry.name))
-        .map((entry) => entry.name),
-    )]
+    return [...new Set(desiredEntries(agent)
+      .filter((entry) => names.has(entry.name))
+      .map((entry) => entry.name))]
   }
 
   const sync = (agent) => {
@@ -150,6 +153,11 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
     for (const agent of activeAgents(ctx)) sync(agent)
   }
 
+  // restrict 只能收窄 inherit 的 global/ancestor 工具；对 agent 作用域自己
+  // 注册的工具（插件 tool-fs / MCP 等）在真正执行前做最后一道名字门禁。
+  // 这是运行时 takeover，不依赖 UI 目录是否完整。
+  const isDeniedCall = (agent, name) => desiredEntries(agent).some((entry) => entry.name === name)
+
   ctx.effect(() => {
     const remember = (agent) => {
       if (agent?.session !== undefined) bySession.set(agent.session, agent)
@@ -172,6 +180,17 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
         if (!stopped) syncAll()
       }, 300)
     })
+    const onPreExecute = ctx.on?.('tools/pre-execute', async (exec, next) => {
+      try {
+        const agent = exec?.agent
+        if (agent !== undefined && typeof exec?.name === 'string' && isDeniedCall(agent, exec.name)) {
+          return { kind: 'deny', reason: `prompt-customizer: tool "${exec.name}" is excluded for this phase` }
+        }
+      } catch {
+        /* 解析失败不拦调用 */
+      }
+      return next()
+    })
     for (const agent of activeAgents(ctx)) {
       if (agent?.session !== undefined) bySession.set(agent.session, agent)
       sync(agent)
@@ -182,6 +201,7 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
       try { onDisposed?.() } catch { /* 已卸载 */ }
       try { onEvent?.() } catch { /* 已卸载 */ }
       try { onTools?.() } catch { /* 已卸载 */ }
+      try { onPreExecute?.() } catch { /* 已卸载 */ }
       if (timer !== undefined) clearTimeout(timer)
       for (const agent of [...installed.keys()]) release(agent)
       bySession.clear()

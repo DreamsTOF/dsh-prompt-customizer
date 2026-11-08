@@ -39,9 +39,7 @@ function harness({ restrictableNames = ['bash', 'edit', 'read'] } = {}) {
       return typeof dispose === 'function' ? dispose : () => {}
     },
   }
-  const emit = (event, ...args) => {
-    for (const handler of handlers.get(event) ?? []) handler(...args)
-  }
+  const emit = (event, ...args) => (handlers.get(event) ?? []).map((handler) => handler(...args))
   return { ctx, agent, tools, restricts, disposals, emit }
 }
 
@@ -158,4 +156,22 @@ test('阶段化工具目录：任意数量工具泛化进入 restrict，且 rest
   h.emit('session/event', h.agent.session, { type: 'turn/start' })
   assert.deepEqual(h.restricts, [generated], '相同 deny 不应重复安装')
   assert.deepEqual(h.disposals, [], '不能释放仍在生效的 restrict')
+})
+
+test('tools/pre-execute 对配置中的任意工具做运行时拦截', async () => {
+  const h = harness()
+  const visibility = createPhaseToolVisibility({
+    ctx: h.ctx,
+    readConfig: () => ({
+      overrides: {
+        standard: { tools: { exclude: [{ name: 'bash' }] } },
+      },
+    }),
+    phaseOf: () => ({ promoted: true, boundary: -1 }),
+    presetOf: () => 'standard',
+  })
+  visibility.sync(h.agent)
+  const decisions = await Promise.all(h.emit('tools/pre-execute', { agent: h.agent, name: 'bash' }, async () => ({ kind: 'allow' })))
+  assert.equal(decisions[0].kind, 'deny')
+  assert.equal(decisions[0].reason.includes('bash'), true)
 })
