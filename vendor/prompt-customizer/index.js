@@ -38,7 +38,6 @@ import { PHASES, PHASE_KEYS, phaseOf, phaseOfStatus, statusOfPhase, normalizeEnt
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
 import { openDb, allDocs, replaceAllDocs } from './db.js'
-import { registerVariables, listVariableNames } from './vars.js'
 import { createPhaseToolVisibility } from './tool-visibility.js'
 
 export const name = 'prompt-customizer'
@@ -279,6 +278,8 @@ export function apply(ctx, entry = {}) {
   // 都发生在 agent 作用域 restrict，纯预设预览看不到。宿主半身在这里注入一个
   // 批量查询函数（vendor 不 import src，保持可独立构建 / 单测）。
   const toolMask = typeof entry.toolMask === 'function' ? entry.toolMask : undefined
+  // 变量清单由 host 半身注入（vendor 不再自带第二套变量注册实现）。
+  const listVariables = typeof entry.listVariables === 'function' ? entry.listVariables : () => []
   // 破坏式更新：插件自有存储统一为 SQLite（单文件 `prompt-customizer.db`）。
   // 不再读写旧版 config.yaml / catalog.yaml；旧文件原样保留但不被读取、不迁移。
   const db = openDb(path.join(dataDir, 'prompt-customizer.db'))
@@ -350,25 +351,6 @@ export function apply(ctx, entry = {}) {
     if (warned) return
     warned = true
     try { ctx.logger?.warn?.(message) } catch { /* logger 缺席只是不再告警 */ }
-  }
-
-  // 提示词变量注册（内置系统事实 + process.env 全量，黑名单过滤）：宿主只有
-  // provider / model / cwd 三个，段文本里的其余 {{name}} 一律严格报错。这里
-  // 通过官方扩展点 systemPrompt.variable() 补齐。懒同步：每次装配入口比对黑名单
-  // 签名，变了才注销重注册 —— 配置写入 / 外部手改都在下次装配自然生效。
-  let varsSignature
-  let varsDispose
-  const syncVariables = () => {
-    try {
-      const blocklist = read().envBlocklist ?? []
-      const signature = JSON.stringify(blocklist)
-      if (signature === varsSignature) return
-      try { varsDispose?.() } catch { /* 注销失败不阻塞重注册 */ }
-      varsDispose = registerVariables(ctx.get('systemPrompt'), blocklist)
-      varsSignature = signature
-    } catch (error) {
-      warnOnce(`prompt-customizer: 提示词变量注册失败（{{…}} 仍只有宿主注册的变量可用）：${String((error && error.message) || error)}`)
-    }
   }
 
   // 3) 装配目标解析（瀑布流与 assemble 强制覆盖共用）：生效配置 = 会话所属
@@ -531,7 +513,6 @@ export function apply(ctx, entry = {}) {
     sp[PATCHED] = { orig: pristine }
     const wrapped = async (context = {}) => {
       // 变量先于装配同步：宿主在 pristine 内部解析 {{name}}，注册必须发生在前。
-      syncVariables()
       const result = await pristine(context)
       // 工具显隐：真实会话装配时按「当前阶段 exclude」过滤最终交给模型的 tools。
       // restrict 只能收窄继承的全局工具；作用域内注册的工具（插件提供的 read /
@@ -581,7 +562,6 @@ export function apply(ctx, entry = {}) {
     ctx.effect(() => () => {
       if (sp.assemble === wrapped) sp.assemble = pristine
       if (sp[PATCHED]?.orig === pristine) delete sp[PATCHED]
-      varsDispose?.()
     }, 'prompt-customizer: assemble wrapper')
   }
 
@@ -636,10 +616,9 @@ export function apply(ctx, entry = {}) {
           if (workspace !== undefined && workspace !== '') target.workspace = workspace
           if (workspace !== undefined && workspace !== '') target.workspaceOvr = workspaceOverrideFor(workspace)
           try {
-            syncVariables()
             const preview = await buildPreview(ctx, read(), target, 'active', undefined, undefined, undefined, toolMask)
             const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, undefined, preview)
-            writeJson(res, 200, { ...inventory, scopeResolved: target.scopeResolved, variables: listVariableNames(read().envBlocklist ?? []) })
+            writeJson(res, 200, { ...inventory, scopeResolved: target.scopeResolved, variables: listVariables() })
           } finally {
             await target.release()
           }
@@ -735,7 +714,6 @@ export function apply(ctx, entry = {}) {
           }
           const presetId = presetIdOfAgent(ctx, live)
           target = await acquireTarget(ctx, presetId)
-          syncVariables()
           const status = statusOf(phaseHandle ?? ctx.get('sessionProjections'), live)
           const preview = await buildSessionPreview(ctx, read(), target.scopeKey, { agent: live, presetId }, status, undefined, toolMask, workspaceOverrideFor(live?.session?.header?.cwd))
           writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved })

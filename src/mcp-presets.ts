@@ -19,8 +19,7 @@
  *
  * 本模块做四件事：
  *   1. 定位预设行（`configEditor.entries()` 的可寻址行优先，回落
- *      `ctx.loader.entries()`）；行不在场时回落 `agentPresets.readDocument()`
- *      的声明 YAML（只读展示）；
+ *      `ctx.loader.entries()`）；行不在场即视为无此预设，不接受旧 YAML 文本兜底；
  *   2. 从 `config.plugins` 解析 mcp-client 行（serverName / transport 摘要）；
  *   3. 增删行走 `configEditor.edit()` —— DSH 自己负责原子写、YAML 保形、
  *      `!!js` 标签、Loader 热重载，失败还会把文件与组合一起回滚；本插件不再
@@ -278,76 +277,12 @@ export function presetTrustOf(ctx: PluginContext, presetId: string): 'system' | 
   return 'system'
 }
 
-/**
- * 预设声明文本（`agentPresets.readDocument()`）：只读展示用。
- *
- * 0.1.7 的 readDocument 把该预设的 `config.plugins` 渲染成 entry-list YAML
- * （`!!js` 条件按声明原文给出），行不在 loader 视图里时靠它兜底。
- */
-export async function compositionTextOf(ctx: PluginContext, presetId: string): Promise<{ content: string } | undefined> {
-  const presets = optionalService(ctx, 'agentPresets')
-  if (presets?.readDocument === undefined) return undefined
-  try {
-    const doc = await presets.readDocument(presetId)
-    if (doc !== null && typeof doc === 'object' && typeof doc.content === 'string') return { content: doc.content }
-  } catch {
-    // 服务没有该预设 / 声明不可读：无可读来源。
-  }
-  return undefined
-}
-
 /** 某预设自带的 mcp-client 行（含 trust，供面板提示存储位置）。 */
 export async function listPresetServers(ctx: PluginContext, presetId: string): Promise<{ trust: string; rows: PresetMcpRow[] } | undefined> {
   const ref = presetRowOf(ctx, presetId)
-  if (ref !== undefined) {
-    return { trust: presetTrustOf(ctx, presetId), rows: presetMcpRowsOf(ref.config.plugins) }
-  }
-  const found = await compositionTextOf(ctx, presetId)
-  if (found === undefined) return undefined
-  return { trust: 'user', rows: parseLegacyYamlRows(found.content) }
+  if (ref === undefined) return undefined
+  return { trust: presetTrustOf(ctx, presetId), rows: presetMcpRowsOf(ref.config.plugins) }
 }
-
-/**
- * 声明 YAML 的兜底解析：逐行扫描所有 `@deepseek-ai/dsh-mcp-client` 行。
- * 仅在预设行不在 loader 视图里（动态注册的预设等）时用到。
- */
-function parseLegacyYamlRows(content: string): PresetMcpRow[] {
-  const lines = content.split(/\r?\n/)
-  const rows: PresetMcpRow[] = []
-  for (let i = 0; i < lines.length; i += 1) {
-    const trimmed = lines[i].trimStart()
-    if (!trimmed.startsWith('- id:')) continue
-    const idMatch = /^- id:\s*([A-Za-z0-9_-]+)/.exec(trimmed)
-    if (idMatch === null) continue
-    let isMcp = false
-    let serverName = ''
-    let transport = ''
-    let summary = ''
-    for (let j = i + 1; j < lines.length; j += 1) {
-      const line = lines[j]
-      if (line.length === 0) continue
-      if (!/^[ \t]/.test(line)) break
-      const t = line.trimStart()
-      if (!isMcp && t.startsWith('name:') && line.includes(MCP_CLIENT_MODULE)) isMcp = true
-      if (!isMcp) continue
-      if (serverName === '' && t.startsWith('serverName:')) {
-        const m = /^serverName:\s*["']?([A-Za-z0-9_-]{1,32})["']?\s*$/.exec(t)
-        if (m !== null) serverName = m[1]!
-      }
-      if (transport === '' && t.startsWith('transport:')) {
-        const m = /^transport:\s*["']?([a-z-]+)["']?\s*$/.exec(t)
-        if (m !== null) transport = m[1]!
-      }
-      if (summary === '' && (t.startsWith('command:') || t.startsWith('url:'))) {
-        summary = t.replace(/^(command|url):\s*/, '').replace(/^["']|["']$/g, '')
-      }
-    }
-    if (!isMcp || serverName === '') continue
-    rows.push({ entryId: idMatch[1]!, serverName, transport: transport === '' ? 'stdio' : transport, summary })
-  }
-  return rows
-}
-
 /** 全部预设的自带 MCP 行（键为 preset id）。 */
 export async function collectPresetServers(ctx: PluginContext): Promise<Record<string, PresetMcpRow[]>> {
   const presets = optionalService(ctx, 'agentPresets')

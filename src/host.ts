@@ -322,6 +322,10 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
         applyPromptHost(promptCtx, {
           ...(typeof entry?.dataDir === 'string' ? { dataDir: entry.dataDir } : {}),
           toolMask: maskedToolsOfPlugin,
+          listVariables: () => {
+            const diagnostics = variables.diagnose()
+            return [...diagnostics.builtins, ...diagnostics.env].sort()
+          },
         })
         promptCtx.logger?.info?.('[dsh-prompt-customizer] prompt customizer mounted')
       } catch (error) {
