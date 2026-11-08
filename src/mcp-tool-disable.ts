@@ -26,7 +26,8 @@
  *   1. 装配过滤：`system-prompt/assemble` waterfall 里就地剔除
  *      `assembly.tools` 中命中的工具。监听器以 `{ global: true }` 注册 ——
  *      装配派发是按作用域过滤的（scopeTarget），只有 global 才能收到每个
- *      agent 的装配；`assembly.context.agent` 用来判定该次装配属于哪个预设。
+ *      agent 的装配；`context.scope`（0.2.2 的 AssembleContext）用来判定该次
+ *      装配属于哪个预设。
  *   2. agent 作用域 restrict：由 mcp-preset-mask 的安装器把有效禁用名并进
  *      `tools.restrict({ deny })`。它作用于「继承的全局层」，因此
  *      `view(scope).visible` 直接少掉这些工具 —— native 目录与 **PTC 生成的
@@ -54,19 +55,19 @@
  *
  * 内存索引是装配过滤的唯一数据源（同步读、零 IO），随写入刷新。
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
+import { writeJsonResponse } from './mcp-recommended.ts'
 import { listPresetServers } from './mcp-presets.ts'
 import { maskedServersOf, readMaskLedger } from './mcp-mask-ledger.ts'
+import { isPresetId, isServerName } from './ids.ts'
+import { presetOfScope } from './scope-context.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
+import { optionalService } from './context-utils.ts'
 
 
 const ROUTE_PREFIX = '/api/triad/mcp-tools'
-const LEDGER_FILE = 'tool-disable.json'
 const MCP_PREFIX = 'mcp__'
 /** 单个 serverName 的上限（与 mcp-client 的命名约束同量级）。 */
 const MAX_SERVER_ENTRIES = 200
@@ -98,24 +99,6 @@ export interface ToolDisableLedger {
   disabled: Record<string, string[]>
   presets: Record<string, Record<string, ToolOwnerEntries>>
   known: Record<string, string[]>
-}
-
-function dshHome(): string {
-  const fromEnv = process.env['DSH_HOME']
-  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh')
-}
-
-/** 工具级禁用账本路径。 */
-export function toolDisableLedgerPath(): string {
-  return join(dshHome(), 'mcp', 'dsh-prompt-customizer', LEDGER_FILE)
-}
-
-function isServerName(value: string): boolean {
-  return /^[A-Za-z0-9_-]{1,32}$/.test(value)
-}
-
-function isPresetId(value: string): boolean {
-  return /^[a-z0-9][a-z0-9-]*$/.test(value)
 }
 
 /** 该 server 的工具全名前缀。 */
@@ -307,7 +290,7 @@ export function rememberPresetOwnServers(presetId: string, serverNames: Iterable
  * 预设自带行的增删都走这条刷新，保证 owner 判定与磁盘一致。
  */
 export async function refreshPresetOwnServers(ctx: PluginContext): Promise<void> {
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   if (typeof presets?.list !== 'function') return
   let roster: unknown
   try {
@@ -451,7 +434,7 @@ export function setToolsDisabled(
   }
   const presetId = target.preset
   const table = { ...(ledger.presets[presetId] ?? {}) }
-  const entries: ToolOwnerEntries = { own: [], inherit: [], ...(table[serverName] ?? {}) }
+  const entries: ToolOwnerEntries = Object.assign({ own: [] as string[], inherit: [] as string[] }, table[serverName])
   entries[owner] = next
   if (entries.own.length === 0 && entries.inherit.length === 0) delete table[serverName]
   else table[serverName] = entries
@@ -492,24 +475,6 @@ interface PromptAssemblyLike {
   tools?: Array<{ name?: unknown }>
 }
 
-interface AssembleContextLike {
-  agent?: { ctx?: unknown }
-}
-
-/** 该次装配属于哪个预设（取不到就按「无预设」= 只应用全局行）。 */
-function presetOfAssembly(ctx: PluginContext, context: unknown): string | undefined {
-  const agent = (context as AssembleContextLike | undefined)?.agent
-  if (agent === undefined || agent === null) return undefined
-  const presets = ctx.get?.('agentPresets')
-  if (typeof presets?.composedPreset !== 'function') return undefined
-  try {
-    const presetId = presets.composedPreset(agent.ctx)
-    return typeof presetId === 'string' && presetId !== '' ? presetId : undefined
-  } catch {
-    return undefined
-  }
-}
-
 /**
  * 常开装配过滤：把「工具级禁用」与「预设遮蔽」命中的工具从模型目录剔除。
  *
@@ -530,7 +495,8 @@ function installAssembleFilter(ctx: PluginContext): void {
       const maskLedger = readMaskLedger()
       const hasMasks = Object.keys(maskLedger.presets).length > 0
       if ((globalIndex.size > 0 || presetIndex.size > 0 || hasMasks) && Array.isArray(assembly?.tools)) {
-        const presetId = presetOfAssembly(ctx, context)
+        // 0.2.2 的 AssembleContext 没有 agent：scope → agent → preset 反查。
+        const presetId = presetOfScope(ctx, context)
         const masked = presetId === undefined ? undefined : maskedServersOf(maskLedger, presetId)
         for (let index = assembly.tools.length - 1; index >= 0; index -= 1) {
           const name = assembly.tools[index]?.name
@@ -564,9 +530,9 @@ function registeredToolsOf(ctx: PluginContext, serverName: string): string[] {
 
 /** 该预设的活动 agent 作用域里可见的该 server 工具（预设自带工具只能这样枚举）。 */
 function scopedToolsOf(ctx: PluginContext, presetId: string, serverName: string): string[] {
-  const agents = ctx.get?.('agents')
+  const agents = optionalService(ctx, 'agents')
   const list: unknown = typeof agents?.list === 'function' ? agents.list() : []
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   const names = new Set<string>()
   for (const agent of Array.isArray(list) ? list : []) {
     if (agent === null || typeof agent !== 'object') continue
@@ -588,8 +554,9 @@ function scopedToolsOf(ctx: PluginContext, presetId: string, serverName: string)
 
 /** 处理一条 PUT /api/triad/mcp-tools/<serverName>。 */
 async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!loopbackAllowed(req)) {
-    writeJsonResponse(res, 403, { error: 'loopback-only' })
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
     return
   }
   const method = req.method ?? 'GET'

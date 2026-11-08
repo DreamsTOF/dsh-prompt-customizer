@@ -9,38 +9,17 @@
  * 只有显式 `false` 表示遮蔽；true/缺省 = 继承全局。
  * 落盘：`${DSH_HOME}/mcp/dsh-prompt-customizer/preset-masks.json`（原子写）。
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { isPresetId, isServerName } from './ids.ts'
 
-const MASK_FILE = 'preset-masks.json'
 const MAX_PRESET_ENTRIES = 50
+
+export { isPresetId, isServerName } from './ids.ts'
 
 /** 账本形状：只有显式 false 才在该预设下遮蔽。 */
 export interface MaskLedger {
   version: 1
   presets: Record<string, Record<string, boolean>>
-}
-
-function dshHome(): string {
-  const fromEnv = process.env['DSH_HOME']
-  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh')
-}
-
-/** 遮蔽账本路径。 */
-export function maskLedgerPath(): string {
-  return join(dshHome(), 'mcp', 'dsh-prompt-customizer', MASK_FILE)
-}
-
-/** preset id 形状（与 dsh-agent-presets 的目录名规则一致）。 */
-export function isPresetId(value: string): boolean {
-  return /^[a-z0-9][a-z0-9-]*$/.test(value)
-}
-
-/** serverName 形状（与 dsh-mcp-client 的校验一致）。 */
-export function isServerName(value: string): boolean {
-  return /^[A-Za-z0-9_-]{1,32}$/.test(value)
 }
 
 /** 工具全名是否属于该 server（严格前缀 + 至少一个字符的工具段）。 */

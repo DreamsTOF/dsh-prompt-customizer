@@ -15,6 +15,8 @@
  * 时，读取端回落到「已晋级」——与清单读取的静态视图一致，绝不阻断装配。
  */
 
+import { statusOfPhase } from './model.js'
+
 // HACK: 上游用 zod 声明 stateSchema；宿主（session-projection/src/index.ts）
 // 只调 `stateSchema.parse(value)`，而 zod 会把 540KB 全量内联进宿主产物。
 // 天花板：非标准 schema 对象，只实现 parse。升级路径：DSH 若改用
@@ -41,7 +43,10 @@ const DEFAULT_PROMOTE_EVENTS = ['tool/call', 'assistant/message']
 export const PHASE_PROJECTION_KEY = 'prompt-customizer/phase'
 
 /** 无从推导时的阶段：视为已晋级（静态视图）。 */
-export const PROMOTED_STATUS = Object.freeze({ boundary: -1, promoted: true })
+export const PROMOTED_STATUS = Object.freeze(statusOfPhase('active'))
+
+/** 新会话（尚无晋级信号）的阶段：引导期。 */
+const INITIAL_STATUS = Object.freeze(statusOfPhase('bootstrap'))
 
 /**
  * 构建阶段投影 unit（`ctx.sessionProjections.register` 的入参）。
@@ -56,7 +61,7 @@ export function createPhaseProjection(promoteEvents = DEFAULT_PROMOTE_EVENTS) {
   return {
     key: PHASE_PROJECTION_KEY,
     stateSchema: phaseStateSchema,
-    init: () => ({ boundary: -1, promoted: false }),
+    init: () => ({ ...INITIAL_STATUS }),
     apply: (state, event) => {
       const seq = event.seq ?? 0 // 没有 seq 的事件视为边界之后
       if (event.type === 'compaction/end') return { boundary: seq, promoted: false }

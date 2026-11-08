@@ -13,6 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { readPluginDoc, closeAllDbs } from '../vendor/prompt-customizer/db.js'
+import { normalizeCwd } from '../src/home-paths.ts'
 
 /** 在沙箱里跑，不碰用户真实的 ~/.agents。 */
 function sandbox() {
@@ -44,8 +45,10 @@ async function withEnv(env, body) {
 /** 造一个最小的宿主 ctx：只实现本模块用到的 webServer 与事件注册。 */
 function fakeCtx() {
   const handlers = []
+  const agents = []
   const ctx = {
     routes: [],
+    agents,
     webServer: {
       register(route) {
         ctx.routes.push(route)
@@ -60,6 +63,10 @@ function fakeCtx() {
       handlers.push({ event, handler })
       return () => {}
     },
+    get(name) {
+      if (name === 'agents') return { list: () => agents }
+      return undefined
+    },
     handlers,
     logger: { info() {}, warn() {} },
   }
@@ -69,7 +76,10 @@ function fakeCtx() {
 /** 模拟一次装配：给定会话 cwd 与工具名，跑完 waterfall 看剩下什么。 */
 async function assemble(ctx, cwd, toolNames) {
   const assembly = { tools: toolNames.map(name => ({ name })) }
-  const context = { agent: { session: { header: { cwd } } } }
+  // 0.2.2 的 AssembleContext 只有 scope（agent 对象本身是 scope key）。
+  const agent = { session: { header: { cwd } }, ctx: {} }
+  ctx.agents.push(agent)
+  const context = { scope: agent }
   let tail = () => Promise.resolve()
   for (const { event, handler } of ctx.handlers) {
     if (event !== 'system-prompt/assemble') continue
@@ -109,8 +119,8 @@ test('工作区级关闭：只影响该工作区，换工作区照常注入', as
       // 账本落盘形状。
       const ledger = readPluginDoc('mcp/workspace-close')
       assert.equal(ledger.version, 1)
-      assert.equal(ledger.workspaces[workspaceA].anysearch, false)
-      assert.equal(ledger.workspaces[workspaceB], undefined, '未操作的工作区不落账')
+      assert.equal(ledger.workspaces[normalizeCwd(workspaceA)].anysearch, false)
+      assert.equal(ledger.workspaces[normalizeCwd(workspaceB)], undefined, '未操作的工作区不落账')
 
       // 在 A 重新启用：记录消失，A 也恢复注入。
       await scope.setWorkspaceServer(workspaceA, 'anysearch', true)
@@ -146,6 +156,7 @@ test('工作区级关闭：通过路由写入并按 cwd 回报状态', async () 
           method,
           url,
           socket: { remoteAddress: '127.0.0.1' },
+          headers: { host: '127.0.0.1:3099' },
           [Symbol.asyncIterator]: async function* iterate() {
             if (body !== undefined) yield Buffer.from(JSON.stringify(body))
           },
@@ -179,7 +190,7 @@ test('工作区级关闭：通过路由写入并按 cwd 回报状态', async () 
       const finalStatus = await call('GET', `/api/triad/mcp-workspace-scope/status?cwd=${encodeURIComponent(workspace)}`)
       assert.deepEqual(finalStatus.body.closed, ['anysearch'], '多次覆盖后账本仍正确')
       const onDisk = readPluginDoc('mcp/workspace-close')
-      assert.equal(onDisk.workspaces[workspace].anysearch, false, '落盘内容与内存一致')
+      assert.equal(onDisk.workspaces[normalizeCwd(workspace)].anysearch, false, '落盘内容与内存一致')
     })
   } finally {
     closeAllDbs()
@@ -204,6 +215,7 @@ test('工作区级工具禁用：路由写入 + 装配剔除 + 别的工作区�
           method,
           url,
           socket: { remoteAddress: '127.0.0.1' },
+          headers: { host: '127.0.0.1:3099' },
           [Symbol.asyncIterator]: async function* iterate() {
             if (body !== undefined) yield Buffer.from(JSON.stringify(body))
           },
@@ -220,7 +232,7 @@ test('工作区级工具禁用：路由写入 + 装配剔除 + 别的工作区�
       const put = await call('PUT', `/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, { name: 'mcp__anysearch__search', enabled: false })
       assert.equal(put.status, 200, JSON.stringify(put.body))
       const ledger = readPluginDoc('mcp/workspace-tool-disable')
-      assert.deepEqual(ledger.workspaces[resolve(workspace)], ['mcp__anysearch__search'], '落库形状正确')
+      assert.deepEqual(ledger.workspaces[normalizeCwd(workspace)], ['mcp__anysearch__search'], '落库形状正确')
       const inWs = await assemble(ctx, workspace, tools)
       assert.deepEqual(inWs, ['mcp__anysearch__score'], '被工作区禁用的工具在装配里被剔除')
       const other = await assemble(ctx, join(box.root, 'other'), tools)

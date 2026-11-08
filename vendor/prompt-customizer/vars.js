@@ -22,23 +22,6 @@ const VARIABLE_NAME = /^[a-z][a-z0-9_]*$/
 /** agent-loop 已注册的三个名字：重复注册会抛错，永远避开。 */
 const RESERVED = new Set(['provider', 'model', 'cwd'])
 
-/** 预填黑名单：常见密钥 / 凭据类环境变量。条目支持 `*` 通配，大小写不敏感。 */
-export const DEFAULT_ENV_BLOCKLIST = [
-  '*SECRET*',
-  '*TOKEN*',
-  '*PASSWORD*',
-  '*PASSWD*',
-  '*CREDENTIAL*',
-  '*API_KEY*',
-  '*APIKEY*',
-  '*ACCESS_KEY*',
-  '*PRIVATE_KEY*',
-  '*AUTH*',
-  '*_DSN',
-  '*CONNECTION_STRING*',
-  'DATABASE_URL',
-]
-
 /**
  * 黑名单条目编译成匹配函数：含 `*` 按通配（`*` 匹配任意串），否则整串
  * 精确比较；统一大小写不敏感（env 键多为大写，用户多写小写）。

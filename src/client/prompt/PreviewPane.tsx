@@ -7,23 +7,20 @@
  * 编辑草稿后由 Panel 防抖叠加同步 —— 所见即模型所见。本视图绝不修改配置。
  */
 import { createElement as h, type ReactElement } from 'react'
-import type { PhaseViewKey, Preview } from './types.ts'
+import { entryKey, type PhaseKey, type PhaseViews, type EntryRef } from './types.ts'
 import type { Translate } from './locales.ts'
 import { s } from './styles.ts'
 import { PreviewTools } from './PreviewTools.tsx'
-
-/** Panel 并行拉取的三阶段装配。 */
-type PhaseViews = Record<PhaseViewKey, Preview | null>
 
 export function PreviewPane({ t, phases, phase, sub, onToggleContext }: {
   t: Translate
   phases: PhaseViews | null
   /** 当前阶段（状态在 Panel 持有，头部阶段按钮统一切换）。 */
-  phase: PhaseViewKey
+  phase: PhaseKey
   /** 提示词 / 工具子视图：跟随顶部模式（无手动切换）。 */
   sub: 'prompt' | 'tools'
   /** 切换某个运行时上下文的显隐（hide=true 表示隐藏）。 */
-  onToggleContext?: (name: string, hide: boolean) => void
+  onToggleContext?: (entry: EntryRef, hide: boolean) => void
 }): ReactElement {
   const data = phases?.[phase] ?? null
   // 按当前所选阶段判定「段级定制没进最终提示词」：有 complete 段整段接管就说
@@ -34,6 +31,10 @@ export function PreviewPane({ t, phases, phase, sub, onToggleContext }: {
       : data.lostSections !== undefined
         ? t('sectionsLost', { emitted: data.lostSections.emitted, survived: data.lostSections.survived })
         : null
+
+  // 运行时上下文：只认服务端 baseContexts（带 blocked / source / dynamic）。
+  // 缺席 = 宿主不支持该项控制：禁用开关并提示，绝不伪造 blocked:false。
+  const baseContexts = data?.baseContexts
 
   return h('div', { style: s.colRight }, [
     h('div', { style: s.colRightScroll }, [
@@ -63,15 +64,31 @@ export function PreviewPane({ t, phases, phase, sub, onToggleContext }: {
               ]),
               h('pre', { style: s.previewText }, data.text || t('empty')),
               h('div', { style: s.rowTitle }, t('runtimeContexts')),
-              ...((data.baseContexts ?? (data.contexts ?? []).map(c => ({ name: c.name, text: c.text, blocked: false }))) ).map((context) => h('div', { key: context.name, style: { opacity: context.blocked ? 0.5 : 1 } }, [
-                h('label', { style: { ...s.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: onToggleContext ? 'pointer' : 'default' } }, [
-                  onToggleContext
-                    ? h('input', { type: 'checkbox', checked: !context.blocked, onChange: (e: { currentTarget: { checked: boolean } }) => onToggleContext(context.name, !e.currentTarget.checked) })
-                    : null,
-                  context.name,
-                ]),
-                h('pre', { style: s.previewText }, context.text || t('empty')),
-              ])),
+              baseContexts === undefined
+                ? h('div', { style: s.noticeWarn }, t('contextsUnsupported'))
+                : baseContexts.length === 0
+                  ? h('div', { style: s.muted }, t('empty'))
+                  : baseContexts.map((context, index) => {
+                      const identity = `${entryKey(context)}:${index}`
+                      const disabled = onToggleContext === undefined
+                      const hidden = context.blocked === true || context.active === false
+                      return h('div', { key: identity, style: { opacity: hidden ? 0.5 : 1 } }, [
+                        h('label', { style: { ...s.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: disabled ? 'default' : 'pointer' } }, [
+                          h('input', {
+                            type: 'checkbox',
+                            checked: !hidden,
+                            disabled,
+                            onChange: (e: { currentTarget: { checked: boolean } }) => onToggleContext?.(context, !e.currentTarget.checked),
+                          }),
+                          context.name,
+                          context.source === undefined
+                            ? null
+                            : h('span', { style: s.badgeSystem }, `${context.source.kind}${context.source.id === undefined ? '' : `:${context.source.id}`}`),
+                          context.dynamic === true ? h('span', { style: s.badgeSystem }, t('dynamic')) : null,
+                        ]),
+                        h('pre', { style: s.previewText }, context.text || t('empty')),
+                      ])
+                    }),
             ]
           : null
         : data

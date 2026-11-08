@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **1.0.0** (breaking: storage moved to SQLite, new workspace-level customization), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **1.4.0** (breaking: single `PHASES` table + `{name, source}` entry identity; workspace level is a preset candidate superset; MCP hot reload uses the host `mcpManager`), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 

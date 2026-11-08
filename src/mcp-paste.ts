@@ -25,7 +25,8 @@ import type { Context } from '@deepseek-ai/cordis'
 // js-yaml 不自带类型声明（无 tsc 门禁）；版本与 DSH 对齐（v4 的 Type/DEFAULT_SCHEMA API）。
 // @ts-expect-error -- untyped dependency
 import { DEFAULT_SCHEMA, Type, load } from 'js-yaml'
-import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
+import { writeJsonResponse } from './mcp-recommended.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 
 const ROUTE_PREFIX = '/api/triad/mcp-preview'
 const MAX_BODY_BYTES = 256 * 1024
@@ -439,7 +440,8 @@ export function applyMcpFormatRoute(ctx: Context): void {
     path: FORMAT_ROUTE,
     handler: (req: IncomingMessage, res: ServerResponse) => {
       void (async () => {
-        if (!loopbackAllowed(req)) { writeJsonResponse(res, 403, { error: 'loopback-only' }); return }
+        const trust = requireTrustedRequest(ctx, req)
+        if (!trust.ok) { rejectUntrusted(res, trust); return }
         try {
           const body = await readJsonBody(req)
           const { format, text } = pasteFieldsOf(body)
@@ -510,8 +512,9 @@ export function applyMcpPreviewRoute(ctx: Context): void {
     path: ROUTE_PREFIX,
     handler: (req: IncomingMessage, res: ServerResponse) => {
       void (async () => {
-        if (!loopbackAllowed(req)) {
-          writeJsonResponse(res, 403, { error: 'loopback-only' })
+        const trust = requireTrustedRequest(ctx, req)
+        if (!trust.ok) {
+          rejectUntrusted(res, trust)
           return
         }
         try {

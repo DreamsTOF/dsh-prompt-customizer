@@ -8,7 +8,7 @@ import {
 import { CheckIcon, CopyIcon } from './icons.js'
 import { skillT } from './locales.js'
 import { css } from './styles.js'
-import { MAX_BUNDLE_CATEGORIES, PRESET_BUNDLE_CATEGORIES, type SkillInfo } from './types.js'
+import { MAX_BUNDLE_CATEGORIES, skillOriginOf, type SkillInfo } from './types.js'
 /**
  * 技能卡片（Skills Hub 风格）：
  *   [图标瓷片] 标题(粗)  [复制钮]      [绿色开关]
@@ -21,13 +21,16 @@ import { MAX_BUNDLE_CATEGORIES, PRESET_BUNDLE_CATEGORIES, type SkillInfo } from 
  * 分类编辑器：已选标签（可摘）+ 建议分类（点加）+ 自定义输入（回车加）。
  * 「新建技能包」与「设置分类」两处共用，值由父级持有。
  */
-export function CategoryEditor({ value, onChange, label }: {
+export function CategoryEditor({ value, onChange, label, suggestions = [] }: {
   value: string[]
   onChange: (next: string[]) => void
   label: string
+  /** 从现有技能包分类派生的候选；不传 = 只允许自由输入。 */
+  suggestions?: string[]
 }): JSX.Element {
   const [draft, setDraft] = useState('')
   const full = value.length >= MAX_BUNDLE_CATEGORIES
+  const suggestionsLeft = suggestions.filter((preset) => !value.includes(preset))
   const add = (raw: string): void => {
     const name = raw.trim().slice(0, 24)
     setDraft('')
@@ -55,20 +58,22 @@ export function CategoryEditor({ value, onChange, label }: {
           ))}
         </ul>
       )}
-      <div className={css.catSuggest} role="group" aria-label={skillT('bundleCatTitle')}>
-        {PRESET_BUNDLE_CATEGORIES.filter((preset) => !value.includes(preset)).map((preset) => (
-          <button
-            type="button"
-            key={preset}
-            className={css.catPreset}
-            disabled={full}
-            title={skillT('bundleCatAddPreset', { name: preset })}
-            onClick={() => { add(preset) }}
-          >
-            <span className={css.catPresetPlus} aria-hidden="true">+</span>{preset}
-          </button>
-        ))}
-      </div>
+      {suggestionsLeft.length > 0 && (
+        <div className={css.catSuggest} role="group" aria-label={skillT('bundleCatTitle')}>
+          {suggestionsLeft.map((preset) => (
+            <button
+              type="button"
+              key={preset}
+              className={css.catPreset}
+              disabled={full}
+              title={skillT('bundleCatAddPreset', { name: preset })}
+              onClick={() => { add(preset) }}
+            >
+              <span className={css.catPresetPlus} aria-hidden="true">+</span>{preset}
+            </button>
+          ))}
+        </div>
+      )}
       <input
         className={css.catInput}
         value={draft}
@@ -145,13 +150,11 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
   const toggleLabel = lockedReason ?? (enabled ? skillT('disableSkill') : skillT('enableSkill'))
   const fileMeta = typeof skill.fileCount === 'number' ? skill.fileCount : files.length
   /**
-   * 来源：内核 `source` 里 `project-*` = 当前工作区专用，其余（user-* / bundled /
-   * runtime / custom）= 全局可用。工作区同名技能优先于全局，这条标签就是让用户
-   * 一眼看出「我关掉的会不会影响别的项目」。
+   * 来源：优先宿主给的 skill.origin / skill.scope，缺省按 SkillSource 枚举集中映射；
+   * 未知来源原样显示。工作区同名技能优先于全局，这条标签就是让用户一眼看出
+   * 「我关掉的会不会影响别的项目」。
    */
-  const skillOrigin: 'workspace' | 'global' | undefined = skill.root === undefined
-    ? undefined
-    : skill.root.startsWith('project-') ? 'workspace' : 'global'
+  const skillOrigin = skillOriginOf(skill)
   return (
     <li
       className={css.skillCard}
@@ -194,8 +197,16 @@ export function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, 
         <span className={`${css.tag} ${css.tagScope}`} data-off={enabled ? undefined : 'true'}>{scopeLabel}</span>
         {/* 来源：工作区（当前工作区专用，同名时优先于全局）还是全局。 */}
         {skillOrigin !== undefined && (
-          <span className={css.scopeTag} data-scope={skillOrigin} title={skillT(skillOrigin === 'workspace' ? 'originWorkspaceHint' : 'originGlobalHint')}>
-            {skillT(skillOrigin === 'workspace' ? 'originWorkspace' : 'originGlobal')}
+          <span
+            className={css.scopeTag}
+            data-scope={skillOrigin.kind === 'unknown' ? 'other' : skillOrigin.kind}
+            title={skillOrigin.kind === 'workspace'
+              ? skillT('originWorkspaceHint')
+              : skillOrigin.kind === 'global' ? skillT('originGlobalHint') : skillOrigin.label}
+          >
+            {skillOrigin.kind === 'workspace'
+              ? skillT('originWorkspace')
+              : skillOrigin.kind === 'global' ? skillT('originGlobal') : skillOrigin.label}
           </span>
         )}
         {!enabled && <span className={`${css.tag} ${css.tagStatus}`}>{skillT('skillOffTag')}</span>}

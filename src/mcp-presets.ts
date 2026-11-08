@@ -34,7 +34,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
+import { writeJsonResponse } from './mcp-recommended.ts'
+import { isPresetId, isServerName } from './ids.ts'
+import { optionalService } from './context-utils.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 import {
   envTemplateOf, parseMcpPaste, pasteFieldsOf, serversToRows,
   type McpRowConfig, type McpServerConfig,
@@ -126,7 +129,7 @@ export function presetIdOf(entry: unknown): string {
  * 组合）时退到 `ctx.loader.entries()` 的全量视图，此时只能读不能写。
  */
 export function presetRowOf(ctx: PluginContext, presetId: string): PresetRowRef | undefined {
-  const editor = ctx.get?.('configEditor')
+  const editor = optionalService(ctx, 'configEditor')
   if (typeof editor?.entries === 'function') {
     try {
       for (const entry of editor.entries()) {
@@ -259,7 +262,7 @@ function toConfigData(value: unknown): unknown {
  *  - `user`：profile patch 已经覆盖过这条行（内容已经是本地定制的）。
  */
 export function presetTrustOf(ctx: PluginContext, presetId: string): 'system' | 'user' {
-  const editor = ctx.get?.('configEditor')
+  const editor = optionalService(ctx, 'configEditor')
   if (typeof editor?.configuration !== 'function') return 'system'
   try {
     const rows = editor.configuration()
@@ -282,7 +285,7 @@ export function presetTrustOf(ctx: PluginContext, presetId: string): 'system' | 
  * （`!!js` 条件按声明原文给出），行不在 loader 视图里时靠它兜底。
  */
 export async function compositionTextOf(ctx: PluginContext, presetId: string): Promise<{ content: string } | undefined> {
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   if (presets?.readDocument === undefined) return undefined
   try {
     const doc = await presets.readDocument(presetId)
@@ -347,7 +350,7 @@ function parseLegacyYamlRows(content: string): PresetMcpRow[] {
 
 /** 全部预设的自带 MCP 行（键为 preset id）。 */
 export async function collectPresetServers(ctx: PluginContext): Promise<Record<string, PresetMcpRow[]>> {
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   const out: Record<string, PresetMcpRow[]> = {}
   if (presets?.list === undefined) return out
   let roster: unknown
@@ -363,16 +366,6 @@ export async function collectPresetServers(ctx: PluginContext): Promise<Record<s
     if (found !== undefined) out[id] = found.rows
   }
   return out
-}
-
-/** preset id 形状（[a-z0-9-]，与 agent-preset-registry 的 id 规则一致）。 */
-function isPresetId(value: string): boolean {
-  return /^[a-z0-9][a-z0-9-]*$/.test(value)
-}
-
-/** serverName 形状（与 dsh-mcp-client 的校验一致）。 */
-function isServerName(value: string): boolean {
-  return /^[A-Za-z0-9_-]{1,32}$/.test(value)
 }
 
 /** 解析 JSON 请求体（带上限）。 */
@@ -440,8 +433,9 @@ export async function writePresetPlugins(ref: PresetRowRef, plugins: unknown[]):
 
 /** 处理一条 /api/triad/mcp-presets 请求。 */
 async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!loopbackAllowed(req)) {
-    writeJsonResponse(res, 403, { error: 'loopback-only' })
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
     return
   }
   const url = new URL(req.url ?? '/', 'http://localhost')

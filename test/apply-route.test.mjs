@@ -72,13 +72,14 @@ test('targeted patch writes overrides[id] only', async () => {
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], {
     target: 'whoami',
-    patch: { sections: ['b'], replace: null },
+    patch: { sections: [{ name: 'b', source: { kind: 'preset', id: 'whoami' } }], replacements: null },
   })
   assert.equal(res.body.ok, true)
   // 返回的是 schema 解析后的 config（override 子字段被补默认值），
-  // 关键是 sections 接管且被置 null 的 replace 没有残留用户值。
-  assert.deepEqual(res.body.config.overrides.whoami.sections, ['b'])
-  assert.deepEqual(res.body.config.overrides.whoami.replace, {})
+  // 关键是 sections 接管且被置 null 的 replacements 没有残留用户值。
+  assert.deepEqual(res.body.config.overrides.whoami.sections, [{ name: 'b', source: { kind: 'preset', id: 'whoami' } }])
+  assert.deepEqual(res.body.config.overrides.whoami.replacements, [])
+  assert.equal('replace' in res.body.config.overrides.whoami, false)
   // 全局顶层不受影响（sections 是 schema 默认空列表，而非补丁写入的值）。
   assert.deepEqual(res.body.config.sections, [])
 })
@@ -89,7 +90,7 @@ test('fully-emptied override is removed instead of leaving an empty shell', asyn
   apply(ctx, { dataDir })
   const res = await call(routes[APPLY], {
     target: 'whoami',
-    patch: { sections: null, replace: null, inject: null, tools: null },
+    patch: { sections: null, replacements: null, inject: null, tools: null },
   })
   assert.equal(res.body.ok, true)
   assert.deepEqual(res.body.config.overrides, {})

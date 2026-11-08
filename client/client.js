@@ -415,11 +415,6 @@ var css = {
   mcpAddTypeActive: "skm-mcp-add-type-active",
   mcpToolSearch: "skm-mcp-tool-search",
   mcpToolSearchInput: "skm-mcp-tool-search-input",
-  mcpLogRow: "skm-mcp-log-row",
-  mcpLogDot: "skm-mcp-log-dot",
-  mcpLogBody: "skm-mcp-log-body",
-  mcpLogText: "skm-mcp-log-text",
-  mcpLogClear: "skm-mcp-log-clear",
   mcpConfigGrid: "skm-mcp-config-grid",
   mcpConfigCard: "skm-mcp-config-card",
   mcpConfigHead: "skm-mcp-config-head",
@@ -529,6 +524,7 @@ var css = {
   skillCardFoot: "skm-skill-card-foot",
   skillFootLabel: "skm-skill-foot-label",
   skillFootIcon: "skm-skill-foot-icon",
+  skillFootIconDanger: "skm-skill-foot-icon-danger",
   skillCardActions: "skm-skill-card-actions",
   // Skills Hub 页面结构
   hub: "skm-hub",
@@ -571,6 +567,7 @@ var css = {
   topbarActions: "skm-topbar-actions",
   healthInline: "skm-health-inline",
   addCard: "skm-add-card",
+  addCardActive: "skm-add-card-active",
   addCardHead: "skm-add-card-head",
   addCardIcon: "skm-add-card-icon",
   addCardTitle: "skm-add-card-title",
@@ -665,7 +662,6 @@ var css = {
   mainScroll: "skm-main-scroll",
   hubSection: "skm-hub-section",
   hubSectionHead: "skm-hub-section-head",
-  skillGridList: "skm-skill-grid-list",
   noResult: "skm-no-result",
   // 归入技能包弹窗（卡片化）
   assignModal: "skm-assign-modal",
@@ -826,7 +822,6 @@ var SHEET3 = `
 
 /* \u2500\u2500 \u6280\u80FD\u5361\u7247\uFF08Skills Hub \u98CE\u683C\uFF09\uFF1A\u53CC\u5217\u7F51\u683C\uFF1B\u5217\u8868\u89C6\u56FE\u5207\u5355\u5217\u5BBD\u5361 \u2500\u2500 */
 .skm-skill-grid{list-style:none;margin:8px 0 0;padding:0;width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;box-sizing:border-box}
-.skm-skill-grid-list{grid-template-columns:minmax(0,1fr)}
 .skm-skill-grid > .skm-status{grid-column:1/-1;padding-top:4px}
 .skm-skill-card{position:relative;min-width:0;display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:16px;background:var(--dsw-alias-bg-base,#fff);padding:14px 16px 0;overflow:hidden;opacity:0;animation:skm-card-in 260ms cubic-bezier(.2,.7,.3,1.06) forwards;animation-delay:calc(var(--skm-i,0)*40ms);transition:border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}
 .skm-skill-card:hover{border-color:var(--dsw-alias-border-l3,rgba(0,0,0,.16));box-shadow:0 3px 14px rgba(16,24,40,.08);transform:translateY(-1px)}
@@ -1016,18 +1011,6 @@ var SHEET3 = `
 .skm-mcp-tool-search-input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:12.5px;line-height:18px;color:var(--dsw-alias-label-primary,#1f2430);font-family:inherit}
 .skm-mcp-tool-search-input::placeholder{color:var(--dsw-alias-label-caption,#adb2b8)}
 /* \u8FDE\u63A5\u65E5\u5FD7\u884C */
-.skm-mcp-log-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.05))}
-.skm-mcp-log-row:first-child{border-top:none}
-.skm-mcp-log-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#3d6be5)}
-.skm-mcp-log-dot[data-kind='enable']{background:#2fb26b}
-.skm-mcp-log-dot[data-kind='disable']{background:var(--dsw-alias-state-warn-primary,#e8a33d)}
-.skm-mcp-log-dot[data-kind='remove']{background:var(--dsw-alias-state-error-primary,#e0434b)}
-.skm-mcp-log-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.skm-mcp-log-text{font-size:12.5px;line-height:18px;color:var(--dsw-alias-label-primary,#1f2430)}
-.skm-mcp-log-text strong{font-weight:600}
-.skm-mcp-log-clear{flex:none;display:inline-flex;align-items:center;height:28px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.12));border-radius:999px;background:transparent;padding:0 12px;font-size:12px;line-height:17px;font-family:inherit;color:var(--dsw-alias-label-secondary,#61666b);cursor:pointer;transition:border-color 140ms ease,color 140ms ease,transform 140ms ease}
-.skm-mcp-log-clear:hover{border-color:var(--dsw-alias-border-l3,rgba(0,0,0,.18));color:var(--dsw-alias-label-primary,#1f2430)}
-.skm-mcp-log-clear:active{transform:scale(.96)}
 /* \u914D\u7F6E\u6A21\u677F\u5361 */
 .skm-mcp-config-grid{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .skm-mcp-config-card{flex:none;min-width:0;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.08));border-radius:14px;background:var(--dsw-alias-bg-base,#fff);padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.03);transition:border-color 160ms ease,box-shadow 160ms ease}
@@ -1568,183 +1551,577 @@ var s = (() => {
   };
 })();
 
-// src/client/prompt/presets.ts
-var CAPTURE_PHASES = ["bootstrap", "active", "compaction"];
-function toChain(names, textOf, customOf, phase) {
-  return names.map((name, i) => ({
-    name,
-    after: i > 0 ? names[i - 1] : void 0,
-    text: customOf(name) ? textOf(name) ?? "" : "",
-    custom: customOf(name),
-    ...phase !== void 0 ? { phase } : {}
-  }));
-}
-function buildPresetData(cfg, merged) {
-  const globalNames = merged.map((sec) => sec.name);
-  const textOf = new Map(merged.map((sec) => [sec.name, sec.text ?? ""]));
-  const customOf = new Map(merged.map((sec) => [sec.name, sec.source === "custom"]));
-  const order = toChain(globalNames, (n) => textOf.get(n) ?? "", (n) => customOf.get(n) === true);
-  for (const phase of CAPTURE_PHASES) {
-    const items = (cfg.inject ?? []).filter((item) => item.phase === phase).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    if (items.length === 0) continue;
-    order.push(...toChain(
-      items.map((item) => item.name),
-      (n) => items.find((item) => item.name === n)?.text ?? "",
-      (n) => items.find((item) => item.name === n)?.custom === true,
-      phase
-    ));
+// src/client/prompt/types.ts
+var PHASES = [
+  { key: "bootstrap", sectionField: "sectionsBootstrap", contextField: "contextsBootstrap", toolField: "bootstrap", status: { promoted: false, boundary: -1 } },
+  { key: "active", sectionField: "sections", contextField: "contexts", toolField: void 0, status: { promoted: true, boundary: -1 } },
+  { key: "compaction", sectionField: "sectionsCompaction", contextField: "contextsCompaction", toolField: "compaction", status: { promoted: false, boundary: 1 } }
+];
+var PHASE_KEYS = PHASES.map((phase) => phase.key);
+var PHASE_LABEL_KEY = {
+  bootstrap: "phaseStageGuide",
+  active: "phaseStageResident",
+  compaction: "phaseStageControlled"
+};
+var SOURCE_LABEL_KEY = {
+  global: "sourceGlobal",
+  preset: "sourcePreset",
+  agent: "sourceAgent",
+  executor: "sourceExecutor",
+  workspace: "sourceWorkspace"
+};
+var SOURCE_KIND_ORDER = ["global", "preset", "workspace", "agent", "executor"];
+function normalizeSource(source) {
+  if (source === null || source === void 0) return void 0;
+  if (typeof source === "string") return void 0;
+  if (typeof source === "object" && typeof source.kind === "string") {
+    return typeof source.id === "string" && source.id !== "" ? { kind: source.kind, id: source.id } : { kind: source.kind };
   }
-  const data = {
-    sections: cfg.sections,
-    replace: cfg.replace,
-    order,
-    tools: cfg.tools
-  };
-  if ((cfg.sectionsBootstrap ?? []).length > 0) data.sectionsBootstrap = cfg.sectionsBootstrap;
-  if ((cfg.sectionsCompaction ?? []).length > 0) data.sectionsCompaction = cfg.sectionsCompaction;
-  return data;
+  return void 0;
 }
-function mergeSections(inv, cfg, blockedNames) {
-  const map = /* @__PURE__ */ new Map();
-  for (const sec of inv?.sections ?? []) map.set(sec.name, { ...sec, source: "system" });
-  for (const item of cfg.inject ?? []) {
-    const isCustom = item.custom === true;
-    const existing = map.get(item.name);
-    if (existing) {
-      map.set(item.name, isCustom ? { ...existing, order: item.order, text: item.text ?? "", source: "custom" } : { ...existing, order: item.order, source: "system" });
-    } else {
-      map.set(item.name, {
-        name: item.name,
-        order: item.order,
-        text: item.text ?? "",
-        active: !blockedNames.has(item.name),
-        replaced: false,
-        source: isCustom ? "custom" : "system"
+function sourceKey(source) {
+  const normalized = normalizeSource(source);
+  return normalized === void 0 ? "" : `${normalized.kind}:${normalized.id ?? ""}`;
+}
+function normalizeEntry(value) {
+  if (typeof value === "string") return value === "" ? void 0 : { name: value };
+  if (value === null || value === void 0 || typeof value !== "object") return void 0;
+  if (typeof value.name !== "string" || value.name === "") return void 0;
+  const source = normalizeSource(value.source);
+  return source === void 0 ? { name: value.name } : { name: value.name, source };
+}
+function entryKey(entry) {
+  const normalized = normalizeEntry(entry);
+  return normalized === void 0 ? "" : `${normalized.name}\0${sourceKey(normalized.source)}`;
+}
+function sameEntry(left, right) {
+  const a = entryKey(left);
+  return a !== "" && a === entryKey(right);
+}
+function hasContent(value) {
+  if (value === null || value === void 0) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.values(value).some(hasContent);
+  return value !== "";
+}
+
+// src/client/prompt/phase-ops.ts
+function descriptorOf(key) {
+  const phase = PHASES.find((item) => item.key === key);
+  if (phase === void 0) throw new Error(`unknown phase: ${String(key)}`);
+  return phase;
+}
+function sectionFieldOf(key) {
+  return descriptorOf(key).sectionField;
+}
+function toolFieldOf(key) {
+  return descriptorOf(key).toolField ?? "static";
+}
+function acceptsInjectFor(key, phase) {
+  return phase === "always" || phase === key;
+}
+function sectionEntries(cfg, key) {
+  return normalizeList(cfg?.[sectionFieldOf(key)]);
+}
+function normalizeList(list) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const value of list ?? []) {
+    const entry = normalizeEntry(value);
+    if (entry === void 0) continue;
+    const key = entryKey(entry);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
+}
+function replacementEntriesFor(cfg, key) {
+  return (cfg?.replacements ?? []).filter((item) => acceptsInjectFor(key, item?.phase ?? "always"));
+}
+function injectedAt(cfg, key) {
+  const names = /* @__PURE__ */ new Set();
+  const custom = /* @__PURE__ */ new Set();
+  const text = /* @__PURE__ */ new Map();
+  const order = /* @__PURE__ */ new Map();
+  for (const item of cfg?.inject ?? []) {
+    const entry = normalizeEntry(item);
+    if (entry === void 0) continue;
+    const identity = entryKey(entry);
+    const phase = item.phase ?? "always";
+    if (phase === key) order.set(identity, item.order ?? 0);
+    if (!acceptsInjectFor(key, phase)) continue;
+    names.add(identity);
+    if (item.text) {
+      if (phase === key || !text.has(identity)) text.set(identity, item.text);
+    }
+    if (item.custom === true) custom.add(identity);
+  }
+  return { names, custom, text, order };
+}
+function blockPatch(cfg, key, entry, blocked) {
+  const field = sectionFieldOf(key);
+  const current2 = sectionEntries(cfg, key);
+  const index = current2.findIndex((item) => sameEntry(item, entry));
+  if (blocked) {
+    if (index >= 0) return {};
+    current2.push({ name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } });
+  } else {
+    if (index < 0) return {};
+    current2.splice(index, 1);
+  }
+  return { [field]: current2 };
+}
+function phaseRows(cfg, view, key) {
+  const base = view?.baseSections ?? [];
+  const post = view?.sections ?? [];
+  const denied = sectionEntries(cfg, key);
+  const deniedKeys = new Set(denied.map((entry) => entryKey(entry)));
+  const baseByKey = new Map(base.map((entry) => [entryKey(entry), entry]));
+  const postByKey = new Map(post.map((entry) => [entryKey(entry), entry]));
+  const injected = injectedAt(cfg, key);
+  const replacements = replacementEntriesFor(cfg, key);
+  const order = [];
+  const seen = /* @__PURE__ */ new Set();
+  const push = (entry) => {
+    const identity = entryKey(entry);
+    if (identity === "" || seen.has(identity)) return;
+    seen.add(identity);
+    order.push({ name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } });
+  };
+  for (const section of base) {
+    const identity = entryKey(section);
+    if (postByKey.has(identity) || deniedKeys.has(identity) || section.blocked === true) push(section);
+  }
+  for (const section of post) {
+    const identity = entryKey(section);
+    if (!baseByKey.has(identity) && injected.names.has(identity)) push(section);
+  }
+  for (const item of cfg?.inject ?? []) {
+    const entry = normalizeEntry(item);
+    if (entry === void 0) continue;
+    const identity = entryKey(entry);
+    if ((item.phase ?? "always") !== key) continue;
+    if (item.custom === true || injected.text.has(identity) || baseByKey.has(identity) || postByKey.has(identity)) push(entry);
+  }
+  for (const entry of denied) push(entry);
+  for (const identity of injected.custom) {
+    const item = (cfg?.inject ?? []).find((candidate) => entryKey(candidate) === identity);
+    if (item !== void 0) push(item);
+  }
+  const rows = order.map((entry) => {
+    const identity = entryKey(entry);
+    const baseSection = baseByKey.get(identity);
+    const postSection = postByKey.get(identity);
+    const override = injected.text.get(identity) ?? "";
+    const replacement = replacements.find((item) => sameEntry(item, entry));
+    const dynamic = typeof baseSection?.dynamic === "boolean" ? baseSection.dynamic : typeof postSection?.dynamic === "boolean" ? postSection.dynamic : void 0;
+    return {
+      name: entry.name,
+      ...entry.source === void 0 ? {} : { source: entry.source },
+      text: postSection?.text ?? baseSection?.text ?? "",
+      replaced: replacement !== void 0 || override !== "",
+      custom: injected.custom.has(identity),
+      override,
+      blocked: deniedKeys.has(identity),
+      ...dynamic === void 0 ? {} : { dynamic }
+    };
+  });
+  if (injected.order.size > 0) {
+    const fallback = new Map(rows.map((row, index) => [entryKey(row), index]));
+    rows.sort((left, right) => {
+      const a = injected.order.get(entryKey(left)) ?? fallback.get(entryKey(left)) ?? 0;
+      const b = injected.order.get(entryKey(right)) ?? fallback.get(entryKey(right)) ?? 0;
+      return a - b;
+    });
+  }
+  return rows;
+}
+function phaseInjectEntries(cfg, key, rows) {
+  const remaining = (cfg?.inject ?? []).filter((item) => (item.phase ?? "always") !== key);
+  const entries = rows.map((row, index) => ({
+    name: row.name,
+    ...row.source === void 0 ? {} : { source: row.source },
+    order: index,
+    text: row.override || (row.custom ? row.text ?? "" : ""),
+    phase: key,
+    custom: row.custom
+  }));
+  return [...remaining, ...entries];
+}
+function reorderInsert(rows, drag, target, pos) {
+  const base = rows.filter((row) => !sameEntry(row, drag));
+  const index = base.findIndex((row) => sameEntry(row, target));
+  if (index < 0) return null;
+  const entry = rows.find((row) => sameEntry(row, drag));
+  if (entry === void 0) return null;
+  base.splice(pos === "above" ? index : index + 1, 0, entry);
+  return base;
+}
+var MIRROR_ORDER = ["active", ...PHASE_KEYS.filter((key) => key !== "active")];
+function mirroredRows(cfg, views, nativeOf) {
+  const picked = /* @__PURE__ */ new Map();
+  const order = [];
+  for (const key of MIRROR_ORDER) {
+    for (const row of phaseRows(cfg, views?.[key] ?? null, key)) {
+      const identity = entryKey(row);
+      const native = nativeOf?.(key, row) === true;
+      const current2 = picked.get(identity);
+      if (current2 === void 0) {
+        picked.set(identity, { row, native });
+        order.push(identity);
+      } else if (current2.native !== true && native) {
+        picked.set(identity, { row, native });
+      }
+    }
+  }
+  return order.map((identity) => picked.get(identity).row);
+}
+function mirrorText(row, native) {
+  if (row.custom === true) return row.override || (row.text ?? "");
+  if (row.override !== "") return row.override;
+  if (native === true) return "";
+  if (row.dynamic === true) return "";
+  return row.text ?? "";
+}
+function mirrorPhaseInjectEntries(cfg, rows, nativeOf) {
+  const names = new Set(rows.map((row) => entryKey(row)));
+  const always = (cfg?.inject ?? []).filter((item) => (item.phase ?? "always") === "always" && names.has(entryKey(item)));
+  const entries = [];
+  for (const key of PHASE_KEYS) {
+    let order = 0;
+    for (const row of rows) {
+      const native = nativeOf?.(key, row);
+      if (native === null || native === void 0) continue;
+      const text = mirrorText(row, native);
+      if (native !== true && text === "") continue;
+      entries.push({
+        name: row.name,
+        ...row.source === void 0 ? {} : { source: row.source },
+        order: order++,
+        text,
+        phase: key,
+        custom: row.custom
       });
     }
   }
-  return [...map.values()].sort((a, b) => a.order - b.order).map((sec, i) => ({ ...sec, order: i }));
+  return [...always, ...entries];
+}
+function mirrorSkippedNames(rows, nativeOf) {
+  const skipped = /* @__PURE__ */ new Set();
+  for (const key of PHASE_KEYS) {
+    for (const row of rows) {
+      const native = nativeOf?.(key, row);
+      if (native === null || native === void 0 || native === true) continue;
+      if (mirrorText(row, false) === "") skipped.add(row.name);
+    }
+  }
+  return [...skipped];
+}
+function mirroredDeniedLists(rows) {
+  const blocked = rows.filter((row) => row.blocked === true).map((row) => ({ name: row.name, ...row.source === void 0 ? {} : { source: row.source } }));
+  const out = {};
+  for (const phase of PHASES) out[phase.sectionField] = blocked.map((entry) => ({ ...entry }));
+  return out;
+}
+
+// src/client/prompt/presets.ts
+function phaseFieldValues(source) {
+  const out = {};
+  for (const phase of PHASES) {
+    out[phase.sectionField] = [...source?.[phase.sectionField] ?? []];
+    out[phase.contextField] = [...source?.[phase.contextField] ?? []];
+  }
+  return out;
+}
+function normalizeToolsConfig(tools) {
+  const out = {
+    exclude: [...tools?.exclude ?? []],
+    add: [...tools?.add ?? []]
+  };
+  for (const phase of PHASES) {
+    if (phase.toolField === void 0) continue;
+    const group = tools?.[phase.toolField];
+    out[phase.toolField] = {
+      exclude: [...group?.exclude ?? []],
+      add: [...group?.add ?? []]
+    };
+  }
+  return out;
+}
+function toChain(items, phase) {
+  return items.map((item, index) => ({
+    name: item.name,
+    ...item.source === void 0 ? {} : { source: item.source },
+    after: index > 0 ? entryKey(items[index - 1]) : void 0,
+    text: item.custom === true ? item.text ?? "" : "",
+    custom: item.custom === true,
+    ...phase === void 0 ? {} : { phase }
+  }));
+}
+function buildPresetData(cfg, merged) {
+  const alwaysText = /* @__PURE__ */ new Map();
+  for (const item of cfg.inject ?? []) {
+    if ((item.phase ?? "always") !== "always") continue;
+    alwaysText.set(entryKey(item), item.text ?? "");
+  }
+  const globalRows = merged.filter((section) => !section.custom || alwaysText.has(entryKey(section)));
+  const order = toChain(globalRows.map((section) => ({
+    name: section.name,
+    ...section.source === void 0 ? {} : { source: section.source },
+    text: section.custom ? alwaysText.get(entryKey(section)) ?? section.text ?? "" : "",
+    custom: section.custom
+  })));
+  for (const phase of PHASE_KEYS) {
+    const items = (cfg.inject ?? []).filter((item) => (item.phase ?? "always") === phase).slice().sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+    if (items.length === 0) continue;
+    order.push(...toChain(items.map((item) => ({
+      name: item.name,
+      ...item.source === void 0 ? {} : { source: item.source },
+      text: item.text,
+      custom: item.custom === true
+    })), phase));
+  }
+  return {
+    ...phaseFieldValues(cfg),
+    replacements: [...cfg.replacements ?? []],
+    order,
+    tools: normalizeToolsConfig(cfg.tools)
+  };
+}
+function mergeSections(inv, cfg, blockedKeys) {
+  const map = /* @__PURE__ */ new Map();
+  for (const section of inv?.sections ?? []) {
+    const entry = normalizeEntry(section);
+    if (entry === void 0) continue;
+    map.set(entryKey(entry), {
+      ...entry,
+      order: section.order,
+      text: section.text ?? "",
+      active: blockedKeys.has(entryKey(entry)) ? false : section.active !== false,
+      replaced: section.replaced === true,
+      custom: false,
+      ...section.dynamic === void 0 ? {} : { dynamic: section.dynamic }
+    });
+  }
+  for (const item of cfg.inject ?? []) {
+    const entry = normalizeEntry(item);
+    if (entry === void 0) continue;
+    const identity = entryKey(entry);
+    const custom = item.custom === true;
+    const existing = map.get(identity);
+    const replacement = (cfg.replacements ?? []).some((candidate) => sameEntry(candidate, entry));
+    if (existing !== void 0) {
+      map.set(identity, {
+        ...existing,
+        order: item.order ?? existing.order,
+        ...item.text !== void 0 && item.text !== "" ? { text: item.text } : {},
+        custom: custom || existing.custom,
+        active: !blockedKeys.has(identity),
+        replaced: replacement || existing.replaced
+      });
+    } else {
+      map.set(identity, {
+        ...entry,
+        order: item.order ?? 0,
+        text: item.text ?? "",
+        active: !blockedKeys.has(identity),
+        replaced: replacement,
+        custom
+      });
+    }
+  }
+  return [...map.values()].sort((left, right) => left.order - right.order || left.name.localeCompare(right.name)).map((section, index) => ({ ...section, order: index }));
 }
 function resolveChain(list) {
-  const afterMap = /* @__PURE__ */ new Map();
-  for (const sec of list) afterMap.set(sec.name, sec.after);
+  const byKey = /* @__PURE__ */ new Map();
+  for (const item of list) {
+    const entry = normalizeEntry(item);
+    if (entry === void 0) continue;
+    byKey.set(entryKey(entry), { ...item, ...entry });
+  }
   const result = [];
   const placed = /* @__PURE__ */ new Set();
-  for (const sec of list) {
-    const anchor = afterMap.get(sec.name);
-    if (!anchor || !afterMap.has(anchor)) {
-      result.push(sec.name);
-      placed.add(sec.name);
-    }
+  const insert = (item) => {
+    const entry = normalizeEntry(item);
+    if (entry === void 0) return;
+    const identity = entryKey(entry);
+    if (placed.has(identity)) return;
+    placed.add(identity);
+    result.push({ ...entry, text: item.text, custom: item.custom });
+  };
+  for (const item of byKey.values()) {
+    if (item.after === void 0 || item.after === "" || !byKey.has(item.after)) insert(item);
   }
   let changed = true;
   while (changed) {
     changed = false;
-    for (const sec of list) {
-      if (placed.has(sec.name)) continue;
-      const anchor = afterMap.get(sec.name);
-      if (anchor && placed.has(anchor)) {
-        result.splice(result.indexOf(anchor) + 1, 0, sec.name);
-        placed.add(sec.name);
+    for (const item of byKey.values()) {
+      const entry = normalizeEntry(item);
+      if (entry === void 0) continue;
+      const identity = entryKey(entry);
+      if (placed.has(identity)) continue;
+      const anchor = item.after;
+      if (anchor !== void 0 && placed.has(anchor)) {
+        const anchorIndex = result.findIndex((candidate) => entryKey(candidate) === anchor);
+        result.splice(anchorIndex + 1, 0, { ...entry, text: item.text, custom: item.custom });
+        placed.add(identity);
         changed = true;
       }
     }
   }
-  for (const sec of list) {
-    if (!placed.has(sec.name)) {
-      result.push(sec.name);
-      placed.add(sec.name);
-    }
-  }
+  for (const item of byKey.values()) insert(item);
   return result;
 }
 function resolveOrder(presetOrder) {
-  const list = presetOrder ?? [];
-  const groups = /* @__PURE__ */ new Map([["always", []]]);
-  for (const sec of list) {
-    const phase = sec.phase ?? "always";
+  const groups = /* @__PURE__ */ new Map();
+  for (const item of presetOrder ?? []) {
+    const phase = item.phase ?? "always";
     const group = groups.get(phase);
-    if (group) group.push(sec);
-    else groups.set(phase, [sec]);
+    if (group === void 0) groups.set(phase, [item]);
+    else group.push(item);
   }
   const out = [];
-  for (const [phase, members] of groups) {
-    const textMap = new Map(members.map((x) => [x.name, x.text ?? ""]));
-    const customMap = new Map(members.map((x) => [x.name, x.custom === true]));
-    const names = resolveChain(members);
-    out.push(...names.map((name, i) => phase === "always" ? { name, order: i, text: textMap.get(name) ?? "", custom: customMap.get(name) } : { name, order: i, text: textMap.get(name) ?? "", custom: customMap.get(name), phase }));
+  for (const phase of ["always", ...PHASE_KEYS]) {
+    const members = groups.get(phase);
+    if (members === void 0) continue;
+    resolveChain(members).forEach((entry, index) => {
+      out.push({
+        name: entry.name,
+        ...entry.source === void 0 ? {} : { source: entry.source },
+        order: index,
+        text: entry.text ?? "",
+        custom: entry.custom === true,
+        ...phase === "always" ? {} : { phase }
+      });
+    });
   }
   return out;
 }
-function applyPresetData(data, cfg, currentNames) {
-  const presetOrder = data.order ?? [];
-  const presetNames = new Set(presetOrder.map((x) => x.name));
-  const blocked = new Set((data.sections ?? []).filter((n) => currentNames.has(n)));
-  const inject2 = resolveOrder(presetOrder.filter((x) => currentNames.has(x.name)));
-  const kept = new Set(inject2.map((x) => x.name));
-  let order = inject2.length;
-  for (const item of cfg.inject ?? []) {
-    if (!item || !item.name || presetNames.has(item.name) || kept.has(item.name)) continue;
-    kept.add(item.name);
-    inject2.push({ name: item.name, order: order++, text: item.text ?? "", custom: item.custom === true });
+function reindexInject(entries) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const item of entries) {
+    const phase = item.phase ?? "always";
+    const group = groups.get(phase);
+    if (group === void 0) groups.set(phase, /* @__PURE__ */ new Map([[entryKey(item), item]]));
+    else group.set(entryKey(item), item);
   }
-  if (presetOrder.length > 0) {
-    const activeNames = new Set([...presetNames].filter((n) => !blocked.has(n)));
-    for (const name of currentNames) if (!presetNames.has(name)) blocked.add(name);
-    for (const name of activeNames) blocked.delete(name);
-  }
-  const keptCatalogs = {};
-  const bootstrap = data.tools?.bootstrap !== void 0 ? data.tools.bootstrap : cfg.tools?.bootstrap;
-  const compaction = data.tools?.compaction !== void 0 ? data.tools.compaction : cfg.tools?.compaction;
-  if (bootstrap !== void 0) keptCatalogs.bootstrap = bootstrap;
-  if (compaction !== void 0) keptCatalogs.compaction = compaction;
-  const patch = {
-    sections: [...blocked],
-    replace: { ...cfg.replace ?? {}, ...data.replace ?? {} },
-    inject: inject2,
-    tools: {
-      exclude: data.tools?.exclude ?? [],
-      ...keptCatalogs
+  const out = [];
+  for (const phase of ["always", ...PHASE_KEYS]) {
+    const group = groups.get(phase);
+    if (group === void 0) continue;
+    let order = 0;
+    for (const item of group.values()) {
+      out.push({
+        name: item.name,
+        ...item.source === void 0 ? {} : { source: item.source },
+        order: order++,
+        text: item.text ?? "",
+        custom: item.custom === true,
+        ...phase === "always" ? {} : { phase }
+      });
     }
-  };
-  if (Array.isArray(data.sectionsBootstrap)) patch.sectionsBootstrap = data.sectionsBootstrap;
-  if (Array.isArray(data.sectionsCompaction)) patch.sectionsCompaction = data.sectionsCompaction;
-  return patch;
+  }
+  return out;
 }
-var PART_ORDER = ["bootstrap", "active", "compaction"];
-function phaseConfigKey(key) {
-  return key === "active" ? "static" : key;
+function mergeReplacements(base, incoming) {
+  const map = /* @__PURE__ */ new Map();
+  for (const item of base ?? []) map.set(`${item.phase ?? "always"}\0${entryKey(item)}`, item);
+  for (const item of incoming ?? []) map.set(`${item.phase ?? "always"}\0${entryKey(item)}`, item);
+  return [...map.values()];
+}
+function mergeToolsSnapshot(base, snapshot) {
+  const out = normalizeToolsConfig(base);
+  if (snapshot === void 0) return out;
+  if (Array.isArray(snapshot.exclude)) out.exclude = [...snapshot.exclude];
+  if (Array.isArray(snapshot.add)) out.add = [...snapshot.add];
+  for (const phase of PHASES) {
+    if (phase.toolField === void 0) continue;
+    const incoming = snapshot[phase.toolField];
+    if (incoming === void 0) continue;
+    const current2 = out[phase.toolField] ?? {};
+    out[phase.toolField] = {
+      exclude: incoming.exclude !== void 0 ? [...incoming.exclude] : current2.exclude,
+      add: incoming.add !== void 0 ? [...incoming.add] : current2.add
+    };
+  }
+  return out;
+}
+function applyPresetData(data, cfg, current2) {
+  const mapCurrent = current2 instanceof Map ? current2 : void 0;
+  const entryOf2 = (identity) => mapCurrent?.get(identity) ?? { name: identity };
+  const currentKeys = mapCurrent === void 0 ? current2 : new Set(mapCurrent.keys());
+  const presetOrder = data.order ?? [];
+  const presetKeys = new Set(presetOrder.map((item) => entryKey(item)));
+  const known = /* @__PURE__ */ new Map();
+  const remember = (entry) => {
+    const normalized = normalizeEntry(entry);
+    if (normalized !== void 0) known.set(entryKey(normalized), normalized);
+  };
+  for (const entry of data.sections ?? []) remember(entry);
+  for (const entry of presetOrder) remember(entry);
+  for (const entry of cfg.sections ?? []) remember(entry);
+  for (const entry of cfg.sectionsBootstrap ?? []) remember(entry);
+  for (const entry of cfg.sectionsCompaction ?? []) remember(entry);
+  for (const item of cfg.inject ?? []) remember(item);
+  if (mapCurrent !== void 0) for (const entry of mapCurrent.values()) remember(entry);
+  const blocked = /* @__PURE__ */ new Set();
+  for (const entry of data.sections ?? []) {
+    const identity = entryKey(entry);
+    if (currentKeys.has(identity)) blocked.add(identity);
+  }
+  const inject2 = resolveOrder(presetOrder.filter((item) => currentKeys.has(entryKey(item))));
+  const kept = new Set(inject2.map((item) => entryKey(item)));
+  for (const item of cfg.inject ?? []) {
+    const identity = entryKey(item);
+    if (identity === "" || presetKeys.has(identity) || kept.has(identity)) continue;
+    kept.add(identity);
+    inject2.push(item);
+  }
+  const finalInject = reindexInject(inject2);
+  if (presetOrder.length > 0) {
+    const active = new Set([...presetKeys].filter((identity) => !blocked.has(identity)));
+    for (const identity of currentKeys) if (!presetKeys.has(identity)) blocked.add(identity);
+    for (const identity of active) blocked.delete(identity);
+  }
+  const patch = {
+    sections: [...blocked].map((identity) => known.get(identity) ?? entryOf2(identity)),
+    replacements: mergeReplacements(cfg.replacements, data.replacements),
+    inject: finalInject,
+    tools: mergeToolsSnapshot(cfg.tools, data.tools)
+  };
+  for (const phase of PHASES) {
+    const sectionList = data[phase.sectionField];
+    const contextList = data[phase.contextField];
+    if (Array.isArray(sectionList)) patch[phase.sectionField] = [...sectionList];
+    if (Array.isArray(contextList)) patch[phase.contextField] = [...contextList];
+  }
+  return patch;
 }
 function withPhaseExclude(tools, key, exclude) {
   const base = tools ?? {};
-  const target = phaseConfigKey(key);
-  if (target === "bootstrap") return { ...base, bootstrap: { ...base.bootstrap ?? {}, exclude } };
-  if (target === "compaction") return { ...base, compaction: { ...base.compaction ?? {}, exclude } };
-  return { ...base, exclude };
+  const field = toolFieldOf(key);
+  if (field === "static") return { ...base, exclude };
+  return { ...base, [field]: { ...base[field] ?? {}, exclude } };
 }
 function withPhaseAdd(tools, key, add) {
   const base = tools ?? {};
-  const target = phaseConfigKey(key);
-  if (target === "bootstrap") return { ...base, bootstrap: { ...base.bootstrap ?? {}, add } };
-  if (target === "compaction") return { ...base, compaction: { ...base.compaction ?? {}, add } };
-  return { ...base, add };
+  const field = toolFieldOf(key);
+  if (field === "static") return { ...base, add };
+  return { ...base, [field]: { ...base[field] ?? {}, add } };
 }
 function overrideView(cfg, ovr) {
   const o = ovr ?? {};
   return {
-    sections: o.sections ?? [],
-    sectionsBootstrap: o.sectionsBootstrap ?? [],
-    sectionsCompaction: o.sectionsCompaction ?? [],
-    replace: o.replace ?? {},
-    inject: o.inject ?? [],
-    tools: {
-      exclude: o.tools?.exclude ?? [],
-      add: o.tools?.add ?? [],
-      bootstrap: o.tools?.bootstrap,
-      compaction: o.tools?.compaction
-    },
+    ...phaseFieldValues(o),
+    replacements: [...o.replacements ?? []],
+    inject: [...o.inject ?? []],
+    tools: normalizeToolsConfig(o.tools),
     presets: cfg.presets,
-    activePreset: cfg.activePreset
+    activePreset: cfg.activePreset,
+    // 全局开关 / 黑名单不经 override：显示与写入都落在顶层，避免面板显示成默认值。
+    forceSections: cfg.forceSections,
+    envBlocklist: cfg.envBlocklist
   };
 }
 function editView(cfg, target) {
@@ -1758,423 +2135,19 @@ function presetExportFilename(name) {
 }
 function addImportedPresets(existing, parsed, makeId) {
   const incoming = Array.isArray(parsed) ? parsed : [parsed];
-  const existingNames = new Set(existing.map((p) => p.name));
-  const added = incoming.filter((p) => p && typeof p.name === "string" && !existingNames.has(p.name)).map((p) => ({ id: makeId(), name: p.name, data: p.data ?? {} }));
+  const existingNames = new Set(existing.map((preset) => preset.name));
+  const added = incoming.filter((preset) => preset && typeof preset.name === "string" && !existingNames.has(preset.name)).map((preset) => ({ id: makeId(), name: preset.name, data: preset.data ?? {} }));
   return added.length > 0 ? [...existing, ...added] : existing;
 }
 function removePreset(presets, id, activeId) {
   return {
-    presets: presets.filter((p) => p.id !== id),
+    presets: presets.filter((preset) => preset.id !== id),
     activeId: activeId === id ? void 0 : activeId
   };
 }
 function genId() {
   return "p_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
-
-// vendor/prompt-customizer/sectionOps.mjs
-function sectionListOf(key) {
-  return key === "bootstrap" ? "bootstrap" : key === "compaction" ? "compaction" : "global";
-}
-function injectPhaseOf(key) {
-  return key === "bootstrap" ? "bootstrap" : key === "active" ? "active" : "compaction";
-}
-function acceptsInjectFor(key, phase) {
-  if (phase === "always") return true;
-  return phase === key;
-}
-function deniedNames(cfg, key) {
-  const list = sectionListOf(key);
-  return list === "bootstrap" ? cfg.sectionsBootstrap ?? [] : list === "compaction" ? cfg.sectionsCompaction ?? [] : cfg.sections ?? [];
-}
-function injectedAt(cfg, key) {
-  const phase = injectPhaseOf(key);
-  const names = /* @__PURE__ */ new Set();
-  const custom = /* @__PURE__ */ new Set();
-  const text = /* @__PURE__ */ new Map();
-  const order = /* @__PURE__ */ new Map();
-  for (const item of cfg.inject ?? []) {
-    if (item === null || typeof item !== "object" || typeof item.name !== "string") continue;
-    const itemPhase = item.phase ?? "always";
-    if (itemPhase === phase) order.set(item.name, item.order ?? 0);
-    if (!acceptsInjectFor(key, itemPhase)) continue;
-    names.add(item.name);
-    if (item.text && !text.has(item.name)) text.set(item.name, item.text);
-    if (item.custom === true) custom.add(item.name);
-  }
-  return { phase, names, custom, text, order };
-}
-function blockPatch(cfg, key, name, blocked) {
-  const list = sectionListOf(key);
-  const field = list === "bootstrap" ? "sectionsBootstrap" : list === "compaction" ? "sectionsCompaction" : "sections";
-  const cur = (cfg[field] ?? []).slice();
-  const i = cur.indexOf(name);
-  if (blocked) {
-    if (i >= 0) return {};
-    cur.push(name);
-  } else {
-    if (i < 0) return {};
-    cur.splice(i, 1);
-  }
-  return { [field]: cur };
-}
-function reorderInsert(rows, dragName, targetName, pos, newRow = null) {
-  const base = rows.filter((row) => row.name !== dragName);
-  const idx = base.findIndex((row) => row.name === targetName);
-  if (idx < 0) return null;
-  const insertAt = Math.max(0, Math.min(pos === "above" ? idx : idx + 1, base.length));
-  const entry = newRow ?? rows.find((row) => row.name === dragName);
-  if (!entry) return null;
-  base.splice(insertAt, 0, entry);
-  return base;
-}
-function phaseInjectEntries(cfg, key, rows) {
-  const phase = injectPhaseOf(key);
-  const others = (cfg.inject ?? []).filter((item) => (item.phase ?? "always") !== phase);
-  const entries = rows.map((row, i) => ({
-    name: row.name,
-    order: i,
-    text: row.override || (row.custom ? row.text ?? "" : ""),
-    phase,
-    custom: row.custom
-  }));
-  return [...others, ...entries];
-}
-function mergedPhaseInjectEntries(cfg, rowsByKey) {
-  const always = (cfg.inject ?? []).filter((item) => (item.phase ?? "always") === "always");
-  const entries = ["bootstrap", "active", "compaction"].flatMap((key) => {
-    const phase = injectPhaseOf(key);
-    return (rowsByKey[key] ?? []).map((row, i) => ({
-      name: row.name,
-      order: i,
-      text: row.override || (row.custom ? row.text ?? "" : ""),
-      phase,
-      custom: row.custom
-    }));
-  });
-  return [...always, ...entries];
-}
-var MIRROR_KEYS = ["active", "bootstrap", "compaction"];
-function mirrorText(row, native) {
-  if (row.custom === true) return row.override || (row.text ?? "");
-  if (row.override !== "") return row.override;
-  if (native === true) return "";
-  const text = row.text ?? "";
-  return text === "" || text.startsWith("<") ? "" : text;
-}
-function mirroredRows(cfg, views, nativeOf) {
-  const picked = /* @__PURE__ */ new Map();
-  const order = [];
-  for (const key of MIRROR_KEYS) {
-    for (const row of phaseRows(cfg, views?.[key] ?? null, key)) {
-      const native = nativeOf?.(key, row.name) === true;
-      const cur = picked.get(row.name);
-      if (cur === void 0) {
-        picked.set(row.name, { row, native });
-        order.push(row.name);
-      } else if (cur.native !== true && native) {
-        picked.set(row.name, { row, native });
-      }
-    }
-  }
-  return order.map((name) => picked.get(name).row);
-}
-function mirrorPhaseInjectEntries(cfg, rows, nativeOf) {
-  const names = new Set(rows.map((row) => row.name));
-  const always = (cfg.inject ?? []).filter((item) => (item.phase ?? "always") === "always" && names.has(item.name));
-  const entries = [];
-  for (const key of MIRROR_KEYS) {
-    const phase = injectPhaseOf(key);
-    let order = 0;
-    for (const row of rows) {
-      const native = nativeOf === void 0 ? false : nativeOf(key, row.name);
-      if (native === null || native === void 0) continue;
-      const text = mirrorText(row, native);
-      if (native !== true && text === "") continue;
-      entries.push({ name: row.name, order: order++, text, phase, custom: row.custom === true });
-    }
-  }
-  return [...always, ...entries];
-}
-function mirrorSkippedNames(rows, nativeOf) {
-  const skipped = /* @__PURE__ */ new Set();
-  for (const key of MIRROR_KEYS) {
-    for (const row of rows) {
-      const native = nativeOf?.(key, row.name);
-      if (native === null || native === void 0 || native === true) continue;
-      if (mirrorText(row, false) === "") skipped.add(row.name);
-    }
-  }
-  return [...skipped];
-}
-function mirroredDeniedLists(rows) {
-  const blocked = rows.filter((row) => row.blocked === true).map((row) => row.name);
-  return { sections: blocked, sectionsBootstrap: [...blocked], sectionsCompaction: [...blocked] };
-}
-function phaseRows(cfg, view, key) {
-  const replace = cfg.replace ?? {};
-  const denied = new Set(deniedNames(cfg, key));
-  const postByName = new Map((view?.sections ?? []).map((sec) => [sec.name, sec]));
-  const baseByName = new Map((view?.baseSections ?? []).map((sec) => [sec.name, sec]));
-  const { phase, names: injectedHere, custom: customNames, text, order: phaseOrder } = injectedAt(cfg, key);
-  const names = [];
-  const seen = /* @__PURE__ */ new Set();
-  const push = (name) => {
-    if (!seen.has(name)) {
-      seen.add(name);
-      names.push(name);
-    }
-  };
-  for (const sec of view?.baseSections ?? []) {
-    if (postByName.has(sec.name) || denied.has(sec.name) || sec.blocked === true) push(sec.name);
-  }
-  for (const name of postByName.keys()) {
-    if (baseByName.has(name) || injectedHere.has(name)) push(name);
-  }
-  for (const item of cfg.inject ?? []) {
-    if (item === null || typeof item !== "object" || typeof item.name !== "string") continue;
-    if ((item.phase ?? "always") !== phase) continue;
-    if (item.custom === true || text.get(item.name) || baseByName.has(item.name) || postByName.has(item.name)) push(item.name);
-  }
-  for (const name of customNames) push(name);
-  const rows = names.map((name) => {
-    const override = text.get(name) ?? "";
-    return {
-      name,
-      text: postByName.get(name)?.text ?? baseByName.get(name)?.text ?? "",
-      replaced: override !== "" || Object.hasOwn(replace, name),
-      custom: customNames.has(name),
-      override,
-      blocked: denied.has(name)
-    };
-  });
-  if (phaseOrder.size > 0) {
-    const fallback = new Map(rows.map((row, i) => [row.name, i]));
-    rows.sort((a, b) => (phaseOrder.get(a.name) ?? fallback.get(a.name) ?? 0) - (phaseOrder.get(b.name) ?? fallback.get(b.name) ?? 0));
-  }
-  return rows;
-}
-function zhMergedInjectEntries(cfg, views, zhMap) {
-  const patched = {};
-  for (const key of ["bootstrap", "active", "compaction"]) {
-    patched[key] = phaseRows(cfg, views?.[key] ?? null, key).map((row) => {
-      if (row.custom) return row;
-      const entry = zhMap?.[row.name];
-      if (entry === void 0) return row;
-      const zh = typeof entry === "function" ? entry(row.text) : entry;
-      return zh ? { ...row, override: zh, text: zh } : row;
-    });
-  }
-  return mergedPhaseInjectEntries(cfg, patched);
-}
-function zhRevertInjectEntries(cfg, views, zhMap) {
-  const patched = {};
-  for (const key of ["bootstrap", "active", "compaction"]) {
-    patched[key] = phaseRows(cfg, views?.[key] ?? null, key).map((row) => {
-      if (row.custom || row.override === "" || zhMap?.[row.name] === void 0) return row;
-      return { ...row, override: "", text: "" };
-    });
-  }
-  return mergedPhaseInjectEntries(cfg, patched);
-}
-function zhApplied(cfg, zhMap) {
-  for (const item of cfg?.inject ?? []) {
-    if (item === null || typeof item !== "object" || typeof item.name !== "string") continue;
-    const zh = zhMap?.[item.name];
-    if (typeof zh === "string" && zh !== "" && item.text === zh) return true;
-  }
-  return false;
-}
-
-// vendor/prompt-customizer/zh/core.mjs
-var CORE = {
-  "harness:identity": `\u4F60\u662F\u4E00\u4E2A\u7531 DeepSeek Harness \u9A71\u52A8\u7684 AI \u667A\u80FD\u4F53\u3002`,
-  "harness:source": `DeepSeek Harness \u7684\u5B9E\u73B0\u4EE3\u7801\u68C0\u51FA\u4F4D\u4E8E C:\\nvm\\v22.22.0\\node_modules\\@deepseek-ai\\dsh\\\u3002\u68C0\u51FA\u4F4D\u7F6E\u4E0E\u5F53\u524D\u5DE5\u4F5C\u76EE\u5F55\u662F\u4E24\u4E2A\u72EC\u7ACB\u7684\u503C\uFF0C\u53EF\u80FD\u4E0D\u540C\uFF1B\u7EDD\u4E0D\u8981\u6839\u636E\u8BE5\u8DEF\u5F84\u63A8\u65AD\u5DE5\u4F5C\u76EE\u5F55\u3002\u8BF7\u7528 pwd \u786E\u5B9A\u5F53\u524D\u5DE5\u4F5C\u76EE\u5F55\u3002\u8BE5\u68C0\u51FA\u53EA\u7528\u4E8E\u67E5\u770B\u6216\u6269\u5C55 DSH \u672C\u8EAB\u3002`,
-  "app:web-surface": `\u4F60\u6B63\u5728\u901A\u8FC7 DeepSeek Harness \u7684 Web \u56FE\u5F62\u754C\u9762\uFF08http://127.0.0.1:3080\uFF09\u4E0E\u7528\u6237\u4EA4\u4E92\u3002\u5F53\u7528\u6237\u63D0\u5230\u300C\u8FD9\u4E2A\u9875\u9762\u300D\u300C\u8FD9\u4E2A GUI\u300D\u300C\u8FD9\u4E2A\u5E94\u7528\u300D\u800C\u6CA1\u6709\u6307\u540D\u5176\u4ED6\u76EE\u6807\u65F6\uFF0C\u6307\u7684\u5C31\u662F\u8FD9\u4E2A GUI\u3002\u6D4F\u89C8\u5668\u4E0D\u63D0\u4F9B\u4EFB\u4F55\u9690\u5F0F\u7684 DOM\u3001\u8DEF\u7531\u6216\u622A\u56FE\u4E0A\u4E0B\u6587\u3002\u5BA2\u6237\u7AEF\u63D2\u4EF6\u7684 HMR \u63A5\u6536\u5668\u5904\u4E8E\u6FC0\u6D3B\u72B6\u6001\uFF0C\u4F46\u53EA\u6709\u5F53 \`pnpm run dev:web\` \u4E5F\u5728\u540C\u4E00\u68C0\u51FA\u91CC\u8FD0\u884C\u4EE5\u91CD\u5EFA\u5176\u5305\u65F6\uFF0C\u5BA2\u6237\u7AEF\u63D2\u4EF6\u7684\u6539\u52A8\u624D\u80FD\u514D\u5237\u65B0\u91CD\u8F7D\uFF1B\u5728\u627F\u8BFA\u81EA\u52A8\u66F4\u65B0\u4E4B\u524D\uFF0C\u5148\u786E\u8BA4\u8BE5\u76D1\u89C6\u8FDB\u7A0B\u5728\u8FD0\u884C\u3002\u5176\u4ED6\u4EFB\u4F55\u6539\u52A8 \u2014\u2014 apps/web \u5916\u58F3\u4E0E\u666E\u901A\u5305 \u2014\u2014 \u90FD\u9700\u8981\u91CD\u65B0\u6784\u5EFA\u53D7\u5F71\u54CD\u7684 Web \u4EA7\u7269\uFF0C\u5E76\u5728\u9875\u9762\u5237\u65B0\u540E\u7528\u8FD9\u4E2A\u65E2\u6709 URL \u9A8C\u8BC1\u3002\u53E6\u8D77\u4E00\u4E2A\u670D\u52A1\u5668\u4E0D\u4F1A\u66F4\u65B0\u8FD9\u4E2A GUI\u3002apps/web \u7684 Vite \u5165\u53E3\u53EA\u6784\u5EFA\u5916\u58F3\uFF0C\u4E0D\u662F\u72EC\u7ACB\u5E94\u7528\uFF0C\u56E0\u4E3A\u53EA\u6709 dsh web \u4F1A\u6CE8\u5165 window.__DSH_BOOT__\u3002\u9664\u975E\u7528\u6237\u8981\u6C42\uFF0C\u4E0D\u8981\u542F\u52A8\u66FF\u4EE3\u670D\u52A1\u5668\uFF1B\u786E\u6709\u5FC5\u8981\u65F6\uFF0C\u7528\u53D7\u7BA1\u540E\u53F0\u4F5C\u4E1A\u8FD0\u884C\uFF0C\u5E76\u6838\u5B9E\u5176\u786E\u5207 URL\u3002`,
-  "deployment:persona": `\u4F60\u662F\u4E00\u4E2A\u7531 {{model}} \u6A21\u578B\u9A71\u52A8\u7684\u7F16\u7801\u667A\u80FD\u4F53\u3002\u4F60\u7684\u5DE5\u4F5C\u76EE\u5F55\u662F {{cwd}}\u3002`,
-  "tool:read": `\u4F7F\u7528 read \u5DE5\u5177\uFF08\u800C\u4E0D\u662F cat \u4E4B\u7C7B\u7684 shell \u547D\u4EE4\uFF09\u67E5\u770B\u6587\u672C\u6587\u4EF6\u3002\u7ED3\u679C\u5E26\u6709\u884C\u53F7\uFF1B\u5BF9\u5927\u6587\u4EF6\u53EF\u7528 offset \u4E0E limit \u7EE7\u7EED\u8BFB\u53D6\u3002`,
-  "tool:write": `\u4F7F\u7528 write \u5DE5\u5177\u65B0\u5EFA\u6587\u4EF6\u6216\u6574\u4F53\u66FF\u6362\u6587\u4EF6\u5185\u5BB9\u3002\u5DF2\u6709\u6587\u4EF6\u4F1A\u88AB\u8986\u76D6\uFF0C\u56E0\u6B64\u5148 read \u73B0\u6709\u6587\u4EF6\uFF08\u9ED8\u8BA4\u7684 fs-observation-policy \u6709\u6B64\u8981\u6C42\uFF09\uFF0C\u5E76\u4F18\u5148\u7528 edit \u505A\u9488\u5BF9\u6027\u4FEE\u6539\u3002`,
-  "tool:edit": `\u4F7F\u7528 edit \u5DE5\u5177\u5BF9\u73B0\u6709\u7684 UTF-8 \u6587\u672C\u6587\u4EF6\u505A\u9488\u5BF9\u6027\u4FEE\u6539\u3002\u5B83\u628A\u5B57\u9762\u91CF old_string \u66FF\u6362\u4E3A new_string\uFF1B\u9ED8\u8BA4\u8981\u6C42 old_string \u6070\u597D\u51FA\u73B0\u4E00\u6B21\u3002\u82E5 old_string \u51FA\u73B0\u591A\u6B21\uFF0C\u8BF7\u63D0\u4F9B\u66F4\u5177\u4F53\u7684 old_string\uFF0C\u6216\u5C06 replace_all \u8BBE\u4E3A true\u3002\u5148 read \u6587\u4EF6\uFF08\u9ED8\u8BA4\u7684 fs-observation-policy \u6709\u6B64\u8981\u6C42\uFF09\uFF0C\u9664\u975E\u4F60\u5728\u672C\u4F1A\u8BDD\u4E2D\u521A\u521B\u5EFA\u6216\u521A\u7F16\u8F91\u8FC7\u5B83\u3002`,
-  "tool:glob": `\u4F7F\u7528 glob \u5DE5\u5177\uFF08\u800C\u4E0D\u662F shell \u7684 find\uFF09\u6309\u8DEF\u5F84\u6A21\u5F0F\u53D1\u73B0\u6587\u4EF6\u3002\u4E0D\u542B "/" \u7684\u6A21\u5F0F\u5728\u4EFB\u610F\u6DF1\u5EA6\u5339\u914D\u57FA\u672C\u540D\uFF0C\u56E0\u6B64 "*" \u5339\u914D\u7684\u662F\u6574\u68F5\u6811\u91CC\u7684\u6BCF\u4E2A\u6587\u4EF6\uFF0C\u800C\u4E0D\u53EA\u662F\u9876\u5C42\u3002\u7ED3\u679C\u53EA\u542B\u6587\u4EF6\u3001\u7EDD\u4E0D\u542B\u76EE\u5F55\uFF0C\u4E14\u5305\u542B\u9690\u85CF\u4E0E\u88AB\u5FFD\u7565\u7684\u6587\u4EF6\uFF1A\u5B8C\u5168\u7B26\u5408\u7684\u7ED3\u679C\u6309\u4FEE\u6539\u65F6\u95F4\u987A\u5E8F\u8FD4\u56DE\uFF1B\u7ED3\u679C\u8D85\u91CF\u65F6\uFF0C\u4FDD\u7559\u6309\u4FEE\u6539\u65F6\u95F4\u6392\u5E8F\u7684\u524D\u7F00\u3002`,
-  "tool:grep": `\u4F7F\u7528 grep \u5DE5\u5177\uFF08\u800C\u4E0D\u662F shell \u7684 grep \u6216 rg\uFF09\u641C\u7D22\u6587\u4EF6\u5185\u5BB9\u3002\u9700\u8981\u4E0A\u4E0B\u6587\u65F6\uFF0C\u7528 read \u8BFB\u53D6\u5339\u914D\u5230\u7684\u6587\u4EF6\u3002`,
-  "tool:pwsh": `\u975E\u96F6\u9000\u51FA\u7801\u4F1A\u4EE5 \`[exit code: N]\` \u6807\u8BB0\u5448\u73B0\uFF1B\u7EE7\u7EED\u4E4B\u524D\u5148\u6392\u67E5\u5931\u8D25\u3002\u5728 Windows \u4E0A\uFF0C\u88AB\u6740\u6389\u7684\u8FDB\u7A0B\u4EE5 \`[exit code: 1]\` \u6536\u5C3E\u4E14\u6CA1\u6709\u4FE1\u53F7\u6807\u8BB0\uFF1B\u628A\u4E2D\u65AD\u4E4B\u540E\u7684\u88F8\u9000\u51FA\u7801 1 \u89C6\u4E3A\u8FDB\u7A0B\u88AB\u7EC8\u6B62\uFF0C\u800C\u4E0D\u662F\u547D\u4EE4\u5931\u8D25\u3002`,
-  "tool:jobs": `\u8DDF\u8E2A\u4F60\u542F\u52A8\u7684\u6BCF\u4E00\u4E2A\u540E\u53F0\u4F5C\u4E1A id\u3002\u4F5C\u4E1A\u5B8C\u6210\u65F6\u4F60\u4F1A\u5728\u4F1A\u8BDD\u5185\u6536\u5230\u901A\u77E5 \u2014\u2014 \u4E0D\u8981\u5FD9\u8F6E\u8BE2\u6216\u7A7A\u7B49\u67D0\u4E2A\u4F5C\u4E1A\uFF1B\u7EE7\u7EED\u505A\u72EC\u7ACB\u7684\u6B65\u9AA4\uFF0C\u4E0D\u8981\u91CD\u590D\u6B63\u5728\u8FD0\u884C\u7684\u4F5C\u4E1A\u7684\u5DE5\u4F5C\u3002\u7ED9\u51FA\u6700\u7EC8\u7B54\u590D\u4E4B\u524D\uFF0C\u7528 job_output \u6536\u96C6\u6BCF\u4E00\u4E2A\u4ECD\u7136\u76F8\u5173\u7684\u4F5C\u4E1A\uFF08\u53EA\u5728\u786E\u5B9E\u88AB\u5B83\u963B\u585E\u65F6\u624D\u8BBE wait: true\uFF09\uFF0C\u5E76\u7528 job_kill \u7EC8\u6B62\u5DF2\u7ECF\u4E0D\u518D\u8981\u7D27\u7684\u4F5C\u4E1A\u3002`,
-  "tool:web_search": `\u4F7F\u7528 web_search \u5DE5\u5177\u5728\u7F51\u7EDC\u4E0A\u53D1\u73B0\u6700\u65B0\u4FE1\u606F\u3002\u5FC5\u586B\u7684 queries \u6570\u7EC4\u63A5\u53D7 1\u20134 \u6761\u975E\u7A7A\u641C\u7D22\u67E5\u8BE2\uFF1B\u5355\u6B21\u641C\u7D22\u7528\u53EA\u542B\u4E00\u9879\u7684\u6570\u7EC4\u3002\u5B83\u8FD4\u56DE\u4E00\u4E2A\u53EF\u9009\u7684 answer \u548C\u4E00\u4EFD\u6765\u6E90 URL \u5217\u8868\u3002\u6709\u6765\u6E90\u6458\u8981\u65F6\u5C3D\u91CF\u4F7F\u7528\uFF0C\u5E76\u4EE5 Markdown \u94FE\u63A5\u7684\u5F62\u5F0F\u5F15\u7528\u76F8\u5173 URL\u3002`,
-  "tool:web_fetch": `\u4F7F\u7528 web_fetch \u5DE5\u5177\u83B7\u53D6\u7279\u5B9A HTTP(S) URL \u7684\u5185\u5BB9\uFF08\u4F8B\u5982\u6765\u81EA web_search \u7684\u67D0\u6761\u7ED3\u679C\uFF09\u3002\u5B83\u8FD4\u56DE\u89E3\u7801\u4E3A\u6587\u672C\u7684\u9875\u9762\u5185\u5BB9\u3002\u4F7F\u7528\u5176\u5185\u5BB9\u65F6\uFF0C\u4EE5 Markdown \u94FE\u63A5\u7684\u5F62\u5F0F\u5F15\u7528\u8BE5 URL\u3002`,
-  "tool:goal": `goal \u5DE5\u5177\u7528\u4E8E\u5F53\u524D\u4F1A\u8BDD\u4E2D\u7684\u4E00\u4E2A\u957F\u671F\u8FD0\u884C\u7684\u5B8C\u6210\u76EE\u6807\u3002create_goal \u53EF\u4EE5\u4ECE\u4EFB\u4F55\u8BED\u8A00\u7684\u76F4\u63A5\u4EBA\u7C7B\u8BF7\u6C42\u4E2D\u63A8\u65AD\u76EE\u6807\u610F\u56FE\uFF1B\u5E38\u89C4\u7684\u5355\u8F6E\u5DE5\u4F5C\u4E0D\u8981\u521B\u5EFA\u76EE\u6807\u3002\u8C03\u7528 update_goal \u4E4B\u524D\u5148\u8C03\u7528 get_goal\uFF0C\u5E76\u9010\u5B57\u590D\u5236\u5B83\u7684 goal_id \u4E0E revision\u3002\u4F1A\u8BDD\u6062\u590D\u6216 fork \u4E4B\u540E\uFF0C\u6D3B\u8DC3\u76EE\u6807\u4F1A\u88AB\u89E3\u9664\u6B66\u88C5\uFF1A\u5F53\u4EBA\u7C7B\u4EE5\u4EFB\u4F55\u63AA\u8F9E\u3001\u4EFB\u4F55\u8BED\u8A00\u8981\u6C42\u7EE7\u7EED\u6216\u6062\u590D\u65F6\uFF0C\u7528 update_goal \u7684 resume \u52A8\u4F5C\u91CD\u65B0\u6B66\u88C5\u5B83\u3002\u53EA\u6709\u76EE\u6807\u771F\u6B63\u8FBE\u6210\u624D\u6807\u8BB0 complete\u3002\u540C\u4E00\u4E2A\u963B\u585E\u6761\u4EF6\u81F3\u5C11\u8FDE\u7EED 3 \u4E2A\u76EE\u6807\u8F6E\u6B21\u4ECD\u672A\u89E3\u9664\uFF0C\u624D\u53EF\u6807\u8BB0 blocked\uFF0C\u5E76\u5728 blocked_reason \u91CC\u5199\u660E\u90A3\u4E2A\u5177\u4F53\u6761\u4EF6\uFF1B\u56F0\u96BE\u3001\u4E0D\u786E\u5B9A\u6216\u8FD8\u6709\u5269\u4F59\u5DE5\u4F5C\u90FD\u4E0D\u7B97\u963B\u585E\u3002`,
-  "tool:workflow": `\u53EA\u6709\u5F53\u7528\u6237\u660E\u786E\u8981\u6C42 workflow \u6216\u5927\u89C4\u6A21\u591A\u667A\u80FD\u4F53\u7F16\u6392\u65F6\uFF0C\u624D\u4F7F\u7528 workflow \u5DE5\u5177\uFF1A\u4F60\u7F16\u5199\u4E00\u4E2A JavaScript \u811A\u672C\uFF08\u5DE5\u5177\u63CF\u8FF0\u91CC\u5199\u660E\u786E\u5207\u683C\u5F0F\uFF09\uFF0C\u628A\u5DE5\u4F5C\u6247\u51FA\u5230\u5927\u91CF\u5B50\u667A\u80FD\u4F53\uFF0C\u5E26\u9636\u6BB5\u4E0E\u7ED3\u6784\u5316\u7ED3\u679C\u3002\u53EA\u6709\u4E00\u4E24\u6B21\u59D4\u6D3E\u65F6\uFF0C\u4F18\u5148\u7528\u666E\u901A\u7684 subagent \u8C03\u7528\u3002`,
-  "tool:ralph": `\u53EA\u6709\u5F53\u76F4\u63A5\u4EBA\u7C7B\u660E\u786E\u8981\u6C42 Ralph \u5FAA\u73AF\u6216\u5168\u65B0\u667A\u80FD\u4F53\u8FED\u4EE3\u6267\u884C\u65F6\uFF0C\u624D\u4F7F\u7528 ralph \u5DE5\u5177\u3002\u6BCF\u4E00\u8F6E Ralph \u90FD\u542F\u52A8\u4E00\u4E2A\u4E0D\u5E26\u5BF9\u8BDD\u79CD\u5B50\u7684\u5168\u65B0\u5B50\u667A\u80FD\u4F53\uFF0C\u5E76\u628A\u5171\u4EAB\u5DE5\u4F5C\u533A\u5F53\u4F5C\u6301\u4E45\u8BB0\u5FC6\u3002\u5B8C\u6210\u4E0E\u963B\u585E\u53EA\u662F worker \u7684\u62A5\u544A\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8BC4\u4F30\u3002\u666E\u901A\u7684\u957F\u76EE\u6807\u7528\u540C\u4F1A\u8BDD\u7684 goal \u5DE5\u5177\uFF1B\u6709\u8FB9\u754C\u7684\u59D4\u6D3E\u4E0E\u6247\u51FA\u7528\u666E\u901A subagent \u6216 workflow\u3002`,
-  "tool:subagent": `\u9ED8\u8BA4\u5728\u540E\u53F0\u4F7F\u7528 subagent\u3002\u628A\u76F8\u4E92\u72EC\u7ACB\u7684\u59D4\u6D3E\u653E\u5728\u540C\u4E00\u6761\u52A9\u624B\u6D88\u606F\u91CC\u4E00\u8D77\u542F\u52A8\uFF0C\u5E76\u5728\u5B83\u4EEC\u8FD0\u884C\u671F\u95F4\u7EE7\u7EED\u505A\u6709\u7528\u7684\u5DE5\u4F5C\u3002\u53EA\u6709\u5F53\u4F60\u7684\u4E0B\u4E00\u6B65\u52A8\u4F5C\u4F9D\u8D56\u8BE5 subagent \u7684\u7ED3\u679C\u65F6\uFF0C\u624D\u8BBE \`run_in_background: false\`\u3002\u540E\u53F0\u8FD0\u884C\u5C18\u57C3\u843D\u5B9A\u65F6\uFF0C\u8FD0\u884C\u65F6\u4F1A\u5411\u4F60\u53D1\u9001\u4E00\u6761\u901A\u77E5\uFF0C\u5185\u542B\u5176\u7ED3\u679C\u4E0E\u6700\u540E\u4E00\u6761\u52A9\u624B\u6D88\u606F\u3002`,
-  "tool:subagent_fork": `\u9ED8\u8BA4\u5728\u540E\u53F0\u4F7F\u7528 subagent_fork\u3002\u628A\u76F8\u4E92\u72EC\u7ACB\u7684\u59D4\u6D3E\u653E\u5728\u540C\u4E00\u6761\u52A9\u624B\u6D88\u606F\u91CC\u4E00\u8D77\u542F\u52A8\uFF0C\u5E76\u5728\u5B83\u4EEC\u8FD0\u884C\u671F\u95F4\u7EE7\u7EED\u505A\u6709\u7528\u7684\u5DE5\u4F5C\u3002\u53EA\u6709\u5F53\u4F60\u7684\u4E0B\u4E00\u6B65\u52A8\u4F5C\u4F9D\u8D56\u8BE5 subagent_fork \u7684\u7ED3\u679C\u65F6\uFF0C\u624D\u8BBE \`run_in_background: false\`\u3002\u540E\u53F0\u8FD0\u884C\u5C18\u57C3\u843D\u5B9A\u65F6\uFF0C\u8FD0\u884C\u65F6\u4F1A\u5411\u4F60\u53D1\u9001\u4E00\u6761\u901A\u77E5\uFF0C\u5185\u542B\u5176\u7ED3\u679C\u4E0E\u6700\u540E\u4E00\u6761\u52A9\u624B\u6D88\u606F\u3002`,
-  "ui:file-review-references": `\u5F53\u4F60\u6210\u529F\u521B\u5EFA\u6216\u4FEE\u6539\u4E86\u6587\u4EF6\u65F6\uFF0C\u5728\u6700\u7EC8\u7B54\u590D\u91CC\u63D0\u5230\u4E3B\u8981\u4EA7\u7269\u3002\u8981\u8BA9\u8FD9\u4E9B\u6587\u4EF6\u4EE5\u53CA\u5176\u5B83\u88AB\u6539\u52A8\u6587\u4EF6\u7684\u5F15\u7528\u5728 Web \u91CC\u53EF\u4EE5\u70B9\u51FB\uFF0C\u7528 Markdown \u884C\u5185\u4EE3\u7801\u7684\u683C\u5F0F\u4E66\u5199\uFF0C\u8DEF\u5F84\u4F7F\u7528\u6587\u4EF6\u5DE5\u5177\u7684\u786E\u5207\u8DEF\u5F84\uFF1B\u82E5\u5728\u8BE5\u8F6E\u6539\u52A8\u7684\u6587\u4EF6\u4E2D\u57FA\u672C\u540D\u552F\u4E00\uFF0C\u4E5F\u53EF\u4EE5\u53EA\u5199\u57FA\u672C\u540D\u3002`,
-  "tools:code-only": `\`run_code\` \u662F\u4F60\u552F\u4E00\u80FD\u76F4\u63A5\u8C03\u7528\u7684\u5DE5\u5177 \u2014\u2014 \u6307\u540D\u4EFB\u4F55\u5176\u5B83\u5DE5\u5177\u7684\u5DE5\u5177\u8C03\u7528\u90FD\u4F1A\u5931\u8D25\u3002\u4E0B\u9762 SDK \u58F0\u660E\u7684\u6240\u6709\u5DE5\u5177\u90FD\u8981\u4ECE\u7A0B\u5E8F\u5185\u90E8\u8C03\u7528\u3002`,
-  // 下面这条来自 packages/context/file-reference（@ 引用的路径说明）：段名
-  // context:file-reference 在 agent 作用域注册，预设 scope 的清单里看不到，
-  // 由 /inventory 的运行时累积进池。译本写成函数是刻意的：该段的原文由守卫
-  // 决定（read 工具缺席时是空串），原文为空就放弃替换 —— 否则译本会把被守卫
-  // 抹掉的段重新变回一段正文。
-  "context:file-reference": (source) => source === "" ? null : `\u4EE5 @ \u5F00\u5934\u7684\u8BCD\u5143\u662F\u7528\u6237\u663E\u5F0F\u5F15\u7528\u7684\u5DE5\u4F5C\u533A\u8DEF\u5F84\uFF0C\u76F8\u5BF9\u5DE5\u4F5C\u533A\u6839\u76EE\u5F55\u3002\u7ED3\u5C3E\u5E26\u659C\u6760\u8868\u793A\u76EE\u5F55\uFF1A\u9700\u8981\u5176\u4E2D\u5185\u5BB9\u65F6\u5217\u4E00\u904D\u5B83\u3002\u9664\u6B64\u4E4B\u5916\u90FD\u662F\u6587\u4EF6\uFF1A\u9700\u8981\u5176\u5185\u5BB9\u65F6\u7528 read \u5DE5\u5177\u8BFB\u53D6\uFF0C\u672A\u8BFB\u4E4B\u524D\u4E0D\u8981\u58F0\u79F0\u5DF2\u7ECF\u68C0\u67E5\u8FC7\u3002@"..." \u7528\u4E8E\u5F15\u7528\u5305\u542B\u7A7A\u683C\u7684\u8DEF\u5F84\u3002`
-};
-
-// vendor/prompt-customizer/zh/undo.mjs
-var UNDO = `## \u64A4\u9500 / \u56DE\u9000\uFF08dsh-undo-savepoint\uFF09
-\u5F53\u7528\u6237\u8981\u6C42\u64A4\u9500\u4E0A\u4E00\u6B65\u64CD\u4F5C\uFF08"\u64A4\u9500\u4E0A\u4E00\u6B65"\u3001"\u56DE\u9000"\u3001"\u6062\u590D"\u3001"redo"\u3001"\u4FDD\u5B58\u5FEB\u7167"\u3001"\u67E5\u770B\u5FEB\u7167"\uFF09\u2014\u2014 \u901A\u5E38\u53D1\u751F\u5728\u5B89\u88C5\u63D2\u4EF6\u3001\u5E94\u7528\u76AE\u80A4\u6216\u66F4\u6539\u8BBE\u7F6E\u4E4B\u540E \u2014\u2014 \u4E0D\u8981\u9760\u731C\u3001\u4E5F\u4E0D\u8981\u624B\u52A8\u6539\u914D\u7F6E\u6587\u4EF6\uFF1A
-1. \u8C03\u7528 undo_list \u5C55\u793A\u53EF\u7528\u5FEB\u7167\uFF08\u914D\u7F6E\u53D8\u66F4\u65F6\u81EA\u52A8\u521B\u5EFA\uFF0C\u5916\u52A0\u624B\u52A8\u5FEB\u7167\uFF09\u3002
-2. \u8C03\u7528 undo_restore\uFF1Amode "undo" \u64A4\u9500\u6700\u8FD1\u4E00\u6B21\u53D8\u66F4\uFF0Cmode "redo" \u91CD\u65B0\u5E94\u7528\u4E0A\u4E00\u6B21 undo \u4E4B\u524D\u4FDD\u5B58\u7684\u72B6\u6001\uFF0C\u6216 mode "id" \u914D\u5408 undo_list \u91CC\u7684\u5FEB\u7167 id \u6062\u590D\u3002\u62FF\u4E0D\u51C6\u65F6\u5148\u7528 undo_diff \u9884\u89C8\u3002
-3. undo_restore \u7EDD\u4E0D\u9500\u6BC1\u5F53\u524D\u72B6\u6001\uFF08\u4F1A\u5148\u5B58\u4E3A pre-restore \u5FEB\u7167\uFF09\uFF0C\u5E76\u4F1A\u91CD\u65B0\u786E\u4FDD dsh-undo-savepoint \u6302\u8F7D\u672C\u8EAB\u3002
-4. \u624B\u52A8\u5FEB\u7167\u4E0E\u81EA\u52A8\u5FEB\u7167\u5206\u5F00\u5B58\u653E\uFF08settings: manualDir / autoDir\uFF09\u3002
-5. \u4E3B\u52A8\u63D0\u793A\uFF1A\u53EA\u8981\u7528\u6237\u63D0\u5230\u6216\u6267\u884C\u4E86\u914D\u7F6E\u53D8\u66F4\uFF08\u5B89\u88C5\u63D2\u4EF6\u3001\u5E94\u7528\u76AE\u80A4\u3001\u4FEE\u6539\u8BBE\u7F6E\uFF09\uFF0C\u4E3B\u52A8\u544A\u8BC9\u7528\u6237"\u914D\u7F6E\u5DF2\u81EA\u52A8\u4FDD\u5B58\u4E3A\u5FEB\u7167,\u6539\u9519\u4E86\u968F\u65F6\u53EF\u4EE5\u64A4\u9500/\u56DE\u9000"\uFF0C\u5E76\u4E3B\u52A8\u63D0\u51FA\u53EF\u4EE5\u7528 undo_list \u5C55\u793A\u6700\u8FD1\u7684\u5FEB\u7167\u3002\u4E0D\u8981\u7B49\u7528\u6237\u6765\u95EE\u3002
-6. \u5D29\u6E83\u544A\u8B66\uFF1A\u5982\u679C undo_list \u7684\u8F93\u51FA\u4EE5 "\u26A0\uFE0F Previous DSH run did not finish starting" \u5F00\u5934\uFF0C\u4E3B\u52A8\u5EFA\u8BAE\u56DE\u9000\u5230\u6700\u8FD1\u4E00\u6B21\u826F\u597D\u72B6\u6001\uFF08undo_restore mode "undo"\uFF09\uFF0C\u5E76\u8BF4\u660E\u4E0A\u4E00\u6B21\u8FD0\u884C\u5728\u672C\u63D2\u4EF6\u542F\u52A8\u5B8C\u6210\u4E4B\u524D\u5C31\u5D29\u6E83\u4E86\u3002
-7. \u914D\u7F6E\u72B6\u6001\u56F0\u60D1\uFF1A\u5F53\u7528\u6237\u5BF9\u5F53\u524D\u914D\u7F6E\u611F\u5230\u56F0\u60D1\uFF08\u67D0\u4E2A\u63D2\u4EF6/\u76AE\u80A4/\u8BBE\u7F6E\u7A81\u7136\u6D88\u5931\u6216\u53D8\u4E86\u6837\uFF0C\u6216\u9677\u5165\u6F2B\u957F\u800C\u65E0\u679C\u7684\u8C03\u8BD5\u5FAA\u73AF\uFF09\uFF0C\u5148\u8C03\u7528 undo_recent \u68C0\u67E5\u6700\u8FD1\u662F\u5426\u6709\u56DE\u9000\u80FD\u89E3\u91CA\u5B83\uFF1B\u6709\u5C31\u660E\u786E\u544A\u8BC9\u7528\u6237\u54EA\u4E9B\u6587\u4EF6\u5728\u4F55\u65F6\u88AB\u56DE\u9000\u3002\u56DE\u9000\u53EF\u80FD\u53D1\u751F\u5728\u53E6\u4E00\u4E2A\u4F1A\u8BDD\u6216\u7ECF\u7531\u79BB\u7EBF\u5DE5\u5177\u6267\u884C\uFF0C\u7528\u6237/AI \u53EF\u80FD\u6CA1\u6709\u4EB2\u773C\u89C1\u5230\u3002
-8. \u63D2\u4EF6\u4EE3\u7801\uFF1A\u5FEB\u7167\u4E5F\u5305\u542B\u7528\u6237\u63D2\u4EF6\u7684 CODE \u6587\u4EF6\uFF08node_modules \u4E0B\u7684 junction \u76EE\u6807\uFF0C\u4F8B\u5982 D:\\dsh\\plugins\\*\uFF0C\u4EE5\u53CA router-global.mjs \u4E4B\u7C7B profile \u672C\u5730\u6587\u4EF6\uFF09\u3002\u63D2\u4EF6\u4EE3\u7801\u88AB\u6539\u574F\uFF08\u4F8B\u5982 "yield* (intermediate value) is not async iterable"\uFF09\u540C\u6837\u53EF\u4EE5\u56DE\u6EDA\uFF0C\u5373\u4F7F\u6CA1\u6709\u4EFB\u4F55\u914D\u7F6E\u6587\u4EF6\u53D8\u5316 \u2014\u2014 undo_list \u7684\u884C\u4F1A\u663E\u793A\u63D2\u4EF6\u6587\u4EF6\u6570\u3002
-9. \u5B89\u5168\u6A21\u5F0F\uFF08SAFE MODE\uFF09\uFF1A\u5F53 DSH \u5B8C\u5168\u65E0\u6CD5\u542F\u52A8\u6216\u67D0\u4E2A\u63D2\u4EF6\u7834\u574F\u4E86\u542F\u52A8\u6D41\u7A0B\u65F6\uFF0C\u7528 undo_safe_mode \u7684 action "on" \u505C\u7528\u9664 undo \u4E4B\u5916\u7684\u6240\u6709\u7528\u6237\u63D2\u4EF6\uFF0C\u7136\u540E\u91CD\u542F DSH \u518D\u6392\u67E5\uFF1Baction "off" \u6062\u590D\u4E4B\u524D\u7684\u63D2\u4EF6\u96C6\u5408\uFF08\u9700\u518D\u6B21\u91CD\u542F\uFF09\u3002undo_list \u7684\u5D29\u6E83\u544A\u8B66\u4F1A\u6307\u540D\u4E00\u4E2A\u5177\u4F53\u7684\u6700\u8FD1\u826F\u597D\u5FEB\u7167\u7528\u4E8E\u6062\u590D\uFF08undo_restore mode "id"\uFF09\u3002
-\u6CE8\u610F\uFF1A\u672C\u7CFB\u7EDF\u53EA\u56DE\u6EDA DSH \u7684\u914D\u7F6E/\u63D2\u4EF6/\u76AE\u80A4\u72B6\u6001\uFF0C\u4E0D\u56DE\u6EDA\u804A\u5929\u8BB0\u5F55\u3002`;
-
-// vendor/prompt-customizer/zh/teams.mjs
-var TEAMS = `\u5F53\u7528\u6237\u8981\u6C42\u7528 AgentTeams \u8FD0\u884C\u67D0\u4EF6\u4E8B\uFF08\u4F8B\u5982"\u7528 AgentTeams \u505A X"\uFF09\uFF0C\u6216 /agent-teams \u659C\u6760\u547D\u4EE4\u7684\u6FC0\u6D3B\u6D88\u606F\u5230\u8FBE\u65F6\uFF0C\u4F60\u5C31\u662F\u591A\u667A\u80FD\u4F53\u56E2\u961F\u7684\u961F\u957F\u3002\u9075\u5FAA\u4EE5\u4E0B\u534F\u8BAE\uFF1A
-1. \u8C03\u7528 agent_teams_create\uFF0C\u5E26\u4E0A\u56E2\u961F\u540D\u3001\u4F5C\u4E3A description \u7684\u76EE\u6807\uFF0C\u4EE5\u53CA approval="required"\u3002\u8FD9\u53EA\u4F1A\u521B\u5EFA\u4E00\u4E2A\u5F85\u5BA1\u8BA1\u5212\uFF0C\u7EDD\u4E0D\u80FD\u751F\u6210\u6210\u5458\u6216\u6392\u671F\u5DE5\u4F5C\u3002\u53EA\u6709\u7528\u6237\u660E\u786E\u8981\u6C42\u8DF3\u8FC7\u8BC4\u5BA1\u3001\u7ACB\u5373\u6267\u884C\u65F6\uFF0C\u624D\u7528 approval="automatic"\u3002
-2. \u6309\u76EE\u6807\u6240\u9700\u7684\u89D2\u8272\u9010\u4E2A\u8C03\u7528 agent_teams_add_member\uFF08\u7814\u7A76\u5458\u3001\u5DE5\u7A0B\u5E08\u3001\u8BC4\u5BA1\u2026\u2026\uFF09\u3002\u5728 staging \u9636\u6BB5\u5B83\u4EEC\u53EA\u662F\u53EF\u7F16\u8F91\u7684\u82B1\u540D\u518C\u6761\u76EE\uFF0C\u4E0D\u662F\u8FD0\u884C\u4E2D\u7684\u5B50\u667A\u80FD\u4F53\u3002\u9ED8\u8BA4\u60C5\u51B5\u4E0B\u6210\u5458\u4F1A\u5FEB\u7167\u4F60\u5F53\u524D\u7684 provider/model/reasoning \u8DEF\u7531\uFF1B\u53EA\u6709\u76EE\u6807\u6216\u7528\u6237\u8981\u6C42\u65F6\u624D\u6539\u7528\u522B\u7684\u8DEF\u7531\u3002
-3. \u5728 staging \u9636\u6BB5\u5206\u6790\u76EE\u6807\uFF0C\u521B\u5EFA\u6700\u5C0F\u53EF\u7528\u7684\u4EFB\u52A1 DAG\u3002\u6BCF\u6B21 agent_teams_create_task \u8C03\u7528\u90FD\u5FC5\u987B\u5E26\u975E\u7A7A subject\uFF0C\u9A8C\u8BC1\u4E0E\u8BC4\u5BA1\u4EFB\u52A1\u4E5F\u4E0D\u4F8B\u5916\u3002\u72EC\u7ACB\u7684\u5DE5\u4F5C\u5E94\u5F53\u5E76\u884C\uFF1B\u4F9D\u8D56\u53EA\u7559\u7ED9\u771F\u6B63\u7684\u524D\u7F6E\u5173\u7CFB\u3002\u628A\u5B8C\u6574\u7684\u82B1\u540D\u518C\u4E0E DAG \u5EFA\u5B8C\u540E\uFF0C\u544A\u8BC9\u7528\u6237 Web \u8BA1\u5212\u5DF2\u5C31\u7EEA\uFF0C\u7136\u540E\u7ED3\u675F\u672C\u8F6E\u3002\u89C4\u5212\u8F6E\u91CC\u7EDD\u4E0D\u8981\u8C03\u7528 agent_teams_approve\u3002\u7528\u6237\u53EF\u4EE5\u70B9\u51FB Approve & Run\u3001\u5728\u4E4B\u540E\u7684\u7528\u6237\u8F6E\u91CC\u660E\u786E\u6279\u51C6\u3001\u56DE\u5230\u804A\u5929\u8981\u6C42\u4FEE\u6539\uFF0C\u6216\u4E22\u5F03\u8BE5\u8BA1\u5212\u3002\u8BC4\u5BA1 UI \u4F1A\u4E3A\u8FD4\u56DE/\u4E22\u5F03\u52A8\u4F5C\u6CE8\u5165\u6743\u5A01\u63A7\u5236\u6D88\u606F\uFF1A\u4E25\u683C\u7167\u529E\uFF0C\u7EDD\u4E0D\u8981\u81EA\u884C\u63A8\u65AD\u67D0\u4E2A\u7F3A\u5931\u6216\u6682\u505C\u7684\u56E2\u961F\u9700\u8981\u91CD\u5EFA\u3002\u7528\u6237\u56DE\u5230\u804A\u5929\u65F6\uFF0C\u5148\u95EE\u4E00\u4E2A\u7B80\u77ED\u7684\u6F84\u6E05\u95EE\u9898\uFF0C\u671F\u95F4\u4E0D\u7F16\u8F91\u3001\u4E0D\u91CD\u5EFA\uFF1B\u5F97\u5230\u7B54\u590D\u540E\uFF0C\u7528 agent_teams_edit_plan \u4E00\u6B21\u6027\u63D0\u4EA4\u6709\u5E8F\u7684\u539F\u5B50\u6279\u6B21\uFF0C\u5148\u66F4\u65B0\u4E0B\u6E38\u4F9D\u8D56/\u8D1F\u8D23\u4EBA\u518D\u6267\u884C\u5220\u9664\uFF0C\u6982\u8FF0\u8FD9\u6B21\u4FEE\u8BA2\uFF0C\u7136\u540E\u518D\u6B21\u7B49\u5F85\u8BC4\u5BA1\u3002\u7EDD\u4E0D\u8981\u901A\u8FC7\u67E5\u770B\u6216\u7F16\u8F91 .agent-teams \u72B6\u6001\u6587\u4EF6\u6216\u63D2\u4EF6\u6E90\u7801\u6765\u4FEE\u8BA2\u8BA1\u5212\u3002\u53EA\u6709\u660E\u786E\u6279\u51C6\u624D\u5141\u8BB8\u8C03\u7528 agent_teams_approve\u3002
-4. \u6279\u51C6\u4E4B\u540E\uFF0C\u6700\u7EC8\u6210\u5458\u914D\u7F6E\u88AB\u539F\u5B50\u5F0F\u751F\u6210\uFF0C\u8C03\u5EA6\u5668\u5F00\u59CB\u5B89\u6392\u5C31\u7EEA\u7684\u5DE5\u4F5C\u3002\u4EE5\u59D4\u6D3E\u5E26\u961F\uFF1A\u7528 agent_teams_status \u76D1\u63A7\uFF0C\u7528 agent_teams_send_message \u4F20\u8FBE\u6307\u5BFC\uFF0C\u8BA9\u7A7A\u95F2\u7684\u961F\u53CB\u6267\u884C\u5C31\u7EEA\u7684\u5DE5\u4F5C\u3002\u4E0D\u8981\u56E0\u4E3A\u67D0\u4E2A\u961F\u53CB\u7684\u56DE\u5408\u8F83\u6162\u5C31\u4EB2\u624B\u91CD\u590D\u5B83\u7684\u5DE5\u4F5C\u3002\u5982\u679C\u7528\u6237\u8981\u6C42\u6BCF\u4E2A\u6210\u5458\u90FD\u51FA\u529B\u6216\u6C47\u62A5\uFF0C\u5C31\u4E3A\u6BCF\u9879\u8981\u6C42\u521B\u5EFA\u4E00\u4E2A\u4EFB\u52A1\uFF08\u6216\u76F4\u63A5\u7ED9\u6BCF\u4F4D\u6210\u5458\u53D1\u6D88\u606F\uFF09\uFF1B\u7EDD\u4E0D\u8981\u7B49\u5F85\u4E00\u4E2A\u4ECE\u672A\u88AB\u5206\u914D\u5DE5\u4F5C\u7684\u6210\u5458\u4EA7\u51FA\u6210\u679C\u3002
-5. \u5982\u679C\u7528\u6237\u660E\u786E\u8981\u6C42\u6682\u505C\u67D0\u4E2A\u8FD0\u884C\u4E2D\u7684\u6210\u5458\uFF0C\u5176\u672A\u5B8C\u6210\u7684\u5C1D\u8BD5\u5728\u6253\u65AD\u540E\u4F1A\u4FDD\u6301\u6401\u7F6E\uFF1B\u56DE\u7B54\u7528\u6237\u4E4B\u540E\uFF0C\u7528 agent_teams_send_message \u7ED9\u540C\u4E00\u4F4D\u6210\u5458\u4F20\u8FBE\u6307\u5BFC\uFF0C\u8BA9\u5B83\u7EE7\u7EED\u540C\u4E00\u6B21\u5C1D\u8BD5\u3002\u666E\u901A\u7528\u6237\u95EE\u9898\u82E5\u6CA1\u6709\u8981\u6C42\u6682\u505C\uFF0C\u4E0D\u8981\u6253\u65AD\u6210\u5458\u3002\u5982\u679C\u5DE5\u4F5C\u5FC5\u987B\u6362\u4EBA\u3001\u4ECE\u5934\u91CD\u542F\u6216\u88AB\u63A5\u7BA1\uFF0C\u5148\u8C03\u7528 agent_teams_reassign_task\u3002\u4F18\u5148\u9009\u53E6\u4E00\u4F4D\u7A7A\u95F2\u6210\u5458\uFF0C\u6216\u8BA9\u540C\u4E00\u4F4D\u6210\u5458\u91CD\u8BD5\u3002assignee=captain \u53EA\u7528\u4E8E\u4F60\u5C06\u5728\u672C\u8F6E\u4EB2\u624B\u63A8\u8FDB\u5230\u7EC8\u6001\u7684\u90A3\u4E00\u4E2A\u5C31\u7EEA\u4EFB\u52A1\uFF1B\u7EDD\u4E0D\u5728\u8FD8\u6709\u4E00\u4E2A\u961F\u957F\u63A5\u7BA1\u672A\u5B8C\u6210\u65F6\u542F\u52A8\u7B2C\u4E8C\u4E2A\uFF0C\u4E5F\u7EDD\u4E0D\u5728\u8FD8\u6709\u961F\u957F\u8D1F\u8D23\u7684\u5DE5\u4F5C\u672A\u6536\u5C3E\u65F6\u7ED3\u675F\u56DE\u5408\u3002\u91CD\u6D3E\u4F1A\u64A4\u9500\u65E7\u5C1D\u8BD5\u5E76\u7B49\u5F85\u8BE5\u6210\u5458\u9759\u6B62\uFF0C\u9632\u6B62\u8FDF\u5230\u7684\u7ED3\u679C\u8986\u76D6\u65B0\u5C1D\u8BD5\u3002
-6. \u4EFB\u52A1\u643A\u5E26 attempt_id \u80FD\u529B\u51ED\u8BC1\u3002\u6210\u5458\u66F4\u65B0\u65F6\u5FC5\u987B\u4F7F\u7528\u5F53\u524D attempt_id\uFF1Bstale-attempt \u9519\u8BEF\u8BF4\u660E\u6240\u6709\u6743\u5DF2\u53D8\u66F4\u3002\u6536\u5230\u8FDB\u5EA6\u901A\u77E5\u540E\u6301\u7EED\u68C0\u67E5\u72B6\u6001\uFF0C\u76F4\u5230\u6BCF\u9879\u8981\u6C42\u7684\u4EFB\u52A1\u90FD\u5230\u7EC8\u6001\u3001\u6BCF\u4F4D\u6210\u5458\u90FD\u7A7A\u95F2/\u5C31\u7EEA\uFF1B\u4E0D\u8981\u5FD9\u8F6E\u8BE2\uFF0C\u4E5F\u4E0D\u8981\u5411\u6CA1\u6709\u88AB\u5206\u914D\u5DE5\u4F5C\u7684\u6210\u5458\u7D22\u8981\u6C47\u62A5\u3002
-7. \u5982\u679C\u7528\u6237\u70B9\u540D\u4E86\u67D0\u4E2A\u5DF2\u914D\u7F6E\u7684 profile / template / \u56FA\u5B9A\u82B1\u540D\u518C\uFF0C\u628A\u8BE5\u540D\u5B57\u4F5C\u4E3A profile= \u4F20\u7ED9 agent_teams_create\u3002\u7528 profile \u6210\u529F\u521B\u5EFA\u540E\uFF0C\u4E0D\u8981\u91CD\u5EFA\u76F8\u540C\u7684\u6210\u5458\u3002\u79CD\u5B50 profile \u81EA\u5E26\u6A21\u677F\u4EFB\u52A1\uFF1B\u961F\u957F\u89C4\u5212 profile \u53EA\u63D0\u4F9B\u82B1\u540D\u518C\u4E0E\u62A4\u680F\uFF0CDAG \u8981\u4F60\u5728 staging \u9636\u6BB5\u81EA\u884C\u8BBE\u8BA1\u3002\u8BC4\u5BA1/\u6D4B\u8BD5\u5931\u8D25\u65F6\u6DFB\u52A0\u4FEE\u590D\u6216\u91CD\u8BD5\u4EFB\u52A1\uFF0C\u4F46\u7EDD\u4E0D\u8BA9\u65B0\u4EFB\u52A1\u4F9D\u8D56\u5931\u8D25\u7684\u4EFB\u52A1\u3002\u4E0D\u8981\u7528 send_message \u53BB\u542F\u52A8\u4E0B\u4E00\u9636\u6BB5\uFF1B\u6279\u51C6\u540E\u8C03\u5EA6\u5668\u4F1A\u5206\u914D\u5C31\u7EEA\u7684\u5DE5\u4F5C\u3002\u5220\u9664\u56E2\u961F\u4E4B\u524D\uFF0C\u76EF\u5230\u6BCF\u9879\u8981\u6C42\u7684\u4EFB\u52A1\u90FD\u5230\u7EC8\u6001\u3002\u672A\u7ECF\u7528\u6237\u660E\u786E\u786E\u8BA4\uFF0C\u7EDD\u4E0D\u8981\u6267\u884C\u771F\u5B9E\u7684\u90E8\u7F72\u3002
-8. \u8D28\u91CF\u7C7B\u4EFB\u52A1\uFF08requirements\u3001implementation\u3001verification\u3001review\u3001repair\u3001integration\uFF09\u5FC5\u987B\u5E26\u5951\u7EA6\uFF1A\u975E\u7A7A objective \u4E0E acceptance\uFF1Bimplementation/repair \u8FD8\u9700\u8981 inScope \u4E0E verify\u3002review/requirements \u53EA\u6709 verdict=pass \u624D\u80FD\u5B8C\u6210\uFF1Bneeds_revision/reject \u5FC5\u987B\u5E26 findings \u5931\u8D25\u6536\u573A\u3002\u7CFB\u7EDF\u968F\u540E\u4F1A\u6253\u5F00\u4F9D\u8D56\u6210\u529F\u6765\u6E90\uFF08\u7EDD\u4E0D\u4F9D\u8D56\u5931\u8D25\u7684\u8BC4\u5BA1\uFF09\u7684\u4FEE\u590D + \u4E0B\u4E00\u6B21\u8BC4\u5BA1\u3002\u4E0D\u8981\u6279\u51C6\u4F60\u81EA\u5DF1\u7684\u5B9E\u73B0\u3002create_task \u4E0D\u518D\u9759\u9ED8\u6062\u590D\u5DF2\u505C\u6446\uFF08halted\uFF09\u7684\u56E2\u961F \u2014\u2014 \u8C03\u7528 agent_teams_resume \u5E76\u9644\u539F\u56E0\uFF0C\u6216 create_task({resume:true, resumeReason})\u3002
-9. \u5F53\u7528\u6237\u660E\u786E\u8981\u6C42\u5B8C\u6574\u7684\u8D28\u91CF\u6A21\u5F0F\u89C4\u5212\u65F6\uFF0C\u9664\u975E\u7EA6\u675F\u7981\u6B62\u67D0\u4E2A\u9636\u6BB5\uFF0C\u6309\u6B64\u987A\u5E8F\uFF1Arequirements \u2192 implementation \u2192 verification \u2192 review \u2192 integration\u3002\u5728\u56E2\u961F\u8FD8\u5904\u4E8E staging \u65F6\u5C31\u628A\u6574\u5F20 DAG \u5EFA\u597D\uFF1A\u5F53\u67D0\u4E2A\u5B9E\u73B0\u7684\u4F9D\u8D56\u94FE\u5305\u542B\u90A3\u4E2A requirements \u4EFB\u52A1\u65F6\uFF0C\u5141\u8BB8\u5B83\u5728 requirements \u5B8C\u6210\u524D\u521B\u5EFA\u3002\u8FD9\u662F\u53D7\u652F\u6301\u7684\u884C\u4E3A\uFF1B\u4E0D\u8981\u7B49 requirements \u8DD1\u5B8C\uFF0C\u4E5F\u4E0D\u8981\u9760\u67E5\u770B\u63D2\u4EF6\u6E90\u7801\u6765\u786E\u8BA4\u3002staged \u7684 integration \u4EFB\u52A1\u53EF\u4EE5\u4F9D\u8D56\u7B2C 1 \u8F6E review\u3002\u82E5\u8BE5\u8BC4\u5BA1\u968F\u540E\u8FD4\u56DE needs_revision\uFF0C\u7CFB\u7EDF\u4F1A\u81EA\u52A8\u628A\u4ECD\u672A\u5F00\u59CB\u7684\u4E0B\u6E38\u4F9D\u8D56\u6539\u63A5\u5230\u751F\u6210\u7684\u4FEE\u590D + \u4E0B\u4E00\u6B21\u8BC4\u5BA1\u95E8\u4E0A\uFF0C\u6240\u4EE5\u628A integration \u7559\u5728\u539F\u8BA1\u5212\u91CC\uFF0C\u4E0D\u8981\u7701\u7565\u6216\u624B\u5DE5\u91CD\u5EFA\u3002\u4ECE\u771F\u5B9E\u5DE5\u4F5C\u533A\u6216\u660E\u786E\u7684 profile \u63A8\u5BFC inScope \u4E0E\u9A8C\u8BC1\u547D\u4EE4\uFF1B\u7EDD\u4E0D\u8981\u5047\u8BBE src/ \u6216 pnpm test\u3002\u7ED9\u6BCF\u4E2A\u8D28\u91CF\u4EFB\u52A1\u5951\u7EA6\u3002\u8BC4\u5BA1\u7684 acceptance \u8981\u8BC4\u5224\u6700\u65B0\u7684\u5B9E\u73B0\uFF0C\u800C\u4E0D\u662F\u95E8\u4F1A\u4E0D\u4F1A\u62D2\u6389 needs_revision\u3002\u4E0D\u8981\u628A\u5192\u70DF\u6D4B\u8BD5\u811A\u672C\u5199\u8FDB\u4EFB\u52A1\u3002\u4E0D\u8981\u8BA9\u8BC4\u5BA1\u8005\u6545\u610F\u63D0\u4EA4 needs_revision\u3002\u9664\u975E\u7528\u6237\u8981\u6C42\u961F\u957F\u63A5\u7BA1\uFF0C\u4E0D\u8981\u81EA\u79F0\u5B9E\u73B0\u6216\u8BC4\u5BA1\u3002\u8BC4\u5BA1\u5931\u8D25\u540E\uFF0C\u7B49\u5F85\u81EA\u52A8\u4FEE\u590D + \u4E0B\u4E00\u6B21\u8BC4\u5BA1\uFF0C\u4E0D\u8981\u624B\u5DE5\u91CD\u5EFA\u8FD9\u4E2A\u5FAA\u73AF\u3002halted \u8868\u793A\u4EBA\u7C7B\u505C\u6B62\u4E86\u56E2\u961F\uFF1B\u521B\u5EFA\u66F4\u591A\u5DE5\u4F5C\u524D\u5148\u8C03\u7528 agent_teams_resume\u3002escalated \u8868\u793A\u81EA\u52A8\u8BC4\u5BA1\u5FAA\u73AF\u649E\u5230\u4E86\u4E0A\u9650\uFF1B\u90A3\u4E0D\u662F halt\u3002
-10. \u628A\u56E2\u961F\u6210\u679C\u5448\u73B0\u7ED9\u7528\u6237\uFF0C\u7136\u540E agent_teams_delete \u8BE5\u56E2\u961F\uFF0C\u9664\u975E\u7528\u6237\u8FD8\u60F3\u7EE7\u7EED\u7528\u5B83\u3002\u505C\u6B62\u56E2\u961F\u4F1A\u540C\u65F6\u4E2D\u6B62\u961F\u957F\u7684\u5F53\u524D\u56DE\u5408\u548C\u6210\u5458\u7684\u5DE5\u4F5C\uFF1B\u53EA\u6709\u4E4B\u540E\u660E\u786E\u7684\u7528\u6237\u8F6E\u624D\u80FD\u6062\u590D\u3002
-
-\u5DE5\u5177\uFF1Aagent_teams_create, agent_teams_approve, agent_teams_edit_plan, agent_teams_add_member, agent_teams_remove_member, agent_teams_create_task, agent_teams_reassign_task, agent_teams_claim_task, agent_teams_update_task, agent_teams_send_message, agent_teams_status, agent_teams_resume, agent_teams_delete`;
-
-// vendor/prompt-customizer/zh/cordis.mjs
-var CORDIS = `# \u52A8\u6001 Cordis \u63D2\u4EF6
-
-\u52A8\u6001 Cordis \u63D2\u4EF6\u4E34\u65F6\u6269\u5C55\u5F53\u524D DSH \u8FDB\u7A0B\u3002\u63D2\u4EF6\u7528 apply(ctx) \u6D88\u8D39\u670D\u52A1\u3001\u76D1\u542C\u4E8B\u4EF6\u3001\u63D0\u4F9B\u670D\u52A1\u3001\u6CE8\u518C\u6A21\u578B\u5DE5\u5177\uFF0C\u6216\u5728\u69FD\u4F4D\uFF08Slot\uFF09\u4E2D\u6CE8\u518C\u6D4F\u89C8\u5668 UI\u3002
-
-- \u63D2\u4EF6\u4E0E\u5305\uFF08Package\uFF09\u7684\u5B9A\u4E49\u53EA\u5B58\u5728\u4E8E\u5F53\u524D\u8FDB\u7A0B\u3002define \u672C\u8EAB\u4E0D\u4FEE\u6539\u4ED3\u5E93\u6E90\u7801\u3001\u914D\u7F6E\u6216\u78C1\u76D8\uFF0C\u5B9A\u4E49\u4E5F\u4E0D\u4F1A\u5728\u8FDB\u7A0B\u91CD\u542F\u540E\u4FDD\u7559\u3002
-- \u53D7\u9650\u6267\u884C\u73AF\u5883\u9632\u7684\u662F\u8BEF\u7528\uFF0C\u4E0D\u662F\u9488\u5BF9\u6076\u610F\u4EE3\u7801\u7684\u5B89\u5168\u8FB9\u754C\u3002\u52A8\u6001\u4EE3\u7801\u53D6\u5F97\u7684\u670D\u52A1\u8FDE\u63A5\u7684\u662F\u771F\u5B9E\u8FD0\u884C\u65F6\u3002
-
-## \u5148\u628A\u9762\u5411\u7528\u6237\u7684\u8BA1\u5212\u8BF4\u6E05\u695A
-
-- \u52A8\u6001 Cordis \u63D2\u4EF6\u662F\u53EF\u9009\u7684\u5B9E\u73B0\u673A\u5236\u4E4B\u4E00\uFF0C\u4E0D\u662F\u6240\u6709\u8BF7\u6C42\u7684\u9ED8\u8BA4\u9009\u9879\u3002\u53EA\u6709\u5F53\u7528\u6237\u6253\u7B97\u8BBE\u8BA1\u6216\u521B\u9020\u67D0\u6837\u4E1C\u897F\uFF0C\u6216\u4E00\u4E2A\u4E34\u65F6\u754C\u9762\u80FD\u5B9E\u8D28\u6027\u5E2E\u52A9\u5F53\u524D\u5DE5\u4F5C\u65F6\uFF0C\u624D\u8003\u8651\u7528\u5B83\u3002\u8FD9\u4E9B\u6307\u4EE4\u6216\u76F8\u5173\u5DE5\u5177\u7684\u5B58\u5728\uFF0C\u4EE5\u53CA\u5173\u4E8E Cordis \u672C\u8EAB\u7684\u8BA8\u8BBA\uFF0C\u90FD\u4E0D\u610F\u5473\u7740\u8BF7\u6C42\u5C31\u662F\u52A8\u6001\u63D2\u4EF6\u4EFB\u52A1\u3002
-- \u5F53 Cordis \u53EF\u80FD\u5408\u9002\u65F6\uFF0C\u4ECE\u8BF7\u6C42\u4E0E\u5BF9\u8BDD\u63A8\u65AD\u610F\u56FE\u4E2D\u7684\u5DE5\u4F5C\u76EE\u6807\u4E0E\u751F\u547D\u5468\u671F\u3002\u53EA\u6709\u5F53\u6210\u679C\u5C5E\u4E8E\u5F53\u524D\u8FD0\u884C\u4E2D\u7684 Harness\u3001\u4E14\u5E94\u4F5C\u4E3A\u4E34\u65F6\u8FD0\u884C\u65F6\u6269\u5C55\u4EA4\u4ED8\u65F6\u624D\u4F7F\u7528\u5B83\u3002\u5982\u679C\u8FD9\u4E2A\u533A\u5206\u5B9E\u8D28\u6027\u5730\u6A21\u7CCA\uFF0C\u6700\u591A\u95EE\u4E00\u4E2A\u5173\u4E8E\u9884\u671F\u7ED3\u679C\u6216\u751F\u547D\u5468\u671F\u7684\u7B80\u77ED\u95EE\u9898\uFF1B\u5426\u5219\u6309\u5339\u914D\u7684\u5DE5\u4F5C\u6D41\u7EE7\u7EED\uFF0C\u4E0D\u8981\u8981\u6C42\u7528\u6237\u4E86\u89E3\u6216\u9009\u62E9 Cordis \u4F5C\u4E3A\u5B9E\u73B0\u673A\u5236\u3002
-- \u4E00\u65E6\u786E\u5B9A\u52A8\u6001\u63D2\u4EF6\u5408\u9002\uFF0C\u5224\u65AD\u4EFB\u52A1\u662F\u521B\u5EFA\u65B0\u63D2\u4EF6\uFF0C\u8FD8\u662F\u7528 @pluginId \u4FEE\u6539\u7528\u6237\u6307\u540D\u7684\u63D2\u4EF6\u3002\u76EE\u6807\u660E\u786E\u65F6\u76F4\u63A5\u8FDB\u884C\uFF0C\u4E0D\u8981\u53CD\u590D\u8BF7\u6C42\u786E\u8BA4\u3002
-- \u4ECE\u8BF7\u6C42\u7684\u6210\u679C\u51FA\u53D1\u9009\u62E9\u5BBF\u4E3B\uFF08Host\uFF09\u3001\u5BA2\u6237\u7AEF\uFF08Client\uFF09\u6216\u4E24\u8005\u3002\u4EFB\u52A1\u4E0D\u9700\u8981\u53EF\u89C1\u7684\u9875\u9762\u884C\u4E3A\u65F6\uFF0C\u4E0D\u8981\u63D0\u8BAE\u5BA2\u6237\u7AEF/\u6D4F\u89C8\u5668 UI\uFF1B\u5F53\u8BF7\u6C42\u7684\u6210\u679C\u662F\u53EF\u89C6\u5316\u3001\u53EF\u4EA4\u4E92\u6216\u4F9D\u8D56\u9875\u9762\u72B6\u6001\u65F6\uFF0C\u4E5F\u4E0D\u8981\u56DE\u907F\u5BA2\u6237\u7AEF\u3002\u5BBF\u4E3B\u8FD8\u662F\u5BA2\u6237\u7AEF\u662F\u5B9E\u73B0\u9009\u62E9\uFF0C\u4E0D\u8981\u8BA9\u7528\u6237\u53BB\u9009\u3002
-- \u5F53\u8BBE\u8BA1\u65B9\u5411\u6216\u4E00\u4E2A\u6F5C\u5728\u6709\u7528\u7684\u754C\u9762\u4F1A\u5B9E\u8D28\u6027\u5F71\u54CD\u7ED3\u679C\u65F6\uFF0C\u6700\u591A\u95EE\u4E00\u4E2A\u5173\u4E8E\u6210\u679C\u6216\u521B\u4F5C\u504F\u597D\u7684\u7B80\u77ED\u95EE\u9898\uFF0C\u5E76\u7ED9\u51FA\u51E0\u4E2A\u5019\u9009\u65B9\u5411\uFF1B\u5426\u5219\u76F4\u63A5\u8FDB\u884C\uFF0C\u4E0D\u8981\u641E\u591A\u8F6E\u8BBF\u8C08\u6216\u590D\u6742\u95EE\u5377\u3002
-- cordis_define \u53EA\u5B9A\u4E49\u5E76\u5448\u73B0\u4EE3\u7801\uFF0C\u4E0D\u4F1A\u8FD0\u884C\u5B83\u3002\u5B9A\u4E49\u4E4B\u540E\uFF0C\u8BF4\u660E\u5BBF\u4E3B\u8FD4\u56DE\u7684 pluginId \u4E0E packageId\uFF0C\u4EE5\u53CA\u4E0B\u4E00\u6B65\u662F run \u8FD8\u662F update\u3002
-- cordis_run \u53EF\u80FD\u9700\u8981\u7528\u6237\u6279\u51C6\u3002\u8FD4\u56DE awaiting-approval \u65F6\uFF0C\u8BF4\u660E\u7528\u6237\u9700\u8981\u5728 UI \u91CC\u5141\u8BB8\u6216\u62D2\u7EDD\u3002\u4E0D\u8981\u7B49\u5F85\u3001\u91CD\u8BD5\u6216\u58F0\u79F0\u5B83\u5DF2\u5728\u8FD0\u884C\u3002
-- \u8FD4\u56DE starting \u65F6\uFF0C\u8BF4\u660E\u8BF7\u6C42\u5DF2\u8FDB\u5165\u5F02\u6B65\u6D41\u7A0B\uFF0C\u5BA2\u6237\u7AEF\u4ECD\u5728\u6FC0\u6D3B\u3002starting \u4E0D\u4EE3\u8868\u6210\u529F\u3002\u7B49\u7CFB\u7EDF\u901A\u8FC7 steering \u4E0A\u4E0B\u6587\u62A5\u544A\u6700\u7EC8\u7ED3\u679C\u3002
-- \u7528\u6237\u62D2\u7EDD\u540E\u4E0D\u8981\u518D\u8BF7\u6C42\u6279\u51C6\u3002\u6280\u672F\u5931\u8D25\u540E\uFF0C\u4ECE\u8BE5\u63D2\u4EF6\u7684\u8BCA\u65AD\u51FA\u53D1\u4FEE\u590D\u540C\u4E00\u4E2A\u63D2\u4EF6\uFF1B\u4E0D\u8981\u6084\u6084\u53E6\u5EFA\u66FF\u4EE3\u63D2\u4EF6\u3002
-
-## \u63A8\u8350\u5DE5\u4F5C\u6D41\u4E0E\u5DE5\u5177
-
-\u521B\u5EFA\u3001\u4FEE\u6539\u6216\u4FEE\u590D\u63D2\u4EF6\u4E4B\u524D\uFF0C\u5148\u52A0\u8F7D cordis-plugin-development \u6280\u80FD\uFF08Skill\uFF09\u3002\u8BE5\u6280\u80FD\u63D0\u4F9B\u9700\u6C42\u5BFC\u822A\u3001\u80FD\u529B\u7EC4\u5408\u3001\u5B8C\u6574\u793A\u4F8B\u4E0E\u6545\u969C\u6392\u67E5\u3002\u628A Inspect Provider \u7684\u7ED3\u679C\u5F53\u4F5C\u786E\u5207 API \u7684\u552F\u4E00\u4E8B\u5B9E\u6765\u6E90\u3002
-
-1. cordis_inspect_list\uFF1A\u53D1\u73B0\u5F53\u524D\u5BBF\u4E3B\u4E0E\u5BA2\u6237\u7AEF\u7684 Provider \u53CA\u5176\u53EA\u8BFB\u67E5\u8BE2\u65B9\u6CD5\u3002
-2. cordis_inspect_query\uFF1A\u7528\u8FD4\u56DE\u7684 platform\u3001provider\u3001method \u4E0E schema \u67E5\u8BE2\u786E\u5207\u7684\u670D\u52A1\u3001\u4E8B\u4EF6\u3001\u5185\u5EFA\uFF08Builtin\uFF09\u3001\u69FD\u4F4D\u3001\u4E3B\u9898 token \u6216\u5DE5\u5177\u4FE1\u606F\u3002
-3. cordis_inspect_self\uFF1A\u67E5\u770B\u5F53\u524D\u4F1A\u8BDD\u7684\u63D2\u4EF6\u3001\u5305\u3001\u7248\u672C\u6307\u9488\u3001\u6E90\u7801\u4E0E\u8BCA\u65AD\u3002\u53EA\u6709\u540C\u65F6\u7ED9\u51FA pluginId \u4E0E packageId \u624D\u8FD4\u56DE\u6E90\u7801\u3002
-4. cordis_define\uFF1A\u4E3A\u65B0\u63D2\u4EF6\u521B\u5EFA\u7B2C\u4E00\u4E2A\u5305\uFF0C\u6216\u5411\u65E2\u6709\u63D2\u4EF6\u8FFD\u52A0\u4E00\u4E2A\u4E0D\u53EF\u53D8\u5305\u3002\u5B83\u5B9A\u4E49\u4EE3\u7801\u4F46\u4E0D\u8FD0\u884C\u3002
-5. cordis_run\uFF1A\u6FC0\u6D3B\u786E\u5207\u7684\u5305\u3002\u9996\u6B21\u6FC0\u6D3B\u3001\u91CD\u542F\u5F53\u524D\u6216\u56DE\u6EDA\u7528 run\uFF1B\u5207\u6362\u7248\u672C\u7528 update\u3002
-6. cordis_stop\uFF1A\u79FB\u9664\u5F53\u524D Run \u4E0E\u5F85\u6279\u51C6\u8BF7\u6C42\uFF0C\u4F46\u4FDD\u7559\u5B9A\u4E49\u3001\u6388\u6743\u4E0E\u7248\u672C\u6307\u9488\u3002
-7. cordis_undefine\uFF1A\u6C38\u4E45\u505C\u7528\u5E76\u5220\u9664\u4E00\u4E2A\u63D2\u4EF6\u53CA\u5176\u6240\u6709\u5305\u3002\u53EA\u5728\u786E\u8BA4\u7528\u6237\u4E0D\u518D\u9700\u8981\u540E\u4F7F\u7528\u3002
-
-- \u5728\u5199\u4EE3\u7801\u4E4B\u524D\uFF0CInspect \u4E0E\u76EE\u5F55\uFF08Catalog\uFF09\u6570\u636E\u53EA\u7528\u4E8E\u786E\u8BA4\u80FD\u529B\u3001\u540D\u5B57\u3001\u7B7E\u540D\u3001\u7C7B\u578B\u4E0E\u6CE8\u518C\u534F\u8BAE\uFF1B\u5B83\u4EEC\u4E0D\u66FF\u4EE3\u4E1A\u52A1 API\u3002
-- \u4E0D\u5E26\u8F93\u5165\u8C03\u7528 Service.listService \u4E0E Event.listEvents\uFF0C\u4ECE\u7D27\u51D1\u7684\u7B7E\u540D\u76EE\u5F55\u91CC\u6311\u9009\uFF0C\u7136\u540E\u518D\u7CBE\u786E\u67E5\u8BE2\u76EE\u6807\u670D\u52A1\u6216\u4E8B\u4EF6\u3002\u7CBE\u786E\u67E5\u8BE2\u8FD4\u56DE\u7ED3\u6784\u5316\u5951\u7EA6\u53CA\u5176\u5F15\u7528\u7684\u7C7B\u578B\u3002
-- \u8FD0\u884C\u65F6\uFF0C\u63D2\u4EF6\u5FC5\u987B\u8C03\u7528\u771F\u5B9E\u670D\u52A1\u3001\u76D1\u542C\u771F\u5B9E\u4E8B\u4EF6\u3002\u4E0D\u8981\u7F13\u5B58\u3001\u5C55\u793A Inspect \u7ED3\u679C\uFF0C\u4E5F\u4E0D\u8981\u628A\u5B83\u5F53\u4E1A\u52A1\u6570\u636E\u4F9D\u8D56\u3002
-
-## \u8EAB\u4EFD\u3001\u7248\u672C\u4E0E\u6279\u51C6
-
-- pluginId \u6807\u8BC6\u4E00\u4E2A\u53EF\u4EE5\u968F\u65F6\u95F4\u4FEE\u6539\u7684\u63D2\u4EF6\u3002\u65B0\u5EFA\u63D2\u4EF6\u53EA\u63D0\u4EA4 3\u20136 \u4E2A\u5C0F\u5199\u82F1\u6587\u5B57\u6BCD\u7684\u8BED\u4E49\u5316 idPrefix\uFF1B\u6700\u7EC8 ID \u7531\u5BBF\u4E3B\u5206\u914D\u3002
-- packageId \u6807\u8BC6\u63D2\u4EF6\u4E0B\u4E00\u4E2A\u4E0D\u53EF\u53D8\u7684\u5BBF\u4E3B/\u5BA2\u6237\u7AEF\u6E90\u7801\u7248\u672C\u3002\u8981\u6539\u4EE3\u7801\u5C31\u5B9A\u4E49\u65B0\u5305\uFF0C\u7EDD\u4E0D\u8986\u76D6\u65E7\u7248\u672C\u3002
-- pluginRunId \u6807\u8BC6\u4E00\u6B21\u6FC0\u6D3B\u5C1D\u8BD5\uFF0C\u5173\u8054\u5176\u6279\u51C6\u3001\u5BBF\u4E3B/\u5BA2\u6237\u7AEF\u52A0\u8F7D\u3001\u79C1\u6709 RPC\u3001Run \u5361\u7247\u4E0E\u9519\u8BEF\u3002
-- currentPackageId \u662F\u6700\u8FD1\u4E00\u6B21\u5B8C\u5168\u6210\u529F\u7684\u5305\u3002\u505C\u6B62\u3001\u542F\u52A8\u66F4\u65B0\u6216\u66F4\u65B0\u5931\u8D25\u90FD\u4E0D\u4F1A\u6E05\u9664\u5B83\u3002
-- nextPackageId \u662F\u7B49\u5F85\u6279\u51C6\u3001\u6B63\u5728\u5C1D\u8BD5\u3001\u7B49\u5F85\u5BA2\u6237\u7AEF\u6FC0\u6D3B\u6216\u6700\u8FD1\u5931\u8D25\u7684\u76EE\u6807\u5305\u3002
-- \u5355\u4E2A\u5BF9\u52FE\u53EA\u6279\u51C6\u5F53\u524D\u5305\uFF1B\u53CC\u5BF9\u52FE\u6279\u51C6\u540C\u4E00\u63D2\u4EF6\u672A\u6765\u7684\u7248\u672C\u3002\u6280\u672F\u5931\u8D25\u540E\u6388\u6743\u4ECD\u7136\u6709\u6548\u3002
-- \u66F4\u65B0\u4F1A\u5728\u542F\u52A8\u76EE\u6807\u5305\u4E4B\u524D\u505C\u6B62\u65E7 Run\u3002\u5931\u8D25\u4E0D\u4F1A\u81EA\u52A8\u91CD\u542F\u65E7\u7248\u672C\uFF1B\u4E4B\u540E\u7528 update \u91CD\u8BD5\uFF0C\u6216\u7528 run \u56DE\u6EDA\u5230 current\u3002
-
-\u5F53\u7528\u6237\u8F93\u5165 @pluginId \u65F6\uFF0C\u7CFB\u7EDF\u6CE8\u5165\u8EAB\u4EFD\u3001\u9ED8\u8BA4\u57FA\u7840\u5305\u3001\u7248\u672C\u6307\u9488\u4E0E\u8FD0\u884C\u72B6\u6001\uFF0C\u4F46\u4E0D\u6CE8\u5165\u6E90\u7801\uFF1A
-
-1. \u8C03\u7528 cordis_inspect_self(pluginId, packageId) \u8BFB\u53D6\u76EE\u6807\u6E90\u7801\u3002
-2. \u4EE5\u65E2\u6709\u6A21\u5F0F\u4F7F\u7528 cordis_define\uFF0C\u5411\u540C\u4E00\u63D2\u4EF6\u8FFD\u52A0\u5305\u3002
-3. \u6309\u7248\u672C\u5173\u7CFB\u4EE5 run \u6216 update \u6A21\u5F0F\u8C03\u7528 cordis_run\u3002
-
-\u7EDD\u4E0D\u4E3A @pluginId \u6084\u6084\u53E6\u5EFA\u63D2\u4EF6\u3002\u5982\u679C\u8BE5\u5F15\u7528\u56E0\u4E3A\u88AB\u5220\u9664\u3001\u5C5E\u4E8E\u522B\u7684\u4F1A\u8BDD\u6216\u968F\u8FDB\u7A0B\u91CD\u542F\u4E22\u5931\u800C\u4E0D\u53EF\u7528\uFF0C\u76F4\u63A5\u544A\u8BC9\u7528\u6237\u3002
-
-## \u5FC5\u987B\u907F\u514D\u7684\u9AD8\u9891\u9519\u8BEF
-
-### \u670D\u52A1\uFF1Actx.get \u4E0E inject
-
-- \u9ED8\u8BA4\u7528 ctx.get('serviceName') \u8BFB\u53D6\u53EF\u9009\u670D\u52A1\uFF0C\u5E76\u5904\u7406 undefined\u3002
-- \u53EA\u6709\u5F53\u8BE5\u670D\u52A1\u662F\u786C\u4F9D\u8D56\u3001\u4E14\u63D2\u4EF6\u5FC5\u987B\u8FDB\u5165\u7B49\u5F85\uFF08\u76F4\u5230 Cordis \u5728\u670D\u52A1\u51FA\u73B0\u540E\u91CD\u65B0\u6FC0\u6D3B\u5B83\uFF09\u65F6\uFF0C\u624D\u5728\u8FD4\u56DE\u7684\u63D2\u4EF6\u5BF9\u8C61\u4E0A\u58F0\u660E inject: ['serviceName']\u3002
-- \u53EA\u6709\u5728 inject \u91CC\u58F0\u660E\u8FC7\u67D0\u670D\u52A1\u540E\uFF0C\u624D\u80FD\u4EE5 ctx.serviceName \u5C5E\u6027\u65B9\u5F0F\u8BFB\u53D6\u3002\u7EDD\u4E0D\u8981\u4EE5 ctx \u5C5E\u6027\u8BBF\u95EE\u672A\u58F0\u660E\u7684\u670D\u52A1\u3002
-
-\`\`\`js
-return {
-  inject: ['requiredService'],
-  apply(ctx) {
-    ctx.requiredService.someMethod()
-    const optionalService = ctx.get('optionalService')
-    if (optionalService !== undefined) optionalService.someMethod()
-  },
-}
-\`\`\`
-
-### \u4EE3\u7801\uFF1A\u53EA\u7528\u666E\u901A JavaScript
-
-- \u5BBF\u4E3B\u4E0E\u5BA2\u6237\u7AEF\u4EE3\u7801\u4E0D\u7ECF TypeScript\u3001JSX \u6216\u6253\u5305\u5668\u8F6C\u6362\u3002
-- \u4E0D\u8981\u7528 TypeScript \u7C7B\u578B\u3001as\u3001\u88C5\u9970\u5668\u3001import\u3001require \u6216 JSX\u3002
-- \u5BA2\u6237\u7AEF React \u4EE3\u7801\u5FC5\u987B\u7528 React.createElement(...)\uFF1B\u7EDD\u4E0D\u5199 <Component />\u3002
-- \u4E0D\u8981\u5047\u8BBE process\u3001Buffer\u3001window\u3001document\u3001fetch\u3001\u539F\u751F\u5B9A\u65F6\u5668\u6216\u4EFB\u4F55\u5176\u5B83\u5168\u5C40\u53EF\u7528\u3002\u5148\u67E5\u8BE2\u5BF9\u5E94\u5E73\u53F0\u7684 Builtins \u4E0E\u670D\u52A1\u3002
-
-### \u6570\u636E\uFF1A\u4E0D\u8981\u5E8F\u5217\u5316\u6D3B\u6570\u636E
-
-- \u670D\u52A1\u3001\u4E8B\u4EF6\u3001\u69FD\u4F4D\u3001\u4F1A\u8BDD\u53CA\u5176\u884D\u751F\u7684 Cordis/DSH \u5BF9\u8C61\u662F\u5185\u90E8\u6D3B\u6570\u636E\uFF0C\u4E0D\u662F\u53EF\u4EE5\u503E\u5012\u7684\u666E\u901A JSON\u3002
-- \u4E0D\u8981\u5BF9\u6D3B\u6570\u636E\u4F7F\u7528 JSON.stringify\u3001structuredClone\u3001\u9012\u5F52\u679A\u4E3E\u3001\u6574\u4F53\u590D\u5236\u6216\u6574\u5BF9\u8C61\u5C55\u793A\u3002
-- \u53EA\u8BFB\u53D6\u4EFB\u52A1\u6240\u9700\u7684\u53F6\u5B50\u5B57\u6BB5\uFF0C\u7136\u540E\u6784\u9020\u4E0D\u5E26\u5BBF\u4E3B\u5F15\u7528\u7684\u6700\u5C0F\u81EA\u6709\u6570\u636E\u5BF9\u8C61\u3002
-
-### \u751F\u547D\u5468\u671F\uFF1A\u6BCF\u4E2A\u526F\u4F5C\u7528\u90FD\u5FC5\u987B\u53EF\u9006
-
-- \u670D\u52A1\u3001\u4E8B\u4EF6\u3001\u5DE5\u5177\u3001\u5904\u7406\u5668\u3001\u5B9A\u65F6\u5668\u3001\u69FD\u4F4D\u3001\u6837\u5F0F\u4E0E\u4E3B\u9898\u8986\u76D6\u90FD\u5FC5\u987B\u5C5E\u4E8E\u5F53\u524D Fiber\u3002
-- \u7528 ctx.effect()\u3001ctx.on() \u6216\u8FD4\u56DE disposer \u7684\u5B98\u65B9 API\uFF0C\u4FDD\u8BC1 stop\u3001update \u6216 undefine \u80FD\u79FB\u9664\u6BCF\u4E2A\u526F\u4F5C\u7528\u3002
-- cordis-plugin-development \u6280\u80FD\u5305\u542B\u5B9A\u65F6\u5668\u3001\u7011\u5E03\u6D41\u3001\u69FD\u4F4D\u3001\u4E3B\u9898\u3001\u5DE5\u5177\u3001RPC \u4E0E React \u7684\u5B8C\u6574\u793A\u4F8B\u4E0E\u6545\u969C\u6392\u67E5\u3002
-
-## \u5BBF\u4E3B\u4E0E\u5BA2\u6237\u7AEF
-
-- \u5BBF\u4E3B\u8FD0\u884C\u5728 DSH \u7684 Node.js \u8FDB\u7A0B\u91CC\uFF0C\u9002\u5408\u6587\u4EF6\u3001\u7F51\u7EDC\u3001\u547D\u4EE4\u3001Agent/\u4F1A\u8BDD\u8BBF\u95EE\u3001\u5BBF\u4E3B\u4E8B\u4EF6\u3001\u670D\u52A1\u3001\u6A21\u578B\u5DE5\u5177\uFF0C\u4EE5\u53CA\u53EF\u88AB\u5BA2\u6237\u7AEF\u8C03\u7528\u7684 JSON \u65B9\u6CD5\u3002
-- \u5BA2\u6237\u7AEF\u8FD0\u884C\u5728\u6D4F\u89C8\u5668\u9875\u9762\u91CC\uFF0C\u9002\u5408\u4E3B\u9898\u3001\u5E03\u5C40\u3001\u5F53\u524D\u9875\u9762\u72B6\u6001\u3001\u5DE5\u5177\u5361\u7247\u4E0E\u69FD\u4F4D UI\u3002
-- \u5BBF\u4E3B\u4E0E\u5BA2\u6237\u7AEF\u901A\u8FC7\u5305\u79C1\u6709\u7684 JSON \u65B9\u6CD5\u901A\u4FE1\uFF1A\u5BBF\u4E3B\u7528 harness.handle(method, handler)\uFF0C\u5BA2\u6237\u7AEF\u7528 host.call(method, args)\u3002\u65B9\u5411\u662F\u5BA2\u6237\u7AEF\u2192\u5BBF\u4E3B\uFF0C\u4E14\u53EA\u6709\u65E0\u635F JSON \u53EF\u4EE5\u8DE8\u8D8A\u5B83\u3002
-- \u5BA2\u6237\u7AEF UI \u5FC5\u987B\u6CE8\u518C\u5728\u67E5\u8BE2\u5230\u7684\u69FD\u4F4D\u91CC\uFF1Bapply() \u4E0D\u80FD\u76F4\u63A5\u8FD4\u56DE React Element\u3002\u4E0D\u5E26 root \u67E5\u8BE2 Slots.listSubTree\uFF0C\u4ECE\u7D27\u51D1\u7684\u76EE\u7684/\u62D3\u6251\u6811\u91CC\u6311\u9009\uFF0C\u7136\u540E\u518D\u7CBE\u786E\u67E5\u8BE2\u76EE\u6807 root \u7684\u5B8C\u6574\u6CE8\u518C\u5951\u7EA6\u4E0E props\uFF0C\u4E4B\u540E\u624D\u5199\u4EE3\u7801\u3002
-- Run \u4E13\u5C5E\u9762\u677F\u4E0E\u786E\u5207\u7684\u69FD\u4F4D\u6CE8\u518C\u6A21\u5F0F\u89C1\u6280\u80FD\u4E0E Inspect Provider\u3002
-
-## \u5F02\u6B65\u7ED3\u679C\u4E0E\u6062\u590D
-
-- \u4E0D\u8981\u5728\u5DE5\u5177\u91CC\u7B49\u5F85\u53EA\u6709\u5F53\u524D\u56DE\u5408\u7ED3\u675F\u540E\u624D\u53EF\u80FD\u53D1\u751F\u7684\u6279\u51C6\u6216\u6D4F\u89C8\u5668\u5DE5\u4F5C\u3002
-- \u5F02\u6B65\u6210\u529F\u3001\u62D2\u7EDD\u4E0E\u8FD0\u884C\u65F6\u9519\u8BEF\u4F1A\u66F4\u65B0 Run \u72B6\u6001\uFF0C\u5E76\u901A\u8FC7 steering \u4E0A\u4E0B\u6587\u901A\u77E5\u4F60\u3002
-- \u6280\u672F\u5931\u8D25\u540E\uFF0C\u7528 cordis_inspect_self \u8BFB\u53D6\u786E\u5207\u5305\u6E90\u7801\u53CA\u5176 message/stack\u3002\u5728\u540C\u4E00\u63D2\u4EF6\u4E0B\u5B9A\u4E49\u4E00\u4E2A\u4FEE\u6B63\u540E\u7684\u5305\u5E76\u81EA\u4E3B\u91CD\u8BD5\u3002
-- \u5176\u5B83\u5931\u8D25\u539F\u56E0\u3001\u4FEE\u590D\u6D41\u7A0B\u4E0E\u5B8C\u6574\u6269\u5C55\u6A21\u5F0F\uFF0C\u4F7F\u7528 cordis-plugin-development \u6280\u80FD\u3002`;
-
-// vendor/prompt-customizer/zh/sdk.mjs
-var SDK_ZH = (original) => {
-  const at = String(original ?? "").indexOf("```ts");
-  if (at < 0) return null;
-  const head = `## \u4E3A run_code \u7F16\u5199\u4EE3\u7801
-
-\`run_code\` \u63A5\u53D7\u4E24\u4E2A\u5FC5\u586B\u53C2\u6570\uFF1A\`code\` \u2014\u2014 \u4E00\u4E2A\u5F02\u6B65 TypeScript \u51FD\u6570\u7684\u51FD\u6570\u4F53\uFF08\u53EA\u5141\u8BB8\u53EF\u64E6\u9664\u8BED\u6CD5 \u2014\u2014 \u4E0D\u7528 \`enum\` \u4E0E\u547D\u540D\u7A7A\u95F4\uFF1B\u7C7B\u578B\u6CE8\u89E3\u4EC5\u4F9B\u53C2\u8003\uFF0C\u8FD0\u884C\u65F6\u4F1A\u5265\u79BB\u7C7B\u578B\uFF09\u2014\u2014 \u548C \`description\`\uFF0C\u4E00\u6BB5\u8BF4\u660E\u8BE5\u7A0B\u5E8F\u505A\u4EC0\u4E48\u7684\u7B80\u77ED\u6458\u8981\u3002\u5728\u7A0B\u5E8F\u5185\u90E8\uFF1A
-
-- \u7528 \`await tools.name(args)\` \u8C03\u7528\u5DE5\u5177 \u2014\u2014 \u540D\u79F0\u53E4\u602A\u65F6\u7528\u5F15\u53F7\u8BBF\u95EE\uFF1A\`tools["my-tool"](args)\`\u3002\u6BCF\u6B21\u8C03\u7528\u90FD\u4F1A\u89E3\u6790\u4E3A\u8BE5\u5DE5\u5177\u7684\u89C4\u8303\u5316 JSON \u503C\u3002\u5DE5\u5177\u53C2\u6570\u5FC5\u987B\u662F\u65E0\u635F JSON\u3002
-- \u5931\u8D25\u7684\u5DE5\u5177\u8C03\u7528\u4F1A\u4EE5 \`ToolCallError\` reject\uFF0C\u5176 \`toolName\` \u6807\u8BC6\u5931\u8D25\u7684\u5DE5\u5177\uFF0C\`message\` \u4EBA\u7C7B\u53EF\u8BFB \u2014\u2014 \u7528 \`try/catch\` \u6355\u83B7\u540E\u7EE7\u7EED\u3002
-- \u76F8\u4E92\u72EC\u7ACB\u7684\u53EA\u8BFB\u8C03\u7528\u53EF\u4EE5\u5728 \`Promise.all\` \u4E0B\u5E76\u884C\uFF08\u5B89\u5168\u8C03\u7528\u5E76\u53D1\u6267\u884C\uFF1B\u4F1A\u6539\u52A8\u72B6\u6001\u7684\u8C03\u7528\u5355\u72EC\u6309\u63D0\u4EA4\u987A\u5E8F\u6267\u884C\uFF09\u3002\u6709\u4F9D\u8D56\u7684\u5DE5\u4F5C\u7528 \`await\` \u4E32\u884C\u3002
-- \u7528 \`return\` \u548C/\u6216 \`console.log(...)\` \u8F93\u51FA\u7ED3\u679C\u3002\u53EA\u6709\u4F60\u6253\u5370\u6216\u8FD4\u56DE\u7684\u5185\u5BB9\u624D\u7B97\u7A0B\u5E8F\u8F93\u51FA\u3002\u5305\u542B\u56FE\u7247\u7684\u6210\u529F\u5DE5\u5177\u7ED3\u679C\u4F1A\u5728\u8FD0\u884C\u7ED3\u675F\u540E\u9644\u4E0A\uFF0C\u4F9B\u4F60\u4E0B\u4E00\u6B65\u67E5\u770B\uFF1B\u5176\u5B83\u6240\u6709\u4E2D\u95F4\u7ED3\u679C\u90FD\u4E0D\u4F1A\u8FDB\u5165\u5BF9\u8BDD\uFF0C\u56E0\u6B64\u53EA\u63D0\u53D6\u4F60\u9700\u8981\u7684\u90E8\u5206\u3002`;
-  return head + "\n\n\u53EF\u7528\u5DE5\u5177\uFF1A\n\n" + original.slice(at);
-};
-
-// vendor/prompt-customizer/zh/index.mjs
-var ZH_SECTIONS = {
-  ...CORE,
-  "tool:dsh-undo-savepoint": UNDO,
-  "agent-teams:usage": TEAMS,
-  "tool:cordis": CORDIS,
-  "tools:sdk": SDK_ZH
-};
 
 // src/client/prompt/SectionsPane.tsx
 var import_react4 = require("react");
@@ -2252,8 +2225,8 @@ function useDragAutoScroll(ref) {
 }
 
 // src/client/prompt/SectionsPane.tsx
-var editKey = (key, name) => `${key}:${name}`;
-function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) {
+var editKey = (key, entry) => `${key}:${entryKey(entry)}`;
+function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const [filter, setFilter] = (0, import_react4.useState)("all");
   const [editing, setEditing] = (0, import_react4.useState)(null);
   const [draft, setDraft] = (0, import_react4.useState)("");
@@ -2263,16 +2236,16 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const [dropMark, setDropMark] = (0, import_react4.useState)(null);
   const scrollRef = (0, import_react4.useRef)(null);
   useDragAutoScroll(scrollRef);
-  const nativeIn = (key, name) => {
+  const nativeIn = (key, entry) => {
     const view = phases?.[key];
     if (view === void 0 || view === null) return null;
-    return (view.baseSections ?? []).some((sec) => sec.name === name);
+    return (view.baseSections ?? []).some((section) => sameEntry(section, entry));
   };
-  const mirrorReady = () => PART_ORDER.every((key) => nativeIn(key, "") !== null);
+  const mirrorReady = () => PHASE_KEYS.every((key) => phases?.[key] !== null && phases?.[key] !== void 0);
   const mirrorRows = () => mirroredRows(cfg, phases, nativeIn);
   const rowsOf = (key) => syncAll === true ? mirrorRows() : phaseRows(cfg, phases?.[key] ?? null, key);
-  const applyBlock = (key, name, blocked) => {
-    const patch = blockPatch(cfg, key, name, blocked);
+  const applyBlock = (key, entry, blocked) => {
+    const patch = blockPatch(cfg, key, entry, blocked);
     for (const [field, value] of Object.entries(patch)) {
       write(field, value);
     }
@@ -2284,11 +2257,9 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     }
     write("inject", mirrorPhaseInjectEntries(cfg, rows2, nativeIn));
     const denied = mirroredDeniedLists(rows2);
-    write("sections", denied.sections);
-    write("sectionsBootstrap", denied.sectionsBootstrap);
-    write("sectionsCompaction", denied.sectionsCompaction);
+    for (const descriptor of PHASES) write(descriptor.sectionField, denied[descriptor.sectionField]);
   };
-  const inBaseOf = (key, name) => nativeIn(key, name) === true;
+  const inBaseOf = (key, entry) => nativeIn(key, entry) === true;
   const persistPhase = (key, rows2) => {
     write("inject", phaseInjectEntries(cfg, key, rows2));
   };
@@ -2296,15 +2267,15 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     if (syncAll === true) persistMirror(rows2);
     else persistPhase(key, rows2);
   };
-  const toggleBlocked = (key, name) => {
+  const toggleBlocked = (key, row) => {
     if (syncAll === true) {
       const rows2 = rowsOf(key);
-      const row = rows2.find((item) => item.name === name);
-      if (row === void 0) return;
-      persistMirror(rows2.map((item) => item.name === name ? { ...item, blocked: !item.blocked } : item));
+      const target = rows2.find((item) => sameEntry(item, row));
+      if (target === void 0) return;
+      persistMirror(rows2.map((item) => sameEntry(item, row) ? { ...item, blocked: !item.blocked } : item));
       return;
     }
-    applyBlock(key, name, !deniedNames(cfg, key).includes(name));
+    applyBlock(key, row, !row.blocked);
   };
   const moveRow = (key, index, dir) => {
     const rows2 = rowsOf(key);
@@ -2315,85 +2286,95 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     next.splice(target, 0, item);
     persistRows(key, next);
   };
-  const removeFromPart = (key, name) => {
+  const removeFromPart = (key, row) => {
     if (syncAll === true) {
-      persistMirror(rowsOf(key).filter((row) => row.name !== name));
+      persistMirror(rowsOf(key).filter((item) => !sameEntry(item, row)));
       return;
     }
-    const phaseOfItem = injectPhaseOf(key);
-    const inject2 = (cfg.inject ?? []).filter((x) => {
-      if (x.name !== name) return true;
-      const itemPhase = x.phase ?? "always";
-      return !(itemPhase === phaseOfItem || itemPhase === "always");
-    });
+    const inject2 = (cfg.inject ?? []).filter((item) => !((item.phase ?? "always") === key && sameEntry(item, row)));
+    const stillAlways = inject2.some((item) => (item.phase ?? "always") === "always" && sameEntry(item, row));
     write("inject", inject2);
-    applyBlock(key, name, false);
+    if (stillAlways) applyBlock(key, row, true);
   };
   const startReplace = (key, row) => {
-    setEditing(editKey(key, row.name));
+    setEditing(editKey(key, row));
     setDraft(row.override || row.text);
   };
   const commitReplace = (key, row) => {
-    const patchRow = (r) => r.name !== row.name ? r : { ...r, override: draft, text: draft };
+    const patchRow = (candidate) => sameEntry(candidate, row) ? { ...candidate, override: draft, text: draft } : candidate;
     persistRows(key, rowsOf(key).map(patchRow));
     setEditing(null);
   };
   const restoreReplace = (key, row) => {
     const next = rowsOf(key).map(
-      (r) => r.name !== row.name ? r : { ...r, override: "", text: r.custom ? r.text : "" }
+      (candidate) => sameEntry(candidate, row) ? { ...candidate, override: "", text: candidate.custom ? candidate.text : "" } : candidate
     );
     persistRows(key, next);
-    if (!row.custom && Object.hasOwn(cfg.replace ?? {}, row.name)) {
-      const rest = { ...cfg.replace ?? {} };
-      delete rest[row.name];
-      write("replace", rest);
-    }
+    const rest = (cfg.replacements ?? []).filter((item) => !(sameEntry(item, row) && ((item.phase ?? "always") === "always" || (item.phase ?? "always") === key)));
+    if (rest.length !== (cfg.replacements ?? []).length) write("replacements", rest);
   };
   const addSection = (name, text, phase2) => {
+    const row = { name, text, replaced: false, custom: true, override: text, blocked: false };
     if (syncAll === true) {
-      persistMirror([...rowsOf(phase2), { name, text, replaced: false, custom: true, override: text, blocked: false }]);
+      persistMirror([...rowsOf(phase2), row]);
       return;
     }
-    const inject2 = (cfg.inject ?? []).slice();
-    inject2.push({ name, order: 120 + inject2.length, text, phase: phase2, custom: true });
-    write("inject", inject2);
+    write("inject", phaseInjectEntries(cfg, phase2, [...rowsOf(phase2), row]));
   };
-  const addFromPool = (key, name, text, copiedFrom) => {
-    if (text === "" || text.startsWith("<")) {
-      setNotice(t("sectionDynamicNoAdd", { name }));
+  const dynamicOf = (entry) => {
+    for (const key of PHASE_KEYS) {
+      const section = (phases?.[key]?.baseSections ?? []).find((candidate) => sameEntry(candidate, entry));
+      if (section !== void 0 && typeof section.dynamic === "boolean") return section.dynamic;
+    }
+    const poolSection = (inv?.sections ?? []).find((candidate) => sameEntry(candidate, entry));
+    return typeof poolSection?.dynamic === "boolean" ? poolSection.dynamic : void 0;
+  };
+  const addFromPool = (key, entry, text, copiedFrom) => {
+    const dynamic = dynamicOf(entry);
+    if (dynamic === true) {
+      setNotice(t("sectionDynamicNoAdd", { name: entry.name }));
       return;
     }
-    const body = poolText === void 0 ? text : poolText(name, text);
+    if (dynamic === void 0) {
+      setNotice(t("sectionDynamicUnsupported", { name: entry.name }));
+      return;
+    }
     setNotice(null);
     const rows2 = rowsOf(key);
-    const existing = rows2.find((row) => row.name === name);
-    const next = existing !== void 0 ? [...rows2.filter((row) => row.name !== name), syncAll === true ? { ...existing, blocked: false } : existing] : [...rows2, {
-      name,
+    const existing = rows2.find((row) => sameEntry(row, entry));
+    const next = existing !== void 0 ? [...rows2.filter((row) => !sameEntry(row, entry)), syncAll === true ? { ...existing, blocked: false } : existing] : [...rows2, {
+      name: entry.name,
+      ...entry.source === void 0 ? {} : { source: entry.source },
       text: "",
-      replaced: Object.hasOwn(cfg.replace ?? {}, name),
+      replaced: (cfg.replacements ?? []).some((item) => sameEntry(item, entry)),
       custom: false,
-      override: body,
+      override: text,
       blocked: false
     }];
-    if (syncAll !== true && existing === void 0 && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
-      applyBlock(key, name, false);
+    if (syncAll !== true && (existing === void 0 || existing.blocked) && inBaseOf(key, entry)) {
+      const patch = blockPatch(cfg, key, entry, false);
+      for (const [field, value] of Object.entries(patch)) write(field, value);
     }
     persistRows(key, next);
-    if (copiedFrom !== void 0) setNotice(t("sectionCopied", { name, to: stageLabel(key), from: copiedFrom }));
+    if (copiedFrom !== void 0) setNotice(t("sectionCopied", { name: entry.name, to: stageLabel(key), from: copiedFrom }));
   };
-  const removeFromPhase = (name) => {
+  const entryOfPayload2 = (payload) => ({
+    name: payload.name,
+    ...payload.source === void 0 ? {} : { source: payload.source }
+  });
+  const removeFromPhase = (entry) => {
     const rows2 = rowsOf(phase);
-    const row = rows2.find((item) => item.name === name);
+    const row = rows2.find((item) => sameEntry(item, entry));
     if (row === void 0) return;
     if (syncAll === true) {
-      const native = PART_ORDER.some((key) => nativeIn(key, name) === true);
-      persistMirror(row.custom || !native ? rows2.filter((item) => item.name !== name) : rows2.map((item) => item.name === name ? { ...item, blocked: true } : item));
-    } else if (row.custom || row.override !== "" || injectedNames.has(name)) {
-      removeFromPart(phase, name);
+      const native = PHASE_KEYS.some((key) => nativeIn(key, row) === true);
+      persistMirror(row.custom || !native ? rows2.filter((item) => !sameEntry(item, row)) : rows2.map((item) => sameEntry(item, row) ? { ...item, blocked: true } : item));
+    } else if (row.custom || row.override !== "" || injectedNames.has(entryKey(row))) {
+      removeFromPart(phase, row);
     } else {
-      applyBlock(phase, name, true);
+      applyBlock(phase, row, true);
     }
-    setNotice(t("sectionRemoved", { name, from: stageLabel(phase) }));
+    setNotice(t("sectionRemoved", { name: row.name, from: stageLabel(phase) }));
   };
   const dropOnRow = (event, target) => {
     const payload = payloadOf(event);
@@ -2401,32 +2382,34 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     event.preventDefault();
     event.stopPropagation();
     setDropMark(null);
-    if (payload.name === target.name) return;
+    const entry = entryOfPayload2(payload);
+    if (sameEntry(entry, target)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const pos = event.clientY < rect.top + rect.height / 2 ? "above" : "below";
     if (payload.from === phase) {
-      const next = reorderInsert(rowsOf(phase), payload.name, target.name, pos);
+      const next = reorderInsert(rowsOf(phase), entry, target, pos);
       if (next !== null) {
         persistRows(phase, next);
         setNotice(null);
       }
       return;
     }
-    addFromPool(phase, payload.name, payload.text ?? "", payload.from === "pool" ? void 0 : stageLabel(payload.from));
+    addFromPool(phase, entry, payload.text ?? "", payload.from === "pool" ? void 0 : stageLabel(payload.from));
   };
   const dropOnList = (event) => {
     const payload = payloadOf(event);
     if (payload === null || payload.kind !== "section") return;
     event.preventDefault();
     setDropMark(null);
+    const entry = entryOfPayload2(payload);
     if (payload.from !== phase) {
-      addFromPool(phase, payload.name, payload.text ?? "", payload.from === "pool" ? void 0 : stageLabel(payload.from));
+      addFromPool(phase, entry, payload.text ?? "", payload.from === "pool" ? void 0 : stageLabel(payload.from));
       return;
     }
     const list = rowsOf(phase);
     const last = list[list.length - 1];
-    if (last === void 0 || last.name === payload.name) return;
-    const next = reorderInsert(list, payload.name, last.name, "below");
+    if (last === void 0 || sameEntry(last, entry)) return;
+    const next = reorderInsert(list, entry, last, "below");
     if (next !== null) persistRows(phase, next);
   };
   const dropOnPool = (event) => {
@@ -2436,17 +2419,17 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     event.stopPropagation();
     setDropMark(null);
     if (payload.from !== phase) return;
-    removeFromPhase(payload.name);
+    removeFromPhase(entryOfPayload2(payload));
   };
   (0, import_react4.useEffect)(() => {
     setPhaseDropHandler((key, payload) => {
       if (payload.kind !== "section" || key === phase) return;
       if (syncAll === true && payload.from !== "pool") return;
-      addFromPool(key, payload.name, payload.text ?? "", stageLabel(phase));
+      addFromPool(key, entryOfPayload2(payload), payload.text ?? "", stageLabel(phase));
     });
     return () => setPhaseDropHandler(null);
   });
-  const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
+  const stageLabel = (key) => t(PHASE_LABEL_KEY[key]);
   const partNote = (key) => {
     const view = phases?.[key];
     if (view === void 0 || view === null) return null;
@@ -2460,25 +2443,26 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
     }
     return null;
   };
-  const isEditing = (key, row) => editing === editKey(key, row.name);
+  const isEditing = (key, row) => editing === editKey(key, row);
   const renderRow = (key, row, index, total) => {
     if (!rowVisible(row)) return null;
-    const mark = dropMark !== null && dropMark.startsWith(`${row.name}:`) ? dropMark.slice(row.name.length + 1) : null;
+    const identity = entryKey(row);
+    const mark = dropMark !== null && dropMark.startsWith(`${identity}:`) ? dropMark.slice(identity.length + 1) : null;
     return (0, import_react4.createElement)("div", {
-      key: row.name,
+      key: identity,
       style: {
         ...s.row,
         ...row.blocked ? s.rowBlocked : {},
         ...mark === "above" ? s.dropAbove : {},
         ...mark === "below" ? s.dropBelow : {},
-        ...dragName === row.name ? s.dragging : {}
+        ...dragName === identity ? s.dragging : {}
       },
       onDragOver: (event) => {
         if (!acceptsDrop(event, "section")) return;
         event.preventDefault();
         event.stopPropagation();
         const rect = event.currentTarget.getBoundingClientRect();
-        setDropMark(`${row.name}:${event.clientY < rect.top + rect.height / 2 ? "above" : "below"}`);
+        setDropMark(`${identity}:${event.clientY < rect.top + rect.height / 2 ? "above" : "below"}`);
       },
       onDrop: (event) => dropOnRow(event, row)
     }, [
@@ -2488,8 +2472,14 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
         title: t("drag"),
         style: s.dragHandle,
         onDragStart: (event) => {
-          setDragName(row.name);
-          beginDrag(event, { kind: "section", name: row.name, from: key, text: row.override || row.text });
+          setDragName(identity);
+          beginDrag(event, {
+            kind: "section",
+            name: row.name,
+            ...row.source === void 0 ? {} : { source: row.source },
+            from: key,
+            text: row.override || row.text
+          });
         },
         onDragEnd: () => {
           setDragName(null);
@@ -2500,7 +2490,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       (0, import_react4.createElement)("input", {
         type: "checkbox",
         checked: !row.blocked,
-        onChange: () => toggleBlocked(key, row.name),
+        onChange: () => toggleBlocked(key, row),
         title: row.blocked ? t("blockedOn") : t("blockedOff"),
         style: { margin: 0, cursor: "pointer", flex: "none" }
       }),
@@ -2509,9 +2499,10 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           (0, import_react4.createElement)("span", { style: s.code }, row.name),
           (0, import_react4.createElement)("span", { style: s.orderTag }, "#" + index),
           (0, import_react4.createElement)("span", { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t("manual") : t("system")),
+          row.source === void 0 ? null : (0, import_react4.createElement)("span", { style: s.badgeSystem }, `${row.source.kind}${row.source.id === void 0 ? "" : `:${row.source.id}`}`),
           // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
           // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
-          agentScoped.has(row.name) ? (0, import_react4.createElement)("span", { style: s.badgeSystem, title: t("agentScopedHint") }, t("agentScoped")) : null,
+          agentScoped.has(identity) ? (0, import_react4.createElement)("span", { style: s.badgeSystem, title: t("agentScopedHint") }, t("agentScoped")) : null,
           row.replaced ? (0, import_react4.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
           row.blocked ? (0, import_react4.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
         ]),
@@ -2520,17 +2511,17 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
           (0, import_react4.createElement)("div", { style: s.injectRow }, [
             (0, import_react4.createElement)("button", { style: s.mini, onClick: () => commitReplace(key, row) }, t("save")),
             (0, import_react4.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
-            !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
+            !row.custom && row.replaced ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
           ])
-        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.custom ? t("empty") : t("dynamic")))
+        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.dynamic === true ? t("dynamic") : t("empty")))
       ]),
       (0, import_react4.createElement)("div", { style: s.arrowCol }, [
         (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
         (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t("moveDown") }, "\u2193")
       ]),
       isEditing(key, row) ? null : (0, import_react4.createElement)("button", { style: s.mini, onClick: () => startReplace(key, row) }, t("replace")),
-      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name)) ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
-      row.custom ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t("delete") }, t("delete")) : null
+      !isEditing(key, row) && !row.custom && row.replaced ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null,
+      row.custom ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => removeFromPart(key, row), title: t("delete") }, t("delete")) : null
     ]);
   };
   const rows = rowsOf(phase);
@@ -2539,7 +2530,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
   const agentScoped = /* @__PURE__ */ new Set();
   for (const view of Object.values(phases ?? {})) {
     for (const section of view?.baseSections ?? []) {
-      if (section.scope === "agent") agentScoped.add(section.name);
+      if (section.scope === "agent") agentScoped.add(entryKey(section));
     }
   }
   const onCount = rows.filter((row) => !row.blocked).length;
@@ -2566,7 +2557,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
       rows.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
       addOpen ? (0, import_react4.createElement)(InjectForm, {
         onAdd: (name, text) => {
-          addSection(name, text, injectPhaseOf(phase));
+          addSection(name, text, phase);
           setAddOpen(false);
         },
         phaseLabel: stageLabel(phase),
@@ -2593,15 +2584,24 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }) 
         (0, import_react4.createElement)("div", { style: { ...s.muted, marginBottom: 4 } }, t("sectionsFourHint")),
         poolSections.length === 0 ? (0, import_react4.createElement)("div", { style: s.muted }, t("empty")) : null,
         poolSections.map((sec) => (0, import_react4.createElement)("div", {
-          key: sec.name,
+          key: entryKey(sec),
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
           title: t("drag"),
-          onDragStart: (event) => beginDrag(event, { kind: "section", name: sec.name, from: "pool", text: sec.text ?? "" }),
+          onDragStart: (event) => beginDrag(event, {
+            kind: "section",
+            name: sec.name,
+            ...sec.source === void 0 ? {} : { source: sec.source },
+            from: "pool",
+            text: sec.text ?? ""
+          }),
           onDragEnd: finishDrag
         }, [
           (0, import_react4.createElement)("div", { style: s.rowBody }, [
-            (0, import_react4.createElement)("div", { style: s.rowTitle }, (0, import_react4.createElement)("span", { style: s.code }, sec.name)),
+            (0, import_react4.createElement)("div", { style: s.rowTitle }, [
+              (0, import_react4.createElement)("span", { style: s.code }, sec.name),
+              sec.source === void 0 ? null : (0, import_react4.createElement)("span", { style: s.badgeSystem }, `${sec.source.kind}${sec.source.id === void 0 ? "" : `:${sec.source.id}`}`)
+            ]),
             (0, import_react4.createElement)("div", { style: s.preview }, String(sec.text ?? "").slice(0, 140) || t("dynamic"))
           ])
         ]))
@@ -2655,6 +2655,25 @@ function InjectForm({ onAdd, phaseLabel, t }) {
 
 // src/client/prompt/ToolsPane.tsx
 var import_react5 = require("react");
+function entryOf(tool) {
+  return normalizeEntry(tool);
+}
+function entryOfPayload(payload) {
+  return {
+    name: payload.name,
+    ...payload.source === void 0 ? {} : { source: payload.source }
+  };
+}
+function listHas(list, entry) {
+  return list.some((item) => sameEntry(item, entry));
+}
+function listWithout(list, entry) {
+  return list.filter((item) => !sameEntry(item, entry));
+}
+function listWith(list, entry) {
+  if (listHas(list, entry)) return list;
+  return [...list, { name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } }];
+}
 function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const [filter, setFilter] = (0, import_react5.useState)("all");
   const [notice, setNotice] = (0, import_react5.useState)(null);
@@ -2664,12 +2683,14 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   useDragAutoScroll(scrollRef);
   const excludeOf = (key) => {
     const tools = cfg.tools ?? {};
-    const list = key === "bootstrap" ? tools.bootstrap?.exclude : key === "compaction" ? tools.compaction?.exclude : tools.exclude;
+    const field = toolFieldOf(key);
+    const list = field === "static" ? tools.exclude : tools[field]?.exclude;
     return list ?? [];
   };
   const addOf = (key) => {
     const tools = cfg.tools ?? {};
-    const list = key === "bootstrap" ? tools.bootstrap?.add : key === "compaction" ? tools.compaction?.add : tools.add;
+    const field = toolFieldOf(key);
+    const list = field === "static" ? tools.add : tools[field]?.add;
     return list ?? [];
   };
   const writeLists = (key, exclude, add) => {
@@ -2677,103 +2698,128 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   };
   const writeSynced = (apply3) => {
     let tools = cfg.tools;
-    for (const k of PART_ORDER) {
-      const next = apply3(k, excludeOf(k), addOf(k));
+    let changed = false;
+    for (const key of PHASE_KEYS) {
+      const next = apply3(key, excludeOf(key), addOf(key));
       if (next === null) continue;
-      tools = withPhaseExclude(withPhaseAdd(tools, k, next.add), k, next.exclude);
+      changed = true;
+      tools = withPhaseExclude(withPhaseAdd(tools, key, next.add), key, next.exclude);
     }
-    write("tools", tools);
+    if (changed) write("tools", tools);
   };
-  const catalogOf = (key) => (phases?.[key]?.baseTools ?? []).map((tool) => tool.name);
-  const isInCatalog = (key, name) => catalogOf(key).includes(name);
+  const catalogOf = (key) => phases?.[key]?.baseTools ?? [];
+  const isInCatalog = (key, entry) => catalogOf(key).some((tool) => sameEntry(tool, entry));
   const registry = (() => {
-    const list = PART_ORDER.map((key) => phases?.[key]?.registryTools).find((x) => Array.isArray(x) && x.length > 0) ?? [];
-    return new Set(list);
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const key of PHASE_KEYS) {
+      for (const value of phases?.[key]?.registryTools ?? []) {
+        const entry = entryOf(value);
+        if (entry === void 0) continue;
+        const identity = entryKey(entry);
+        if (seen.has(identity)) continue;
+        seen.add(identity);
+        out.push(entry);
+      }
+    }
+    return out;
   })();
+  const inRegistry = (entry) => registry.some((candidate) => sameEntry(candidate, entry) || candidate.source === void 0 && candidate.name === entry.name);
   const stateOf = (tool) => tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
-  const isToggleable = (tool) => stateOf(tool) === "controllable" || stateOf(tool) === "locked-agent";
-  const isLockedExec = (tool) => stateOf(tool) === "locked-executor";
-  const isMaskedRow = (tool) => stateOf(tool) === "masked-plugin" || stateOf(tool) === "masked-own";
-  const reasonOf = (tool) => {
-    const st = stateOf(tool);
-    if (st === "locked-agent") return { label: t("toolAgentScoped"), hint: t("toolAgentScopedHint") };
-    if (st === "locked-executor") return { label: t("toolExecutorScoped"), hint: t("toolExecutorScopedHint") };
-    if (st === "masked-own") return { label: t("toolMaskedByOwnPlugin"), hint: t("toolMaskedByOwnPluginHint") };
-    return { label: t("toolMaskedByPlugin"), hint: t("toolMaskedByPluginHint") };
+  const isToggleable = (tool) => {
+    const state = stateOf(tool);
+    return state === "controllable" || state === "locked-agent";
   };
-  const addToPhase = (key, name, hidden) => {
+  const isLockedExec = (tool) => stateOf(tool) === "locked-executor";
+  const isMaskedRow = (tool) => {
+    const state = stateOf(tool);
+    return state === "masked-plugin" || state === "masked-own";
+  };
+  const addToPhase = (key, entry, hidden) => {
     let exclude = excludeOf(key);
     let add = addOf(key);
-    if (!isInCatalog(key, name) && !add.includes(name)) add = [...add, name];
-    exclude = hidden ? exclude.includes(name) ? exclude : [...exclude, name] : exclude.filter((x) => x !== name);
+    if (!isInCatalog(key, entry) && !listHas(add, entry)) add = listWith(add, entry);
+    exclude = hidden ? listHas(exclude, entry) ? exclude : listWith(exclude, entry) : listWithout(exclude, entry);
     writeLists(key, exclude, add);
   };
   const rowsOf = (key) => {
-    const catalog = (phases?.[key]?.baseTools ?? []).filter((tool) => isToggleable(tool) || isLockedExec(tool)).map((tool) => ({
+    const catalog = catalogOf(key).filter((tool) => isToggleable(tool) || isLockedExec(tool)).map((tool) => ({
       name: tool.name,
+      ...tool.source === void 0 ? {} : { source: tool.source },
       description: tool.description ?? "",
       hidden: isLockedExec(tool) ? false : tool.hidden === true,
       added: false,
       state: stateOf(tool),
-      ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {}
+      ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {},
+      ...tool.keySuffix === void 0 ? {} : { keySuffix: tool.keySuffix }
     }));
-    const names = new Set(catalog.map((row) => row.name));
-    const added = addOf(key).filter((name) => !names.has(name)).map((name) => ({ name, description: "", hidden: false, added: true, state: "controllable" }));
+    const added = addOf(key).filter((entry) => !catalog.some((row) => sameEntry(row, entry))).map((entry) => ({
+      name: entry.name,
+      ...entry.source === void 0 ? {} : { source: entry.source },
+      description: "",
+      hidden: false,
+      added: true,
+      state: "controllable"
+    }));
     return [...catalog, ...added];
   };
-  const toggleHide = (key, name, currentlyHidden) => {
+  const toggleHide = (key, row, currentlyHidden) => {
     if (syncAll) {
-      writeSynced((_k, exclude, add) => {
-        if (currentlyHidden) return { exclude: exclude.filter((x) => x !== name), add };
-        if (add.includes(name)) return { exclude, add: add.filter((x) => x !== name) };
-        return exclude.includes(name) ? null : { exclude: [...exclude, name], add };
+      writeSynced((_key, exclude, add) => {
+        if (currentlyHidden) return { exclude: listWithout(exclude, row), add };
+        if (listHas(add, row)) return { exclude, add: listWithout(add, row) };
+        return listHas(exclude, row) ? null : { exclude: listWith(exclude, row), add };
       });
       setNotice(null);
       return;
     }
     if (currentlyHidden) {
-      addToPhase(key, name, false);
+      addToPhase(key, row, false);
     } else {
       let exclude = excludeOf(key);
       let add = addOf(key);
-      if (add.includes(name)) add = add.filter((x) => x !== name);
-      else if (!exclude.includes(name)) exclude = [...exclude, name];
+      if (listHas(add, row)) add = listWithout(add, row);
+      else if (!listHas(exclude, row)) exclude = listWith(exclude, row);
       writeLists(key, exclude, add);
     }
     setNotice(null);
   };
-  const addFromPool = (key, name) => {
-    if (!isInCatalog(key, name) && !registry.has(name)) {
-      setNotice({ kind: "warn", text: t("toolNotInRegistry", { name }) });
+  const addFromPool = (key, entry) => {
+    if (!isInCatalog(key, entry) && !inRegistry(entry)) {
+      setNotice({ kind: "warn", text: t("toolNotInRegistry", { name: entry.name }) });
       return;
     }
     if (syncAll) {
-      writeSynced((k, exclude, add) => ({
-        exclude: exclude.filter((x) => x !== name),
-        add: !isInCatalog(k, name) && !add.includes(name) ? [...add, name] : add
+      writeSynced((phaseKey, exclude, add) => ({
+        exclude: listWithout(exclude, entry),
+        add: !isInCatalog(phaseKey, entry) && !listHas(add, entry) ? listWith(add, entry) : add
       }));
-      setNotice({ kind: "ok", text: t("toolSyncShown", { name }) });
+      setNotice({ kind: "ok", text: t("toolSyncShown", { name: entry.name }) });
       return;
     }
-    addToPhase(key, name, false);
-    setNotice({ kind: "ok", text: isInCatalog(key, name) ? t("toolShown", { name, to: stageLabel(key) }) : t("toolAdded", { name, phase: stageLabel(key) }) });
+    addToPhase(key, entry, false);
+    setNotice({
+      kind: "ok",
+      text: isInCatalog(key, entry) ? t("toolShown", { name: entry.name, to: stageLabel(key) }) : t("toolAdded", { name: entry.name, phase: stageLabel(key) })
+    });
   };
-  const removeFromPhase = (key, name) => {
+  const removeFromPhase = (key, entry) => {
     let exclude = excludeOf(key);
     let add = addOf(key);
-    if (add.includes(name)) add = add.filter((item) => item !== name);
-    else if (!exclude.includes(name)) exclude = [...exclude, name];
+    if (listHas(add, entry)) add = listWithout(add, entry);
+    else if (!listHas(exclude, entry)) exclude = listWith(exclude, entry);
     writeLists(key, exclude, add);
-    setNotice({ kind: "ok", text: t("toolRemovedFromPhase", { name, from: stageLabel(key) }) });
+    setNotice({ kind: "ok", text: t("toolRemovedFromPhase", { name: entry.name, from: stageLabel(key) }) });
   };
   const dropToolInto = (key, payload) => {
     if (payload.kind !== "tool" || payload.from === key) return;
+    const entry = entryOfPayload(payload);
     if (payload.from === "pool") {
-      addFromPool(key, payload.name);
+      addFromPool(key, entry);
       return;
     }
-    addToPhase(key, payload.name, payload.hidden === true);
-    setNotice({ kind: "ok", text: t("toolCopied", { name: payload.name, to: stageLabel(key), from: stageLabel(payload.from) }) });
+    addToPhase(key, entry, payload.hidden === true);
+    setNotice({ kind: "ok", text: t("toolCopied", { name: entry.name, to: stageLabel(key), from: stageLabel(payload.from) }) });
   };
   const dropOnPane = (event) => {
     const payload = payloadOf(event);
@@ -2789,34 +2835,35 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     event.preventDefault();
     event.stopPropagation();
     setDropMark(null);
-    if (payload.from === phase) removeFromPhase(phase, payload.name);
+    if (payload.from === phase) removeFromPhase(phase, entryOfPayload(payload));
   };
   (0, import_react5.useEffect)(() => {
     setPhaseDropHandler((key, payload) => dropToolInto(key, payload));
     return () => setPhaseDropHandler(null);
   });
-  const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
+  const stageLabel = (key) => t(PHASE_LABEL_KEY[key]);
   const rows = rowsOf(phase);
   const onCount = rows.filter((row) => !row.hidden).length;
   const offCount = rows.length - onCount;
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.hidden : row.hidden);
   const renderRow = (row) => {
     if (!rowVisible(row)) return null;
-    const locked = isLockedExec(row);
+    const locked = row.state === "locked-executor";
+    const identity = `${entryKey(row)}\0${row.keySuffix ?? ""}`;
     return (0, import_react5.createElement)("div", {
-      key: row.name,
+      key: identity,
       style: {
         ...s.row,
         ...row.hidden ? s.rowBlocked : {},
-        ...dropMark === row.name ? s.dropZoneActive : {},
-        ...dragName === row.name ? s.dragging : {}
+        ...dropMark === identity ? s.dropZoneActive : {},
+        ...dragName === identity ? s.dragging : {}
       },
       title: row.description.slice(0, 120),
       onDragOver: (event) => {
         if (!acceptsDrop(event, "tool")) return;
         event.preventDefault();
         event.stopPropagation();
-        setDropMark(row.name);
+        setDropMark(identity);
       },
       onDrop: dropOnPane
     }, [
@@ -2826,8 +2873,15 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         title: locked ? t("toolExecutorScopedHint") : t("drag"),
         style: s.dragHandle,
         onDragStart: (event) => {
-          setDragName(row.name);
-          beginDrag(event, { kind: "tool", name: row.name, from: phase, hidden: row.hidden });
+          setDragName(identity);
+          beginDrag(event, {
+            kind: "tool",
+            name: row.name,
+            ...row.source === void 0 ? {} : { source: row.source },
+            ...row.keySuffix === void 0 ? {} : { keySuffix: row.keySuffix },
+            from: phase,
+            hidden: row.hidden
+          });
         },
         onDragEnd: () => {
           setDragName(null);
@@ -2839,13 +2893,15 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         type: "checkbox",
         checked: locked ? true : !row.hidden,
         disabled: locked,
-        onChange: () => toggleHide(phase, row.name, row.hidden),
+        onChange: () => toggleHide(phase, row, row.hidden),
         title: locked ? t("toolExecutorScopedHint") : row.hidden ? t("hiddenOn") : t("hiddenOff"),
         style: { margin: 0, cursor: locked ? "not-allowed" : "pointer", flex: "none" }
       }),
       (0, import_react5.createElement)("div", { style: s.rowBody }, [
         (0, import_react5.createElement)("div", { style: s.rowTitle }, [
           (0, import_react5.createElement)("span", { style: s.code }, row.name),
+          row.source === void 0 ? null : (0, import_react5.createElement)("span", { style: s.badgeSystem }, sourceLabel(row.source)),
+          row.keySuffix === void 0 ? null : (0, import_react5.createElement)("span", { style: s.badgeSystem }, row.keySuffix),
           row.added ? (0, import_react5.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
           row.state === "locked-agent" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolAgentScopedHint") }, t("toolAgentScoped")) : null,
           row.state === "locked-executor" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : null,
@@ -2855,24 +2911,61 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       ])
     ]);
   };
-  const allTools = (inv?.tools ?? []).filter((tool) => isToggleable(tool)).map((tool) => ({ name: tool.name, description: tool.description ?? "" }));
-  const readOnlyTools = (() => {
+  const allTools = (inv?.tools ?? []).filter((tool) => isToggleable(tool)).map((tool) => ({
+    name: tool.name,
+    ...tool.source === void 0 ? {} : { source: tool.source },
+    description: tool.description ?? "",
+    keySuffix: tool.keySuffix
+  }));
+  const readOnly = (() => {
     const map = /* @__PURE__ */ new Map();
     const consider = (tool) => {
-      if (typeof tool.name !== "string" || tool.name === "" || !isMaskedRow(tool) || map.has(tool.name)) return;
-      map.set(tool.name, {
-        name: tool.name,
-        description: tool.description ?? "",
-        ...tool.state === void 0 ? {} : { state: tool.state },
-        ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {},
-        ...tool.maskedByPlugin === true ? { maskedByPlugin: true } : {},
-        ...tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}
-      });
+      if (tool.name === "" || !isMaskedRow(tool)) return;
+      const entry = normalizeEntry(tool);
+      if (entry === void 0) return;
+      const identity = entryKey(entry);
+      const state = stateOf(tool);
+      const existing = map.get(identity);
+      if (existing === void 0) {
+        map.set(identity, { entry, description: tool.description ?? "", states: /* @__PURE__ */ new Set([state]) });
+      } else {
+        existing.states.add(state);
+        if (existing.description === "" && (tool.description ?? "") !== "") existing.description = tool.description ?? "";
+      }
     };
     for (const tool of inv?.tools ?? []) consider(tool);
-    for (const key of PART_ORDER) for (const tool of phases?.[key]?.baseTools ?? []) consider(tool);
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+    for (const key of PHASE_KEYS) for (const tool of catalogOf(key)) consider(tool);
+    return [...map.values()].sort((left, right) => left.entry.name.localeCompare(right.entry.name));
   })();
+  const readOnlyGroups = (() => {
+    const groups = /* @__PURE__ */ new Map();
+    for (const row of readOnly) {
+      const key = sourceKey(row.entry.source);
+      const group = groups.get(key);
+      if (group === void 0) groups.set(key, { ...row.entry.source === void 0 ? {} : { source: row.entry.source }, rows: [row] });
+      else group.rows.push(row);
+    }
+    return [...groups.values()].sort((left, right) => {
+      const leftKind = left.source?.kind;
+      const rightKind = right.source?.kind;
+      const leftRank = leftKind === void 0 ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(leftKind);
+      const rightRank = rightKind === void 0 ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(rightKind);
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return String(left.source?.id ?? "").localeCompare(String(right.source?.id ?? ""));
+    });
+  })();
+  const sourceLabel = (source) => {
+    if (source === void 0) return t("sourceUnknown");
+    const label = t(SOURCE_LABEL_KEY[source.kind] ?? "sourceUnknown");
+    return source.id === void 0 ? label : `${label} \xB7 ${source.id}`;
+  };
+  const stateBadge = (state) => {
+    const own = state === "masked-own";
+    return (0, import_react5.createElement)("span", {
+      style: s.badgeReplaced,
+      title: own ? t("toolMaskedByOwnPluginHint") : t("toolMaskedByPluginHint")
+    }, own ? t("toolMaskedByOwnPlugin") : t("toolMaskedByPlugin"));
+  };
   return (0, import_react5.createElement)("div", { style: s.colLeft }, [
     (0, import_react5.createElement)("div", {
       ref: scrollRef,
@@ -2890,9 +2983,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       notice ? (0, import_react5.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
       rows.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
-      // 本系统全部工具：注册表的完整目录，只读池。加入某个阶段靠拖拽：把行拖进
-      // 上面的阶段列表 = 加入本阶段，拖到头部阶段 Tab = 加入那个阶段（行上不再
-      // 放三个按钮 —— 拖拽是唯一路径，池同时是「从阶段拿掉」的投放点）。
+      // 本系统全部工具：注册表的完整目录，只读池；拖入 / 拖出改变阶段名单。
       (0, import_react5.createElement)("details", {
         style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
         onDragOver: (event) => {
@@ -2910,37 +3001,47 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
         ),
         allTools.length === 0 ? (0, import_react5.createElement)("div", { style: s.muted }, t("empty")) : null,
         allTools.map((tool) => (0, import_react5.createElement)("div", {
-          key: tool.name,
+          key: `${entryKey(tool)}\0${tool.keySuffix ?? ""}`,
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
           title: t("dragHint"),
-          onDragStart: (event) => beginDrag(event, { kind: "tool", name: tool.name, from: "pool" }),
+          onDragStart: (event) => beginDrag(event, {
+            kind: "tool",
+            name: tool.name,
+            ...tool.source === void 0 ? {} : { source: tool.source },
+            ...tool.keySuffix === void 0 ? {} : { keySuffix: tool.keySuffix },
+            from: "pool"
+          }),
           onDragEnd: finishDrag
         }, [
           (0, import_react5.createElement)("div", { style: s.rowBody }, [
-            (0, import_react5.createElement)("div", { style: s.rowTitle }, (0, import_react5.createElement)("span", { style: s.code }, tool.name)),
+            (0, import_react5.createElement)("div", { style: s.rowTitle }, [
+              (0, import_react5.createElement)("span", { style: s.code }, tool.name),
+              tool.source === void 0 ? null : (0, import_react5.createElement)("span", { style: s.badgeSystem }, sourceLabel(tool.source))
+            ]),
             tool.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120)) : null
           ])
         ]))
       ]),
-      // 只读「完整目录」：不可控工具（agent 作用域 / 执行器 / 被别的插件遮蔽 / 被本
-      // 插件遮蔽）集中展示，解释「为什么有的工具在面板里、有的不在」，不可操作。
-      readOnlyTools.length === 0 ? null : (0, import_react5.createElement)("details", { style: s.injectBox }, [
-        (0, import_react5.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("completeCatalogTitle")} (${readOnlyTools.length})`),
+      // 只读「完整目录」：不可控工具按来源分组，同一 name+source 的多状态聚合一行。
+      readOnly.length === 0 ? null : (0, import_react5.createElement)("details", { style: s.injectBox }, [
+        (0, import_react5.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("completeCatalogTitle")} (${readOnly.length})`),
         (0, import_react5.createElement)("div", { style: s.muted }, t("completeCatalogHint")),
-        readOnlyTools.map((tool) => {
-          const reason = reasonOf(tool);
-          const badge = tool.maskedByOwnPlugin === true || tool.maskedByPlugin === true ? s.badgeReplaced : s.badgeSystem;
-          return (0, import_react5.createElement)("div", { key: tool.name, style: { ...s.row, opacity: 0.8 } }, [
+        readOnlyGroups.map((group) => (0, import_react5.createElement)("div", { key: sourceKey(group.source) || "unknown" }, [
+          (0, import_react5.createElement)("div", { style: { ...s.muted, marginTop: 6, fontWeight: 600 } }, sourceLabel(group.source)),
+          group.rows.map((row) => (0, import_react5.createElement)("div", {
+            key: entryKey(row.entry),
+            style: { ...s.row, opacity: 0.8 }
+          }, [
             (0, import_react5.createElement)("div", { style: s.rowBody }, [
               (0, import_react5.createElement)("div", { style: s.rowTitle }, [
-                (0, import_react5.createElement)("span", { style: s.code }, tool.name),
-                (0, import_react5.createElement)("span", { style: badge, title: reason.hint }, reason.label)
+                (0, import_react5.createElement)("span", { style: s.code }, row.entry.name),
+                ...[...row.states].map((state) => stateBadge(state))
               ]),
-              tool.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, tool.description.slice(0, 120)) : null
+              row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
             ])
-          ]);
-        })
+          ]))
+        ]))
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。
@@ -3090,14 +3191,15 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
   const [name, setName] = (0, import_react6.useState)("");
   const { notice, show } = useNotice();
   const fileRef = (0, import_react6.useRef)(null);
-  const blockedNames = new Set(cfg.sections ?? []);
-  const assemblyNames = /* @__PURE__ */ new Set();
-  for (const key of PART_ORDER) {
-    for (const sec of phases?.[key]?.baseSections ?? []) assemblyNames.add(sec.name);
+  const blockedKeys = new Set((cfg.sections ?? []).map((entry) => entryKey(entry)));
+  const merged = mergeSections(inv, cfg, blockedKeys);
+  const currentEntries = /* @__PURE__ */ new Map();
+  for (const section of merged) currentEntries.set(entryKey(section), { name: section.name, ...section.source === void 0 ? {} : { source: section.source } });
+  for (const key of PHASE_KEYS) {
+    for (const section of phases?.[key]?.baseSections ?? []) {
+      currentEntries.set(entryKey(section), { name: section.name, ...section.source === void 0 ? {} : { source: section.source } });
+    }
   }
-  const mergedAll = mergeSections(inv, cfg, blockedNames);
-  const merged = assemblyNames.size === 0 ? mergedAll : mergedAll.filter((sec) => sec.source === "custom" || assemblyNames.has(sec.name));
-  const currentNames = new Set(merged.map((sec) => sec.name));
   const saveCurrent = () => {
     const presetName = name.trim() || `${t("preset")} ${presets.length + 1}`;
     const data = buildPresetData(cfg, merged);
@@ -3105,7 +3207,7 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     setName("");
   };
   const applyPreset = (preset) => {
-    writePatch(applyPresetData(preset.data, cfg, currentNames));
+    writePatch(applyPresetData(preset.data, cfg, currentEntries));
     if (applyLevel !== "workspace") writeGlobal("activePreset", preset.id);
   };
   const deletePreset = (id) => {
@@ -3303,7 +3405,13 @@ var import_react8 = require("react");
 // src/client/prompt/PreviewTools.tsx
 var import_react7 = require("react");
 function norm(tool) {
-  return typeof tool === "string" ? { name: tool, description: "" } : tool;
+  if (typeof tool === "string") return { name: tool, description: "" };
+  return {
+    name: tool.name,
+    description: tool.description ?? "",
+    ...tool.source === void 0 ? {} : { source: tool.source },
+    ...tool.keySuffix === void 0 ? {} : { keySuffix: tool.keySuffix }
+  };
 }
 function PreviewTools({ tools, t }) {
   if (tools.length === 0) return (0, import_react7.createElement)("div", { style: s.muted }, t("empty"));
@@ -3311,11 +3419,16 @@ function PreviewTools({ tools, t }) {
     (0, import_react7.createElement)("div", { style: s.rowTitle }, [
       (0, import_react7.createElement)("span", { style: s.orderTag }, `${tools.length} ${t("previewToolCount")}`)
     ]),
-    tools.map((tool) => {
-      const { name, description } = norm(tool);
-      return (0, import_react7.createElement)("div", { key: name, style: s.row }, [
+    tools.map((tool, index) => {
+      const { name, description, source, keySuffix } = norm(tool);
+      const identity = `${entryKey({ name, ...source === void 0 ? {} : { source } })}:${index}:${keySuffix ?? ""}`;
+      return (0, import_react7.createElement)("div", { key: identity, style: s.row }, [
         (0, import_react7.createElement)("div", { style: s.rowBody }, [
-          (0, import_react7.createElement)("div", { style: s.rowTitle }, (0, import_react7.createElement)("span", { style: s.code }, name)),
+          (0, import_react7.createElement)("div", { style: s.rowTitle }, [
+            (0, import_react7.createElement)("span", { style: s.code }, name),
+            source === void 0 ? null : (0, import_react7.createElement)("span", { style: s.badgeSystem }, `${source.kind}${source.id === void 0 ? "" : `:${source.id}`}`),
+            keySuffix === void 0 ? null : (0, import_react7.createElement)("span", { style: s.badgeSystem }, keySuffix)
+          ]),
           (0, import_react7.createElement)("div", { style: s.preview }, String(description ?? "").slice(0, 140))
         ])
       ]);
@@ -3327,6 +3440,7 @@ function PreviewTools({ tools, t }) {
 function PreviewPane({ t, phases, phase, sub, onToggleContext }) {
   const data = phases?.[phase] ?? null;
   const lossNote = data === null || data === void 0 ? null : data.takenOverBy !== void 0 ? t("sectionsTakenOver", { name: data.takenOverBy }) : data.lostSections !== void 0 ? t("sectionsLost", { emitted: data.lostSections.emitted, survived: data.lostSections.survived }) : null;
+  const baseContexts = data?.baseContexts;
   return (0, import_react8.createElement)("div", { style: s.colRight }, [
     (0, import_react8.createElement)("div", { style: s.colRightScroll }, [
       // 该阶段的本插件段级产出没进最终提示词（整段接管或被下游丢弃）。
@@ -3347,13 +3461,25 @@ function PreviewPane({ t, phases, phase, sub, onToggleContext }) {
         ]),
         (0, import_react8.createElement)("pre", { style: s.previewText }, data.text || t("empty")),
         (0, import_react8.createElement)("div", { style: s.rowTitle }, t("runtimeContexts")),
-        ...(data.baseContexts ?? (data.contexts ?? []).map((c) => ({ name: c.name, text: c.text, blocked: false }))).map((context) => (0, import_react8.createElement)("div", { key: context.name, style: { opacity: context.blocked ? 0.5 : 1 } }, [
-          (0, import_react8.createElement)("label", { style: { ...s.muted, display: "flex", alignItems: "center", gap: 6, cursor: onToggleContext ? "pointer" : "default" } }, [
-            onToggleContext ? (0, import_react8.createElement)("input", { type: "checkbox", checked: !context.blocked, onChange: (e) => onToggleContext(context.name, !e.currentTarget.checked) }) : null,
-            context.name
-          ]),
-          (0, import_react8.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
-        ]))
+        baseContexts === void 0 ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("contextsUnsupported")) : baseContexts.length === 0 ? (0, import_react8.createElement)("div", { style: s.muted }, t("empty")) : baseContexts.map((context, index) => {
+          const identity = `${entryKey(context)}:${index}`;
+          const disabled = onToggleContext === void 0;
+          const hidden = context.blocked === true || context.active === false;
+          return (0, import_react8.createElement)("div", { key: identity, style: { opacity: hidden ? 0.5 : 1 } }, [
+            (0, import_react8.createElement)("label", { style: { ...s.muted, display: "flex", alignItems: "center", gap: 6, cursor: disabled ? "default" : "pointer" } }, [
+              (0, import_react8.createElement)("input", {
+                type: "checkbox",
+                checked: !hidden,
+                disabled,
+                onChange: (e) => onToggleContext?.(context, !e.currentTarget.checked)
+              }),
+              context.name,
+              context.source === void 0 ? null : (0, import_react8.createElement)("span", { style: s.badgeSystem }, `${context.source.kind}${context.source.id === void 0 ? "" : `:${context.source.id}`}`),
+              context.dynamic === true ? (0, import_react8.createElement)("span", { style: s.badgeSystem }, t("dynamic")) : null
+            ]),
+            (0, import_react8.createElement)("pre", { style: s.previewText }, context.text || t("empty"))
+          ]);
+        })
       ] : null : data ? [
         // 模型视角 vs 注册表视角的对照：预览按所选阶段运行全部装配规则
         //（含预设原生的阶段裁剪），某些预设（如 PTC / Code Mode）会把
@@ -3380,10 +3506,13 @@ var CONFIG_SET_URL = "/api/prompt-customizer/config/set";
 var CONFIG_UNSET_URL = "/api/prompt-customizer/config/unset";
 var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
 var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
-var EXPORT_URL = "/api/prompt-customizer/export";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
-var VIEW_KEYS = ["bootstrap", "compaction", "active"];
-var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
+var DRAFT_FIELDS = [
+  ...PHASES.flatMap((phase) => [phase.sectionField, phase.contextField]),
+  "replacements",
+  "inject",
+  "tools"
+];
 function Panel({ t, onClose, level = "preset", workspace }) {
   const [cfg, setCfg] = (0, import_react9.useState)(null);
   const [inv, setInv] = (0, import_react9.useState)(null);
@@ -3399,6 +3528,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [dropPhase, setDropPhase] = (0, import_react9.useState)(null);
   const syncSeq = (0, import_react9.useRef)(0);
   const refreshSeq = (0, import_react9.useRef)(0);
+  const scopeKeyRef = (0, import_react9.useRef)("");
   const [target, setTarget] = (0, import_react9.useState)(void 0);
   const [syncAll, setSyncAll] = (0, import_react9.useState)(false);
   const [previewSub, setPreviewSub] = (0, import_react9.useState)("prompt");
@@ -3406,7 +3536,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [saving, setSaving] = (0, import_react9.useState)(false);
   const [flash, setFlash] = (0, import_react9.useState)(null);
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
-  const [exporting, setExporting] = (0, import_react9.useState)(false);
   const [backingUp, setBackingUp] = (0, import_react9.useState)(false);
   const [restoring, setRestoring] = (0, import_react9.useState)(false);
   const flashTimer = (0, import_react9.useRef)(null);
@@ -3422,9 +3551,17 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   (0, import_react9.useEffect)(load, []);
   const refresh = () => {
     const seq = ++refreshSeq.current;
-    if (level === "preset" && target === void 0) return Promise.resolve();
+    const scopeKey = `${level}\0${target ?? ""}\0${level === "workspace" ? workspace ?? currentWorkspace ?? "" : ""}`;
+    scopeKeyRef.current = scopeKey;
+    if (level === "preset" && target === void 0) {
+      setPhases(null);
+      setInv(null);
+      return Promise.resolve();
+    }
     const wsSel = level === "workspace" ? workspace ?? currentWorkspace ?? "" : "";
     const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ""}${wsSel === "" ? "" : `${target ? "&" : "?"}workspace=${encodeURIComponent(wsSel)}`}`;
+    setPhases(null);
+    setInv(null);
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
     const failures = [];
     const grab = (phase2) => fetch(PREVIEW_URL + params(phase2)).then((r) => r.json()).then((body) => {
@@ -3434,26 +3571,33 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       failures.push(`${phase2}: ${String(error2 instanceof Error ? error2.message : error2)}`);
       return null;
     });
-    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
+    return Promise.all([...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
       if (body.ok === false) throw new Error(body.error ?? "inventory failed");
       return body;
     }).catch((error2) => {
       failures.push(String(error2 instanceof Error ? error2.message : error2));
       return null;
-    })]).then(([boot, comp, act, inventoryData]) => {
-      if (seq !== refreshSeq.current) return;
-      setPhases({ bootstrap: boot, compaction: comp, active: act });
+    })]).then((responses) => {
+      const inventoryData = responses[responses.length - 1];
+      if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return;
+      const views = { ...{} };
+      PHASE_KEYS.forEach((key, index) => {
+        views[key] = responses[index];
+      });
+      setPhases(views);
       setInv(inventoryData);
       setError(failures.length ? failures.join("\n") : null);
     }).catch((e) => {
-      if (seq !== refreshSeq.current) return;
-      setPhases({ bootstrap: null, compaction: null, active: null });
+      if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return;
+      const empty = {};
+      for (const key of PHASE_KEYS) empty[key] = null;
+      setPhases(empty);
       setError(String(e instanceof Error ? e.message : e));
     });
   };
   (0, import_react9.useEffect)(() => {
     void refresh();
-  }, [target, version]);
+  }, [target, version, level, workspace, currentWorkspace]);
   const syncDraftPreview = () => {
     if (draft === null || !draft.dirty) return;
     if (level !== "preset") return;
@@ -3464,8 +3608,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     if (Object.keys(patch).length === 0) return;
     const seq = ++syncSeq.current;
-    const wsSel2 = level === "workspace" ? workspace ?? currentWorkspace ?? "" : "";
-    const scopeQs = `${target !== void 0 ? `?scope=${encodeURIComponent(target)}` : ""}${wsSel2 === "" ? "" : `${target !== void 0 ? "&" : "?"}workspace=${encodeURIComponent(wsSel2)}`}`;
+    const scopeQs = target !== void 0 ? `?scope=${encodeURIComponent(target)}` : "";
     fetch(PREVIEW_URL + scopeQs, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -3485,7 +3628,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     return () => {
       clearTimeout(timer);
     };
-  }, [draft, phase, target]);
+  }, [draft, phase, target, level, workspace, currentWorkspace]);
   const fetchPresets = () => {
     fetch(AGENT_PRESETS_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
       setAgentPresets(Array.isArray(body?.presets) ? body.presets : []);
@@ -3522,15 +3665,20 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   }
   const wsKey = workspace ?? currentWorkspace ?? void 0;
   const base = level === "workspace" ? overrideView(cfg, wsKey !== void 0 ? workspaceOverrides[wsKey] : void 0) : editView(cfg, target);
-  const view = draft ? {
-    ...base,
-    sections: draft.sections ?? base.sections,
-    sectionsBootstrap: draft.sectionsBootstrap ?? base.sectionsBootstrap,
-    sectionsCompaction: draft.sectionsCompaction ?? base.sectionsCompaction,
-    replace: draft.replace ?? base.replace,
-    inject: draft.inject ?? base.inject,
-    tools: draft.tools ?? base.tools
-  } : base;
+  const view = (() => {
+    if (draft === null) return base;
+    const next = {
+      ...base,
+      replacements: draft.replacements ?? base.replacements,
+      inject: draft.inject ?? base.inject,
+      tools: draft.tools ?? base.tools
+    };
+    for (const phase2 of PHASES) {
+      next[phase2.sectionField] = draft[phase2.sectionField] ?? base[phase2.sectionField];
+      next[phase2.contextField] = draft[phase2.contextField] ?? base[phase2.contextField];
+    }
+    return next;
+  })();
   const ep = phases;
   const writeField = (field, value) => {
     const url = value === void 0 ? CONFIG_UNSET_URL : CONFIG_SET_URL;
@@ -3558,10 +3706,10 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       showFlash(t("workspaceRequired"), "err");
       return;
     }
-    const EDITED_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
     const patch = {};
-    for (const field of EDITED_FIELDS) {
-      if (Object.hasOwn(draft, field)) patch[field] = draft[field];
+    const edited = draft;
+    for (const field of DRAFT_FIELDS) {
+      if (Object.hasOwn(edited, field)) patch[field] = edited[field];
     }
     setSaving(true);
     fetch(CONFIG_APPLY_URL, {
@@ -3612,41 +3760,38 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     writePatch(patch);
   };
-  const toggleContext = (name, hide) => {
-    const rows = phases?.[phase]?.baseContexts ?? (inv?.contexts ?? []);
-    const hidden = new Set(rows.filter((c) => c.blocked === true || c.active === false).map((c) => c.name));
-    if (hide) hidden.add(name);
-    else hidden.delete(name);
-    const arr = [...hidden];
-    const phaseKey = phase === "bootstrap" ? "contextsBootstrap" : phase === "compaction" ? "contextsCompaction" : "contexts";
-    const patch = syncAll ? { contexts: arr, contextsBootstrap: arr, contextsCompaction: arr } : { [phaseKey]: arr };
+  const toggleContext = (entry, hide) => {
+    const keys = syncAll ? PHASE_KEYS : [phase];
+    const patch = {};
+    for (const key of keys) {
+      const view2 = phases?.[key];
+      const base2 = view2?.baseContexts;
+      if (view2 === null || view2 === void 0 || !Array.isArray(base2)) {
+        showFlash(t("contextsNotReady"), "err");
+        return;
+      }
+      const hidden = base2.filter((context) => context.blocked === true || context.active === false).map((context) => ({ name: context.name, ...context.source === void 0 ? {} : { source: context.source } }));
+      const index = hidden.findIndex((candidate) => sameEntry(candidate, entry));
+      if (hide) {
+        if (index < 0) hidden.push(entry);
+      } else if (index >= 0) {
+        hidden.splice(index, 1);
+      }
+      const field = PHASES.find((descriptor) => descriptor.key === key).contextField;
+      patch[field] = hidden;
+    }
     writePatchLayered(patch);
   };
   const writeGlobal = writeField;
-  const zhOn = zhApplied(view, ZH_SECTIONS);
-  const poolText = (name, fallback) => {
-    if (!zhOn) return fallback;
-    const entry = ZH_SECTIONS[name];
-    const zh = typeof entry === "function" ? entry(fallback) : entry;
-    return typeof zh === "string" && zh !== "" ? zh : fallback;
-  };
-  const toggleZh = () => {
-    if (ep === null || ep.bootstrap === null || ep.active === null || ep.compaction === null) {
-      showFlash(t("zhNotReady"), "err");
-      return;
-    }
-    edit("inject", zhOn ? zhRevertInjectEntries(view, ep, ZH_SECTIONS) : zhMergedInjectEntries(view, ep, ZH_SECTIONS));
-    showFlash(zhOn ? t("zhReverted") : t("zhApplied"));
-  };
-  const nativeIn = (key, name) => {
+  const nativeIn = (key, entry) => {
     const view2 = ep?.[key];
     if (view2 === void 0 || view2 === null) return null;
-    return (view2.baseSections ?? []).some((sec) => sec.name === name);
+    return (view2.baseSections ?? []).some((section) => sameEntry(section, entry));
   };
   const toggleSyncAll = (on) => {
     setSyncAll(on);
     if (!on) return;
-    if (ep === null || VIEW_KEYS.some((key) => ep[key] === null)) {
+    if (ep === null || PHASE_KEYS.some((key) => ep[key] === null)) {
       showFlash(t("syncNotReady"), "err");
       return;
     }
@@ -3657,9 +3802,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     edit("inject", mirrorPhaseInjectEntries(view, rows, nativeIn));
     const denied = mirroredDeniedLists(rows);
-    edit("sections", denied.sections);
-    edit("sectionsBootstrap", denied.sectionsBootstrap);
-    edit("sectionsCompaction", denied.sectionsCompaction);
+    for (const descriptor of PHASES) edit(descriptor.sectionField, denied[descriptor.sectionField]);
     const skipped = mirrorSkippedNames(rows, nativeIn);
     showFlash(skipped.length > 0 ? `${t("syncApplied")} ${t("syncSkippedDynamic", { names: skipped.join("\u3001") })}` : t("syncApplied"));
   };
@@ -3689,23 +3832,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     if (draft?.dirty && !window.confirm(t("discardConfirm"))) return;
     clearDraft();
     setTarget(next);
-  };
-  const exportCurrentPreset = () => {
-    if (exporting) return;
-    setExporting(true);
-    fetch(`${EXPORT_URL}?scope=${encodeURIComponent(target)}`).then((r) => r.json()).then((body) => {
-      if (body?.ok !== true) throw new Error(body?.error ?? t("exportPresetFail"));
-      const filename = `prompt-customizer-${String(body.target ?? target)}.json`;
-      const text = JSON.stringify(body, null, 2);
-      const io = makeIoEnv();
-      void io.saveText(filename, text).then((outcome) => {
-        if (outcome.kind === "saved") showFlash(t("exportPresetOk", { name: filename }), "ok");
-        else if (outcome.kind === "unavailable") {
-          io.download(filename, text);
-          showFlash(t("exportPresetOk", { name: filename }), "ok");
-        }
-      });
-    }).catch((e) => showFlash(`${t("exportPresetFail")}\uFF1A${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setExporting(false));
   };
   const backupAll = () => {
     if (backingUp) return;
@@ -3753,12 +3879,12 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }).catch((e) => setError(`${t("restoreFail")}: ${e instanceof Error ? e.message : String(e)}`)).finally(() => setRestoring(false));
   };
   const modeBtn = (key, label) => (0, import_react9.createElement)("button", { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label);
-  const stageLabel = (key) => key === "bootstrap" ? t("phaseStageGuide") : key === "compaction" ? t("phaseStageControlled") : t("phaseStageResident");
+  const stageLabel = (key) => t(PHASE_LABEL_KEY[key]);
   const draftDirty = draft?.dirty === true;
   const targetChip = (id, label, icon, broken) => {
     const active = target === id;
     const bad = broken !== void 0 && broken !== "";
-    const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length;
+    const customized = Object.values(cfg?.overrides?.[id] ?? {}).filter(hasContent).length;
     return (0, import_react9.createElement)("button", {
       key: id,
       type: "button",
@@ -3803,7 +3929,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
         modeBtn("presets", t("tabsPresets"))
       ]),
       (0, import_react9.createElement)("div", { style: s.headActions }, [
-        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, VIEW_KEYS.map((key) => (0, import_react9.createElement)("button", {
+        mode === "sections" || mode === "tools" ? (0, import_react9.createElement)("div", { style: s.seg }, PHASE_KEYS.map((key) => (0, import_react9.createElement)("button", {
           key,
           style: dropPhase === key ? phase === key ? s.segBtnDropActive : s.segBtnDrop : phase === key ? s.segBtnActive : s.segBtn,
           onClick: () => setPhase(key),
@@ -3834,18 +3960,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
             style: { margin: 0, cursor: "pointer" }
           }),
           t("syncAllPhases")
-        ]) : null,
-        mode === "sections" ? (0, import_react9.createElement)("label", {
-          style: { ...s.muted, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" },
-          title: t("zhHint")
-        }, [
-          (0, import_react9.createElement)("input", {
-            type: "checkbox",
-            checked: zhOn,
-            onChange: toggleZh,
-            style: { margin: 0, cursor: "pointer" }
-          }),
-          t("zhSwitch")
         ]) : null,
         (0, import_react9.createElement)("button", {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
@@ -3882,7 +3996,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       "div",
       { key: "body", style: s.body },
       mode === "sections" ? [
-        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
+        (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
         (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext })
       ] : mode === "tools" ? [
         (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
@@ -3925,14 +4039,11 @@ var DICT = {
     nav: "\u63D0\u793A\u8BCD\u5B9A\u5236",
     previewPreset: "\u6765\u6E90\uFF1A\u5F53\u524D\u6A21\u5F0F\u9884\u8BBE\u3002\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u53CA\u987A\u5E8F\u6309\u6B64\u9884\u8BBE\u72EC\u7ACB\u88C5\u914D\uFF0C\u4E0D\u5339\u914D\u6216\u66F4\u6539\u5DF2\u6709\u5BF9\u8BDD\u3002",
     previewUnresolved: "\u4F1A\u8BDD\u53D8\u91CF {names} \u5C1A\u672A\u7ED1\u5B9A\uFF0C\u4FDD\u7559\u6A21\u677F\u5F15\u7528\uFF1B\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u4ECD\u53EF\u67E5\u770B\u548C\u7F16\u8F91\u3002",
-    runtimeContexts: "\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\uFF08user-role \u5FEB\u7167\uFF0C\u53EA\u8BFB\uFF0C\u4E0D\u5C5E\u4E8E system \u63D0\u793A\u8BCD\u6BB5\uFF09",
+    runtimeContexts: "\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\uFF08\u53EF\u663E\u9690\uFF1Bhost \u5E76\u5165\u7CFB\u7EDF\u63D0\u793A\u8BCD\u7684\u90E8\u5206\uFF09",
     loading: "\u52A0\u8F7D\u4E2D\u2026",
-    unavailable: "\u5F53\u524D\u73AF\u5883\u672A\u542F\u7528\u672C\u547D\u540D\u7A7A\u95F4\u3002",
     tabsSections: "\u63D0\u793A\u8BCD",
     tabsTools: "\u5DE5\u5177",
-    tabsSession: "\u5F53\u524D\u4F1A\u8BDD",
     tabsPresets: "\u914D\u7F6E",
-    tabsPreview: "\u9884\u89C8",
     refresh: "\u5237\u65B0",
     blockedOff: "\u672A\u5C4F\u853D",
     blockedOn: "\u5DF2\u5C4F\u853D",
@@ -3940,30 +4051,22 @@ var DICT = {
     manual: "\u624B\u52A8",
     system: "\u7CFB\u7EDF",
     replace: "\u7F16\u8F91",
-    clearReplace: "\u6E05\u9664",
     clearInput: "\u6E05\u7A7A",
     injectNew: "\u6CE8\u5165\u65B0\u6BB5",
     name: "\u540D\u79F0",
-    order: "\u987A\u5E8F",
     text: "\u6587\u672C",
     add: "\u6DFB\u52A0",
     hiddenOff: "\u53EF\u89C1",
     hiddenOn: "\u5DF2\u9690\u85CF",
-    selectAll: "\u5168\u9009",
-    selectNone: "\u5168\u4E0D\u9009",
     empty: "\uFF08\u7A7A\uFF09",
     dynamic: "<\u52A8\u6001\u751F\u6210>",
     drag: "\u62D6\u52A8\u6392\u5E8F",
     moveUp: "\u4E0A\u79FB",
     moveDown: "\u4E0B\u79FB",
     previewHint: "\u4EE5\u4E0B\u4E3A\u5C4F\u853D/\u66FF\u6362/\u6CE8\u5165\u540E\u7684\u6700\u7EC8\u7CFB\u7EDF\u63D0\u793A\u8BCD\uFF1A",
-    previewPrompt: "\u63D0\u793A\u8BCD\u9884\u89C8",
     previewSections: "\u6BB5",
-    previewTools: "\u5DE5\u5177\u9884\u89C8",
     previewToolCount: "\u4E2A\u5DE5\u5177",
-    savePreset: "\u4FDD\u5B58\u5F53\u524D\u914D\u7F6E",
     presetName: "\u914D\u7F6E\u540D\u79F0",
-    exportPresetCard: "\u5BFC\u51FA\u5F53\u524D\u9884\u8BBE\u914D\u7F6E",
     backupTitle: "\u5B8C\u6574\u5907\u4EFD\uFF08\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177\uFF09",
     backupHint: "\u6574\u5E93\u5BFC\u51FA\uFF1A\u6240\u6709\u9884\u8BBE\u4E0E\u5DE5\u4F5C\u533A\u7684\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u76EE\u5F55\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\u3001MCP/\u6280\u80FD\u8D26\u672C\uFF0C\u4E00\u4E2A JSON\u3002\u6062\u590D\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u6570\u636E\u3002",
     backupExport: "\u5BFC\u51FA\u5B8C\u6574\u5907\u4EFD",
@@ -3976,14 +4079,7 @@ var DICT = {
     restoreFail: "\u6062\u590D\u5907\u4EFD\u5931\u8D25",
     restoreBadFormat: "\u4E0D\u662F\u6709\u6548\u7684\u5907\u4EFD\u6587\u4EF6\uFF08\u683C\u5F0F\u4E0D\u5339\u914D\uFF09",
     restoreConfirm: "\u6062\u590D\u5907\u4EFD\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177 / \u5DE5\u4F5C\u533A / \u8D26\u672C\u6570\u636E\uFF0C\u786E\u5B9A\u7EE7\u7EED\uFF1F",
-    exportPresetHint: "\u628A\u300C{name}\u300D\u5728\u672C\u63D2\u4EF6\u91CC\u7684\u5168\u90E8\u5B9A\u5236\uFF08\u6BB5\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165\u3001\u4E09\u9636\u6BB5\u5DE5\u5177\u76EE\u5F55\u3001forceSections\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF09\u8FDE\u540C\u8BE5\u9884\u8BBE\u7684\u7EC4\u6210\u58F0\u660E\u5BFC\u51FA\u4E3A JSON\u3002\u53EA\u8BFB\u5BFC\u51FA\uFF0C\u4E0D\u6539\u52A8 DSH \u914D\u7F6E\uFF1B\u8981\u653E\u8FDB DSH \u8BF7\u81EA\u884C\u5E76\u5165 cordis \u914D\u7F6E\u3002",
-    exportPreset: "\u5BFC\u51FA",
-    exportPresetRunning: "\u5BFC\u51FA\u4E2D\u2026",
-    exportTargetDefault: "\u9ED8\u8BA4\u9884\u8BBE",
-    exportPresetOk: "\u5DF2\u5BFC\u51FA {name}",
-    exportPresetFail: "\u5BFC\u51FA\u5931\u8D25",
     save: "\u4FDD\u5B58",
-    importPreset: "\u5BFC\u5165\u914D\u7F6E",
     import: "\u5BFC\u5165",
     apply: "\u5E94\u7528",
     export: "\u5BFC\u51FA",
@@ -3991,10 +4087,6 @@ var DICT = {
     restore: "\u8FD8\u539F",
     active: "\u4F7F\u7528\u4E2D",
     preset: "\u9884\u8BBE",
-    ioFailed: "\u5BFC\u5165/\u5BFC\u51FA\u5931\u8D25",
-    importInvalid: "\u65E0\u6548\u7684\u914D\u7F6E\u6587\u4EF6",
-    targetGlobal: "\u76EE\u6807\uFF1A\u5168\u5C40\u9ED8\u8BA4",
-    targetHint: "\u9009\u62E9\u8981\u5B9A\u5236\u7684 agent \u9884\u8BBE \u2014\u2014 \u63D0\u793A\u8BCD\u5FC5\u987B\u6309\u5177\u4F53\u9884\u8BBE\u4FEE\u6539\uFF1A\u672A\u5B9A\u5236\u7684\u5B57\u6BB5 = \u5B98\u65B9\u9ED8\u8BA4\uFF0C\u6539\u52A8\u53EA\u5BF9\u8BE5\u9884\u8BBE\u751F\u6548\uFF080.9.0 \u8D77\u300C\u5168\u90E8 Agent\u300D\u5168\u5C40\u5C42\u5DF2\u505C\u7528\uFF09\u3002",
     syncAllPhases: "\u4E09\u6001\u540C\u6B65",
     syncAllPhasesHint: "\u52FE\u9009\u540E\u4E09\u4E2A\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\uFF08\u5E38\u9A7B\u671F\u4E3A\u9AA8\u67B6\uFF0C\u5176\u4F59\u4E24\u6001\u72EC\u6709\u7684\u6BB5\u8FFD\u52A0\u5728\u5C3E\u90E8\uFF0C\u540C\u540D\u6BB5\u4EE5\u539F\u751F\u90A3\u9636\u6BB5\u4E3A\u51C6\uFF09\uFF0C\u589E\u5220 / \u6392\u5E8F / \u52FE\u9009 / \u6587\u672C\u7F16\u8F91\u4E00\u6B21\u5199\u5168\u4E09\u4E2A\u9636\u6BB5\uFF1B\u52FE\u9009\u77AC\u95F4\u5373\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF08\u5199\u5165\u7F16\u8F91\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002\u5DE5\u5177\u680F\u7684\u9690\u85CF / \u663E\u793A\u4E0E\u52A0\u56DE\u540C\u6837\u5BF9\u4E09\u6001\u4E00\u8D77\u751F\u6548\u3002\u9ED8\u8BA4\u5173\u95ED\uFF1A\u4E09\u4E2A\u9636\u6BB5\u5404\u7BA1\u5404\u7684\u3002",
     syncApplied: "\u5DF2\u6309\u5E38\u9A7B\u671F\u8986\u5199\u53E6\u5916\u4E24\u6001\uFF1A\u4E09\u9636\u6BB5\u5171\u7528\u540C\u4E00\u4EFD\u6BB5\u5217\u8868\u4E0E\u6587\u672C\uFF08\u5199\u5165\u8349\u7A3F\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF09\u3002",
@@ -4002,25 +4094,15 @@ var DICT = {
     syncSkippedDynamic: "\u300C{names}\u300D\u662F\u8FD0\u884C\u65F6\u52A8\u6001\u6BB5\uFF0C\u65E0\u6CD5\u52A0\u5165\u5176\u5B83\u9636\u6BB5\uFF08\u5B83\u7684\u5185\u5BB9\u53EA\u6709\u88C5\u914D\u65F6\u624D\u77E5\u9053\uFF09\u3002",
     broken: "\u635F\u574F",
     brokenPreset: "\u8BE5 agent \u9884\u8BBE\u5F53\u524D\u65E0\u6CD5\u6302\u8F7D\uFF0C\u4ECD\u53EF\u7F16\u8F91\u5176\u5B9A\u5236\uFF08\u4FEE\u590D\u9884\u8BBE\u540E\u81EA\u52A8\u751F\u6548\uFF09\u3002",
-    phaseBootstrap: "\u4EC5\u5F15\u5BFC\u9636\u6BB5",
-    phaseActive: "\u664B\u7EA7\u540E",
-    phaseCompaction: "\u538B\u7F29\u540E",
     // agent 周期三阶段的展示命名（引导期 → 常驻期 → 压缩受控期）。
     phaseStageGuide: "\u5F15\u5BFC\u671F",
     phaseStageResident: "\u5E38\u9A7B\u671F",
     phaseStageControlled: "\u538B\u7F29\u53D7\u63A7\u671F",
-    toolsPartGuide: "\u5F15\u5BFC\u671F\u5DE5\u5177",
-    toolsPartResident: "\u5E38\u9A7B\u671F\u5DE5\u5177",
-    toolsPartControlled: "\u538B\u7F29\u53D7\u63A7\u671F\u5DE5\u5177",
     allToolsTitle: "\u672C\u7CFB\u7EDF\u5168\u90E8\u5DE5\u5177",
-    sectionsPartGuide: "\u5F15\u5BFC\u671F\u63D0\u793A\u8BCD",
-    sectionsPartResident: "\u5E38\u9A7B\u671F\u63D0\u793A\u8BCD",
-    sectionsPartControlled: "\u538B\u7F29\u53D7\u63A7\u671F\u63D0\u793A\u8BCD",
     allSectionsTitle: "\u672C\u7CFB\u7EDF\u5168\u90E8\u63D0\u793A\u8BCD",
     toolsFourHint: "\u4E09\u4E2A\u9636\u6BB5\u5404\u4E00\u4EFD\u540D\u5355\uFF0C\u4E92\u4E0D\u7EE7\u627F\uFF1A\u52FE\u9009 = \u8BE5\u9636\u6BB5\u662F\u5426\u5BF9\u6A21\u578B\u53EF\u89C1\uFF1B\u4ECE\u300C\u5168\u90E8\u300D\u62D6\u5165\u67D0\u9636\u6BB5 = \u8BA9\u8FD9\u4E00\u4E2A\u5DE5\u5177\u5728\u8BE5\u9636\u6BB5\u51FA\u73B0\uFF08\u82E5\u8BE5\u9636\u6BB5\u9ED8\u8BA4\u88C1\u6389\u4E86\u5B83\uFF0C\u5C31\u52A0\u56DE\u53BB\uFF09\uFF1B\u5728\u4E24\u4E2A\u9636\u6BB5\u4E4B\u95F4\u62D6\u52A8\uFF08\u62D6\u5230\u4E0A\u65B9\u9636\u6BB5\u6309\u94AE\uFF09= \u590D\u5236\uFF08\u6E90\u9636\u6BB5\u4E0D\u52A8\uFF0C\u76EE\u6807\u9636\u6BB5\u591A\u4E00\u4EFD\uFF0C\u9690\u85CF/\u542F\u7528\u72B6\u6001\u4E00\u8D77\u5E26\u8FC7\u53BB\uFF09\uFF1B\u62D6\u56DE\u300C\u5168\u90E8\u300D= \u4ECE\u8BE5\u9636\u6BB5\u62FF\u6389\u5B83\u3002\u6BCF\u4E2A\u52A8\u4F5C\u53EA\u5F71\u54CD\u88AB\u62D6\u7684\u90A3\u4E00\u4E2A\u5DE5\u5177\u3002",
     sectionsFourHint: "\u62D6\u62FD\u53CC\u5411\uFF1A\u628A\u300C\u5168\u90E8\u300D\u91CC\u7684\u6BB5\u62D6\u8FDB\u4E0A\u65B9\u5217\u8868 = \u52A0\u5165\u8BE5\u9636\u6BB5\u5E76\u9ED8\u8BA4\u5F00\u542F\uFF1B\u4ECE\u9636\u6BB5\u62D6\u56DE\u300C\u5168\u90E8\u300D= \u4ECE\u8BE5\u9636\u6BB5\u79FB\u9664\uFF08\u539F\u751F\u6BB5\u8F6C\u4E3A\u5C4F\u853D\uFF09\u3002\u540C\u4E00\u4E2A\u9636\u6BB5\u91CC\u62D6\u52A8\u884C\u6293\u624B = \u6392\u5E8F\uFF1B\u62D6\u5230\u4E0A\u65B9\u7684\u9636\u6BB5\u6309\u94AE = \u590D\u5236\u5230\u90A3\u4E2A\u9636\u6BB5\u3002\u5C4F\u853D\u6BB5\u4E0E\u666E\u901A\u6BB5\u5B8C\u5168\u4E00\u6837\u53EF\u62D6\u62FD / \u7F16\u8F91\uFF0C\u53EA\u662F\u4E0D\u6CE8\u5165\u6A21\u578B\u3002",
     dragHint: "\u62D6\u5165 = \u8BA9\u8BE5\u5DE5\u5177\u5728\u8FD9\u4E2A\u9636\u6BB5\u51FA\u73B0",
-    poolMarksHint: "\u6BCF\u4E2A\u540D\u5B57\u540E\u7684\u4E09\u4E2A\u6807\u8BB0 = \u8BE5\u5DE5\u5177\u5728\u5F15\u5BFC\u671F / \u5E38\u9A7B\u671F / \u538B\u7F29\u53D7\u63A7\u671F\u7684\u72B6\u6001\uFF1A\u7EFF=\u8BE5\u9636\u6BB5\u53EF\u89C1\uFF08\u6216\u5DF2\u52A0\u56DE\uFF09\uFF0C\u7070=\u8BE5\u9636\u6BB5\u5DF2\u9690\u85CF\uFF0C\u6697=\u4E0D\u5728\u8BE5\u9636\u6BB5\u3001\u4E5F\u6CA1\u52A0\u56DE\u3002",
     toolAddedTag: "\u52A0\u56DE",
     toolAdded: "\u5DF2\u628A\u300C{name}\u300D\u52A0\u56DE{phase}\uFF1A\u8BE5\u9636\u6BB5\u9ED8\u8BA4\u88C1\u6389\u4E86\u5B83\uFF0C\u4FDD\u5B58\u540E\u5B83\u4F1A\u91CD\u65B0\u51FA\u73B0\u5728\u8BE5\u9636\u6BB5\uFF08\u5F53\u524D\u9884\u8BBE\u6CE8\u518C\u8868\u91CC\u6709\u5B83\uFF09\u3002",
     toolNotInRegistry: "\u300C{name}\u300D\u4E0D\u5728\u672C\u9884\u8BBE\u7684\u6CE8\u518C\u8868\u91CC\uFF08\u5B83\u662F\u522B\u7684\u9884\u8BBE\u72EC\u6709\u7684\u5DE5\u5177\uFF09\uFF0C\u5F53\u524D\u9884\u8BBE\u6CA1\u6709\u5B83\u7684\u5B9A\u4E49\uFF0C\u52A0\u4E0D\u8FDB\u6765\u3002",
@@ -4029,13 +4111,9 @@ var DICT = {
     sectionCopied: "\u5DF2\u628A\u300C{name}\u300D\u590D\u5236\u5230{to}\uFF08\u6E90{from}\u4FDD\u6301\u4E0D\u52A8\uFF09\uFF1A\u65B0\u9636\u6BB5\u91CC\u5B83\u662F\u5F00\u542F\u7684\uFF0C\u53EF\u7EE7\u7EED\u7F16\u8F91\u6587\u672C\u6216\u62D6\u52A8\u6392\u5E8F\u3002",
     sectionRemoved: "\u5DF2\u628A\u300C{name}\u300D\u4ECE{from}\u62FF\u6389\uFF1A\u65B0\u52A0\u5165\u7684\u64A4\u9500\u52A0\u5165\uFF0C\u539F\u751F\u6BB5\u5219\u8F6C\u4E3A\u5C4F\u853D\uFF08\u53EF\u52FE\u9009\u56DE\u6765\uFF09\u3002",
     toolShown: "\u300C{name}\u300D\u5DF2\u5728{to}\u663E\u793A\u3002",
-    toolHiddenIn: "\u300C{name}\u300D\u5DF2\u5728{to}\u9690\u85CF\u3002",
     toolSyncShown: "\u300C{name}\u300D\u5DF2\u5728\u4E09\u4E2A\u9636\u6BB5\u663E\u793A\uFF08\u8BE5\u9636\u6BB5\u76EE\u5F55\u91CC\u6CA1\u6709\u7684\u5DF2\u5199\u8FDB\u5404\u81EA\u7684\u52A0\u56DE\u540D\u5355\uFF09\u3002",
-    toolSyncHidden: "\u300C{name}\u300D\u5DF2\u5728\u4E09\u4E2A\u9636\u6BB5\u9690\u85CF / \u79FB\u9664\u3002",
     sectionsTakenOver: "\u300C{name}\u300D\u6BB5\u58F0\u660E\u4E86 complete \u6574\u6BB5\u63A5\u7BA1\uFF08\u5BBF\u4E3B\u5728\u88C5\u914D\u7011\u5E03\u6D41\u4E4B\u540E\u5F3A\u5236\u8FD8\u539F\u4E3A\u90A3\u4E00\u6761\u6BB5\uFF09\u3002\u672C\u63D2\u4EF6\u9ED8\u8BA4\u7684 forceSections \u5DF2\u7ED5\u5F00\u8BE5\u673A\u5236\uFF0C\u6BB5\u7EA7\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165 / \u6392\u5E8F\u7167\u5E38\u751F\u6548\uFF1B\u6B64\u63D0\u793A\u53EA\u4F1A\u5728 forceSections \u5173\u95ED\u6216\u5F3A\u5236\u8986\u76D6\u5931\u6548\u65F6\u51FA\u73B0\uFF0C\u5F00\u542F forceSections \u5373\u53EF\u6062\u590D\u3002",
     sectionsLost: "\u672C\u63D2\u4EF6\u5728\u8BE5\u9636\u6BB5\u4EA7\u51FA\u7684 {emitted} \u4E2A\u6BB5\u91CC\uFF0C\u53EA\u6709 {survived} \u4E2A\u8FDB\u5165\u6700\u7EC8\u63D0\u793A\u8BCD\uFF1A\u5176\u4F59\u88AB\u4E0B\u6E38\u88C5\u914D\u89C4\u5219\u4E22\u5F03\uFF0C\u6BB5\u7EA7\u5B9A\u5236\u4E0D\u4F1A\u5B8C\u5168\u751F\u6548\uFF08\u5DE5\u5177\u8FC7\u6EE4\u4E0D\u53D7\u5F71\u54CD\uFF09\u3002",
-    sectionBlockedStrip: "\uFF08\u672C\u9636\u6BB5\u5DF2\u5C4F\u853D\uFF0C\u6A21\u578B\u4E0D\u53EF\u89C1\uFF09",
-    phaseSuppressed: "\u88AB\u6291\u5236\uFF08\u4E0D\u5728\u4EFB\u4F55\u9636\u6BB5\u7684\u88C5\u914D\u4E2D\uFF09",
     sectionDynamicNoAdd: "\u300C{name}\u300D\u662F\u8FD0\u884C\u65F6\u624D\u751F\u6210\u7684\u52A8\u6001\u6BB5\uFF0C\u6CA1\u6CD5\u9884\u5148\u52A0\u8FDB\u67D0\u4E2A\u9636\u6BB5\uFF08\u5B83\u7684\u5185\u5BB9\u53EA\u6709\u88C5\u914D\u65F6\u624D\u77E5\u9053\uFF09\u3002",
     exportOk: "\u5BFC\u51FA\u6210\u529F",
     exportCancel: "\u5DF2\u53D6\u6D88\u5BFC\u51FA",
@@ -4051,11 +4129,6 @@ var DICT = {
     forceHint: "\u5F00\u542F\u540E\u6240\u6709\u9884\u8BBE\u7684\u63D0\u793A\u8BCD\u6BB5\u4E00\u5F8B\u4EE5\u672C\u63D2\u4EF6\u4E3A\u51C6\uFF08\u7ED5\u8FC7 complete \u6574\u6BB5\u63A5\u7BA1\u4E0E\u9884\u8BBE\u9636\u6BB5\u88C1\u6BB5\uFF09\uFF1B\u5173\u95ED\u540E\u9000\u56DE\u7011\u5E03\u6D41\u5185\u8FC7\u6EE4\uFF0C\u9884\u8BBE\u53EF\u80FD\u538B\u8FC7\u5B9A\u5236\u3002\u300C\u6062\u590D\u521D\u59CB\u72B6\u6001\u300D\u4F1A\u81EA\u52A8\u5173\u95ED\u5B83\u3002",
     forceOn: "\u5DF2\u5F00\u542F",
     forceOff: "\u5DF2\u5173\u95ED",
-    zhSwitch: "\u4E2D\u6587\u63D0\u793A\u8BCD",
-    zhHint: "\u5F00\u5173\u3002\u5F00\u542F\uFF1A\u628A\u540D\u5B57\u5BF9\u5F97\u4E0A\u8BD1\u672C\u7684\u6BB5\u4E00\u6B21\u6027\u8986\u76D6\u4E3A\u4E2D\u6587\uFF08\u5199\u5165\u7F16\u8F91\u8349\u7A3F\uFF0C\u4FDD\u5B58\u540E\u751F\u6548\uFF09\uFF1B\u5173\u95ED\uFF1A\u6E05\u9664\u8FD9\u4E9B\u6BB5\u7684\u66FF\u6362\u6587\u672C\uFF0C\u56DE\u5F52\u82F1\u6587\u539F\u6587\u3002\u81EA\u5B9A\u4E49\u6BB5\u4E0E\u5BF9\u4E0D\u4E0A\u540D\u5B57\u7684\u6BB5\u4E0D\u53D7\u5F71\u54CD\u3002",
-    zhApplied: "\u5DF2\u628A\u4E2D\u6587\u5199\u5165\u7F16\u8F91\u8349\u7A3F\uFF1A\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\uFF1B\u5BF9\u4E0D\u4E0A\u540D\u5B57\u7684\u6BB5\u4FDD\u6301\u539F\u6837\u3002",
-    zhReverted: "\u5DF2\u628A\u82F1\u6587\u539F\u6587\u5199\u56DE\u7F16\u8F91\u8349\u7A3F\uFF08\u6E05\u9664\u4E2D\u6587\u66FF\u6362\uFF09\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u751F\u6548\u3002",
-    zhNotReady: "\u4E09\u9636\u6BB5\u88C5\u914D\u5C1A\u672A\u52A0\u8F7D\u5B8C\u6210\uFF0C\u8BF7\u5148\u70B9\u300C\u5237\u65B0\u300D\u6216\u7A0D\u540E\u518D\u8BD5\u3002",
     envBlockTitle: "\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF08envBlocklist\uFF09",
     envBlockHint: "\u7CFB\u7EDF\u73AF\u5883\u53D8\u91CF\uFF08process.env\uFF09\u5DF2\u5168\u91CF\u6CE8\u518C\u4E3A\u63D0\u793A\u8BCD\u53D8\u91CF\uFF1A\u6BB5\u6587\u672C\u91CC\u5199 {{env_\u952E\u540D\u5C0F\u5199}} \u5F15\u7528\uFF08\u5982 {{env_path}}\uFF09\uFF1B\u547D\u4E2D\u9ED1\u540D\u5355\u7684\u952E\u4E0D\u6CE8\u518C\u2014\u2014env \u91CC\u5E38\u6709\u5BC6\u94A5\uFF0C\u8FDB\u4E86\u63D0\u793A\u8BCD\u5C31\u4F1A\u968F\u8BF7\u6C42\u53D1\u7ED9\u6A21\u578B\u3002\u6761\u76EE\u652F\u6301 * \u901A\u914D\u3001\u5927\u5C0F\u5199\u4E0D\u654F\u611F\u3002\u5185\u7F6E\u53D8\u91CF {{date}} {{time}} {{datetime}} {{weekday}} {{hostname}} {{platform}} {{arch}} {{username}} {{home}} {{shell}} {{locale}} {{node_version}} \u6052\u53EF\u7528\u3002",
     envBlockAdd: "\u952E\u540D\u6216\u901A\u914D\uFF0C\u5982 GITHUB_TOKEN \u6216 *_KEY*",
@@ -4072,19 +4145,9 @@ var DICT = {
     resetFail: "\u6062\u590D\u521D\u59CB\u72B6\u6001\u5931\u8D25",
     scopeFallback: "\u8BE5 agent \u9884\u8BBE\u7684\u5E38\u9A7B scope \u672A\u80FD\u6302\u8F7D\uFF0C\u4EE5\u4E0B\u663E\u793A\u7684\u662F\u5168\u5C40\u5C42\u5185\u5BB9\uFF08\u5E76\u975E\u8BE5\u9884\u8BBE\u7684\u539F\u751F\u6BB5\u4E0E\u5DE5\u5177\uFF09\u3002",
     previewFail: "\u8BE5\u9636\u6BB5\u88C5\u914D\u5931\u8D25\uFF08scope \u6302\u8F7D\u5931\u8D25\u6216\u9884\u8BBE\u63D2\u4EF6\u5F02\u5E38\uFF09\uFF0C\u8BF7\u5207\u6362\u76EE\u6807\u6216\u67E5\u770B\u670D\u52A1\u65E5\u5FD7\u3002",
-    phaseVisible: "\u9636\u6BB5\u53EF\u89C1",
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
     previewSessionOverlay: "\u5DE6\u680F\u5DF2\u5E76\u5165\u5F53\u524D\u4F1A\u8BDD\u7684\u4F1A\u8BDD\u7EA7\u6761\u76EE\uFF1B\u53F3\u680F\u4ECD\u662F\u7F16\u8F91\u76EE\u6807\u9884\u8BBE\u7684\u7EAF\u88C5\u914D\u3002",
-    sessionHint: "\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF08\u53EA\u8BFB\uFF09\uFF1A\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u6765\u81EA\u6700\u65B0\u6D3B\u52A8\u6839\u4F1A\u8BDD\u81EA\u5DF1\u7684 agent \u4F5C\u7528\u57DF\u3002",
-    sessionNone: "\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF1B\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u8FD9\u91CC\u4F1A\u663E\u793A\u6A21\u578B\u771F\u5B9E\u770B\u5230\u7684\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u3002",
-    sessionPromptTitle: "\u6700\u7EC8\u7CFB\u7EDF\u63D0\u793A\u8BCD\uFF08\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u88C5\u914D\uFF09",
-    sessionToolsTitle: "\u5DE5\u5177\u76EE\u5F55\uFF08\u5F53\u524D\u4F1A\u8BDD\u771F\u5B9E\u89C6\u56FE\uFF09",
-    sessionToolsVisible: "\u6A21\u578B\u53EF\u89C1",
-    sessionToolsTotal: "\u5B8C\u6574\u76EE\u5F55",
-    sessionPhase: "\u9636\u6BB5",
-    sessionPreset: "\u9884\u8BBE",
-    sessionId: "\u4F1A\u8BDD",
     toolAgentScoped: "\u4F1A\u8BDD\u7EA7",
     toolAgentScopedHint: "\u8BE5\u5DE5\u5177\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u6CE8\u518C\uFF08\u4E0D\u662F\u9884\u8BBE\u6CE8\u518C\u8868\u9879\uFF09\uFF1B\u672C\u63D2\u4EF6\u7684\u9636\u6BB5\u8FC7\u6EE4\u65E0\u6CD5\u62D2\u7EDD\u4F5C\u7528\u57DF\u5185\u540D\u5B57\uFF0C\u56E0\u6B64\u53EA\u80FD\u67E5\u770B\u3002",
     toolExecutorScoped: "\u6267\u884C\u5668\u5305\u88C5",
@@ -4095,12 +4158,9 @@ var DICT = {
     toolMaskedByOwnPluginHint: "\u8BE5\u5DE5\u5177\u88AB\u672C\u63D2\u4EF6\u7684 MCP \u5DE5\u5177\u7EA7\u7981\u7528 / \u9884\u8BBE\u906E\u853D / \u5DE5\u4F5C\u533A\u5173\u95ED\u9690\u85CF\uFF0C\u53EF\u5728 MCP Tab \u6062\u590D\u3002",
     completeCatalogTitle: "\u5B8C\u6574\u76EE\u5F55 / \u5DF2\u906E\u853D\uFF08\u53EA\u8BFB\uFF09",
     completeCatalogHint: "\u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u65E0\u6CD5\u6309\u9636\u6BB5\u5F00\u5173\u7684\u5DE5\u5177\uFF1Aagent \u4F5C\u7528\u57DF\u6CE8\u518C\u3001\u6267\u884C\u5668\u5305\u88C5\u3001\u88AB\u522B\u7684\u63D2\u4EF6 restrict\u3001\u88AB\u672C\u63D2\u4EF6 MCP \u906E\u853D\u3002\u5B83\u4EEC\u4E0D\u4F1A\u51FA\u73B0\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u91CC\u3002",
-    levelPreset: "\u9884\u8BBE\u7EA7",
-    levelWorkspace: "\u5DE5\u4F5C\u533A\u7EA7",
     workspaceRequired: "\u5DE5\u4F5C\u533A\u7EA7\u4FDD\u5B58\u9700\u8981\u5F53\u524D\u5DE5\u4F5C\u533A\uFF08\u6D3B\u52A8\u4F1A\u8BDD\u7684 cwd\uFF09",
     workspaceNoSession: "\u5DE5\u4F5C\u533A\u7EA7\uFF1A\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF0C\u53D6\u4E0D\u5230\u5DE5\u4F5C\u533A\u8DEF\u5F84\uFF1B\u5F00\u4F1A\u8BDD\u540E\u518D\u7F16\u8F91\u5DE5\u4F5C\u533A\u7EA7\u3002",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
-    navShort: "\u63D0\u793A\u8BCD",
     close: "\u5173\u95ED",
     filterAll: "\u5168\u90E8",
     filterOn: "\u5DF2\u542F\u7528",
@@ -4108,26 +4168,31 @@ var DICT = {
     targetLabel: "\u7F16\u8F91\u76EE\u6807\uFF08Agent \u9884\u8BBE\uFF09",
     targetCustomized: "\u8BE5\u9884\u8BBE {n} \u9879\u5B9A\u5236",
     agentScoped: "\u4F1A\u8BDD\u7EA7",
-    agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7684\u9884\u89C8\u88C5\u914D\u770B\u4E0D\u5230\u5B83\uFF0C\u4F46\u6BCF\u4E2A\u771F\u5B9E\u4F1A\u8BDD\u7684\u63D0\u793A\u8BCD\u91CC\u90FD\u6709\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u63D0\u793A\u8BCD\u91CC\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F \u2014\u2014 \u60F3\u8BA9\u5B83\u53D8\u4E2D\u6587\uFF0C\u7528\u300C\u4E2D\u6587\u63D0\u793A\u8BCD\u300D\u5F00\u5173\u6216\u624B\u52A8\u66FF\u6362\u90FD\u884C\u3002",
-    settingsTitle: "\u5168\u5C40\u8BBE\u7F6E",
+    agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7684\u9884\u89C8\u88C5\u914D\u770B\u4E0D\u5230\u5B83\uFF0C\u4F46\u6BCF\u4E2A\u771F\u5B9E\u4F1A\u8BDD\u7684\u63D0\u793A\u8BCD\u91CC\u90FD\u6709\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u63D0\u793A\u8BCD\u91CC\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F\u3002",
     libraryTitle: "\u914D\u7F6E\u5FEB\u7167\u5E93",
     applyToPreset: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u9884\u8BBE\u7EA7\u300C{name}\u300D",
     applyToWorkspace: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u5DE5\u4F5C\u533A\u7EA7\u300C{name}\u300D",
     draftBadge: "\u9884\u89C8\u542B\u672A\u4FDD\u5B58\u8349\u7A3F",
-    previewSyncFail: "\u5B9E\u65F6\u9884\u89C8\u540C\u6B65\u5931\u8D25\uFF08\u4E0B\u6B21\u7F16\u8F91\u4F1A\u81EA\u52A8\u91CD\u8BD5\uFF0C\u6216\u70B9\u300C\u5237\u65B0\u300D\uFF09"
+    previewSyncFail: "\u5B9E\u65F6\u9884\u89C8\u540C\u6B65\u5931\u8D25\uFF08\u4E0B\u6B21\u7F16\u8F91\u4F1A\u81EA\u52A8\u91CD\u8BD5\uFF0C\u6216\u70B9\u300C\u5237\u65B0\u300D\uFF09",
+    sectionDynamicUnsupported: "\u5BBF\u4E3B\u6CA1\u6709\u4E3A\u8BE5\u6BB5\u63D0\u4F9B dynamic \u6807\u8BB0\uFF0C\u65E0\u6CD5\u5224\u65AD\u5B83\u662F\u4E0D\u662F\u8FD0\u884C\u65F6\u52A8\u6001\u6BB5 \u2014\u2014 \u5DF2\u7981\u7528\u52A0\u5165\uFF08\u4E0D\u731C\u6D4B\uFF09\u3002",
+    contextsUnsupported: "\u5BBF\u4E3B\u6CA1\u6709\u63D0\u4F9B\u8BE5\u9636\u6BB5\u7684\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\u6E05\u5355\uFF08baseContexts\uFF09\uFF0C\u65E0\u6CD5\u5728\u8FD9\u91CC\u663E\u9690\uFF1B\u4E0D\u4F2A\u9020\u72B6\u6001\u3002",
+    contextsNotReady: "\u4E09\u9636\u6BB5\u88C5\u914D\u5C1A\u672A\u5C31\u7EEA\uFF0C\u65E0\u6CD5\u6267\u884C\u4E0A\u4E0B\u6587\u7684\u4E09\u6001\u540C\u6B65 \u2014\u2014 \u8BF7\u70B9\u300C\u5237\u65B0\u300D\u540E\u91CD\u8BD5\u3002",
+    sourceGlobal: "\u5168\u5C40",
+    sourcePreset: "\u9884\u8BBE",
+    sourceAgent: "\u4F1A\u8BDD",
+    sourceExecutor: "\u6267\u884C\u5668",
+    sourceWorkspace: "\u5DE5\u4F5C\u533A",
+    sourceUnknown: "\u6765\u6E90\u672A\u77E5"
   },
   en: {
     nav: "Prompt Customizer",
     previewPreset: "Source: selected mode preset. Sections, tools and ordering are assembled independently; existing conversations are neither matched nor changed.",
     previewUnresolved: "Session variables {names} are not bound and remain template references. Sections and tools are still available for editing.",
-    runtimeContexts: "Runtime context (read-only user-role snapshot, separate from system sections)",
+    runtimeContexts: "Runtime contexts (toggleable; the part the host folds into the system prompt)",
     loading: "Loading\u2026",
-    unavailable: "Namespace unavailable in this environment.",
     tabsSections: "Sections",
     tabsTools: "Tools",
-    tabsSession: "Current session",
     tabsPresets: "Presets",
-    tabsPreview: "Preview",
     refresh: "Refresh",
     blockedOff: "Active",
     blockedOn: "Blocked",
@@ -4135,30 +4200,22 @@ var DICT = {
     manual: "Manual",
     system: "System",
     replace: "Replace",
-    clearReplace: "Clear",
     clearInput: "Clear",
     injectNew: "Inject section",
     name: "Name",
-    order: "Order",
     text: "Text",
     add: "Add",
     hiddenOff: "Visible",
     hiddenOn: "Hidden",
-    selectAll: "Select all",
-    selectNone: "Select none",
     empty: "(empty)",
     dynamic: "<dynamic>",
     drag: "Drag to reorder",
     moveUp: "Move up",
     moveDown: "Move down",
     previewHint: "Final system prompt after block/replace/inject:",
-    previewPrompt: "Prompt preview",
     previewSections: "sections",
-    previewTools: "Tools preview",
     previewToolCount: "tools",
-    savePreset: "Save current config",
     presetName: "Config name",
-    exportPresetCard: "Export this preset's configuration",
     backupTitle: "Full backup (all prompts / tools)",
     backupHint: "Whole-DB export: prompts, tool catalog, env blocklist, and MCP/skill ledgers across every preset and workspace, in one JSON. Restore overwrites current data.",
     backupExport: "Export full backup",
@@ -4171,14 +4228,7 @@ var DICT = {
     restoreFail: "Restore failed",
     restoreBadFormat: "Not a valid backup file (format mismatch)",
     restoreConfirm: "Restoring will overwrite ALL current prompt / tool / workspace / ledger data. Continue?",
-    exportPresetHint: "Export everything this plugin customizes for '{name}' (section blocking / replacement / injection, per-phase tool catalogs, forceSections, env blocklist) plus that preset's composition declaration, as JSON. Read-only: it never touches your DSH configuration \u2014 merge it into your cordis config yourself.",
-    exportPreset: "Export",
-    exportPresetRunning: "Exporting\u2026",
-    exportTargetDefault: "the default preset",
-    exportPresetOk: "Exported {name}",
-    exportPresetFail: "Export failed",
     save: "Save",
-    importPreset: "Import preset",
     import: "Import",
     apply: "Apply",
     export: "Export",
@@ -4186,10 +4236,6 @@ var DICT = {
     restore: "Restore",
     active: "Active",
     preset: "Preset",
-    ioFailed: "Import/export failed",
-    importInvalid: "Invalid preset file",
-    targetGlobal: "Target: global default",
-    targetHint: "Pick an agent preset to customize \u2014 prompts are edited per preset: untouched fields stay official defaults, and changes apply only to that preset (the \u201CAll agents\u201D global layer is retired since 0.9.0).",
     syncAllPhases: "Sync phases",
     syncAllPhasesHint: "When checked, the three phases share one section list (the resident period is the backbone; sections only the other two phases have are appended at the end, and a same-named row follows the phase where it natively exists), and add / remove / reorder / check / text edits are written to all three phases at once. Ticking the box immediately overwrites the other two phases with the resident-period content (written to the edit draft; press Save to apply). Tool hiding / showing and adding back also apply to all three phases. Unchecked (default): handle each phase separately.",
     syncApplied: "The other two phases were overwritten from the resident period: all three phases now share one section list and text (written to the draft; press Save to apply).",
@@ -4197,25 +4243,15 @@ var DICT = {
     syncSkippedDynamic: '"{names}" is a runtime-generated dynamic section and cannot be added to the other phases (its content is only known during assembly).',
     broken: "broken",
     brokenPreset: "This agent preset cannot mount right now; its customization is still editable and applies once fixed.",
-    phaseBootstrap: "Bootstrap only",
-    phaseActive: "After promotion",
-    phaseCompaction: "Post-compaction",
     // agent 周期三阶段的展示命名（引导期 → 常驻期 → 压缩受控期）。
     phaseStageGuide: "Guide period",
     phaseStageResident: "Resident period",
     phaseStageControlled: "Compaction-controlled period",
-    toolsPartGuide: "Guide-period tools",
-    toolsPartResident: "Resident-period tools",
-    toolsPartControlled: "Compaction-controlled tools",
     allToolsTitle: "All system tools",
-    sectionsPartGuide: "Guide-period sections",
-    sectionsPartResident: "Resident-period sections",
-    sectionsPartControlled: "Compaction-controlled sections",
     allSectionsTitle: "All system sections",
     toolsFourHint: 'Each of the three periods keeps its own list, with no inheritance: the checkbox = visible to the model in that period; dragging a tool from "All" into a period makes it appear there (if the period trims it by default, it is added back); dragging between two periods copies it (the source is untouched, the target gains one, and the hidden/enabled state carries over); dragging it back to "All" removes it from that period. Every action touches only the tool you dragged.',
     sectionsFourHint: 'Drag both ways: drop a section from "All" onto a period part to enable it there; drag from a part back to "All" to remove it from that period. Blocked sections stay fully operable \u2014 they are just not injected.',
     dragHint: "Drag in to make this tool appear in this period",
-    poolMarksHint: "The three marks after each name = this tool\u2019s state in the guide / resident / compaction-controlled periods: green = visible there (or added back), grey = hidden there, dim = not present and not added.",
     toolAddedTag: "added",
     toolAdded: 'Added "{name}" back to {phase}: the period trims it by default, so it will reappear there once saved (it exists in this preset\u2019s registry).',
     toolNotInRegistry: '"{name}" is not in this preset\u2019s registry (it belongs to another preset). There is no definition for it here, so it cannot be added.',
@@ -4224,13 +4260,9 @@ var DICT = {
     sectionCopied: 'Copied "{name}" to {to} (the source {from} is untouched): it is enabled there and can be edited or dragged to reorder.',
     sectionRemoved: 'Removed "{name}" from {from}: an added-in section is reverted, a native section becomes blocked (tick it to restore).',
     toolShown: '"{name}" is now visible in {to}.',
-    toolHiddenIn: '"{name}" is now hidden in {to}.',
     toolSyncShown: '"{name}" is now visible in all three phases (periods without it in their catalog got it added back).',
-    toolSyncHidden: '"{name}" is now hidden / removed in all three phases.',
     sectionsTakenOver: 'The "{name}" section declares a complete takeover (the host restores that single section after the assembly waterfall). This plugin\u2019s forceSections (default on) bypasses that mechanism, so section-level blocking / replacement / injection / ordering still applies; this notice only appears when forceSections is off or the override fails \u2014 enable it to restore.',
     sectionsLost: "Only {survived} of the {emitted} sections this plugin emitted for this phase reach the final prompt \u2014 the rest are dropped by downstream assembly rules, so section-level customization cannot fully apply (tool filtering is unaffected).",
-    sectionBlockedStrip: " (blocked in this period; invisible to the model)",
-    phaseSuppressed: "Suppressed (absent from every phase assembly)",
     sectionDynamicNoAdd: '"{name}" is generated at runtime \u2014 it cannot be added to a phase ahead of time (its content is only known during assembly).',
     exportOk: "Exported",
     exportCancel: "Export cancelled",
@@ -4246,11 +4278,6 @@ var DICT = {
     forceHint: 'When on, every preset\u2019s prompt sections always follow this plugin (bypassing complete takeover and preset phase pruning); when off, filtering falls back to the waterfall, where presets may override your customization. "Restore initial state" turns this off automatically.',
     forceOn: "On",
     forceOff: "Off",
-    zhSwitch: "Chinese sections",
-    zhHint: "Toggle. On: overwrite sections matching the bundled translation with Chinese (written to the edit draft, applies on save). Off: clear those replacements, restoring the English originals. Custom sections and unmatched names are untouched.",
-    zhApplied: "Chinese written to the edit draft \u2014 press Save to apply; unmatched sections stay as-is.",
-    zhReverted: "English originals written back to the edit draft (Chinese replacements cleared) \u2014 press Save to apply.",
-    zhNotReady: "Phase assemblies are not loaded yet \u2014 press Refresh or try again shortly.",
     envBlockTitle: "Environment variable blocklist (envBlocklist)",
     envBlockHint: "All system environment variables (process.env) are registered as prompt variables: reference them in section text as {{env_lowercase_key}} (e.g. {{env_path}}); keys hit by the blocklist are not registered \u2014 env often carries secrets, and anything in the prompt is sent to the model. Entries support * wildcards, case-insensitive. Built-ins {{date}} {{time}} {{datetime}} {{weekday}} {{hostname}} {{platform}} {{arch}} {{username}} {{home}} {{shell}} {{locale}} {{node_version}} are always available.",
     envBlockAdd: "Key or wildcard, e.g. GITHUB_TOKEN or *_KEY*",
@@ -4267,19 +4294,9 @@ var DICT = {
     resetFail: "Failed to restore initial state",
     scopeFallback: "This agent preset's standing scope could not be mounted; what you see is the global layer (not the preset's native sections/tools).",
     previewFail: "Assembly for this phase failed (scope mount error or a preset plugin threw); switch target or check the server log.",
-    phaseVisible: "visible in phase",
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
     previewSessionOverlay: "The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset.",
-    sessionHint: "Real assembly of the current session (read-only): prompt sections and tools come from the newest active root session's own agent scope.",
-    sessionNone: "No active session right now. Start a conversation and this view will show exactly what the model sees.",
-    sessionPromptTitle: "Final system prompt (real current-session assembly)",
-    sessionToolsTitle: "Tool catalog (real current-session view)",
-    sessionToolsVisible: "model-visible",
-    sessionToolsTotal: "complete catalog",
-    sessionPhase: "Phase",
-    sessionPreset: "Preset",
-    sessionId: "Session",
     toolAgentScoped: "session-level",
     toolAgentScopedHint: "Registered by a plugin in the agent's own scope (not a preset registry entry); this plugin's phase filter cannot deny scope-local names, so this row is read-only.",
     toolExecutorScoped: "executor wrapper",
@@ -4290,12 +4307,9 @@ var DICT = {
     toolMaskedByOwnPluginHint: "Hidden by this plugin's MCP tool disable / preset mask / workspace close ledger; re-enable it in the MCP tab.",
     completeCatalogTitle: "Complete catalog / masked (read-only)",
     completeCatalogHint: "Tools this plugin cannot toggle per phase: agent-scope registrations, executor wrappers, tools restricted by other plugins, and tools masked by this plugin's MCP ledgers. They never appear in the enabled list above.",
-    levelPreset: "Preset",
-    levelWorkspace: "Workspace",
     workspaceRequired: "Saving workspace-level requires a current workspace (active session cwd).",
     workspaceNoSession: "Workspace level: no active session, so the workspace path is unknown; open a session first.",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
-    navShort: "Prompts",
     close: "Close",
     filterAll: "All",
     filterOn: "Enabled",
@@ -4303,13 +4317,21 @@ var DICT = {
     targetLabel: "Edit target (agent preset)",
     targetCustomized: "{n} overridden field(s)",
     agentScoped: "session-level",
-    agentScopedHint: "This section is registered by a plugin in the agent\u2019s own scope (it is not in this preset scope\u2019s registry): the panel\u2019s preview assembly cannot see it, but every real session\u2019s prompt has it. It is in the prompt by default, and it can be blocked / replaced / reordered like any other row \u2014 use the \u201CChinese prompt\u201D toggle or a manual replacement to translate it.",
-    settingsTitle: "Global settings",
+    agentScopedHint: "This section is registered by a plugin in the agent\u2019s own scope (it is not in this preset scope\u2019s registry): the panel\u2019s preview assembly cannot see it, but every real session\u2019s prompt has it. It is in the prompt by default, and it can be blocked / replaced / reordered like any other row.",
     libraryTitle: "Config snapshots",
     applyToPreset: 'Apply writes to: preset "{name}"',
     applyToWorkspace: 'Apply writes to: workspace "{name}"',
     draftBadge: "Preview includes unsaved draft",
-    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)"
+    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)",
+    sectionDynamicUnsupported: "The host supplies no dynamic marker for this section, so it cannot be told apart from a runtime-generated one \u2014 adding it is disabled rather than guessed.",
+    contextsUnsupported: "The host supplies no runtime-context list (baseContexts) for this phase; visibility cannot be toggled here and no fake state is shown.",
+    contextsNotReady: "The three phase assemblies are not ready; cannot sync contexts across phases \u2014 press Refresh and retry.",
+    sourceGlobal: "Global",
+    sourcePreset: "Preset",
+    sourceAgent: "Session",
+    sourceExecutor: "Executor",
+    sourceWorkspace: "Workspace",
+    sourceUnknown: "Source unknown"
   }
 };
 
@@ -4354,8 +4376,76 @@ function PromptView({ level, workspace }) {
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT(), level, workspace: workspace ?? void 0 }) });
 }
 
+// src/client/skills/types.ts
+var UNCATEGORIZED = "\0none";
+var MAX_BUNDLE_CATEGORIES = 8;
+function sortCategories(counts) {
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")).map((entry) => entry[0]);
+}
+var ALL_PRESETS = "";
+function isValidPresetId(value) {
+  return value.trim() !== "";
+}
+var SKILL_SOURCE_ORIGINS = {
+  "project-dsh": "workspace",
+  "project-agents": "workspace",
+  "user-dsh": "global",
+  "user-agents": "global",
+  bundled: "global",
+  runtime: "global",
+  custom: "global",
+  // 宿主显式 origin 字段可能直接是桶名。
+  workspace: "workspace",
+  global: "global",
+  project: "workspace",
+  user: "global"
+};
+function skillOriginOf(skill) {
+  const raw = skill.origin ?? skill.scope;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const mapped2 = SKILL_SOURCE_ORIGINS[raw.trim()];
+    return mapped2 === void 0 ? { kind: "unknown", label: raw.trim() } : { kind: mapped2 };
+  }
+  if (typeof raw === "object" && raw !== null) {
+    const bucket = [raw.kind, raw.origin, raw.scope].find((value) => typeof value === "string" && value.trim() !== "");
+    const label = typeof raw.label === "string" && raw.label.trim() !== "" ? raw.label.trim() : void 0;
+    if (bucket !== void 0) {
+      const mapped2 = SKILL_SOURCE_ORIGINS[bucket.trim()];
+      return mapped2 === void 0 ? { kind: "unknown", label: label ?? bucket.trim() } : { kind: mapped2 };
+    }
+    if (label !== void 0) return { kind: "unknown", label };
+  }
+  if (skill.root === void 0 || skill.root.trim() === "") return void 0;
+  const source = skill.root.trim();
+  const mapped = SKILL_SOURCE_ORIGINS[source];
+  return mapped === void 0 ? { kind: "unknown", label: source } : { kind: mapped };
+}
+function enabledStateAt(scope, name, tables) {
+  if (scope.level === "workspace" && scope.cwd !== null) {
+    const workspace = tables.workspaceOverrides[scope.cwd] ?? {};
+    if (Object.hasOwn(workspace, name)) return workspace[name] !== false;
+  }
+  if (scope.presetId !== ALL_PRESETS) {
+    const preset = tables.overrides[scope.presetId] ?? {};
+    if (Object.hasOwn(preset, name)) return preset[name] !== false;
+  }
+  return tables.skills[name] !== false;
+}
+function skillOverridesAt(scope, tables) {
+  if (scope.level === "workspace") {
+    return scope.cwd === null ? {} : tables.workspaceOverrides[scope.cwd] ?? {};
+  }
+  return scope.presetId === ALL_PRESETS ? {} : tables.overrides[scope.presetId] ?? {};
+}
+function bundleVisibleInList(bundle, filtering) {
+  return bundle.skills.length > 0 || (bundle.missingSkills?.length ?? 0) > 0 || bundle.skillCount === 0 && !filtering;
+}
+
 // src/client/skills/api.ts
 var SKILL_API_BASE = "/api/skill-manager";
+function assertPresetId(presetId) {
+  if (!isValidPresetId(presetId)) throw new Error(`invalid preset id: ${JSON.stringify(presetId)}`);
+}
 async function skillRequest(path, options) {
   const response = await fetch(SKILL_API_BASE + path, options);
   const body = await response.json().catch(() => ({}));
@@ -4399,29 +4489,38 @@ var skillApi = {
     }
     return body;
   }),
-  setPresetSkillEnabled: (presetId, name, enabled) => fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/skills/${encodeURIComponent(name)}`, {
-    method: "PUT",
-    headers: { accept: "application/json", "content-type": "application/json" },
-    body: JSON.stringify({ enabled })
-  }).then((response) => response.json()).then((body) => {
-    if (!body.ok) throw new Error(body.error || "toggle failed");
-    return body;
-  }),
-  setPresetBundleEnabled: (presetId, bundleId, enabled) => fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/bundles/${encodeURIComponent(bundleId)}`, {
-    method: "PUT",
-    headers: { accept: "application/json", "content-type": "application/json" },
-    body: JSON.stringify({ enabled })
-  }).then((response) => response.json()).then((body) => {
-    if (!body.ok) throw new Error(body.error || "toggle failed");
-    return body;
-  }),
-  resetPreset: (presetId) => fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/reset`, {
-    method: "POST",
-    headers: { accept: "application/json" }
-  }).then((response) => response.json()).then((body) => {
-    if (!body.ok) throw new Error(body.error || "reset failed");
-    return body;
-  }),
+  setPresetSkillEnabled: (presetId, name, enabled) => {
+    assertPresetId(presetId);
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/skills/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ enabled })
+    }).then((response) => response.json()).then((body) => {
+      if (!body.ok) throw new Error(body.error || "toggle failed");
+      return body;
+    });
+  },
+  setPresetBundleEnabled: (presetId, bundleId, enabled) => {
+    assertPresetId(presetId);
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/bundles/${encodeURIComponent(bundleId)}`, {
+      method: "PUT",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ enabled })
+    }).then((response) => response.json()).then((body) => {
+      if (!body.ok) throw new Error(body.error || "toggle failed");
+      return body;
+    });
+  },
+  resetPreset: (presetId) => {
+    assertPresetId(presetId);
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/reset`, {
+      method: "POST",
+      headers: { accept: "application/json" }
+    }).then((response) => response.json()).then((body) => {
+      if (!body.ok) throw new Error(body.error || "reset failed");
+      return body;
+    });
+  },
   /** 工作区级开关：全部工作区覆盖（按 cwd）。 */
   workspaceStatus: () => fetch("/api/skill-toggles/workspaces", { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
     if (body.error) throw new Error(body.error);
@@ -4441,6 +4540,14 @@ var skillApi = {
     body: JSON.stringify({ enabled })
   }).then((response) => response.json()).then((body) => {
     if (!body.ok) throw new Error(body.error || "toggle failed");
+    return body;
+  }),
+  /** 清空某工作区的全部技能开关覆盖（按 cwd，回落预设/全局）。 */
+  resetWorkspace: (cwd) => fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/reset`, {
+    method: "POST",
+    headers: { accept: "application/json" }
+  }).then((response) => response.json()).then((body) => {
+    if (!body.ok) throw new Error(body.error || "reset failed");
     return body;
   }),
   createBundle: (name, categories = []) => skillRequest("/bundles", { method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify({ name, categories }) }),
@@ -4692,24 +4799,17 @@ function GuidePanel({ t, onClose, left, top, height }) {
 
 // src/client/skills/locales.ts
 var SKILL_ZH = {
-  entry: "\u80FD\u529B",
   panelTitle: "\u80FD\u529B\u7BA1\u7406",
   close: "\u5173\u95ED",
   loading: "\u6B63\u5728\u8BFB\u53D6\u6280\u80FD\u2026",
   error: "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6280\u80FD\u3002",
   retry: "\u91CD\u8BD5",
   refresh: "\u5237\u65B0",
-  uploadHint: "\u62D6\u5165\u6280\u80FD\u6587\u4EF6\u5939\u5B89\u88C5\uFF0C\u6216\u70B9\u51FB\u9009\u62E9",
   uploadMeta: "{n} \u4E2A\u6587\u4EF6 \xB7 {folder}",
   fileCount: "{n} \u6587\u4EF6",
-  expandSkillFiles: "\u5C55\u5F00\u6280\u80FD\u6587\u4EF6",
   previewLoading: "\u6B63\u5728\u52A0\u8F7D\u5185\u5BB9\u2026",
-  viewSkillFiles: "\u67E5\u770B\u6280\u80FD\u6587\u4EF6",
   viewerNav: "\u6280\u80FD\u6587\u4EF6",
   viewerFont: "\u5B57\u53F7",
-  viewerSmall: "\u5C0F\u5B57\u53F7",
-  viewerNormal: "\u6807\u51C6\u5B57\u53F7",
-  viewerLarge: "\u5927\u5B57\u53F7",
   viewerFull: "\u5168\u5C4F\u67E5\u770B",
   viewerExitFull: "\u9000\u51FA\u5168\u5C4F",
   viewerFilesCount: "{n} \u4E2A\u6587\u4EF6",
@@ -4726,8 +4826,6 @@ var SKILL_ZH = {
   installLoose: "\u4E0D\u5F52\u7EC4\uFF08\u6563\u88C5\uFF09",
   installConfirm: "\u5B89\u88C5",
   installCancel: "\u53D6\u6D88",
-  bundlesTitle: "\u6280\u80FD\u5305",
-  bundlesEmpty: "\u8FD8\u6CA1\u6709\u6280\u80FD\u5305\uFF0C\u70B9\u300C\u65B0\u5EFA Bundle\u300D\u521B\u5EFA\u4E00\u4E2A\u3002",
   // 技能包分类
   bundleCatTitle: "\u5206\u7C7B",
   bundleCatAll: "\u5168\u90E8\u5206\u7C7B",
@@ -4741,10 +4839,9 @@ var SKILL_ZH = {
   bundleCatLimit: "\u4E00\u4E2A\u6280\u80FD\u5305\u6700\u591A {n} \u4E2A\u5206\u7C7B",
   bundleCatDone: "\u4FDD\u5B58",
   bundleCatAddPreset: "\u52A0\u5165\u300C{name}\u300D",
-  bundleCatEmptyHint: "\u8FD8\u6CA1\u5206\u7C7B\u3002\u70B9\u4E0B\u9762\u7684\u5EFA\u8BAE\u5206\u7C7B\uFF0C\u6216\u81EA\u5DF1\u5199\u4E00\u4E2A \u2014\u2014 \u5206\u7C7B\u53EA\u5F71\u54CD\u8FD9\u91CC\u7684\u67E5\u627E\uFF0C\u4E0D\u6539\u53D8\u6280\u80FD\u672C\u8EAB\u3002",
+  bundleCatEmptyHint: "\u8FD8\u6CA1\u5206\u7C7B\u3002\u4ECE\u5DF2\u6709\u5206\u7C7B\u91CC\u9009\u4E00\u4E2A\uFF0C\u6216\u81EA\u5DF1\u5199\u4E00\u4E2A \u2014\u2014 \u5206\u7C7B\u53EA\u5F71\u54CD\u8FD9\u91CC\u7684\u67E5\u627E\uFF0C\u4E0D\u6539\u53D8\u6280\u80FD\u672C\u8EAB\u3002",
   bundleCatRemove: "\u79FB\u9664\u5206\u7C7B\u300C{name}\u300D",
   bundleCatCustom: "\u81EA\u5B9A\u4E49\u5206\u7C7B",
-  bundleNoSkills: "\u8FD8\u6CA1\u6709\u6280\u80FD\uFF0C\u53EF\u4E0A\u4F20\u6216\u4ECE\u6563\u88C5\u6280\u80FD\u4E2D\u5F52\u5165\u3002",
   newBundle: "\u65B0\u5EFA\u6280\u80FD\u5305",
   newBundlePlaceholder: "\u6280\u80FD\u5305\u540D\u79F0",
   create: "\u521B\u5EFA",
@@ -4755,7 +4852,6 @@ var SKILL_ZH = {
   skillsCount: "{n} \u4E2A\u6280\u80FD",
   removeSkill: "\u79FB\u51FA",
   looseTitle: "\u6563\u88C5\u6280\u80FD",
-  looseEmpty: "\u6CA1\u6709\u6563\u88C5 Skill",
   deleteBundleConfirm: "\u5220\u9664 Bundle\u300C{name}\u300D\uFF1F\u5176\u4E2D\u7684\u6280\u80FD\u5C06\u53D8\u4E3A\u6563\u88C5\u3002",
   deleteSkillConfirm: "\u5220\u9664\u6280\u80FD\u300C{name}\u300D\uFF1F\u6B64\u64CD\u4F5C\u4F1A\u5220\u9664\u5B83\u7684\u6587\u4EF6\u3002",
   enableSkill: "\u542F\u7528",
@@ -4764,12 +4860,9 @@ var SKILL_ZH = {
   disableBundle: "\u7981\u7528\u5168\u90E8",
   toggleFailed: "\u5207\u6362\u5931\u8D25\uFF1A{message}",
   presetAll: "\u5168\u90E8",
-  presetAllName: "\u5168\u90E8 Agent",
-  presetStripLabel: "Agent \u9884\u8BBE",
   presetHintAll: "\u5F53\u524D\u7F16\u8F91\u300C\u5168\u90E8 Agent\u300D\uFF1A\u5F00\u5173\u5BF9\u6240\u6709\u9884\u8BBE\u751F\u6548\uFF0C\u6240\u6709\u6765\u6E90\u7684\u6280\u80FD\u90FD\u80FD\u5173\uFF08\u968F\u5B89\u88C5/\u63D2\u4EF6\u63D0\u4F9B\u7684\u4E5F\u4E00\u6837\uFF0C\u4E0D\u6539\u5B83\u4EEC\u7684\u6587\u4EF6\uFF09\u3002",
   presetHintScoped: "\u5F53\u524D\u7F16\u8F91\u300C{name}\u300D\uFF1A\u53EA\u5BF9\u8BE5 Agent \u9884\u8BBE\u751F\u6548\uFF0C\u5176\u5B83\u9884\u8BBE\u4E0D\u53D7\u5F71\u54CD\u3002",
   presetReset: "\u6E05\u7A7A\u8BE5\u9884\u8BBE\u7684\u5355\u72EC\u8BBE\u7F6E",
-  presetDefaultTag: "\u9ED8\u8BA4",
   presetOverrideCount: "{n} \u9879\u5355\u72EC\u8BBE\u7F6E",
   presetLockedByGlobal: "\u300C\u5168\u90E8 Agent\u300D\u5C42\u5DF2\u7981\u7528\uFF0C\u9884\u8BBE\u5C42\u65E0\u6CD5\u6253\u5F00",
   // 卡片（Skills Hub 风格）文案
@@ -4777,68 +4870,30 @@ var SKILL_ZH = {
   copiedSkillName: "\u5DF2\u590D\u5236",
   toolsLabel: "\u5DE5\u5177",
   scopeAll: "\u5168\u5C40",
+  scopeWorkspace: "\u5DE5\u4F5C\u533A",
   tagLoose: "\u6563\u88C5",
   // Skills Hub 页面文案
-  hubSubtitle: "Skill \u7BA1\u7406\u5DE5\u4F5C\u533A",
-  hubWorkspace: "\u5DE5\u4F5C\u533A",
-  hubManage: "\u7BA1\u7406",
-  hubMySkills: "\u6211\u7684\u6280\u80FD",
-  hubAddSkills: "\u6DFB\u52A0\u6280\u80FD",
-  hubBundles: "\u6280\u80FD\u5305",
-  hubPresets: "Agent \u9884\u8BBE",
-  hubLoose: "\u6563\u88C5\u6280\u80FD",
-  statManaged: "\u7BA1\u7406\u7684\u6280\u80FD",
-  statEnabled: "\u5168\u5C40\u542F\u7528",
-  statLoose: "\u6563\u88C5\u6280\u80FD",
   statSync: "\u6280\u80FD\u5065\u5EB7",
   statHealthy: "\u5168\u90E8\u5065\u5EB7",
-  statManagedDesc: "\u60A8\u521B\u5EFA\u548C\u7BA1\u7406\u7684\u6280\u80FD\u603B\u6570",
-  statEnabledDesc: "\u5728\u6240\u6709 Agent \u4E2D\u542F\u7528\u7684\u6280\u80FD",
-  statLooseDesc: "\u672A\u5206\u7C7B\u7684\u6563\u88C5\u6280\u80FD",
-  statSyncDesc: "\u6240\u6709\u6280\u80FD\u8FD0\u884C\u6B63\u5E38",
   statChecking: "\u68C0\u6D4B\u4E2D\u2026",
   statIssues: "{n} \u4E2A\u95EE\u9898",
-  statUnknown: "\u68C0\u6D4B\u5931\u8D25",
   statPending: "\u5F85\u68C0\u6D4B",
   searchPlaceholder: "\u641C\u7D22\u6280\u80FD\u540D\u79F0\u3001\u63CF\u8FF0\u6216\u6807\u7B7E\u2026",
-  filterAll: "\u5168\u90E8",
-  filterBundles: "\u6280\u80FD\u5305",
-  filterLoose: "\u6563\u88C5\u6280\u80FD",
   sortLabel: "\u540D\u79F0",
-  presetSelect: "Agent \u9884\u8BBE",
-  viewList: "\u5217\u8868",
-  viewGrid: "\u7F51\u683C",
   bannerTitle: "\u6DFB\u52A0\u6280\u80FD",
   bannerSub: "\u62D6\u5165\u6280\u80FD\u6587\u4EF6\u5939\u5B89\u88C5\uFF0C\u6216\u70B9\u51FB\u6D4F\u89C8\u9009\u62E9",
-  bannerDiscovered: "\u53D1\u73B0\u5F85\u5BFC\u5165\u6280\u80FD",
-  bannerFound: "\u53D1\u73B0 {n} \u4E2A\u6587\u4EF6\uFF08{folder}\uFF09\u5F85\u5BFC\u5165",
-  bannerBtnBrowse: "\u6D4F\u89C8\u5E76\u5BFC\u5165",
-  bannerBtnReview: "\u5BA1\u67E5\u5E76\u5BFC\u5165",
   noMatch: "\u6CA1\u6709\u7B26\u5408\u7B5B\u9009\u6761\u4EF6\u7684\u6280\u80FD",
   // 左栏：Agent 预设分类 / 快捷筛选 / 添加技能卡
   presetCatTitle: "Agent \u9884\u8BBE\u5206\u7C7B",
-  quickFilter: "\u5FEB\u6377\u7B5B\u9009",
-  catAll: "\u5168\u90E8",
-  catStandard: "\u6807\u51C6\u6A21\u5F0F",
-  catPtc: "PTC \u6A21\u5F0F",
-  catExtreme: "\u6781\u9650\u6A21\u5F0F",
-  catCreative: "\u521B\u610F\u6A21\u5F0F",
   statusAll: "\u5168\u90E8",
   statusOn: "\u5DF2\u542F\u7528",
   statusOff: "\u5DF2\u505C\u7528",
-  toolAll: "\u5168\u90E8\u5DE5\u5177",
-  updatedAll: "\u6700\u8FD1\u66F4\u65B0",
-  filterUpdated: "\u6700\u8FD1\u66F4\u65B0",
   addSkillsTitle: "\u6DFB\u52A0\u6280\u80FD",
   addSkillsSub: "\u62D6\u5165\u6280\u80FD\u6587\u4EF6\u5B89\u88C5\uFF0C\u6216\u70B9\u51FB\u6D4F\u89C8\u9009\u62E9",
   dropHere: "\u62D6\u62FD\u6587\u4EF6\u5230\u6B64\u5904",
   dropFormat: "\u652F\u6301 .zip .skill \u7B49\u683C\u5F0F",
   browseImport: "\u6D4F\u89C8\u5E76\u5BFC\u5165",
   // 快速上手指南卡
-  guideTitle: "\u5FEB\u901F\u4E0A\u624B\u6307\u5357",
-  guideDesc1: "\u4E86\u89E3 Skill \u7684\u4F5C\u7528\u548C\u4F7F\u7528\u65B9\u6CD5",
-  guideDesc2: "\u5FEB\u901F\u521B\u5EFA\u4F60\u7684\u7B2C\u4E00\u4E2A Skill",
-  guideStart: "\u5F00\u59CB\u5B66\u4E60",
   guidePanelTitle: "\u5FEB\u901F\u4E0A\u624B",
   guideWhat: "\u4EC0\u4E48\u662F Skill?",
   guideWhatDesc: "Skill \u662F Agent \u7684\u80FD\u529B\u6A21\u5757\uFF0C\u53EF\u4EE5\u8BA9 Agent \u5B66\u4F1A\u7279\u5B9A\u4EFB\u52A1\u3001\u6269\u5C55\u66F4\u591A\u80FD\u529B\u3002",
@@ -4855,7 +4910,6 @@ var SKILL_ZH = {
   guideStep3Desc: "\u5C06 Skill \u542F\u7528\u5230 Agent \u4E2D\uFF0C\u8BA9 Agent \u5728\u5BF9\u8BDD\u4E2D\u81EA\u52A8\u4F7F\u7528\u3002",
   guideStep4: "\u67E5\u770B\u6548\u679C",
   guideStep4Desc: "\u5728\u5BF9\u8BDD\u4E2D\u6D4B\u8BD5 Skill \u7684\u6548\u679C\uFF0C\u6301\u7EED\u4F18\u5316\u6280\u80FD\u8868\u73B0\u3002",
-  guideFull: "\u67E5\u770B\u5B8C\u6574\u6307\u5357",
   guideBest: "\u6700\u4F73\u5B9E\u8DF5",
   guideBest1: "\u4E00\u4E2A Skill \u4E13\u6CE8\u4E00\u4E2A\u80FD\u529B",
   guideBest2: "\u63CF\u8FF0\u6E05\u695A\u8F93\u5165\u548C\u8F93\u51FA",
@@ -4882,99 +4936,24 @@ var SKILL_ZH = {
   mcpEditTitle: "\u7F16\u8F91 MCP Server",
   mcpEditReload: "\u4FDD\u5B58\u540E\u5C1D\u8BD5\u70ED\u91CD\u8F7D\uFF08\u9ED8\u8BA4\u4E0B\u6B21\u4F1A\u8BDD / \u91CD\u542F\u751F\u6548\uFF09",
   mcpEditSaved: "\u5DF2\u4FDD\u5B58\u4FEE\u6539\uFF08\u4E0B\u6B21\u4F1A\u8BDD / \u91CD\u542F\u751F\u6548\uFF09",
-  // MCP 视图
-  mcpServer: "MCP Server",
-  mcpTools: "\u5DE5\u5177\u5217\u8868",
-  mcpLog: "\u8FDE\u63A5\u65E5\u5FD7",
-  mcpConfig: "\u914D\u7F6E\u6A21\u677F",
-  mcpRecommendMenu: "\u63A8\u8350 MCP Server",
-  mcpRecommendTitle: "\u63A8\u8350 MCP Server",
-  mcpAdd: "\u6DFB\u52A0",
-  // MCP Server 页（图一头部 + 统计卡）
-  mcpTitle: "MCP \u7BA1\u7406",
-  mcpProtocol: "Model Contest Protocol",
-  mcpSubtitle: "\u7BA1\u7406 MCP Server\uFF0C\u6269\u5C55 Agent \u80FD\u529B\u8FB9\u754C",
-  mcpMarketplace: "MCP Marketplace",
   mcpAddServer: "\u6DFB\u52A0 MCP Server",
-  mcpStatTotal: "MCP Server \u603B\u6570",
-  mcpStatTotalDesc: "\u5DF2\u6DFB\u52A0\u7684 MCP Server",
-  mcpStatEnabled: "\u5DF2\u542F\u7528",
-  mcpStatEnabledDesc: "Agent \u53EF\u4F7F\u7528",
-  mcpStatTools: "\u53EF\u7528\u5DE5\u5177",
-  mcpStatToolsDesc: "\u901A\u8FC7 MCP \u63D0\u4F9B\u7684\u5DE5\u5177",
-  mcpStatRunning: "\u8FD0\u884C\u4E2D",
-  mcpStatRunningDesc: "\u5F53\u524D\u8FDE\u63A5\u6B63\u5E38",
-  // 推荐 Skill
-  skillRecommendTitle: "\u63A8\u8350 Skill",
-  // MCP Server 列表（图二）
+  // MCP Server 列表
   mcpListTitle: "MCP Server \u5217\u8868",
-  mcpEmptyList: "\u6682\u65E0 MCP Server\uFF0C\u70B9\u51FB\u53F3\u4E0A\u89D2\u300C\u6DFB\u52A0 MCP Server\u300D\u5F00\u59CB\u63A5\u5165\u3002",
-  mcpViewAll: "\u67E5\u770B\u5168\u90E8 {n} \u4E2A MCP Server",
-  mcpAdded: "\u5DF2\u6DFB\u52A0",
   mcpRemove: "\u79FB\u9664",
   mcpAddModalTitle: "\u6DFB\u52A0 MCP Server",
-  mcpAddName: "\u540D\u79F0",
-  mcpAddNamePlaceholder: "\u4F8B\u5982 My MCP",
-  mcpAddDesc: "\u63CF\u8FF0\uFF08\u53EF\u9009\uFF09",
-  mcpAddDescPlaceholder: "\u7B80\u5355\u63CF\u8FF0\u8FD9\u4E2A MCP \u7684\u7528\u9014",
-  mcpAddType: "\u8FDE\u63A5\u7C7B\u578B",
-  mcpAddTypeStdio: "stdio",
-  mcpAddTypeHttp: "http",
-  mcpAddTypeSse: "sse",
-  mcpAddCommand: "\u542F\u52A8\u547D\u4EE4",
-  mcpAddCommandPlaceholder: "\u4F8B\u5982 npx -y @modelcontextprotocol/server-filesystem",
-  mcpAddUrl: "\u63A5\u53E3\u5730\u5740",
-  mcpAddUrlPlaceholder: "\u4F8B\u5982 https://example.com/mcp",
   mcpAddConfirm: "\u6DFB\u52A0",
-  mcpAddCat: "\u81EA\u5B9A\u4E49",
-  // 工具列表页
-  mcpToolsTitle: "\u53EF\u7528\u5DE5\u5177 \xB7 {n}",
-  mcpToolsSearch: "\u641C\u7D22\u5DE5\u5177\u2026",
-  mcpToolsEmpty: "\u6682\u65E0\u53EF\u7528\u5DE5\u5177\uFF1A\u5148\u6DFB\u52A0\u5E76\u542F\u7528 MCP Server",
-  // 推荐页联网搜索
-  mcpSearchPlaceholder: "\u641C\u7D22 MCP Server\uFF0C\u5982 google / \u9489\u9489 / \u98DE\u4E66\u2026",
-  mcpSearching: "\u6B63\u5728\u641C\u7D22\u5916\u90E8 MCP \u76EE\u5F55\u2026",
-  mcpSearchResults: "\u641C\u7D22\u7ED3\u679C \xB7 {n}",
-  mcpSearchEmpty: "\u6CA1\u6709\u627E\u5230\u300C{q}\u300D\u76F8\u5173\u7684 MCP\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5",
-  mcpOpen: "\u6253\u5F00",
-  mcpOpenGitHub: "GitHub \u4ED3\u5E93",
-  mcpOpenRegistry: "MCP Registry",
-  mcpResolving: "\u89E3\u6790\u4E2D\u2026",
-  mcpResolveFailed: "\u672A\u80FD\u8BC6\u522B\u5B89\u88C5\u65B9\u5F0F\uFF0C\u8BF7\u6253\u5F00\u4ED3\u5E93\u67E5\u770B\u914D\u7F6E",
-  // 连接日志页
-  mcpLogTitle: "\u8FDE\u63A5\u65E5\u5FD7",
-  mcpLogEmpty: "\u6682\u65E0\u8FDE\u63A5\u65E5\u5FD7\uFF0C\u63A5\u5165 MCP Server \u540E\u81EA\u52A8\u8BB0\u5F55",
-  mcpLogClear: "\u6E05\u7A7A\u65E5\u5FD7",
-  mcpLogAdd: "\u5DF2\u6DFB\u52A0",
-  mcpLogEnable: "\u5DF2\u542F\u7528",
-  mcpLogDisable: "\u5DF2\u7981\u7528",
-  mcpLogRemove: "\u5DF2\u79FB\u9664",
-  // 配置模板页
-  mcpConfigTitle: "\u914D\u7F6E\u6A21\u677F",
-  mcpConfigCopy: "\u590D\u5236",
-  copied: "\u5DF2\u590D\u5236",
-  mcpTagOfficial: "\u5B98\u65B9",
-  mcpTagCommunity: "\u793E\u533A",
-  mcpStatusEnabled: "\u5DF2\u542F\u7528",
-  mcpStatusDisabled: "\u5DF2\u7981\u7528",
-  mcpAutostart: "\u81EA\u542F\u52A8",
-  mcpAutostartTitle: "\u4F1A\u8BDD\u542F\u52A8\u65F6\u81EA\u52A8\u62C9\u8D77\u8BE5 MCP \u8FDB\u7A0B\uFF08\u5173\u95ED\u53EF\u8282\u7701\u5185\u5B58\uFF09",
   // 真实注册状态（mcp-client 桥接）
-  mcpLiveNote: "\u4EE5\u4E0B\u4E3A DSH \u5B9E\u9645\u6CE8\u518C\u7684 MCP Server\xB7\u53F3\u4E0A\u5F00\u5173 = \u542F\u7528/\u7981\u7528\uFF08\u5B9E\u65F6\u751F\u6548\uFF09\xB7\u62A5 Session not found \u65F6\u5F00\u5173\u5207\u4E00\u6B21\uFF08\u7981\u2192\u542F\uFF09\u5373\u91CD\u8FDE\uFF0C\u65E0\u9700\u91CD\u542F DSH",
   mcpLiveDisabled: "\u5DF2\u7981\u7528",
-  mcpLiveToggleFailed: "\u5207\u6362\u5931\u8D25\uFF08\u914D\u7F6E\u5199\u4FDD\u62A4\u6216\u6761\u76EE\u7F3A\u5931\uFF09",
   mcpLiveEmpty: "\u672A\u68C0\u6D4B\u5230\u5DF2\u6CE8\u518C\u7684 MCP Server\uFF1A\u5728 cordis.patch.yml \u6DFB\u52A0 mcp-client \u6761\u76EE\u5E76\u91CD\u542F DSH \u540E\u5373\u53EF",
   mcpLiveUnavailable: "\u72B6\u6001\u63A5\u53E3\u672A\u5C31\u7EEA\uFF08host \u6539\u52A8\u9700\u91CD\u542F DSH \u670D\u52A1\uFF09\uFF1A\u6865\u63A5\u5DE5\u5177\u4ECD\u53EF\u7528\uFF0C\u6B64\u9875\u6682\u65E0\u6CD5\u8BFB\u53D6\u6CE8\u518C\u8868",
-  mcpLiveRegistered: "\u5DF2\u6CE8\u518C",
-  mcpLiveRegisteredTitle: "\u5DF2\u6865\u63A5",
   mcpLiveToolsOf: "\u5DE5\u5177",
+  mcpToolsUnknown: "\u5DE5\u5177\u6570\u672A\u77E5",
   mcpLiveRefresh: "\u5237\u65B0",
   mcpConnStatus: "\u8FDE\u63A5\u72B6\u6001",
   mcpConnOk: "\u5DF2\u8FDE\u63A5",
   mcpConnDown: "\u4E0D\u53EF\u7528",
   mcpConnTip: "\u5B9E\u65F6\u8BFB\u53D6\u5230 {n} \u4E2A\u5168\u5C40 MCP Server",
   mcpLiveConfigHint: "\u6DFB\u52A0\uFF1A\u7F16\u8F91 cordis.patch.yml\uFF08\u6216\u4F7F\u7528\u300C\u6DFB\u52A0 MCP Server\u300D\u751F\u6210\u914D\u7F6E\u7247\u6BB5\uFF09",
-  // mcps 目录来源（内核不读这些文件，本插件读出来挂载）
   // 预设维度（0.1.6）：全局 / 预设专属 / 遮蔽
   mcpScopeTitle: "Agent \u9884\u8BBE\u8303\u56F4",
   mcpScopeHintAll: "\u5F53\u524D\u67E5\u770B\u5168\u5C40 Server\uFF08\u6240\u6709\u9884\u8BBE\u5171\u7528\uFF09\u3002\u9009\u62E9\u67D0\u4E2A\u9884\u8BBE\uFF0C\u53EF\u7BA1\u7406\u5B83\u4E13\u5C5E\u7684 Server \u4E0E\u906E\u853D\u3002",
@@ -5000,20 +4979,11 @@ var SKILL_ZH = {
   mcpPresetNewSession: "\u9884\u8BBE\u6539\u52A8\uFF08\u70ED\u91CD\u8F7D\uFF09\u5BF9\u65B0\u4F1A\u8BDD\u751F\u6548",
   mcpPresetFailed: "\u64CD\u4F5C\u5931\u8D25\uFF1A{message}",
   // MCP 页（与技能页同构）：统计卡 / 提示行 / 工具条
-  mcpStatManaged: "\u7BA1\u7406\u7684 Server",
-  mcpStatManagedDesc: "\u60A8\u63A5\u5165\u7684 MCP Server \u603B\u6570",
-  mcpStatGlobal: "\u5168\u5C40 Server",
-  mcpStatGlobalDesc: "\u6240\u6709 Agent \u9884\u8BBE\u5171\u7528",
-  mcpStatOwn: "\u9884\u8BBE\u4E13\u5C5E",
-  mcpStatOwnDesc: "\u53EA\u5728\u67D0\u4E2A\u9884\u8BBE\u5185\u751F\u6548",
-  mcpStatHealth: "\u8FDE\u63A5\u72B6\u6001",
-  mcpStatHealthDesc: "\u5DF2\u505C\u7528\u7684\u6761\u76EE\u4E0D\u8BA1\u5165\u5DE5\u5177",
-  mcpHealthOk: "\u5168\u90E8\u8FD0\u884C\u4E2D",
-  mcpHealthWarn: "{n} \u4E2A\u5DF2\u505C\u7528",
   mcpScopeAllTip: "\u5168\u90E8 Agent\uFF1A{n} \u4E2A\u5168\u5C40 Server\uFF08\u6240\u6709\u9884\u8BBE\u5171\u7528\uFF09",
   mcpScopePresetTip: "\u8BE5\u9884\u8BBE\u53EF\u89C1 {n} \u4E2A Server",
   mcpScopeOverrideCount: "{n} \u9879\u5355\u72EC\u8BBE\u7F6E",
   mcpScopeHintScoped: "\u5F53\u524D\u7F16\u8F91\u300C{name}\u300D\uFF1A\u4E13\u5C5E Server \u53EA\u5BF9\u8FD9\u4E2A\u9884\u8BBE\u751F\u6548\uFF1B\u5F00\u5173 = \u906E\u853D\u5B83\u7EE7\u627F\u7684\u5168\u5C40 Server\uFF0C\u5176\u5B83\u9884\u8BBE\u4E0D\u53D7\u5F71\u54CD\u3002",
+  mcpScopeHintWorkspace: "\u5F53\u524D\u7F16\u8F91\u5DE5\u4F5C\u533A\u300C{path}\u300D\uFF1A\u4E3B\u5F00\u5173\u5199\u300C\u672C\u5DE5\u4F5C\u533A\u5173\u95ED\u300D\uFF0C\u53EA\u5F71\u54CD\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u7684\u4F1A\u8BDD\uFF1B\u9884\u8BBE\u4E13\u5C5E Server \u4ECD\u6309\u9884\u8BBE\u8BB0\u8D26\u3002",
   mcpWaitingTools: "\u6B63\u5728\u7B49\u5F85\u300C{names}\u300D\u8FDE\u63A5\u5E76\u6CE8\u518C\u5DE5\u5177\u2026\uFF08\u81EA\u52A8\u5237\u65B0\u4E2D\uFF0C\u65E0\u9700\u624B\u52A8\u70B9\u5237\u65B0\uFF09",
   mcpToolsPendingReg: "\u7B49\u5F85\u6CE8\u518C",
   mcpToolsPendingRegTip: "\u5DE5\u5177\u540D\u6765\u81EA\u5386\u53F2\u7F13\u5B58\uFF1A\u8FDB\u7A0B\u8FD8\u5728\u8FDE\u63A5\uFF0C\u6CE8\u518C\u5B8C\u6210\u540E\u6570\u91CF\u4F1A\u81EA\u52A8\u66F4\u65B0\u4E3A\u5B9E\u9645\u503C\u3002",
@@ -5052,50 +5022,10 @@ var SKILL_ZH = {
   mcpPasteFailed: "\u6DFB\u52A0\u5931\u8D25",
   mcpRemoveConfirmTitle: "\u79FB\u9664 MCP Server",
   mcpRemoveConfirmMsg: "\u5C06\u4ECE cordis.patch.yml \u4E2D\u5220\u9664\u300C{name}\u300D\u6761\u76EE\uFF0C\u5176\u5DE5\u5177\u968F\u5373\u6CE8\u9500\u4E14\u4E0D\u53EF\u6062\u590D\uFF1B\u5982\u9700\u6062\u590D\u8BF7\u91CD\u65B0\u6DFB\u52A0\u3002",
-  mcpLiveRemoveFailed: "\u79FB\u9664\u5931\u8D25\uFF08\u914D\u7F6E\u5199\u4FDD\u62A4\u6216\u6761\u76EE\u7F3A\u5931\uFF09",
-  mcpCopyDone: "\u5DF2\u590D\u5236 \u2713",
-  mcpCopyHint: "\u5DF2\u590D\u5236\u914D\u7F6E\u7247\u6BB5\uFF0C\u8BF7\u7C98\u8D34\u5230 cordis.patch.yml \u540E\u91CD\u542F DSH \u751F\u6548",
-  mcpLogNewNote: "\u6865\u63A5\u5F0F MCP\uFF08cordis.patch.yml \u914D\u7F6E\uFF09\u65E0\u672C\u5730\u8FDE\u63A5\u65E5\u5FD7\uFF1A\u8FDE\u63A5\u72B6\u6001\u4EE5\u300CMCP Server\u300D\u9875\u771F\u5B9E\u6CE8\u518C\u4E3A\u51C6\uFF1B\u6B64\u9875\u4EC5\u5C55\u793A\u65E7\u7248\u9762\u677F\u7684\u672C\u5730\u8BB0\u5F55\u3002",
-  // 右侧信息栏（图三）
-  mcpWhatTitle: "\u4EC0\u4E48\u662F MCP?",
-  mcpWhatDesc: "MCP (Model Contest Protocol) \u662F\u4E00\u4E2A\u5F00\u653E\u534F\u8BAE\uFF0C\u5B83\u6807\u51C6\u5316\u4E86\u5E94\u7528\u7A0B\u5E8F\u5411 LLM \u63D0\u4F9B\u4E0A\u4E0B\u6587\u548C\u5DE5\u5177\u7684\u65B9\u5F0F\u3002",
-  mcpPoint1: "\u6807\u51C6\u5316",
-  mcpPoint1Desc: "\u7EDF\u4E00\u7684\u534F\u8BAE\u89C4\u8303",
-  mcpPoint2: "\u5B89\u5168\u53EF\u63A7",
-  mcpPoint2Desc: "\u6743\u9650\u7BA1\u7406\uFF0C\u5B89\u5168\u8BBF\u95EE",
-  mcpPoint3: "\u53EF\u6269\u5C55",
-  mcpPoint3Desc: "\u8F7B\u677E\u96C6\u6210\u65B0\u7684\u5DE5\u5177\u548C\u670D\u52A1",
-  mcpPoint4: "\u4E92\u64CD\u4F5C",
-  mcpPoint4Desc: "\u8DE8\u5E73\u53F0\u3001\u8DE8\u670D\u52A1\u517C\u5BB9",
-  mcpHowTitle: "MCP \u5DE5\u4F5C\u539F\u7406",
-  mcpAgent: "Agent",
-  mcpClient: "MCP Client",
-  mcpServerNode: "MCP Server",
-  mcpReq: "\u8BF7\u6C42",
-  mcpResp: "\u54CD\u5E94",
-  mcpCall: "\u8C03\u7528",
-  mcpExt: "\u5916\u90E8\u5DE5\u5177 / \u6570\u636E\u5E93 / \u51FD\u6570",
-  mcpStartTitle: "\u5FEB\u901F\u4E0A\u624B",
-  mcpStep1: "\u6DFB\u52A0 MCP Server",
-  mcpStep1Desc: "\u914D\u7F6E\u6216\u5BFC\u5165 MCP Server \u8FDE\u63A5\u4FE1\u606F",
-  mcpStep2: "\u6388\u6743\u4E0E\u914D\u7F6E",
-  mcpStep2Desc: "\u8BBE\u7F6E\u8BBF\u95EE\u6743\u9650\u548C\u5FC5\u8981\u7684\u914D\u7F6E",
-  mcpStep3: "\u4F7F\u7528\u4E0E\u4F18\u5316",
-  mcpStep3Desc: "\u5728\u5BF9\u8BDD\u4E2D\u8C03\u7528 MCP \u5DE5\u5177\uFF0C\u6301\u7EED\u4F18\u5316\u914D\u7F6E",
-  mcpIntroTitle: "MCP \u5FEB\u901F\u4E86\u89E3",
-  mcpIntroDesc: "\u4E86\u89E3 MCP \u7684\u4F5C\u7528\u3001\u5DE5\u4F5C\u539F\u7406\u4E0E\u5FEB\u901F\u4E0A\u624B",
-  mcpIntroBtn: "\u4E86\u89E3 MCP",
-  mcpOverlayTitle: "\u4E86\u89E3 MCP",
-  mcpNavTitle: "MCP",
-  mcpComingDesc: "\u529F\u80FD\u5F00\u53D1\u4E2D\uFF0C\u656C\u8BF7\u671F\u5F85",
   // 分组行 / 更多菜单 / 分页
   nameAsc: "\u5347\u5E8F",
   nameDesc: "\u964D\u5E8F",
   moreActions: "\u66F4\u591A\u64CD\u4F5C",
-  totalItems: "\u5171 {n} \u6761",
-  pageSize: "{n} \u6761/\u9875",
-  pagePrev: "\u4E0A\u4E00\u9875",
-  pageNext: "\u4E0B\u4E00\u9875",
   // 空技能包 / 失效引用 / 操作反馈
   bundleEmptyTitle: "\u8FD9\u4E2A\u6280\u80FD\u5305\u8FD8\u662F\u7A7A\u7684",
   bundleEmptyHint: "\u4E0A\u4F20\u6280\u80FD\u65F6\u5728\u8FD9\u91CC\u9009\u5B83\u5F52\u7EC4\uFF0C\u6216\u4ECE\u6563\u88C5\u6280\u80FD\u5361\u7247\u70B9\u300C+\u300D\u5F52\u5165\u3002",
@@ -5128,6 +5058,9 @@ var SKILL_ZH = {
   mcpWorkspaceEnableHint: "\u91CD\u65B0\u5728\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u6CE8\u5165\u5B83\u7684\u5DE5\u5177\u3002",
   mcpWorkspaceClosed: "\u672C\u5DE5\u4F5C\u533A\u5DF2\u5173",
   mcpWorkspaceClosedHint: "\u8BE5 Server \u5728\u5F53\u524D\u5DE5\u4F5C\u533A\u88AB\u5173\u95ED\uFF1A\u8FD9\u91CC\u7684\u4F1A\u8BDD\u770B\u4E0D\u5230\u5B83\u7684\u5DE5\u5177\uFF0C\u5176\u5B83\u5DE5\u4F5C\u533A\u4E0D\u53D7\u5F71\u54CD\u3002",
+  mcpWorkspaceToolLedgerRaw: "\u672C\u5DE5\u4F5C\u533A\u5DE5\u5177\u7981\u7528\u8D26\u672C\uFF08\u672A\u80FD\u5F52\u5230\u5F53\u524D Server \u5361\u7247\uFF0C\u6309\u670D\u52A1\u7AEF\u539F\u6837\u5217\u51FA\uFF09\uFF1A{names}",
+  workspaceHint: "\u5F53\u524D\u7F16\u8F91\u5DE5\u4F5C\u533A\u300C{path}\u300D\uFF1A\u5F00\u5173\u53EA\u5728\u8FD9\u4E2A\u5DE5\u4F5C\u533A\u751F\u6548\uFF0C\u5E76\u8986\u76D6\u540C\u540D\u7684\u9884\u8BBE/\u5168\u5C40\u8BBE\u7F6E\u3002",
+  workspaceReset: "\u6E05\u7A7A\u8BE5\u5DE5\u4F5C\u533A\u7684\u5355\u72EC\u8BBE\u7F6E",
   presetCountTip: "\u8BE5\u9884\u8BBE\u4E0B\u5DF2\u542F\u7528 {n} \u4E2A / \u5171 {total} \u4E2A\u6280\u80FD"
 };
 function skillT(key, params) {
@@ -5141,9 +5074,61 @@ function skillT(key, params) {
 // src/client/skills/McpAddModal.tsx
 var import_react10 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
+
+// src/client/skills/mcp-state.ts
+function mcpToggleTarget(level, scope, workspace) {
+  if (level === "workspace") {
+    if (workspace === null || workspace.trim() === "") return null;
+    return { kind: "workspace", cwd: workspace };
+  }
+  return scope === "" ? { kind: "global" } : { kind: "mask", presetId: scope };
+}
+function mcpEffectiveEnabled(input) {
+  return input.configDisabled !== true && input.masked !== true && input.workspaceClosed !== true;
+}
+function normalizeMcpFormatCapabilities(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const raw = value;
+  const result = {};
+  if (Array.isArray(raw.formats)) {
+    const formats = [...new Set(raw.formats.filter((item) => item === "json" || item === "yaml"))];
+    if (formats.length > 0) result.formats = formats;
+  }
+  if (typeof raw.editable === "boolean") result.editable = raw.editable;
+  if (typeof raw.convert === "boolean") result.convert = raw.convert;
+  return Object.keys(result).length === 0 ? void 0 : result;
+}
+function detectMcpFormat(text) {
+  const trimmed = text.trim();
+  if (trimmed === "") return "json";
+  return trimmed.startsWith("{") || trimmed.startsWith("[") ? "json" : "yaml";
+}
+function mcpFormatOptions(capabilities, fallback) {
+  const formats = capabilities?.formats;
+  return formats !== void 0 && formats.length > 0 ? [...new Set(formats)] : [...new Set(fallback)];
+}
+function workspaceDisabledToolsFor(ledger, cwd, serverName, tools) {
+  if (cwd === null || cwd === "") return [];
+  const grouped = ledger.byServer?.[cwd]?.[serverName];
+  if (grouped !== void 0) return grouped;
+  const owned = new Set(tools.map((tool) => tool.name));
+  return (ledger.flat?.[cwd] ?? []).filter((name) => owned.has(name));
+}
+function ungroupedWorkspaceTools(ledger, cwd, attributed) {
+  if (cwd === null || cwd === "") return [];
+  if (ledger.byServer?.[cwd] !== void 0) return [];
+  return (ledger.flat?.[cwd] ?? []).filter((name) => !attributed.has(name));
+}
+
+// src/client/skills/McpAddModal.tsx
 var import_jsx_runtime5 = require("react/jsx-runtime");
-function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat }) {
-  const [format, setFormat] = (0, import_react10.useState)(editServer !== void 0 ? editFormat ?? "yaml" : "json");
+function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat, editCapabilities }) {
+  const initialFormat = editServer !== void 0 ? editFormat ?? detectMcpFormat(editText ?? "") : "json";
+  const [format, setFormat] = (0, import_react10.useState)(initialFormat);
+  const formatOptions = mcpFormatOptions(
+    editCapabilities,
+    editServer !== void 0 ? [initialFormat] : ["json", "yaml"]
+  );
   const [text, setText] = (0, import_react10.useState)(editText ?? "");
   const [reload, setReload] = (0, import_react10.useState)(false);
   const [busy, setBusy] = (0, import_react10.useState)(null);
@@ -5213,7 +5198,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
     setBusy("add");
     reset();
     if (editServer !== void 0) {
-      const payload2 = editSource === "preset" ? { source: "preset", preset: editPreset, serverName: editServer, format: "json", text, reload } : editSource === "workspace" ? { source: "workspace", workspace: editWorkspace, serverName: editServer, format: "json", text, reload } : { serverName: editServer, format, text, reload };
+      const payload2 = editSource === "preset" ? { source: "preset", preset: editPreset, serverName: editServer, format, text, reload } : editSource === "workspace" ? { source: "workspace", workspace: editWorkspace, serverName: editServer, format, text, reload } : { serverName: editServer, format, text, reload };
       void call("/api/triad/mcp-edit", payload2).then((body) => {
         const list = Array.isArray(body.errors) ? body.errors : [];
         if (list.length > 0) {
@@ -5260,7 +5245,7 @@ function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, ed
   };
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: css.mcpAddForm, children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: css.installHint, children: t("mcpPasteHint", { scope: presetId === void 0 ? t("mcpPasteScopeGlobal") : `${t("mcpPasteScopePreset")} \u201C${presetId}\u201D` }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: ["json", "yaml"].filter((value) => !(editServer !== void 0 && (editSource === "preset" || editSource === "workspace") && value === "yaml")).map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.installRow, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: css.mcpAddTypeRow, role: "group", "aria-label": t("mcpPasteFormat"), children: formatOptions.map((value) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "button",
       {
         type: "button",
@@ -5505,14 +5490,12 @@ function mcpToolNames(tools, disabledTools) {
   return [...tools.map((tool) => tool.name), ...disabledTools.filter((name) => !known.has(name))];
 }
 function McpToolChips({ t, serverName, tools, disabledTools, locked, busy, onToggle }) {
-  const prefix = `mcp__${serverName}__`;
   const names = mcpToolNames(tools, disabledTools);
   if (names.length === 0) return null;
   const off = new Set(disabledTools);
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpToolChips, role: "group", "aria-label": t("mcpToolChipsAria", { name: serverName }), children: names.map((name) => {
     const disabled = off.has(name);
     const isLocked = locked?.has(name) === true;
-    const short = name.startsWith(prefix) ? name.slice(prefix.length) : name;
     const description = tools.find((tool) => tool.name === name)?.description ?? "";
     return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "button",
@@ -5533,7 +5516,7 @@ ${description}`}`,
         },
         children: [
           isLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(LockGlyph, { size: 9 }),
-          short
+          name
         ]
       },
       name
@@ -5577,16 +5560,18 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
   const ownNames = new Set(ownRows.map((row) => row.serverName));
   const globalOff = ready?.toolDisabled ?? {};
   const presetTables = ready?.toolDisabledByPreset ?? {};
-  const workspaceDisabledTools = new Set(workspace !== null ? ready?.workspaceToolDisabled?.[workspace] ?? [] : []);
-  const offOf = (serverName, owner) => {
+  const workspaceToolLedger = {
+    byServer: ready?.workspaceToolDisabledByServer,
+    flat: ready?.workspaceToolDisabled
+  };
+  const offOf = (serverName, owner, tools) => {
     const entry = presetTables[scope]?.[serverName];
     let base;
     if (owner === "own") base = entry?.own ?? [];
     else if (scope === "") base = globalOff[serverName] ?? [];
     else base = [.../* @__PURE__ */ new Set([...globalOff[serverName] ?? [], ...entry?.inherit ?? []])];
     if (level === "workspace") {
-      const prefix = `mcp__${serverName}__`;
-      base = [.../* @__PURE__ */ new Set([...base, ...[...workspaceDisabledTools].filter((n) => n.startsWith(prefix))])];
+      base = [.../* @__PURE__ */ new Set([...base, ...workspaceDisabledToolsFor(workspaceToolLedger, workspace, serverName, tools)])];
     }
     return base;
   };
@@ -5651,8 +5636,19 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
     if (extra?.workspace !== void 0) qs.set("workspace", extra.workspace);
     void fetch(`/api/triad/mcp-edit?${qs.toString()}`, { headers: { accept: "application/json" } }).then((response) => response.json()).then((body) => {
       const payload = body;
-      if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? ""), source, preset: extra?.preset, workspace: extra?.workspace });
-      else setError(String(payload?.error ?? "load mcp config failed"));
+      if (payload?.ok === true) {
+        const text = String(payload.text ?? "");
+        const format = payload.format === "json" || payload.format === "yaml" ? payload.format : detectMcpFormat(text);
+        setEditState({
+          serverName,
+          text,
+          source,
+          preset: extra?.preset,
+          workspace: extra?.workspace,
+          format,
+          capabilities: normalizeMcpFormatCapabilities(payload.capabilities)
+        });
+      } else setError(String(payload?.error ?? "load mcp config failed"));
     }).catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause));
     });
@@ -5731,6 +5727,31 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
     }
     putTools(serverName, [fullName], enabled, source);
   };
+  const putWorkspaceTools = (names, enabled) => {
+    if (names.length === 0 || toolBusy !== null || busy !== null) return;
+    if (workspace === null) {
+      setError("no active workspace");
+      return;
+    }
+    setToolBusy(names[0]);
+    setError(null);
+    void (async () => {
+      for (const name of names) {
+        const response = await fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, {
+          method: "PUT",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ name, enabled })
+        });
+        const body = await response.json().catch(() => null);
+        if (!(response.ok && body?.ok === true)) throw new Error(body?.error ?? String(response.status));
+      }
+      onRefresh();
+    })().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }).finally(() => {
+      setToolBusy(null);
+    });
+  };
   const removeOwn = (serverName) => {
     if (busy !== null) return;
     setBusy(`own:${serverName}`);
@@ -5773,9 +5794,28 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
       setBusy(null);
     });
   };
+  const target = mcpToggleTarget(level, scope, workspace);
+  const globalRowEnabled = (server) => mcpEffectiveEnabled({
+    configDisabled: server.config.disabled,
+    masked: scope !== "" && masked.has(server.serverName),
+    workspaceClosed: closedInWorkspace.has(server.serverName)
+  });
+  const ownRowEnabled = (row) => mcpEffectiveEnabled({ workspaceClosed: closedInWorkspace.has(row.serverName) });
+  const statusMatch = (enabled) => status === "all" || (status === "on" ? enabled : !enabled);
   const needle = query.trim().toLowerCase();
-  const shownGlobals = globals.filter((server) => (needle === "" || server.serverName.toLowerCase().includes(needle) || server.tools.some((tool) => tool.name.toLowerCase().includes(needle))) && (status === "all" || (scope === "" ? status === "off" ? server.config.disabled : !server.config.disabled : status === "off" ? masked.has(server.serverName) : !masked.has(server.serverName))));
+  const shownGlobals = globals.filter((server) => (needle === "" || server.serverName.toLowerCase().includes(needle) || server.tools.some((tool) => tool.name.toLowerCase().includes(needle))) && statusMatch(globalRowEnabled(server)));
   const shownOwn = ownRows.filter((row) => needle === "" || row.serverName.toLowerCase().includes(needle) || row.summary.toLowerCase().includes(needle));
+  const shownOwnFiltered = shownOwn.filter((row) => statusMatch(ownRowEnabled(row)));
+  const attributedWorkspaceTools = /* @__PURE__ */ new Set();
+  if (level === "workspace") {
+    for (const server of globals) {
+      for (const name of workspaceDisabledToolsFor(workspaceToolLedger, workspace, server.serverName, server.tools)) attributedWorkspaceTools.add(name);
+    }
+    for (const row of ownRows) {
+      for (const name of workspaceDisabledToolsFor(workspaceToolLedger, workspace, row.serverName, row.tools ?? [])) attributedWorkspaceTools.add(name);
+    }
+  }
+  const unattributedWorkspaceTools = level === "workspace" ? ungroupedWorkspaceTools(workspaceToolLedger, workspace, attributedWorkspaceTools) : [];
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpServerMain, children: [
     editState !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.Modal, { open: true, onClose: () => setEditState(null), closeLabel: t("close"), title: t("mcpEditTitle"), children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       McpPasteAdd,
@@ -5791,19 +5831,22 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         editSource: editState.source,
         editPreset: editState.preset,
         editWorkspace: editState.workspace,
-        editFormat: editState.source === "global" ? "yaml" : "json",
+        editFormat: editState.format,
+        editCapabilities: editState.capabilities,
         onEdited: () => {
           setEditState(null);
           onRefresh();
         }
-      }
+      },
+      `${editState.source}:${editState.preset ?? ""}:${editState.workspace ?? ""}:${editState.serverName}`
     ) }),
     /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.hintRow, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.hintRowText, children: scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
-      scope !== "" && masked.size > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.presetReset, disabled: busy !== null, onClick: clearMasks, children: t("presetReset") })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.hintRowText, children: level === "workspace" ? t("mcpScopeHintWorkspace", { path: workspace ?? "" }) : scope === "" ? t("mcpScopeHintAll") : t("mcpScopeHintScoped", { name: scoped?.name ?? scope }) }),
+      level === "preset" && scope !== "" && masked.size > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.presetReset, disabled: busy !== null, onClick: clearMasks, children: t("presetReset") })
     ] }),
     error !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.error, role: "alert", children: t("mcpPresetFailed", { message: error }) }),
     maskWarn !== null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.error, role: "alert", children: maskWarn }),
+    unattributedWorkspaceTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, role: "status", children: t("mcpWorkspaceToolLedgerRaw", { names: unattributedWorkspaceTools.join("\u3001") }) }),
     waitingTools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, role: "status", children: t("mcpWaitingTools", { names: waitingTools.join("\u3001") }) }),
     live.state === "unavailable" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpLiveUnavailable") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.hubSection, "data-open": globalOpen ? "true" : void 0, children: [
@@ -5829,11 +5872,15 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
           shownGlobals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: globals.length === 0 ? t("mcpLiveEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: shownGlobals.map((server) => {
             const isMasked = masked.has(server.serverName);
             const covered = ownNames.has(server.serverName);
-            const offTools = offOf(server.serverName, "inherit");
+            const offTools = offOf(server.serverName, "inherit", server.tools);
             const lockedTools = lockedOf(server.serverName);
             const listed = server.tools.length;
             const pendingReg = isToolRegistrationPending(server.toolCount, listed);
             const lockedCount = mcpToolNames(server.tools, offTools).filter((name) => lockedTools.has(name)).length;
+            const workspaceClosed = closedInWorkspace.has(server.serverName);
+            const switchOn = target === null ? false : target.kind === "workspace" ? !workspaceClosed : target.kind === "mask" ? !isMasked : !server.config.disabled;
+            const switchDisabled = busy !== null || target === null || target.kind === "global" && !server.config.editable;
+            const switchLabel = target === null ? t("mcpWorkspaceDisableHint") : target.kind === "workspace" ? workspaceClosed ? t("mcpWorkspaceEnable") : t("mcpWorkspaceDisable") : target.kind === "mask" ? isMasked ? t("enableSkill") : t("mcpPresetMasked") : t("mcpLiveDisabled");
             return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.mcpRecCard, children: [
               /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpRecCardHead, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTitleRow, children: [
@@ -5858,7 +5905,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   import_dsh_client_ui_primitives5.Tooltip,
                   {
-                    label: scope === "" ? server.config.disabled ? t("enableSkill") : t("mcpLiveDisabled") : covered ? t("mcpPresetCoveredSwitchHint") : isMasked ? t("enableSkill") : t("mcpPresetMasked"),
+                    label: target?.kind === "workspace" ? workspaceClosed ? t("mcpWorkspaceEnableHint") : t("mcpWorkspaceDisableHint") : target?.kind === "mask" && covered ? t("mcpPresetCoveredSwitchHint") : switchLabel,
                     side: "bottom",
                     delayMs: 500,
                     children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -5866,16 +5913,18 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                       {
                         type: "button",
                         role: "switch",
-                        "aria-checked": scope === "" ? !server.config.disabled : !isMasked,
-                        "aria-label": scope === "" ? t("mcpLiveDisabled") : t("mcpPresetMasked"),
-                        className: `${css.toggle} ${(scope === "" ? server.config.disabled : isMasked) ? css.toggleOff : css.toggleOn}`,
-                        disabled: busy !== null || scope === "" && !server.config.editable,
+                        "aria-checked": switchOn,
+                        "aria-label": switchLabel,
+                        className: `${css.toggle} ${switchOn ? css.toggleOn : css.toggleOff}`,
+                        disabled: switchDisabled,
                         onClick: () => {
-                          if (scope === "") {
+                          if (target === null) return;
+                          if (target.kind === "global") {
                             const nextDisabled = !server.config.disabled;
                             toggleGlobal(server.serverName, nextDisabled);
                             if (!nextDisabled) onWatchTools([server.serverName]);
-                          } else setMasked(server.serverName, isMasked);
+                          } else if (target.kind === "mask") setMasked(server.serverName, isMasked);
+                          else toggleWorkspaceServer(server.serverName, workspaceClosed);
                         },
                         children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
                       }
@@ -5900,20 +5949,6 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
               ),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: css.mcpCardFoot, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItem, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpCardItemLabel, children: scope === "" ? t("mcpLiveConfigHint") : covered ? isMasked ? t("mcpPresetCoveredMasked") : t("mcpPresetCovered") : isMasked ? t("mcpPresetMasked") : t("mcpPresetMaskState") }) }),
-                workspace !== null && level === "workspace" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    className: css.mcpCardDelete,
-                    "data-closed": closedInWorkspace.has(server.serverName) || void 0,
-                    title: closedInWorkspace.has(server.serverName) ? t("mcpWorkspaceEnableHint") : t("mcpWorkspaceDisableHint"),
-                    disabled: busy !== null,
-                    onClick: () => {
-                      toggleWorkspaceServer(server.serverName, closedInWorkspace.has(server.serverName));
-                    },
-                    children: closedInWorkspace.has(server.serverName) ? t("mcpWorkspaceEnable") : t("mcpWorkspaceDisable")
-                  }
-                ),
                 scope === "" && server.config.editable ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: css.mcpCardDelete, title: t("mcpEdit"), disabled: busy !== null, onClick: () => {
                   openEdit(server.serverName);
                 }, children: t("mcpEdit") }) : null,
@@ -5954,7 +5989,7 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleIcon, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconAgentPresetOutlineRegular, { size: 16 }) }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleName, children: t("mcpPresetOwnSection") }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownOwn.length }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.bundleCount, children: shownOwnFiltered.length }),
               /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_dsh_client_ui_primitives5.IconChevronDownOutlineRegular, { className: css.chevron, size: 13, "aria-hidden": "true" })
             ]
           }
@@ -5962,8 +5997,8 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
         ownOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetOwnHint") }),
           scoped?.trust === "system" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: t("mcpPresetStorageHint") }),
-          shownOwn.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: ownRows.length === 0 ? t("mcpPresetOwnEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: shownOwn.map((row) => {
-            const offOwn = offOf(row.serverName, "own");
+          shownOwnFiltered.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: css.mcpEmptyList, children: ownRows.length === 0 ? t("mcpPresetOwnEmpty") : t("mcpListFilteredEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: css.mcpRecGrid, children: shownOwnFiltered.map((row) => {
+            const offOwn = offOf(row.serverName, "own", row.tools ?? []);
             const ownToolNames = (row.tools ?? []).map((tool) => tool.name);
             const allDisabled = ownToolNames.length > 0 && ownToolNames.every((name) => offOwn.includes(name));
             return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: css.mcpRecCard, children: [
@@ -5972,12 +6007,8 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                   /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCardName, children: row.serverName }),
                   /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCardTags, children: [
                     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: row.transport }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: css.mcpRecCatTag, children: [
-                      (row.registeredCount ?? 0) > 0 ? row.registeredCount : row.tools?.length ?? 0,
-                      " ",
-                      t("mcpLiveToolsOf")
-                    ] }),
-                    isToolRegistrationPending(row.registeredCount ?? 0, row.tools?.length ?? 0) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, children: row.registeredCount === void 0 ? t("mcpToolsUnknown") : `${row.registeredCount > 0 ? row.registeredCount : row.tools?.length ?? 0} ${t("mcpLiveToolsOf")}` }),
+                    row.registeredCount !== void 0 && isToolRegistrationPending(row.registeredCount, row.tools?.length ?? 0) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", title: t("mcpToolsPendingRegTip"), children: t("mcpToolsPendingReg") }),
                     globals.some((item) => item.serverName === row.serverName) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-shadow": "true", title: t("mcpPresetShadowGlobalTip"), children: t("mcpPresetShadowGlobalTag") }),
                     offOwn.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.mcpRecCatTag, "data-off": "true", children: t("mcpToolDisabledCount", { n: offOwn.length }) })
                   ] })
@@ -5996,9 +6027,10 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
                         "aria-checked": !allDisabled,
                         "aria-label": t("mcpToolAllAria", { name: row.serverName }),
                         className: `${css.toggle} ${allDisabled ? css.toggleOff : css.toggleOn}`,
-                        disabled: busy !== null || toolBusy !== null || ownToolNames.length === 0,
+                        disabled: busy !== null || toolBusy !== null || ownToolNames.length === 0 || level === "workspace" && workspace === null,
                         onClick: () => {
-                          putTools(row.serverName, ownToolNames, allDisabled, "own");
+                          if (level === "workspace") putWorkspaceTools(ownToolNames, allDisabled);
+                          else putTools(row.serverName, ownToolNames, allDisabled, "own");
                         },
                         children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: css.toggleKnob, "aria-hidden": "true" })
                       }
@@ -6112,21 +6144,11 @@ function McpView({ t, live, scope, query, status, onRefresh, waitingTools, onWat
 // src/client/skills/SkillCard.tsx
 var import_react14 = require("react");
 var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
-
-// src/client/skills/types.ts
-var PRESET_BUNDLE_CATEGORIES = ["\u5F00\u53D1", "\u8BBE\u8BA1", "\u529E\u516C\u534F\u540C", "\u6587\u6863\u77E5\u8BC6", "\u6570\u636E", "\u81EA\u52A8\u5316", "\u8FD0\u7EF4", "\u5176\u4ED6"];
-var UNCATEGORIZED = "\0none";
-var MAX_BUNDLE_CATEGORIES = 8;
-function sortCategories(counts) {
-  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")).map((entry) => entry[0]);
-}
-var ALL_PRESETS = "*";
-
-// src/client/skills/SkillCard.tsx
 var import_jsx_runtime8 = require("react/jsx-runtime");
-function CategoryEditor({ value, onChange, label }) {
+function CategoryEditor({ value, onChange, label, suggestions = [] }) {
   const [draft, setDraft] = (0, import_react14.useState)("");
   const full = value.length >= MAX_BUNDLE_CATEGORIES;
+  const suggestionsLeft = suggestions.filter((preset) => !value.includes(preset));
   const add = (raw) => {
     const name = raw.trim().slice(0, 24);
     setDraft("");
@@ -6149,7 +6171,7 @@ function CategoryEditor({ value, onChange, label }) {
         }
       )
     ] }, name)) }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.catSuggest, role: "group", "aria-label": skillT("bundleCatTitle"), children: PRESET_BUNDLE_CATEGORIES.filter((preset) => !value.includes(preset)).map((preset) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    suggestionsLeft.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: css.catSuggest, role: "group", "aria-label": skillT("bundleCatTitle"), children: suggestionsLeft.map((preset) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "button",
       {
         type: "button",
@@ -6234,7 +6256,7 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
   };
   const toggleLabel = lockedReason ?? (enabled ? skillT("disableSkill") : skillT("enableSkill"));
   const fileMeta = typeof skill.fileCount === "number" ? skill.fileCount : files.length;
-  const skillOrigin = skill.root === void 0 ? void 0 : skill.root.startsWith("project-") ? "workspace" : "global";
+  const skillOrigin = skillOriginOf(skill);
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     "li",
     {
@@ -6280,7 +6302,15 @@ function SkillCard({ skill, bundleId, bundleName, enabled, lockedReason, scopeLa
         /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: css.skillTags, children: [
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagSource}`, children: bundleName ?? skillT("tagLoose") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagScope}`, "data-off": enabled ? void 0 : "true", children: scopeLabel }),
-          skillOrigin !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.scopeTag, "data-scope": skillOrigin, title: skillT(skillOrigin === "workspace" ? "originWorkspaceHint" : "originGlobalHint"), children: skillT(skillOrigin === "workspace" ? "originWorkspace" : "originGlobal") }),
+          skillOrigin !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+            "span",
+            {
+              className: css.scopeTag,
+              "data-scope": skillOrigin.kind === "unknown" ? "other" : skillOrigin.kind,
+              title: skillOrigin.kind === "workspace" ? skillT("originWorkspaceHint") : skillOrigin.kind === "global" ? skillT("originGlobalHint") : skillOrigin.label,
+              children: skillOrigin.kind === "workspace" ? skillT("originWorkspace") : skillOrigin.kind === "global" ? skillT("originGlobal") : skillOrigin.label
+            }
+          ),
           !enabled && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: `${css.tag} ${css.tagStatus}`, children: skillT("skillOffTag") }),
           /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: css.skillMeta, children: skillT("fileCount", { n: fileMeta }) })
         ] }),
@@ -6572,10 +6602,10 @@ function SkillsView({
   t,
   state,
   health,
-  activePreset,
+  scope,
+  scopeOverrideCount,
   presets,
-  presetOverride,
-  resetActivePreset,
+  onResetScope,
   openMenu,
   setOpenMenu,
   refresh,
@@ -6588,7 +6618,6 @@ function SkillsView({
   submitRename,
   bundleEnabledIn,
   toggling,
-  viewMode,
   setCatFilter,
   activeCat,
   toggleExpanded,
@@ -6609,14 +6638,17 @@ function SkillsView({
   setLooseExpanded,
   visibleLooseAll
 }) {
+  const showReset = scopeOverrideCount > 0 && (scope.level === "workspace" ? scope.cwd !== null : scope.presetId !== ALL_PRESETS);
   return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
     health.state === "issue" && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.healthNotice, role: "status", children: [
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.healthNoticeTitle, children: t("statIssues", { n: health.report.issues.length }) }),
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { children: health.report.issues.slice(0, 4).map((issue, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("li", { children: issue.message }, `${issue.code}-${String(index)}`)) })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: css.hintRow, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.hintRowText, children: activePreset === ALL_PRESETS ? t("presetHintAll") : t("presetHintScoped", { name: presets.find((preset) => preset.id === activePreset)?.name ?? activePreset }) }),
-      activePreset !== ALL_PRESETS && Object.keys(presetOverride).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: css.presetReset, onClick: resetActivePreset, children: t("presetReset") })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.hintRowText, children: scope.level === "workspace" ? t("workspaceHint", { path: scope.cwd ?? "" }) : scope.presetId === ALL_PRESETS ? t("presetHintAll") : t("presetHintScoped", { name: presets.find((preset) => preset.id === scope.presetId)?.name ?? scope.presetId }) }),
+      showReset && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: css.presetReset, onClick: () => {
+        onResetScope(scope);
+      }, children: scope.level === "workspace" ? t("workspaceReset") : t("presetReset") })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: `${css.mainScroll} ${modalStaggerClass}`, children: [
       state.status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: css.status, children: t("loading") }) : null,
@@ -6634,7 +6666,6 @@ function SkillsView({
           const renamingThis = renameTarget?.bundleId === bundle.id;
           const bundleEnabled = bundleEnabledIn(bundle);
           const bundleToggling = toggling.has(`bundle:${bundle.id}`);
-          const gridClass = viewMode === "list" ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid;
           const missing = bundle.missingSkills ?? [];
           const bundleCats = bundle.categories ?? [];
           const emptyBundle = bundle.skillCount === 0;
@@ -6771,7 +6802,7 @@ function SkillsView({
                 void pruneBundle(bundle);
               }, children: t("bundlePrune") })
             ] }),
-            openView && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: gridClass, "data-renamed": renamedFlash === bundle.id ? "true" : void 0, children: bundle.skills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { className: css.bundleEmpty, children: [
+            openView && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: css.skillGrid, "data-renamed": renamedFlash === bundle.id ? "true" : void 0, children: bundle.skills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { className: css.bundleEmpty, children: [
               /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleEmptyTitle, children: t("bundleEmptyTitle") }),
               /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: css.bundleEmptyHint, children: t("bundleEmptyHint") }),
               /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("button", { type: "button", className: css.bundleEmptyBtn, onClick: () => {
@@ -6828,7 +6859,7 @@ function SkillsView({
               )
             }
           ),
-          looseOpen && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: viewMode === "list" ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid, children: visibleLooseAll.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          looseOpen && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: css.skillGrid, children: visibleLooseAll.map((skill, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             SkillCard,
             {
               skill,
@@ -7274,30 +7305,52 @@ function McpTopBar({
   onQuery,
   onRefresh,
   onAddOwn,
-  onAddCustom
+  onAddCustom,
+  workspace,
+  level
 }) {
   const data = live.state === "ready" ? live.data : null;
   const presets = data?.presets ?? [];
   const globals = data?.servers ?? [];
-  const offCount = globals.filter((server) => server.config.disabled).length;
+  const closedInWorkspace = new Set(
+    workspace === null ? [] : Object.entries(data?.workspaceClosed?.[workspace] ?? {}).filter(([, on]) => on === false).map(([name]) => name)
+  );
   const maskedOf = (presetId) => new Set(
     Object.entries(data?.masks?.[presetId] ?? {}).filter(([, on]) => on === false).map(([name]) => name)
   );
-  const visibleCount = (presetId) => {
+  const rowsOf = (presetId) => {
     const masked = maskedOf(presetId);
-    return globals.filter((server) => !masked.has(server.serverName)).length + (data?.presetServers?.[presetId] ?? []).length;
+    const rows = globals.map((server) => ({
+      enabled: mcpEffectiveEnabled({
+        configDisabled: server.config.disabled,
+        masked: presetId !== "" && masked.has(server.serverName),
+        workspaceClosed: closedInWorkspace.has(server.serverName)
+      })
+    }));
+    if (presetId !== "") {
+      for (const row of data?.presetServers?.[presetId] ?? []) {
+        rows.push({ enabled: mcpEffectiveEnabled({ workspaceClosed: closedInWorkspace.has(row.serverName) }) });
+      }
+    }
+    return rows;
+  };
+  const visibleCount = (presetId) => {
+    return rowsOf(presetId).filter((row) => row.enabled).length;
   };
   const chips = [
-    { id: "", label: t("presetAll"), count: globals.length, overrides: 0, icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CatAllIcon, { size: 16 }) },
+    { id: "", label: t("presetAll"), count: visibleCount(""), overrides: 0, icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CatAllIcon, { size: 16 }) },
     ...presets.map((preset) => ({
       id: preset.id,
       label: preset.name ?? preset.id,
       count: visibleCount(preset.id),
-      overrides: maskedOf(preset.id).size,
+      overrides: level === "preset" ? maskedOf(preset.id).size : 0,
       icon: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_dsh_client_ui_primitives9.IconAgentPresetOutlineRegular, { size: 15 })
     }))
   ];
   const conn = live.state === "ready" ? { tone: "ok", label: t("mcpConnOk"), title: t("mcpConnTip", { n: globals.length }) } : live.state === "loading" ? { tone: "pending", label: t("statChecking"), title: "" } : { tone: "warn", label: t("mcpConnDown"), title: t("mcpLiveUnavailable") };
+  const scopeRows = rowsOf(scope);
+  const onCount = scopeRows.filter((row) => row.enabled).length;
+  const offCount = scopeRows.length - onCount;
   return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.topbar, children: [
     presets.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.chipRow, role: "group", "aria-label": t("mcpScopeTitle"), children: chips.map((chip) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "button",
@@ -7322,7 +7375,7 @@ function McpTopBar({
           )
         ]
       },
-      chip.id === "" ? "__all__" : chip.id
+      chip.id === "" ? "\0all" : chip.id
     )) }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.topbarActions, children: [
       /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.searchBox, children: [
@@ -7341,8 +7394,8 @@ function McpTopBar({
         )
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.statusSeg, role: "group", "aria-label": t("statusAll"), children: [
-        ["all", t("statusAll"), globals.length],
-        ["on", t("statusOn"), globals.length - offCount],
+        ["all", t("statusAll"), scopeRows.length],
+        ["on", t("statusOn"), onCount],
         ["off", t("statusOff"), offCount]
       ].map(([value, label, count]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "button",
@@ -7504,7 +7557,6 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const [query, setQuery] = (0, import_react15.useState)("");
   const [sourceFilter, setSourceFilter] = (0, import_react15.useState)("all");
   const [sortAsc, setSortAsc] = (0, import_react15.useState)(true);
-  const [viewMode] = (0, import_react15.useState)("grid");
   const [statusFilter, setStatusFilter] = (0, import_react15.useState)("all");
   const [catFilter, setCatFilter] = (0, import_react15.useState)(null);
   const [catTarget, setCatTarget] = (0, import_react15.useState)(null);
@@ -7721,66 +7773,69 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       });
     }
   };
+  const effectiveWorkspace = workspace ?? currentWorkspace;
+  const scope = { level, presetId: activePreset, cwd: effectiveWorkspace };
   const toggleSkill = (skill, enabled) => {
-    if (level === "workspace") {
-      const cwd = workspace ?? currentWorkspace;
-      if (cwd === null) {
+    if (scope.level === "workspace") {
+      if (scope.cwd === null) {
         pushToast("err", "no active workspace");
         return;
       }
-      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(cwd, skill.name, enabled));
+      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(scope.cwd, skill.name, enabled));
       return;
     }
-    if (activePreset === ALL_PRESETS) {
+    if (scope.presetId === ALL_PRESETS) {
       void runToggle(`skill:${skill.name}`, () => skillApi.setSkillEnabled(skill.name, enabled));
       return;
     }
     void runToggle(
       `skill:${skill.name}`,
-      () => skillApi.setPresetSkillEnabled(activePreset, skill.name, enabled)
+      () => skillApi.setPresetSkillEnabled(scope.presetId, skill.name, enabled)
     );
   };
   const toggleBundle = (bundle, enabled) => {
-    if (level === "workspace") {
-      const cwd = workspace ?? currentWorkspace;
-      if (cwd === null) {
+    if (scope.level === "workspace") {
+      if (scope.cwd === null) {
         pushToast("err", "no active workspace");
         return;
       }
-      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(cwd, bundle.id, enabled));
+      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(scope.cwd, bundle.id, enabled));
       return;
     }
-    if (activePreset === ALL_PRESETS) {
+    if (scope.presetId === ALL_PRESETS) {
       void runToggle(`bundle:${bundle.id}`, () => skillApi.setBundleEnabled(bundle.id, enabled));
       return;
     }
     void runToggle(
       `bundle:${bundle.id}`,
-      () => skillApi.setPresetBundleEnabled(activePreset, bundle.id, enabled)
+      () => skillApi.setPresetBundleEnabled(scope.presetId, bundle.id, enabled)
     );
   };
-  const effectiveWorkspace = workspace ?? currentWorkspace;
-  const presetOverride = level === "workspace" ? effectiveWorkspace !== null ? workspaceOverrides[effectiveWorkspace] ?? {} : {} : activePreset === ALL_PRESETS ? {} : overrides[activePreset] ?? {};
-  const skillEnabledAt = (presetId, name) => {
-    if (toggles.skills[name] === false) return false;
-    if (presetId === ALL_PRESETS) return true;
-    return (overrides[presetId] ?? {})[name] !== false;
+  const enableTables = {
+    skills: toggles.skills,
+    overrides,
+    workspaceOverrides
   };
+  const scopeOverrides = skillOverridesAt(scope, enableTables);
+  const scopeOverrideCount = Object.keys(scopeOverrides).length;
   const enabledCountFor = (presetId) => {
+    const target = { level: scope.level, presetId, cwd: scope.cwd };
     let n = 0;
-    for (const bundle of bundles) for (const skill of bundle.skills) if (skillEnabledAt(presetId, skill.name)) n += 1;
-    for (const skill of loose) if (skillEnabledAt(presetId, skill.name)) n += 1;
+    for (const bundle of bundles) for (const skill of bundle.skills) if (enabledStateAt(target, skill.name, enableTables)) n += 1;
+    for (const skill of loose) if (enabledStateAt(target, skill.name, enableTables)) n += 1;
     return n;
   };
-  const skillEnabledIn = (name) => skillEnabledAt(activePreset, name);
-  const bundleEnabledIn = (bundle) => {
-    if (activePreset === ALL_PRESETS) return toggles.bundles[bundle.id] !== false;
-    return bundle.skills.every((skill) => skillEnabledIn(skill.name));
-  };
-  const skillLockedReason = (name) => activePreset !== ALL_PRESETS && toggles.skills[name] === false ? t("presetLockedByGlobal") : void 0;
-  const resetActivePreset = () => {
-    if (activePreset === ALL_PRESETS) return;
-    void runToggle(`reset:${activePreset}`, () => skillApi.resetPreset(activePreset));
+  const skillEnabledIn = (name) => enabledStateAt(scope, name, enableTables);
+  const bundleEnabledIn = (bundle) => bundle.skills.length > 0 && bundle.skills.every((skill) => skillEnabledIn(skill.name));
+  const skillLockedReason = (name) => scope.level === "preset" && scope.presetId !== ALL_PRESETS && toggles.skills[name] === false ? t("presetLockedByGlobal") : void 0;
+  const resetScope = (target) => {
+    if (target.level === "workspace") {
+      if (target.cwd === null) return;
+      void runToggle(`reset:workspace:${target.cwd}`, () => skillApi.resetWorkspace(target.cwd));
+      return;
+    }
+    if (target.presetId === ALL_PRESETS) return;
+    void runToggle(`reset:${target.presetId}`, () => skillApi.resetPreset(target.presetId));
   };
   const applySkillsToAllPresets = async () => {
     if (!window.confirm(t("applyAllConfirm"))) return;
@@ -8057,7 +8112,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   };
   const bundles = state.status === "ready" ? state.snapshot.bundles : [];
   const loose = state.status === "ready" ? state.snapshot.loose : [];
-  const scopeLabel = activePreset === ALL_PRESETS ? t("scopeAll") : presets.find((preset) => preset.id === activePreset)?.name ?? activePreset;
+  const scopeLabel = level === "workspace" ? t("scopeWorkspace") : activePreset === ALL_PRESETS ? t("scopeAll") : presets.find((preset) => preset.id === activePreset)?.name ?? activePreset;
   const q = query.trim().toLowerCase();
   const qMatch = (skill) => {
     if (q === "") return true;
@@ -8066,7 +8121,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   };
   const statusMatch = (skill) => {
     if (statusFilter === "all") return true;
-    const on = activePreset === ALL_PRESETS ? toggles.skills[skill.name] !== false : skillEnabledAt(activePreset, skill.name);
+    const on = enabledStateAt(scope, skill.name, enableTables);
     return statusFilter === "on" ? on : !on;
   };
   const sortedSkills = (list) => [...list].sort((a, b) => {
@@ -8088,6 +8143,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     return counts;
   })();
   const categoryList = sortCategories(categoryCounts);
+  const categorySuggestions = categoryList.filter((cat) => cat !== UNCATEGORIZED);
   const hasCategories = categoryList.some((cat) => cat !== UNCATEGORIZED);
   const activeCat = catFilter !== null && categoryCounts.has(catFilter) ? catFilter : null;
   const catMatch = (bundle) => {
@@ -8095,23 +8151,14 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     const cats = bundle.categories ?? [];
     return activeCat === UNCATEGORIZED ? cats.length === 0 : cats.includes(activeCat);
   };
-  const visibleBundleAll = (sourceFilter === "loose" ? [] : bundles).filter((bundle) => catMatch(bundle)).map((bundle) => ({ ...bundle, skills: filteredSkills(bundle.skills) })).filter((bundle) => bundle.skills.length > 0 || bundle.skillCount === 0 && !filtering);
+  const visibleBundleAll = (sourceFilter === "loose" ? [] : bundles).filter((bundle) => catMatch(bundle)).map((bundle) => ({ ...bundle, skills: filteredSkills(bundle.skills) })).filter((bundle) => bundleVisibleInList(bundle, filtering));
   const visibleLooseAll = sourceFilter === "bundles" || activeCat !== null ? [] : filteredSkills(loose);
-  const totalSkills = bundles.reduce((n, bundle) => n + bundle.skillCount, 0) + loose.length;
+  const allSkills = [...bundles.flatMap((bundle) => bundle.skills), ...loose];
+  const totalSkills = allSkills.length;
   const bundleCount = bundles.length;
   const healthView = health.state === "ok" ? { tone: "ok", label: t("statHealthy"), title: t("statHealthy") } : health.state === "issue" ? { tone: "warn", label: t("statIssues", { n: health.report.issues.length }), title: health.report.issues.map((issue) => issue.message).join("\n") } : health.state === "unavailable" ? { tone: "pending", label: t("statPending"), title: t("statPending") } : { tone: "idle", label: t("statChecking"), title: "" };
-  const enabledCount = (() => {
-    let n = 0;
-    for (const bundle of bundles) for (const skill of bundle.skills) if (toggles.skills[skill.name] !== false) n += 1;
-    for (const skill of loose) if (toggles.skills[skill.name] !== false) n += 1;
-    return n;
-  })();
-  const disabledCount = (() => {
-    let n = 0;
-    for (const bundle of bundles) for (const skill of bundle.skills) if (toggles.skills[skill.name] === false) n += 1;
-    for (const skill of loose) if (toggles.skills[skill.name] === false) n += 1;
-    return n;
-  })();
+  const enabledCount = allSkills.filter((skill) => enabledStateAt(scope, skill.name, enableTables)).length;
+  const disabledCount = allSkills.length - enabledCount;
   const noResults = visibleBundleAll.length === 0 && visibleLooseAll.length === 0;
   const trimmedName = installName.trim();
   const nameInvalid = trimmedName !== "" && !SKILL_NAME_PATTERN.test(trimmedName);
@@ -8160,7 +8207,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 activePreset,
                 setActivePreset,
                 presets,
-                overrides,
+                overrides: level === "workspace" ? {} : overrides,
                 enabledCountFor,
                 totalSkills,
                 enabledCount,
@@ -8213,14 +8260,16 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                 },
                 onAddCustom: () => {
                   setMcpAddOpen(true);
-                }
+                },
+                workspace: effectiveWorkspace,
+                level
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.hubMain, children: [
-              kind === "skill" && activePreset === ALL_PRESETS ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("applyAllHint"), onClick: () => {
+              kind === "skill" && level === "preset" && activePreset === ALL_PRESETS ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("applyAllHint"), onClick: () => {
                 void applySkillsToAllPresets();
               }, children: t("applyAll") }) }) : null,
-              kind === "mcp" && mcpScope === "" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("mcpApplyAllHint"), onClick: () => {
+              kind === "mcp" && level === "preset" && mcpScope === "" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("mcpApplyAllHint"), onClick: () => {
                 void applyMcpToAllPresets();
               }, children: t("mcpApplyAll") }) }) : null,
               kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, { level, workspace: workspace ?? currentWorkspace }) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
@@ -8242,7 +8291,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   onCloseAddOwn: () => {
                     setMcpAddOwnOpen(false);
                   },
-                  workspace: workspace ?? currentWorkspace,
+                  workspace: effectiveWorkspace,
                   level
                 }
               ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
@@ -8251,10 +8300,10 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   t,
                   state,
                   health,
-                  activePreset,
+                  scope,
+                  scopeOverrideCount,
                   presets,
-                  presetOverride,
-                  resetActivePreset,
+                  onResetScope: resetScope,
                   openMenu,
                   setOpenMenu,
                   refresh,
@@ -8267,7 +8316,6 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   submitRename,
                   bundleEnabledIn,
                   toggling,
-                  viewMode,
                   setCatFilter,
                   activeCat,
                   toggleExpanded,
@@ -8341,7 +8389,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
                   }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: newBundleCats, onChange: setNewBundleCats, label: t("newBundle") }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: newBundleCats, onChange: setNewBundleCats, label: t("newBundle"), suggestions: categorySuggestions }),
               /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.inlineForm, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", type: "submit", disabled: creatingBundle || newBundleName.trim() === "", children: t("create") }),
                 /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "outline", type: "button", disabled: creatingBundle, onClick: () => {
@@ -8362,7 +8410,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
             closeLabel: t("close"),
             title: t("bundleCatEditTitle", { name: catTarget?.name ?? "" }),
             children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.stackForm, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: catDraft, onChange: setCatDraft, label: t("bundleCatEdit") }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CategoryEditor, { value: catDraft, onChange: setCatDraft, label: t("bundleCatEdit"), suggestions: categorySuggestions }),
               /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: css.inlineForm, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_dsh_client_ui_primitives10.Button, { variant: "primary", type: "button", disabled: savingCats, onClick: () => {
                   void submitCategories();

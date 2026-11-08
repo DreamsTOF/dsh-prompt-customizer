@@ -20,6 +20,8 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
 import {
   apply as applySkillsHost,
@@ -30,6 +32,8 @@ import {
 } from '../vendor/skill-manager/skills-host.js'
 // @ts-expect-error — vendored JS half (no type declarations shipped)
 import { apply as applyPromptHost } from '../vendor/prompt-customizer/index.js'
+// @ts-expect-error — vendored JS half (no type declarations shipped)
+import { getDoc, openDb } from '../vendor/prompt-customizer/db.js'
 import { apply as applySkillToggles } from './skill-toggles.js'
 import { applySkillHealth } from './skill-health.js'
 import { resolveSkillRoots, setSkillRoots } from './skill-roots.ts'
@@ -43,6 +47,7 @@ import { applyMcpToolDisable, isToolDisabled, presetOwnsServer, serverOfToolName
 import { applyMcpWorkspaceScope, closedServersInWorkspace, disabledToolsInWorkspace } from './mcp-workspace-scope.ts'
 import { applyMcpApplyAll } from './mcp-apply-all.ts'
 import { maskedServersOf, readMaskLedger } from './mcp-mask-ledger.js'
+import { installPromptVariables } from './vars.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-prompt-customizer'
@@ -59,6 +64,45 @@ export const inject = [
   'webServer',
   'tools',
 ]
+
+/** prompt-customizer 自己的数据目录（与 vendor apply 的默认推导一致）。 */
+function promptDataDir(dataDir: unknown): string {
+  if (typeof dataDir === 'string' && dataDir.length > 0) return dataDir
+  const fromEnv = process.env['DSH_HOME']
+  const home = typeof fromEnv === 'string' && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh')
+  return join(home, 'prompt-customizer')
+}
+
+/** 从插件自有 SQLite 读当前 envBlocklist（缺省空数组；坏配置按空处理）。 */
+function readEnvBlocklist(dataDir: unknown): string[] {
+  try {
+    const doc = getDoc(openDb(join(promptDataDir(dataDir), 'prompt-customizer.db')), 'config') as
+      | { envBlocklist?: unknown }
+      | undefined
+    const list = doc?.envBlocklist
+    return Array.isArray(list) ? list.filter((entry): entry is string => typeof entry === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** 宿主 shell：优先 `ctx.shell` 服务配置，其次环境变量；都没有返回 undefined。 */
+function detectHostShell(ctx: Context): string | undefined {
+  try {
+    const shell = (ctx as unknown as { get?: (name: string) => any }).get?.('shell')
+    const candidates = [
+      shell?.shell, shell?.executable, shell?.command,
+      shell?.config?.shell, shell?.config?.command, shell?.config?.executable,
+    ]
+    for (const value of candidates) {
+      if (typeof value === 'string' && value.trim() !== '') return value.trim()
+    }
+  } catch {
+    // shell 服务缺席：回落环境变量。
+  }
+  const fromEnv = process.env['SHELL'] ?? process.env['COMSPEC']
+  return typeof fromEnv === 'string' && fromEnv.trim() !== '' ? fromEnv.trim() : undefined
+}
 
 /**
  * 本插件自己的 MCP 遮蔽（工具级禁用 / 预设遮蔽 / 工作区关闭）在预览里的
@@ -263,6 +307,15 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   try {
     ctx.inject(['systemPrompt'], (promptCtx: Context) => {
       try {
+        // 提示词变量必须抢在 vendor 的 registerVariables 之前注册：同名注册
+        // 后者会抛错并被它自己吞掉，这样这组实现（Intl 日期 / dshHome /
+        // 宿主 shell / 冲突诊断）才是真正生效的那一份。
+        const variables = installPromptVariables((promptCtx as unknown as { systemPrompt: any }).systemPrompt, {
+          readBlocklist: () => readEnvBlocklist(entry?.dataDir),
+          detectShell: () => detectHostShell(ctx),
+          warn: (message) => promptCtx.logger?.warn?.(`[dsh-prompt-customizer] ${message}`),
+        })
+        promptCtx.effect(() => () => variables.dispose(), 'dsh-prompt-customizer: prompt variables')
         // 把 entry 的 dataDir 原样传给 vendor 半身：它自己会回落到
         // ~/.dsh/prompt-customizer，但那样的话无法隔离（测试 / 沙箱只能
         // 覆盖同一个真实目录）。缺省时行为不变。

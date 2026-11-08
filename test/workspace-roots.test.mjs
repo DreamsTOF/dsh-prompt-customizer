@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { EventEmitter } from 'node:events'
+import { normalizeCwd } from '../src/home-paths.ts'
 
 const SKILL = (name, desc) => `---\nname: ${name}\ndescription: ${desc}\n---\n\nbody of ${name}\n`
 
@@ -91,7 +92,7 @@ test('skill-roots: 项目根按最近的 .git 祖先判定（子目录会话不�
       mkdirSync(join(box.workspace, '.agents', 'skills', 'x'), { recursive: true })
       writeFileSync(join(box.workspace, '.agents', 'skills', 'x', 'SKILL.md'), SKILL('x', 'x'))
       const roots = await resolveSkillRoots(fakeCtx(nested))
-      assert.ok(roots.some((root) => root.path === join(box.workspace, '.agents', 'skills')),
+      assert.ok(roots.some((root) => root.path === normalizeCwd(join(box.workspace, '.agents', 'skills'))),
         '嵌套 cwd 也要解析到工作区根')
     })
   } finally {

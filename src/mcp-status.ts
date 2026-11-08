@@ -1,36 +1,39 @@
 /**
- * mcp-config — 真实 MCP Server 状态 + 启用/禁用/删除（host 半身）。
+ * mcp-status — 全局 MCP Server 状态与编辑（host 半身，0.2.2 契约）。
  *
- * GET  /api/triad/mcp-status  只读：注册工具（ctx.tools 中 mcp__*）∪ 配置文件
- *                             （宿主活动 profile 的 cordis.patch.yml 的
- *                             mcp-client 条目，含 disabled 标记；0.8.1 起随
- *                             宿主 profileContext 走，桌面端即 desktop profile，
- *                             旧行为回落见 fallbackProfileName）。
- *                             0.1.6 起附带预设维度：presets（预设名单）、
- *                             masks（预设遮蔽账本镜像）、presetServers
- *                             （各预设自带的 mcp-client 行）、每个 server 的
- *                             scope 与 maskedBy。
- * POST /api/triad/mcp-config  写：三种动作（默认 toggle 兼容旧客户端）：
- *                             - 无 action → disabled=true/false 标记（禁用/启用）；
- *                             - action: remove → 删除该 mcp-client 整个条目
- *                               （连同所属单条目 insert 容器，保留上方注释）。
- *                             文本级编辑，保留注释与其余行；改前自动备份到
- *                             cordis.patch.yml.bak-last-toggle。web profile 为
- *                             patchReload: live，写完后 DSH 热重载配置：
- *                             禁用→工具立即注销，启用→重新注册，删除→条目消失。
- *                             桌面 profile 没有 patchReload: live，写入后需
- *                             重启桌面端才生效。
+ * 数据来源：
+ *  1. **可编辑全局行**：`ctx.configEditor.entries()` 里
+ *     `entry.options.name === '@deepseek-ai/dsh-mcp-client'` 的 profile 根行。
+ *     禁用状态取 `entry.options.disabled`（Loader 行选项，布尔值），
+ *     **不是** YAML 里出现过 `disabled:` 这一行 —— 旧版逐行扫描会把
+ *     `disabled: false` 误判成禁用，也会把 config 里的同名键算进来。
+ *  2. **只读行**：注册了 `mcp__*` 工具、但没有可编辑 profile 行的 server
+ *     （自带行 / 手工组合 / mcp-manager 条目），标 `editable: false`。
+ *  3. **预设自带行**：作用域注册，只有该预设的活动 agent 能看到；没有活动
+ *     agent 时回退名单缓存。
+ *  4. **mcp-manager 运行时状态**：服务存在时用 `watch()` + `mcp-manager/status`
+ *     维护快照；服务缺席时返回 `manualRefreshRequired: true`，UI 提示手动刷新。
+ *
+ * 明确不做：
+ *  - 不逐行解析 YAML（增删改全部走 Loader / configEditor 的稳定 API）；
+ *  - 不探活第三方 URL、不自动改写用户配置（旧 watchdog 已删除）；
+ *  - profile 未知（没有 profileContext.patchPath）一律 503，不回退 `web`。
+ *
+ * Routes:
+ *   GET  /api/triad/mcp-status
+ *   POST /api/triad/mcp-config   { action?: toggle|remove|add, ... }
+ *   GET/POST /api/triad/mcp-edit
  */
 
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
+import { writeJsonResponse } from './mcp-recommended.ts'
 import { readMaskLedger } from './mcp-mask-ledger.ts'
 import { maskInstallReport } from './mcp-preset-mask.ts'
 import { collectPresetServers, presetRowOf, writePresetPlugins } from './mcp-presets.ts'
-import { appendRowsToText, parseMcpPaste, pasteFieldsOf, rowsToPatchYaml } from './mcp-paste.ts'
+import { parseMcpPaste, pasteFieldsOf, rowsToMcpServersYaml, type McpRowConfig } from './mcp-paste.ts'
 import {
   knownToolsOf,
   ledgerServerNamesOf,
@@ -41,153 +44,248 @@ import {
   toolDisableTables,
 } from './mcp-tool-disable.ts'
 import { readPresetRoster } from './skill-toggles.ts'
-import { workspaceMcpLedger, workspaceToolDisabledLedger } from './mcp-workspace-scope.ts'
+import {
+  workspaceMcpLedger,
+  workspaceMcpMountStatus,
+  workspaceToolDisabledLedger,
+} from './mcp-workspace-scope.ts'
+import { optionalService } from './context-utils.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 
 const STATUS_ROUTE = '/api/triad/mcp-status'
 const CONFIG_ROUTE = '/api/triad/mcp-config'
-const MCP_CLIENT_NAME = `'@deepseek-ai/dsh-mcp-client'`
+const EDIT_ROUTE = '/api/triad/mcp-edit'
+const MCP_CLIENT_NAME = '@deepseek-ai/dsh-mcp-client'
 /** 备份文件名（固定名，覆盖式；保留最近一次切换前的版本）。 */
 const BACKUP_SUFFIX = '.bak-last-toggle'
 
-function dshHome(): string {
-  const fromEnv = process.env['DSH_HOME']
-  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh')
-}
+type PluginContext = any
 
-/**
- * 活动 profile 的 cordis.patch.yml。
- *
- * 面板管理的补丁文件随宿主启动的 profile 走（web / desktop / 自定义名），
- * 不能写死：applyMcpStatus 挂载时从宿主 `profileContext` 解析一次并缓存在
- * 模块级（launch 注入的常量，进程内不变）。宿主面缺失时（单测 stub / 直挂）
- * 回落 DSH_DESKTOP_PROFILE 环境变量（桌面壳 v4 传递实际 profile 名），
- * 最后回落 'web' 保持 0.8.0 前的旧行为。
- */
-let resolvedPatchPath: string | undefined
-let resolvedProfileName: string | undefined
-
-function fallbackProfileName(): string {
-  const fromEnv = process.env['DSH_DESKTOP_PROFILE']
-  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : 'web'
-}
-
-/** 面板管理的补丁文件：宿主活动 profile 的 cordis.patch.yml（未挂载时按回落链推算）。 */
-function patchFilePath(): string {
-  return resolvedPatchPath ?? join(dshHome(), 'profiles', fallbackProfileName(), 'cordis.patch.yml')
-}
-
-/** 挂载时从宿主读一次活动 profile（patchPath 精确到文件，dir/name 仅诊断用）。 */
-function resolveActiveProfile(ctx: Context): void {
-  const anyCtx = ctx as unknown as {
-    profileContext?: { patchPath?: unknown; dir?: unknown; name?: unknown }
-    get?: (name: string) => unknown
+/** profile 未知：路由层转成 503，绝不回落 `web`。 */
+class ProfileUnavailableError extends Error {
+  constructor() {
+    super('profile-unavailable')
+    this.name = 'ProfileUnavailableError'
   }
-  const profileContext = anyCtx.profileContext
-    ?? (typeof anyCtx.get === 'function' ? anyCtx.get('profileContext') as any : undefined)
-  const patchPath = profileContext?.patchPath
-  if (typeof patchPath === 'string' && patchPath.trim() !== '') {
-    resolvedPatchPath = patchPath
-    resolvedProfileName = typeof profileContext?.name === 'string' ? profileContext.name : undefined
-    return
-  }
-  const dir = profileContext?.dir
-  if (typeof dir === 'string' && dir.trim() !== '') {
-    resolvedPatchPath = join(dir, 'cordis.patch.yml')
-    resolvedProfileName = typeof profileContext?.name === 'string' ? profileContext.name : undefined
-    return
-  }
-  resolvedPatchPath = undefined
-  resolvedProfileName = fallbackProfileName()
 }
 
-interface PatchMcpEntry {
-  /** 文件中的条目 id（编辑定位用）。 */
+interface ProfileInfo {
+  patchPath: string
+  name?: string
+}
+
+/** 当前活动 profile；没有 patchPath 即视为未知。 */
+function profileInfo(ctx: PluginContext): ProfileInfo | undefined {
+  const profileContext = optionalService<{ patchPath?: unknown; name?: unknown }>(ctx, 'profileContext')
+  const patchPath = typeof profileContext?.patchPath === 'string' && profileContext.patchPath.trim() !== ''
+    ? profileContext.patchPath
+    : undefined
+  if (patchPath === undefined) return undefined
+  return {
+    patchPath,
+    ...typeof profileContext?.name === 'string' && profileContext.name !== '' ? { name: profileContext.name } : {},
+  }
+}
+
+function requireProfile(ctx: PluginContext): ProfileInfo {
+  const profile = profileInfo(ctx)
+  if (profile === undefined) throw new ProfileUnavailableError()
+  return profile
+}
+
+function plainObject(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+/** config-editor 读出的 `!!js` 包装 → mcp-paste 的序列化标记。 */
+function fromEditorConfig(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(fromEditorConfig)
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    if (typeof record.__jsExpr === 'string' && Object.keys(record).length === 1) return { __js: record.__jsExpr }
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(record)) out[key] = fromEditorConfig(item)
+    return out
+  }
+  return value
+}
+
+/** mcp-paste 的 `${VAR}` / `!!js` 标记 → config-editor 的 `__jsExpr` 包装。 */
+function toEditorConfig(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(toEditorConfig)
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    if (typeof record.__js === 'string' && Object.keys(record).length === 1) return { __jsExpr: record.__js }
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(record)) out[key] = toEditorConfig(item)
+    return out
+  }
+  return value
+}
+
+interface ConfigEditorLike {
+  entries?: () => unknown[]
+  configuration?: () => Array<{ entry?: unknown; inherited?: unknown; override?: unknown }>
+  edit?: (entry: unknown, change: (current: Record<string, unknown>, inherited: Record<string, unknown>) => Record<string, unknown>) => Promise<void>
+}
+
+function configEditorOf(ctx: PluginContext): ConfigEditorLike | undefined {
+  return optionalService<ConfigEditorLike>(ctx, 'configEditor')
+}
+
+/** 一条可编辑的 profile 根 MCP 行。 */
+export interface EditableMcpRow {
+  entry: unknown
   entryId: string
   serverName: string
+  config: Record<string, unknown>
   disabled: boolean
-  /** streamable-http 端点（存在即远程服务型，watchdog 候选）。 */
-  url: string
-  /** 行号（文件行索引，编辑用）。 */
-  idLine: number
-  nameLine: number
-  serverNameLine: number
-  disabledLine: number
+  inherited: Record<string, unknown>
+  override: Record<string, unknown>
 }
 
 /**
- * 扫描补丁文件中所有 `@deepseek-ai/dsh-mcp-client` 条目。
- * 逐行解析：`- id:` 开头的条目，后续数行内找 name 行与 serverName 行。
+ * 枚举所有可编辑全局 MCP 行。
+ * @param ctx - 宿主上下文。
+ * @returns 行快照（顺序与 profile 根 Include 一致）。
  */
-function scanPatchEntries(content: string): PatchMcpEntry[] {
-  const lines = content.split(/\r?\n/)
-  const entries: PatchMcpEntry[] = []
-  for (let i = 0; i < lines.length; i += 1) {
-    const trimmed = lines[i].trimStart()
-    if (!trimmed.startsWith('- id:')) continue
-    const idMatch = /^- id:\s*([A-Za-z0-9_-]+)/.exec(trimmed)
-    if (idMatch === null) continue
-    const idLine = i
-    let nameLine = -1
-    let serverNameLine = -1
-    let serverName = ''
-    let entryUrl = ''
-    for (let j = i + 1; j < lines.length && j <= i + 10; j += 1) {
-      const line = lines[j].trimStart()
-      if (line.startsWith('- ')) break
-      if (nameLine === -1 && line.startsWith('name:') && line.includes(MCP_CLIENT_NAME)) nameLine = j
-      if (nameLine !== -1 && serverNameLine === -1 && line.startsWith('serverName:')) {
-        const m = /^serverName:\s*([A-Za-z0-9_-]+)/.exec(line)
-        if (m !== null) {
-          serverNameLine = j
-          serverName = m[1]
+export function editableMcpRows(ctx: PluginContext): EditableMcpRow[] {
+  const editor = configEditorOf(ctx)
+  if (typeof editor?.entries !== 'function') return []
+  let entries: unknown[]
+  try {
+    entries = editor.entries()
+  } catch {
+    return []
+  }
+  const rows: EditableMcpRow[] = []
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const options = (entry as { options?: { id?: unknown; name?: unknown; config?: unknown; disabled?: unknown } } | null)?.options
+    if (options?.name !== MCP_CLIENT_NAME) continue
+    const entryId = typeof options.id === 'string' ? options.id : ''
+    const config = plainObject(options.config)
+    const serverName = typeof config.serverName === 'string' ? config.serverName : ''
+    if (entryId === '' || serverName === '') continue
+    rows.push({
+      entry,
+      entryId,
+      serverName,
+      config,
+      // Loader 行选项：布尔值；`undefined` = 启用。`entry.disabled` 还会把
+      // 祖先分组 / 表达式结果算进来，二者取或即有效禁用状态。
+      disabled: (entry as { disabled?: unknown }).disabled === true || options.disabled === true,
+      inherited: {},
+      override: {},
+    })
+  }
+  if (typeof editor.configuration === 'function') {
+    try {
+      for (const row of editor.configuration() ?? []) {
+        const entryId = (row?.entry as { options?: { id?: unknown } } | undefined)?.options?.id
+        const match = rows.find((candidate) => candidate.entry === row?.entry || candidate.entryId === entryId)
+        if (match === undefined) continue
+        match.inherited = plainObject(row?.inherited)
+        match.override = plainObject(row?.override)
+      }
+    } catch {
+      // configuration() 读失败不影响行枚举：写操作仍走 configEditor.edit。
+    }
+  }
+  return rows
+}
+
+/** 该 server 的 MCP 行（按 serverName 找可编辑行）。 */
+function editableRowOf(ctx: PluginContext, serverName: string): EditableMcpRow | undefined {
+  return editableMcpRows(ctx).find((row) => row.serverName === serverName)
+}
+
+/* ── mcp-manager 运行时状态（watch / status 事件） ─────────────────────── */
+
+interface ManagerView {
+  name: string
+  configured: boolean
+  status: unknown
+}
+
+let managerSnapshot: ManagerView[] = []
+let managerWatched = false
+
+function managerOf(ctx: PluginContext): any {
+  return optionalService(ctx, 'mcpManager')
+}
+
+function readManagerViews(ctx: PluginContext): ManagerView[] {
+  const manager = managerOf(ctx)
+  if (manager === undefined) return []
+  try {
+    if (typeof manager.list === 'function') {
+      const list: unknown = manager.list()
+      if (Array.isArray(list)) {
+        managerSnapshot = list.map((item: any) => ({
+          name: String(item?.name ?? ''),
+          configured: item?.configured === true,
+          status: item?.status,
+        })).filter((item) => item.name !== '')
+      }
+    }
+  } catch {
+    // list() 失败：沿用上一份快照。
+  }
+  return managerSnapshot
+}
+
+/**
+ * 订阅 mcp-manager 状态流。`watch()` 是首选（一次订阅拿到全量列表），
+ * `mcp-manager/status` 事件用于把单条变化并进快照；两者都不存在时靠
+ * `list()` 轮询式读取（仅状态路由请求时）。
+ */
+function attachManagerWatch(ctx: PluginContext): void {
+  if (managerWatched) return
+  const manager = managerOf(ctx)
+  if (manager === undefined) return
+  managerWatched = true
+  readManagerViews(ctx)
+  const update = (name: unknown, status: unknown): void => {
+    const serverName = String(name ?? '')
+    if (serverName === '') return
+    const index = managerSnapshot.findIndex((item) => item.name === serverName)
+    if (index < 0) managerSnapshot = [...managerSnapshot, { name: serverName, configured: true, status }]
+    else managerSnapshot = managerSnapshot.map((item, at) => at === index ? { ...item, status } : item)
+  }
+  let off: (() => void) | undefined
+  try {
+    if (typeof ctx.on === 'function') off = ctx.on('mcp-manager/status', update)
+  } catch {
+    // 事件声明缺席：只靠 watch。
+  }
+  const abort = new AbortController()
+  if (typeof manager.watch === 'function') {
+    void (async () => {
+      try {
+        for await (const views of manager.watch(abort.signal)) {
+          if (!Array.isArray(views)) continue
+          managerSnapshot = views.map((item: any) => ({
+            name: String(item?.name ?? ''),
+            configured: item?.configured === true,
+            status: item?.status,
+          })).filter((item) => item.name !== '')
         }
+      } catch {
+        // 订阅结束（abort / 服务销毁）：保留最后快照。
       }
-      if (nameLine !== -1 && entryUrl === '' && line.startsWith('url:')) {
-        const m = /^url:\s*(.+?)\s*$/.exec(line)
-        if (m !== null) entryUrl = m[1]
-      }
-    }
-    if (nameLine === -1 || serverNameLine === -1) continue
-    let disabledLine = -1
-    for (let j = i + 1; j < lines.length && j <= i + 10; j += 1) {
-      const line = lines[j].trimStart()
-      if (line.startsWith('- ')) break
-      if (line.startsWith('disabled:')) { disabledLine = j; break }
-    }
-    entries.push({ entryId: idMatch[1], serverName, disabled: disabledLine >= 0, url: entryUrl, idLine, nameLine, serverNameLine, disabledLine })
+    })()
   }
-  return entries
+  ctx.effect(() => () => {
+    abort.abort()
+    try { off?.() } catch { /* 已卸载 */ }
+  }, 'dsh-mcp-status: manager watch')
 }
 
-function defaultLineEnding(content: string): string {
-  return content.includes('\r\n') ? '\r\n' : '\n'
-}
+/* ── 工作区 .mcp.json（保留解析/编辑） ─────────────────────────────────── */
 
-/** 编辑条目：disabled=true 在 name 行后插入 disabled 行，false 删除既有行（保留注释）。 */
-function applyToggle(content: string, entry: PatchMcpEntry, disabled: boolean): string {
-  const eol = defaultLineEnding(content)
-  const lines = content.split(/\r?\n/)
-  if (entry.disabled === disabled) return content
-  if (disabled) {
-    const indent = /^\s*/.exec(lines[entry.nameLine])?.[0] ?? '      '
-    lines.splice(entry.nameLine + 1, 0, `${indent}disabled: true`)
-  } else if (entry.disabledLine >= 0) {
-    lines.splice(entry.disabledLine, 1)
-  }
-  return lines.join(eol)
-}
-
-function readPatchContent(): string {
-  const path = patchFilePath()
-  if (!existsSync(path)) return ''
-  return readFileSync(path, 'utf8')
-}
-
-/**
- * 读工作区 `.mcp.json` 里已有的 server 键名（缺文件/坏 JSON 返回空集）。
- * @param path - `.mcp.json` 绝对路径。
- * @returns 已有的 serverName 集合。
- */
+/** 读工作区 `.mcp.json` 里已有的 server 键名（缺文件/坏 JSON 返回空集）。 */
 function readWorkspaceMcpJsonNames(path: string): Set<string> {
   const names = new Set<string>()
   if (!existsSync(path)) return names
@@ -205,13 +303,7 @@ function readWorkspaceMcpJsonNames(path: string): Set<string> {
 
 /**
  * 把新行合并进工作区的 `.mcp.json`（主流 agent 通用格式）。
- *
- * - 文件不存在 → 新建 `{ "mcpServers": {…} }`；
- * - 已存在 → 保留别人的键与其它顶层字段，只追加本次的新 server；
- * - 同名已存在 → 跳过（不覆盖，避免冲掉用户手写的配置）；
- * - 文件存在但 JSON 损坏 → 抛错，绝不覆盖用户内容。
- * @param path - `.mcp.json` 绝对路径。
- * @param rows - 本次待写入的行。
+ * 同名跳过、坏 JSON 不覆盖、其它顶层字段保留。
  */
 function mergeWorkspaceMcpJson(path: string, rows: readonly { id: string; name: string; config: Record<string, unknown> }[]): void {
   let document: Record<string, unknown> = {}
@@ -236,12 +328,8 @@ function mergeWorkspaceMcpJson(path: string, rows: readonly { id: string; name: 
   for (const row of rows) {
     const name = String(row.config.serverName ?? row.name)
     if (servers[name] !== undefined) continue
-    /**
-     * 落盘只写通用字段：`serverName` 是 DSH 内部键（键名已表达），`transport`
-     * 是推断值（主流 agent 按有无 url 判断，无需写）。其余 command/args/env/cwd/
-     * url/headers 原样保留，别人家的 agent 直接就能读。
-     */
-    const { serverName: _name, transport: _transport, ...rest } = row.config as Record<string, unknown>
+    // 落盘只写通用字段：serverName 是 DSH 内部键，transport 是推断值。
+    const { serverName: _name, transport: _transport, ...rest } = row.config
     servers[name] = rest
   }
   document.mcpServers = servers
@@ -250,18 +338,17 @@ function mergeWorkspaceMcpJson(path: string, rows: readonly { id: string; name: 
   writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, 'utf8')
 }
 
+/* ── 状态收集 ─────────────────────────────────────────────────────────── */
+
 /**
  * 每个预设的活动 agent 作用域里可见的 `mcp__*` 工具（去重）。
- *
- * 预设自带的 mcp-client 行在预设作用域注册工具，插件层的全局视图看不到，
- * 因此只能借该预设的活动 agent 枚举；同一预设的多个 agent 去重合并。
+ * 预设自带的 mcp-client 行在预设作用域注册工具，插件层的全局视图看不到。
  */
-function collectPresetTools(ctx: Context): Map<string, Array<{ name: string; description: string }>> {
+function collectPresetTools(ctx: PluginContext): Map<string, Array<{ name: string; description: string }>> {
   const out = new Map<string, Array<{ name: string; description: string }>>()
-  const anyCtx = ctx as unknown as { get?: (name: string) => any }
-  const agents = anyCtx.get?.('agents')
+  const agents = optionalService<{ list?: () => unknown }>(ctx, 'agents')
   const list: unknown = typeof agents?.list === 'function' ? agents.list() : []
-  const presets = anyCtx.get?.('agentPresets')
+  const presets = optionalService<{ composedPreset?: (scope: unknown) => unknown }>(ctx, 'agentPresets')
   for (const agent of Array.isArray(list) ? list : []) {
     if (agent === null || typeof agent !== 'object') continue
     let presetId: unknown
@@ -272,7 +359,7 @@ function collectPresetTools(ctx: Context): Map<string, Array<{ name: string; des
     }
     if (typeof presetId !== 'string' || presetId === '') continue
     const schemas: unknown = (agent as { ctx?: { get?: (name: string) => any } }).ctx?.get?.('tools')?.schemas?.() ?? []
-    const seen = new Set(out.get(presetId)?.map(tool => tool.name) ?? [])
+    const seen = new Set(out.get(presetId)?.map((tool) => tool.name) ?? [])
     const merged = out.get(presetId) ?? []
     for (const schema of Array.isArray(schemas) ? schemas : []) {
       const name = typeof (schema as { name?: unknown })?.name === 'string' ? (schema as { name: string }).name : ''
@@ -290,36 +377,42 @@ function collectPresetTools(ctx: Context): Map<string, Array<{ name: string; des
   return out
 }
 
-/**
- * 合并「注册工具 ∪ 名单缓存」成卡片要显示的完整工具清单。
- *
- * 缓存（tool-disable.json 的 `known`）有两层用途：预设自带的工具在没有活动
- * agent 时枚举不到；被禁用的工具在 agent 作用域里已被隐藏。两者都靠缓存把
- * 名字继续列出来，用户才有得点（禁用也能点回来）。
- */
+/** 合并「注册工具 ∪ 名单缓存」成卡片要显示的完整工具清单。 */
 function mergeWithKnown(serverName: string, tools: Array<{ name: string; description: string }>): Array<{ name: string; description: string }> {
   const known = knownToolsOf(serverName)
   if (known.length === 0) return tools
-  const seen = new Set(tools.map(tool => tool.name))
-  const missing = known.filter(name => !seen.has(name)).map(name => ({ name, description: '' }))
+  const seen = new Set(tools.map((tool) => tool.name))
+  const missing = known.filter((name) => !seen.has(name)).map((name) => ({ name, description: '' }))
   return missing.length === 0 ? tools : [...tools, ...missing]
 }
 
-/** 只读：合并配置文件条目与运行时注册工具（含预设维度）。 */
-async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> {
-  const path = patchFilePath()
-  const content = readPatchContent()
-  const patchEntries = content === '' ? [] : scanPatchEntries(content)
+/** 配置行的可安全外露字段（不返回 env / headers，避免把凭据送进前端）。 */
+function rowConfigView(row: EditableMcpRow, editable: boolean): Record<string, unknown> {
+  const config = row.config
+  return {
+    entryId: row.entryId,
+    disabled: row.disabled,
+    editable,
+    serverName: row.serverName,
+    ...typeof config.transport === 'string' ? { transport: config.transport } : {},
+    ...typeof config.command === 'string' ? { command: config.command } : {},
+    ...Array.isArray(config.args) ? { args: config.args.filter((arg): arg is string => typeof arg === 'string') } : {},
+    ...typeof config.url === 'string' ? { url: config.url } : {},
+  }
+}
+
+/** 只读：合并可编辑行、运行时注册工具与预设维度。 */
+async function collectMcpStatus(ctx: PluginContext): Promise<Record<string, unknown>> {
+  const profile = requireProfile(ctx)
+  const rows = editableMcpRows(ctx)
   const [presets, presetServers] = await Promise.all([
-    readPresetRoster(ctx), collectPresetServers(ctx),
+    readPresetRoster(ctx),
+    collectPresetServers(ctx),
   ])
 
-  // serverName 候选集：配置文件条目 ∪ 预设自带行 ∪ 账本键。工具全名按**最长
-  // 前缀匹配**归组，避免 `my` / `my_server` 这类前缀把工具算到别人头上
-  // （旧实现按第一个 `__` 切分会连带）。
-  const presetServerNames = Object.values(presetServers).flat().map(row => row.serverName)
+  const presetServerNames = Object.values(presetServers).flat().map((row) => row.serverName)
   const candidates = [
-    ...patchEntries.map(entry => entry.serverName),
+    ...rows.map((row) => row.serverName),
     ...presetServerNames,
     ...ledgerServerNamesOf(),
   ]
@@ -338,31 +431,30 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
 
   const seen = new Set<string>()
   const servers: Array<Record<string, unknown>> = []
-  // 预设遮蔽镜像：某 server 被哪些预设显式关闭（账本 false 条目）。
   const ledger = readMaskLedger()
   const maskedBy = (serverName: string): string[] => Object.entries(ledger.presets)
     .filter(([, table]) => table[serverName] === false)
     .map(([presetId]) => presetId)
   const knownToRemember: Record<string, string[]> = {}
-  for (const entry of patchEntries) {
-    seen.add(entry.serverName)
-    const registered = groups.get(entry.serverName) ?? []
-    const tools = mergeWithKnown(entry.serverName, registered)
-    knownToRemember[entry.serverName] = tools.map(tool => tool.name)
+  for (const row of rows) {
+    seen.add(row.serverName)
+    const registered = groups.get(row.serverName) ?? []
+    const tools = mergeWithKnown(row.serverName, registered)
+    knownToRemember[row.serverName] = tools.map((tool) => tool.name)
     servers.push({
-      serverName: entry.serverName,
+      serverName: row.serverName,
       toolCount: registered.length,
       tools,
-      config: { entryId: entry.entryId, disabled: entry.disabled, editable: true },
+      config: rowConfigView(row, true),
       scope: 'global',
-      maskedBy: maskedBy(entry.serverName),
+      maskedBy: maskedBy(row.serverName),
     })
   }
-  // 注册了工具但没有配置条目（手工改过文件等情况）：只读展示。
+  // 注册了工具但没有可编辑行：只读展示（editable:false）。
   for (const [serverName, registered] of groups) {
     if (seen.has(serverName)) continue
     const tools = mergeWithKnown(serverName, registered)
-    knownToRemember[serverName] = tools.map(tool => tool.name)
+    knownToRemember[serverName] = tools.map((tool) => tool.name)
     servers.push({
       serverName,
       toolCount: registered.length,
@@ -372,256 +464,152 @@ async function collectMcpStatus(ctx: Context): Promise<Record<string, unknown>> 
       maskedBy: maskedBy(serverName),
     })
   }
-  // 预设自带 server 的工具清单：作用域注册，只有该预设的活动 agent 能看见；
-  // 没有活动 agent 时回退到名单缓存。
+
+  // 预设自带 server：作用域注册，只有该预设的活动 agent 能看见。
   const toolsByPreset = collectPresetTools(ctx)
-  for (const [presetId, rows] of Object.entries(presetServers)) {
-    // 上报「该预设自带哪些 server」：同名时装配过滤只应用自带行那条账目。
-    rememberPresetOwnServers(presetId, rows.map(row => row.serverName))
+  for (const [presetId, presetRows] of Object.entries(presetServers)) {
+    rememberPresetOwnServers(presetId, presetRows.map((row) => row.serverName))
     const view = toolsByPreset.get(presetId) ?? []
-    for (const row of rows) {
+    for (const row of presetRows) {
       const prefix = `mcp__${row.serverName}__`
-      const live = view.filter(tool => tool.name.startsWith(prefix))
+      const live = view.filter((tool) => tool.name.startsWith(prefix))
       const tools = mergeWithKnown(row.serverName, live)
-      knownToRemember[row.serverName] = tools.map(tool => tool.name)
+      knownToRemember[row.serverName] = tools.map((tool) => tool.name)
       if (tools.length > 0) row.tools = tools
-      // 实际注册数（不含名单缓存）：面板用它判断「进程是否已连上并注册工具」，
-      // 自动等待不能用 tools.length —— 缓存会让还没注册的 Server 看起来已就绪。
       row.registeredCount = live.length
     }
   }
-  // 名单缓存只增不减：读到就记住（面板下次没有活动 agent 也能列出工具名）。
   try {
     rememberKnownTools(knownToRemember)
   } catch {
     /* 缓存写盘失败不影响状态读取 */
   }
+
+  // mcp-manager：合并运行时状态（含 manager-only 条目）。
+  const managerViews = readManagerViews(ctx)
+  for (const view of managerViews) {
+    const existing = servers.find((server) => server.serverName === view.name)
+    if (existing !== undefined) {
+      existing.managerStatus = view.status
+      continue
+    }
+    servers.push({
+      serverName: view.name,
+      toolCount: (groups.get(view.name) ?? []).length,
+      tools: mergeWithKnown(view.name, groups.get(view.name) ?? []),
+      config: { entryId: null, disabled: false, editable: false, manager: true },
+      scope: 'global',
+      maskedBy: maskedBy(view.name),
+      managerStatus: view.status,
+    })
+  }
+
   servers.sort((a, b) => String(a.serverName).localeCompare(String(b.serverName)))
   const tables = toolDisableTables()
+  const manager = managerOf(ctx)
   return {
     at: new Date().toISOString(),
     serverCount: servers.length,
     toolCount: servers.reduce((sum, server) => sum + (server.toolCount as number), 0),
-    patchFile: path,
-    // 面板管理的 profile 名（诊断用：桌面端应显示 desktop，而不是 web）。
-    profile: resolvedProfileName ?? fallbackProfileName(),
+    patchFile: profile.patchPath,
+    profile: profile.name ?? null,
     servers,
     presets,
     masks: ledger.presets,
-    // 遮蔽补丁的运行期安装诊断：presetId → 几个活动 agent 挂了 deny、失败原因。
-    // 面板用它把「账本已写但工具还在」说清楚（以前只打日志，静默）。
     maskInstall: maskInstallReport(),
     presetServers,
-    // 工作区级关闭账本：`{ 工作区路径: { serverName: false } }`。
-    // 前端按当前选中的工作区判定「这台是否在该工作区被关闭」。
     workspaceClosed: workspaceMcpLedger().workspaces,
     workspaceToolDisabled: workspaceToolDisabledLedger().workspaces,
-    // 工具级禁用两层账本镜像（客户端按当前范围取状态）：
-    // 有效禁用 = toolDisabled（全局层）∪ toolDisabledByPreset[当前预设]。
+    workspaceMcp: workspaceMcpMountStatus(),
     toolDisabled: tables.disabled,
     toolDisabledByPreset: tables.presets,
+    // mcpManager 缺席 = 无法观察热重载，UI 应提示手动刷新。
+    manualRefreshRequired: manager === undefined,
+    manager: manager !== undefined,
+    hotReload: manager === undefined ? 'manual' : 'live',
   }
 }
 
-/** 写：标记 disabled。成功返回新状态；失败返回 error（不改文件）。 */
-function togglePatchEntry(serverName: string, disabled: boolean): { ok: boolean; error?: string; entryId?: string; disabled?: boolean } {
-  const path = patchFilePath()
-  const content = readPatchContent()
-  if (content === '') return { ok: false, error: `patch file not found: ${path}` }
-  const entries = scanPatchEntries(content)
-  const entry = entries.find((item) => item.serverName === serverName)
-  if (entry === undefined) return { ok: false, error: `no mcp-client entry for serverName "${serverName}" in ${path}` }
-  const next = applyToggle(content, entry, disabled)
-  if (next === content) return { ok: true, entryId: entry.entryId, disabled: entry.disabled }
+/* ── 写操作（Loader / configEditor） ──────────────────────────────────── */
+
+function loaderOf(ctx: PluginContext): any {
+  return optionalService(ctx, 'loader')
+}
+
+/** 切换一条全局行的 `disabled`（Loader 行选项，非 config）。 */
+async function togglePatchEntry(ctx: PluginContext, serverName: string, disabled: boolean): Promise<{ ok: boolean; error?: string; entryId?: string; disabled?: boolean; reload?: string; manualRefreshRequired?: boolean }> {
+  requireProfile(ctx)
+  const row = editableRowOf(ctx, serverName)
+  if (row === undefined) return { ok: false, error: `no editable mcp-client row for serverName "${serverName}"` }
+  const loader = loaderOf(ctx)
+  if (typeof loader?.update !== 'function') return { ok: false, error: 'loader unavailable' }
   try {
-    copyFileSync(path, `${path}${BACKUP_SUFFIX}`)
-    writeFileSync(path, next, 'utf8')
+    await loader.update(row.entryId, { disabled })
   } catch (error) {
     return { ok: false, error: `write failed: ${error instanceof Error ? error.message : String(error)}` }
   }
-  return { ok: true, entryId: entry.entryId, disabled }
+  return { ok: true, entryId: row.entryId, disabled, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
 }
 
-/**
- * 写：从 patch 文件中删除指定 serverName 的完整 mcp-client 条目。
- *
- * 以 YAML 缩进界定块边界（避开注释归属问题）：
- *  - 条目块 = `- id:` 行 + 其下全部缩进行，到下一个 0 缩进行（注释/空行/下一
- *    顶层条目）或文件尾止；
- *  - 向上找最近一个 `- ` 行：是 `- insert:` 且其内只剩当前一条 → 连同该
- *    `- insert:` 整块（按同样缩进边界）删；是 `- id:` 或顶层 → 只删条目块；
- *  - 条目上方注释按本文件惯例保留（删项留注释存档），不并入删除范围。
- * 改前自动备份到 cordis.patch.yml.bak-last-toggle。
- */
-function removePatchEntry(serverName: string): { ok: boolean; error?: string; entryId?: string } {
-  const path = patchFilePath()
-  const content = readPatchContent()
-  if (content === '') return { ok: false, error: `patch file not found: ${path}` }
-  const entries = scanPatchEntries(content)
-  const entry = entries.find((item) => item.serverName === serverName)
-  if (entry === undefined) return { ok: false, error: `no mcp-client entry for serverName "${serverName}" in ${path}` }
-  const lines = content.split(/\r?\n/)
-  /** 块尾：line 之后第一个 0 缩进行（注释/空行/下一个顶层条目）或文件尾。 */
-  const blockEndOf = (line: number): number => {
-    for (let j = line + 1; j < lines.length; j += 1) {
-      const current = lines[j]
-      if (current.length === 0) return j
-      if (!/^[ \t]/.test(current)) return j
-    }
-    return lines.length
-  }
-  // 条目所属容器：向上最近的一个 `- ` 行（可能是 `- insert:`、同 insert 的前一条目，或顶层条目）。
-  let insertLine = -1
-  for (let k = entry.idLine - 1; k >= 0; k -= 1) {
-    const trimmed = lines[k].trimStart()
-    if (trimmed.startsWith('- ')) { insertLine = k; break }
-  }
-  let removeFrom = entry.idLine
-  let removeTo = blockEndOf(entry.idLine)
-  if (insertLine >= 0 && lines[insertLine].trimStart().startsWith('- insert:')) {
-    let itemCount = 0
-    for (let k = insertLine + 1; k < removeTo; k += 1) {
-      if (lines[k].trimStart().startsWith('- id:')) itemCount += 1
-    }
-    // 该 insert 仅含此一条：连 `- insert:` 一起删，不留空容器。
-    if (itemCount === 1) {
-      removeFrom = insertLine
-      removeTo = blockEndOf(insertLine)
-    }
-  }
-  const next = lines.slice(0, removeFrom).concat(lines.slice(removeTo)).join(defaultLineEnding(content))
+/** 删除一条全局 mcp-client 行（Loader 协调，configEditor 同款持久化）。 */
+async function removePatchEntry(ctx: PluginContext, serverName: string): Promise<{ ok: boolean; error?: string; entryId?: string; reload?: string; manualRefreshRequired?: boolean }> {
+  requireProfile(ctx)
+  const row = editableRowOf(ctx, serverName)
+  if (row === undefined) return { ok: false, error: `no editable mcp-client row for serverName "${serverName}"` }
+  const loader = loaderOf(ctx)
+  if (typeof loader?.remove !== 'function') return { ok: false, error: 'loader unavailable' }
   try {
-    copyFileSync(path, `${path}${BACKUP_SUFFIX}`)
-    writeFileSync(path, next, 'utf8')
+    loader.remove(row.entryId)
   } catch (error) {
-    return { ok: false, error: `write failed: ${error instanceof Error ? error.message : String(error)}` }
+    return { ok: false, error: `remove failed: ${error instanceof Error ? error.message : String(error)}` }
   }
-  return { ok: true, entryId: entry.entryId }
+  return { ok: true, entryId: row.entryId, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
 }
 
-/* ── 自动守护（watchdog）：MCP 会话被服务端回收后自动重建，DSH 永不卡死 ──
- *
- * 原理：neo（claw-server）正常回收闲置 MCP 会话；回收后它的 REST
- * /api/v1/sessions 中该客户端（slug=dsh-mcp-client）的 status 由 live
- * 落为 done（sessions.rs: contract_status(task.status, live.is_some()),
- * 会话对象消失即非 live）。本守护每隔 WATCHDOG_INTERVAL_MS 探活一次：
- * 未发现 live 的 dsh-mcp-client 会话 → 对该 serverName 执行
- * disabled 切换（禁→启, 与面板开关同机制,HMR 重建拿新会话）。
- *
- * 防误伤：启动后宽限期不进圈；最近一次修复 90s 内不重复；每次探活失败
- * 只是跳过（neo 未运行时也无副作用, 因为条目未 enabled 时禁用切换而已）。
- */
-
-const WATCHDOG_INTERVAL_MS = 60_000
-const WATCHDOG_GRACE_MS = 150_000
-const WATCHDOG_RETRY_GAP_MS = 90_000
-const WATCHDOG_CLIENT_SLUG = 'dsh-mcp-client'
-
-let watchdogStartedAt = 0
-let watchdogLastHealAt = 0
-let watchdogHealing = false
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => { setTimeout(resolve, ms) })
-}
-
-/** 探活一个远程 MCP 服务：其 REST sessions 里是否有本客户端 live 会话。 */
-async function remoteSessionAlive(entryUrl: string): Promise<boolean | null> {
-  const base = /^(https?:\/\/[^/]+)/.exec(entryUrl)?.[1]
-  if (base === undefined) return null
+/** profile 根 Include 的持久化树：从任一可编辑行的 parent 取。 */
+function profileTreeOf(ctx: PluginContext): any {
+  const editor = configEditorOf(ctx)
+  let entries: unknown[] = []
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
-    try {
-      const response = await fetch(`${base}/api/v1/sessions`, { headers: { accept: 'application/json' }, signal: controller.signal })
-      if (!response.ok) return null
-      const body = await response.json() as { items?: Array<{ slug?: unknown; status?: unknown }> }
-      if (!Array.isArray(body.items)) return null
-      return body.items.some((item) => item.slug === WATCHDOG_CLIENT_SLUG && item.status === 'live')
-    } finally {
-      clearTimeout(timer)
-    }
+    entries = typeof editor?.entries === 'function' ? editor.entries() : []
   } catch {
-    return null
+    entries = []
   }
+  const tree = (entries[0] as { parent?: { tree?: unknown } } | undefined)?.parent?.tree
+  return tree
 }
 
-/** 一轮探活：收集远程型条目（streamable-http url 存在且未 disabled）。 */
-async function watchdogTick(): Promise<void> {
-  if (watchdogHealing) return
-  const content = readPatchContent()
-  if (content === '') return
-  const entries = scanPatchEntries(content).filter((entry) => entry.url !== '' && !entry.disabled)
-  for (const entry of entries) {
-    const alive = await remoteSessionAlive(entry.url)
-    if (alive !== null && !alive) {
-      // 会话被回收 → 自动重连：禁→启（与面板开关同机制）。
-      watchdogHealing = true
-      try {
-        const before = Date.now()
-        if (before - watchdogLastHealAt < WATCHDOG_RETRY_GAP_MS) continue
-        watchdogLastHealAt = before
-        const disable = togglePatchEntry(entry.serverName, true)
-        if (disable.ok) {
-          await sleep(2500)
-          togglePatchEntry(entry.serverName, false)
-          console.log(`[dsh-prompt-customizer] mcp watchdog: session for ${entry.serverName} reclaimed by server; reconnected (disabled toggle)`)
-        }
-      } finally {
-        watchdogHealing = false
-      }
-    }
+/** 往 profile 根 Include 新增 mcp-client 行。 */
+async function addGlobalRows(ctx: PluginContext, rows: readonly McpRowConfig[]): Promise<string[]> {
+  requireProfile(ctx)
+  const tree = profileTreeOf(ctx)
+  if (typeof tree?.create !== 'function') throw new Error('profile tree unavailable')
+  const existingIds = new Set(editableMcpRows(ctx).map((row) => row.entryId))
+  const added: string[] = []
+  for (const row of rows) {
+    const serverName = String(row.config.serverName ?? '')
+    if (serverName === '') continue
+    const baseId = row.id !== '' ? row.id : `mcp-${serverName}`
+    let id = baseId
+    let suffix = 2
+    while (existingIds.has(id)) { id = `${baseId}-${suffix}`; suffix += 1 }
+    existingIds.add(id)
+    await tree.create({ id, name: MCP_CLIENT_NAME, config: toEditorConfig(row.config) as Record<string, unknown> })
+    added.push(serverName)
   }
+  return added
 }
 
-/** 注册自动守护（周期探活;effect 清理时释放计时器）。 */
-function startWatchdog(): () => void {
-  watchdogStartedAt = Date.now()
-  const timer = setInterval(() => {
-    if (Date.now() - watchdogStartedAt < WATCHDOG_GRACE_MS) return
-    void watchdogTick()
-  }, WATCHDOG_INTERVAL_MS)
-  timer.unref?.()
-  return () => clearInterval(timer)
-}
+/* ── mcp-edit：读取/保存现有配置块 ───────────────────────────────────── */
 
-/* ── MCP 编辑：读取当前 config 原文 / 保存修改（全局 profile patch）────────── */
-const EDIT_ROUTE = '/api/triad/mcp-edit'
-
-/** 取某 patch 条目的 config 子块原文（去掉 serverName 行、按子缩进去缩进）。 */
-function mcpConfigBlockText(serverName: string): string | null {
-  const content = readPatchContent()
-  if (content === '') return null
-  const entry = scanPatchEntries(content).find((item) => item.serverName === serverName)
-  if (entry === undefined) return null
-  const lines = content.split(/\r?\n/)
-  let end = lines.length
-  for (let j = entry.idLine + 1; j < lines.length; j += 1) {
-    const cur = lines[j]
-    if (cur.length === 0 || !/^[ \t]/.test(cur)) { end = j; break }
-  }
-  let cfgLine = -1
-  for (let j = entry.idLine + 1; j < end; j += 1) {
-    if (lines[j].trimStart().startsWith('config:')) { cfgLine = j; break }
-  }
-  if (cfgLine < 0) return null
-  const childIndent = /^[ \t]*/.exec(lines[cfgLine + 1] ?? '')?.[0] ?? '  '
-  return lines
-    .slice(cfgLine + 1, end)
-    .filter((line) => line.trim() !== '' && !line.trimStart().startsWith('serverName:'))
-    .map((line) => (line.startsWith(childIndent) ? line.slice(childIndent.length) : line.trimStart()))
-    .join('\n')
-}
-
-const MCP_CLIENT_NAME_EDIT = '@deepseek-ai/dsh-mcp-client'
 function findPresetServerConfig(plugins: unknown, serverName: string): Record<string, unknown> | null {
   let found: Record<string, unknown> | null = null
   const walk = (list: unknown): void => {
     for (const item of Array.isArray(list) ? list : []) {
       if (item === null || typeof item !== 'object' || Array.isArray(item)) continue
       const row = item as Record<string, unknown>
-      if (row.name === MCP_CLIENT_NAME_EDIT) {
-        const cfg = row.config !== null && typeof row.config === 'object' && !Array.isArray(row.config) ? row.config as Record<string, unknown> : {}
+      if (row.name === MCP_CLIENT_NAME) {
+        const cfg = plainObject(row.config)
         if (cfg.serverName === serverName) { found = cfg; return }
       }
       if (Array.isArray(row.config)) walk(row.config)
@@ -630,13 +618,14 @@ function findPresetServerConfig(plugins: unknown, serverName: string): Record<st
   walk(plugins)
   return found
 }
+
 function replacePresetServerConfig(plugins: unknown, serverName: string, config: Record<string, unknown>): { plugins: unknown[]; changed: boolean } {
   let changed = false
   const mapList = (list: unknown[]): unknown[] => list.map((item) => {
     if (item === null || typeof item !== 'object' || Array.isArray(item)) return item
     const row = { ...(item as Record<string, unknown>) }
-    if (row.name === MCP_CLIENT_NAME_EDIT) {
-      const cfg = row.config !== null && typeof row.config === 'object' && !Array.isArray(row.config) ? row.config as Record<string, unknown> : {}
+    if (row.name === MCP_CLIENT_NAME) {
+      const cfg = plainObject(row.config)
       if (cfg.serverName === serverName) { row.config = config; changed = true; return row }
     }
     if (Array.isArray(row.config)) row.config = mapList(row.config)
@@ -645,12 +634,14 @@ function replacePresetServerConfig(plugins: unknown, serverName: string, config:
   return { plugins: mapList(Array.isArray(plugins) ? plugins : []), changed }
 }
 
-async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const anyReq = req as unknown as { socket?: { remoteAddress?: string }; url?: string; method?: string }
-  const anyRes = res as unknown as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }
-  if (!loopbackAllowed(req)) { anyRes.writeHead(403, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, error: 'loopback-only' })); return }
-  const url = new URL(anyReq.url ?? '/', 'http://localhost')
-  const method = anyReq.method ?? 'GET'
+async function handleMcpEdit(ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
+    return
+  }
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const method = req.method ?? 'GET'
   const source = url.searchParams.get('source') ?? 'global'
   try {
     if (method === 'GET') {
@@ -660,10 +651,14 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
         let names: string[] = []
         if (ws !== '') {
           const p = join(ws, '.mcp.json')
-          if (existsSync(p)) { try { const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>; names = doc?.mcpServers !== null && typeof doc?.mcpServers === 'object' ? Object.keys(doc.mcpServers) : [] } catch { /* bad json */ } }
+          if (existsSync(p)) {
+            try {
+              const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>
+              names = doc?.mcpServers !== null && typeof doc?.mcpServers === 'object' ? Object.keys(doc.mcpServers) : []
+            } catch { /* bad json */ }
+          }
         }
-        anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-        anyRes.end(JSON.stringify({ ok: true, source: 'workspace', names }))
+        writeJsonResponse(res, 200, { ok: true, source: 'workspace', names })
         return
       }
       if (source === 'preset' || source === 'workspace') {
@@ -671,25 +666,42 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
         if (source === 'preset') {
           const preset = url.searchParams.get('preset') ?? ''
           const ref = presetRowOf(ctx, preset)
-          if (ref !== undefined) { const cfg = findPresetServerConfig(ref.config.plugins, serverName); if (cfg !== null) text = JSON.stringify(cfg, null, 2) }
+          if (ref !== undefined) {
+            const cfg = findPresetServerConfig(ref.config.plugins, serverName)
+            if (cfg !== null) text = JSON.stringify(cfg, null, 2)
+          }
         } else {
           const ws = url.searchParams.get('workspace') ?? ''
           if (ws !== '') {
             const p = join(ws, '.mcp.json')
-            if (existsSync(p)) { try { const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>; const cfg = doc?.mcpServers?.[serverName]; if (cfg !== undefined) text = JSON.stringify(cfg, null, 2) } catch { /* bad json */ } }
+            if (existsSync(p)) {
+              try {
+                const doc = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>
+                const cfg = doc?.mcpServers?.[serverName]
+                if (cfg !== undefined) text = JSON.stringify(cfg, null, 2)
+              } catch { /* bad json */ }
+            }
           }
         }
-        anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-        anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no ${source} config for ${serverName}` } : { ok: true, source, serverName, text }))
+        writeJsonResponse(res, text === null ? 404 : 200, text === null
+          ? { ok: false, error: `no ${source} config for ${serverName}` }
+          : { ok: true, source, serverName, text, format: 'json' })
         return
       }
-      const block = mcpConfigBlockText(serverName)
-      let text: string | null = null
-      if (block !== null) { const ind = block.split(/\r?\n/).map((line) => `    ${line}`).join('\n'); text = `mcpServers:\n  ${serverName}:\n${ind}\n` }
-      anyRes.writeHead(text === null ? 404 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-      anyRes.end(JSON.stringify(text === null ? { ok: false, error: `no patch entry for ${serverName}` } : { ok: true, serverName, text }))
+      const row = editableRowOf(ctx, serverName)
+      if (row === undefined) {
+        writeJsonResponse(res, 404, { ok: false, error: `no mcp-client row for ${serverName}` })
+        return
+      }
+      const text = rowsToMcpServersYaml([{
+        id: row.entryId,
+        name: MCP_CLIENT_NAME,
+        config: fromEditorConfig(row.config) as Record<string, unknown>,
+      }])
+      writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, text, format: 'yaml' })
       return
     }
+
     let body = ''
     for await (const chunk of req as unknown as AsyncIterable<Uint8Array>) body += Buffer.from(chunk).toString('utf8')
     const parsed = (body === '' ? {} : JSON.parse(body)) as Record<string, unknown>
@@ -702,14 +714,15 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
       const ref = presetRowOf(ctx, preset)
       if (ref === undefined) throw new Error('preset not found')
       if (ref.editor === undefined) throw new Error('preset not editable')
-      const cfg = JSON.parse(String(parsed.text ?? '')) as Record<string, unknown>
-      if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('config object required')
+      const { format, text } = pasteFieldsOf(parsed)
+      const outcome = parseMcpPaste(format, text)
+      if (outcome.errors.length > 0) throw new Error(outcome.errors.join('; '))
+      const cfg = outcome.rows[0]?.config ?? {}
       if (typeof cfg.serverName !== 'string' || cfg.serverName === '') cfg.serverName = serverName
       const result = replacePresetServerConfig(ref.config.plugins, serverName, cfg)
       if (!result.changed) throw new Error('server not found in preset')
       await writePresetPlugins(ref, result.plugins)
-      anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-      anyRes.end(JSON.stringify({ ok: true, source: 'preset', serverName, preset, reload: 'live' }))
+      writeJsonResponse(res, 200, { ok: true, source: 'preset', serverName, preset, reload: 'live' })
       return
     }
     if (effSource === 'workspace') {
@@ -722,55 +735,65 @@ async function handleMcpEdit(ctx: Context, req: IncomingMessage, res: ServerResp
       if (doc === null || typeof doc !== 'object') throw new Error('invalid .mcp.json')
       doc.mcpServers = doc.mcpServers !== null && typeof doc.mcpServers === 'object' ? doc.mcpServers : {}
       if (!(serverName in doc.mcpServers)) throw new Error('server not found in workspace .mcp.json')
-      const cfg = JSON.parse(String(parsed.text ?? '')) as Record<string, unknown>
-      if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('config object required')
-      doc.mcpServers[serverName] = cfg
+      const { format, text } = pasteFieldsOf(parsed)
+      const outcome = parseMcpPaste(format, text)
+      if (outcome.errors.length > 0) throw new Error(outcome.errors.join('; '))
+      doc.mcpServers[serverName] = outcome.rows[0]?.config ?? {}
       copyFileSync(p, `${p}${BACKUP_SUFFIX}`)
       writeFileSync(p, `${JSON.stringify(doc, null, 2)}\n`, 'utf8')
-      anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-      anyRes.end(JSON.stringify({ ok: true, source: 'workspace', serverName, workspace: ws, reload: 'manual' }))
+      writeJsonResponse(res, 200, { ok: true, source: 'workspace', serverName, workspace: ws, reload: 'manual' })
       return
     }
+    // global：configEditor 整份替换该行 config。
+    requireProfile(ctx)
+    const row = editableRowOf(ctx, serverName)
+    if (row === undefined) throw new Error(`no editable mcp-client row for ${serverName}`)
+    const editor = configEditorOf(ctx)
+    if (typeof editor?.edit !== 'function') throw new Error('configEditor unavailable')
     const { format, text } = pasteFieldsOf(parsed)
     const outcome = parseMcpPaste(format, text)
-    if (outcome.errors.length > 0) { anyRes.writeHead(400, { 'content-type': 'application/json' }); anyRes.end(JSON.stringify({ ok: false, errors: outcome.errors })); return }
-    if (outcome.rows.length === 0) throw new Error('未解析出任何 MCP server')
-    const row = outcome.rows[0]
-    const newName = String(row.config.serverName ?? serverName)
-    const removed = removePatchEntry(serverName)
-    if (!removed.ok) throw new Error(removed.error ?? 'remove old entry failed')
-    const next = appendRowsToText(readPatchContent(), rowsToPatchYaml([row]))
-    writeFileSync(patchFilePath(), next, 'utf8')
-    if (parsed.reload === true) {
-      try { togglePatchEntry(newName, true); togglePatchEntry(newName, false) } catch { /* 热重载尽力而为 */ }
-    }
-    anyRes.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-    anyRes.end(JSON.stringify({ ok: true, serverName: newName, reload: parsed.reload === true ? 'attempted' : 'manual' }))
+    if (outcome.errors.length > 0) throw new Error(outcome.errors.join('; '))
+    const cfg = outcome.rows[0]?.config ?? {}
+    if (typeof cfg.serverName !== 'string' || cfg.serverName === '') cfg.serverName = serverName
+    await editor.edit(row.entry, () => toEditorConfig(cfg) as Record<string, unknown>)
+    writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, reload: 'live' })
   } catch (error) {
-    anyRes.writeHead(400, { 'content-type': 'application/json' })
-    anyRes.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }))
+    if (error instanceof ProfileUnavailableError) {
+      writeJsonResponse(res, 503, { ok: false, error: 'profile-unavailable' })
+      return
+    }
+    writeJsonResponse(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
   }
 }
 
-/** 注册 GET /api/triad/mcp-status 与 POST /api/triad/mcp-config。 */
+/* ── 路由 ──────────────────────────────────────────────────────────────── */
+
+/** 注册 GET /api/triad/mcp-status、POST /api/triad/mcp-config 与 mcp-edit。 */
 export function applyMcpStatus(ctx: Context): void {
-  resolveActiveProfile(ctx)
+  const pluginCtx = ctx as PluginContext
+  attachManagerWatch(pluginCtx)
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: EDIT_ROUTE,
-    handler: (req: IncomingMessage, res: ServerResponse) => { void handleMcpEdit(ctx, req, res) },
+    handler: (req: IncomingMessage, res: ServerResponse) => { void handleMcpEdit(pluginCtx, req, res) },
   }), 'dsh-mcp-edit: routes')
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: STATUS_ROUTE,
-    handler: (req: { socket: { remoteAddress?: string }; headers: { host?: string } }, res: { writeHead: (status: number, headers: Record<string, string>) => void; end: (body: string) => void }) => {
-      if (!loopbackAllowed(req)) {
-        writeJsonResponse(res, 403, { error: 'loopback-only' })
-        return
-      }
-      void collectMcpStatus(ctx).then(status => {
+    handler: (req: IncomingMessage, res: ServerResponse) => {
+      // 服务可能在插件挂载之后才提供（Loader 顺序不同）：首次请求时补订阅。
+      if (!managerWatched) attachManagerWatch(pluginCtx)
+      const trust = requireTrustedRequest(pluginCtx, req)
+      if (!trust.ok) { rejectUntrusted(res, trust); return }
+      void collectMcpStatus(pluginCtx).then((status) => {
         writeJsonResponse(res, 200, status)
       }).catch((error: unknown) => {
+        if (error instanceof ProfileUnavailableError) {
+          writeJsonResponse(res, 503, { ok: false, error: 'profile-unavailable' })
+          return
+        }
         writeJsonResponse(res, 500, { error: error instanceof Error ? error.message : String(error) })
       })
     },
@@ -779,16 +802,12 @@ export function applyMcpStatus(ctx: Context): void {
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: CONFIG_ROUTE,
-    handler: (req: { socket: { remoteAddress?: string }; headers: { host?: string }; method?: string }, res: { writeHead: (status: number, headers: Record<string, string>) => void; end: (body: string) => void }) => {
+    handler: (req: IncomingMessage, res: ServerResponse) => {
       void (async () => {
-        if (!loopbackAllowed(req)) {
-          writeJsonResponse(res, 403, { error: 'loopback-only' })
-          return
-        }
+        const trust = requireTrustedRequest(pluginCtx, req)
+        if (!trust.ok) { rejectUntrusted(res, trust); return }
         let body = ''
-        for await (const chunk of req as unknown as AsyncIterable<Uint8Array>) {
-          body += Buffer.from(chunk).toString('utf8')
-        }
+        for await (const chunk of req as unknown as AsyncIterable<Uint8Array>) body += Buffer.from(chunk).toString('utf8')
         let parsed: Record<string, unknown>
         try {
           parsed = JSON.parse(body) as Record<string, unknown>
@@ -796,9 +815,9 @@ export function applyMcpStatus(ctx: Context): void {
           writeJsonResponse(res, 400, { ok: false, error: 'invalid json' })
           return
         }
-        // ── action: add —— 粘贴文本（JSON / YAML）追加到 profile patch ──
-        if (parsed.action === 'add') {
-          try {
+        try {
+          // ── action: add —— 粘贴文本（JSON / YAML）追加到 profile patch 或工作区 .mcp.json ──
+          if (parsed.action === 'add') {
             const { format, text } = pasteFieldsOf(parsed)
             const outcome = parseMcpPaste(format, text)
             if (outcome.errors.length > 0) {
@@ -809,31 +828,33 @@ export function applyMcpStatus(ctx: Context): void {
               writeJsonResponse(res, 400, { ok: false, error: '未解析出任何 MCP server' })
               return
             }
-            const path = patchFilePath()
-            const content = readPatchContent()
-            // 落点：默认全局（profile patch）；scope=workspace 时写到该工作区项目根的
-            // `.mcp.json`（新文件，目录不存在就创建），只在该工作区注入。
             const scope = parsed.scope === 'workspace' ? 'workspace' : 'global'
             const workspace = typeof parsed.workspace === 'string' ? parsed.workspace.trim() : ''
-            if (scope === 'workspace' && workspace === '') {
-              writeJsonResponse(res, 400, { ok: false, error: 'scope=workspace 需要 workspace 路径' })
+            if (scope === 'workspace') {
+              if (workspace === '') {
+                writeJsonResponse(res, 400, { ok: false, error: 'scope=workspace 需要 workspace 路径' })
+                return
+              }
+              const targetPath = join(workspace, '.mcp.json')
+              const existing = readWorkspaceMcpJsonNames(targetPath)
+              const added: string[] = []
+              const fresh = outcome.rows.filter((row) => {
+                const serverName = String(row.config.serverName ?? '')
+                if (existing.has(serverName)) return false
+                existing.add(serverName)
+                added.push(serverName)
+                return true
+              })
+              if (fresh.length > 0) mergeWorkspaceMcpJson(targetPath, fresh)
+              writeJsonResponse(res, 200, {
+                ok: true, added, skipped: outcome.rows.length - fresh.length, scope,
+                warnings: outcome.warnings, patchFile: targetPath, reload: 'manual',
+              })
               return
             }
-            /**
-             * 工作区落点是**项目根的 `.mcp.json`**（`{ "mcpServers": {…} }`）：
-             * Claude Desktop / Cursor / Cline 等主流 agent 读的就是这个文件，
-             * 写标准格式才能被它们直接复用。首次新建，后续在同文件上合并
-             * （同名跳过，不覆盖别人已有的配置）。全局仍走 profile patch。
-             */
-            const targetPath = scope === 'workspace' ? join(workspace, '.mcp.json') : path
-            /**
-             * 去重要按**目标文件**算：工作区只和该工作区 `.mcp.json` 里已有的键比，
-             * 不能拿全局 profile patch 的 serverName 判重 —— 否则「全局已有 anysearch」
-             * 会让工作区里想配同名的那条被误判为重复、直接跳过。
-             */
-            const existing = new Set(scope === 'workspace'
-              ? readWorkspaceMcpJsonNames(targetPath)
-              : scanPatchEntries(content).map(entry => entry.serverName))
+            const profile = requireProfile(pluginCtx)
+            const existingRows = editableMcpRows(pluginCtx)
+            const existing = new Set(existingRows.map((row) => row.serverName))
             const added: string[] = []
             const fresh = outcome.rows.filter((row) => {
               const serverName = String(row.config.serverName ?? '')
@@ -842,37 +863,31 @@ export function applyMcpStatus(ctx: Context): void {
               added.push(serverName)
               return true
             })
-            const skipped = outcome.rows.length - fresh.length
-            if (fresh.length > 0) {
-              if (scope === 'workspace') {
-                mergeWorkspaceMcpJson(targetPath, fresh)
-              } else {
-                const next = appendRowsToText(content, rowsToPatchYaml(fresh))
-                copyFileSync(targetPath, `${targetPath}${BACKUP_SUFFIX}`)
-                writeFileSync(targetPath, next, 'utf8')
-              }
-            }
+            if (fresh.length > 0) await addGlobalRows(pluginCtx, fresh)
             writeJsonResponse(res, 200, {
-              ok: true, added, skipped, scope, warnings: outcome.warnings, patchFile: targetPath, reload: 'live',
+              ok: true, added, skipped: outcome.rows.length - fresh.length, scope,
+              warnings: outcome.warnings, patchFile: profile.patchPath, reload: 'live',
+              manualRefreshRequired: managerOf(pluginCtx) === undefined,
             })
-          } catch (error) {
-            writeJsonResponse(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+            return
           }
-          return
+          const serverName = typeof parsed.serverName === 'string' ? parsed.serverName : ''
+          if (serverName === '') {
+            writeJsonResponse(res, 400, { ok: false, error: 'serverName required' })
+            return
+          }
+          const result = parsed.action === 'remove'
+            ? await removePatchEntry(pluginCtx, serverName)
+            : await togglePatchEntry(pluginCtx, serverName, parsed.disabled === true)
+          writeJsonResponse(res, result.ok ? 200 : 400, result)
+        } catch (error) {
+          if (error instanceof ProfileUnavailableError) {
+            writeJsonResponse(res, 503, { ok: false, error: 'profile-unavailable' })
+            return
+          }
+          writeJsonResponse(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
         }
-        const serverName = typeof parsed.serverName === 'string' ? parsed.serverName : ''
-        if (serverName === '') {
-          writeJsonResponse(res, 400, { ok: false, error: 'serverName required' })
-          return
-        }
-        const result = parsed.action === 'remove'
-          ? removePatchEntry(serverName)
-          : togglePatchEntry(serverName, parsed.disabled === true)
-        writeJsonResponse(res, result.ok ? 200 : 400, result)
       })()
     },
   }), 'dsh-mcp-config: routes')
-
-  // ── 自动守护：会话被服务端回收后自动重建（免重启 DSH）──────────
-  ctx.effect(() => startWatchdog(), 'dsh-mcp-watchdog: interval')
 }

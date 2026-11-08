@@ -10,6 +10,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CatAllIcon, CloudUpIcon, SearchIcon, SortDirIcon } from './icons.js'
 import type { LiveMcpStatus } from './mcp-live.js'
+import { mcpEffectiveEnabled } from './mcp-state.js'
 import { css } from './styles.js'
 import { ALL_PRESETS, UNCATEGORIZED, type HealthViewModel, type PresetRow } from './types.js'
 
@@ -162,7 +163,7 @@ export function SkillTopBar({
   onAdd: () => void
   onRefresh: () => void
   /** 隐藏的目录选择框：添加技能弹窗与顶栏拖放共用。 */
-  fileInput: RefObject<HTMLInputElement | null>
+  fileInput: RefObject<HTMLInputElement>
   acceptFiles: (files: File[] | null) => void
 }): JSX.Element {
   return (
@@ -356,7 +357,7 @@ export function SkillTopBar({
  * + 启用状态分段。摆在主区之上，与技能页同一位置、同一套类名。
  */
 export function McpTopBar({
-  t, live, scope, onScope, status, onStatus, query, onQuery, onRefresh, onAddOwn, onAddCustom,
+  t, live, scope, onScope, status, onStatus, query, onQuery, onRefresh, onAddOwn, onAddCustom, workspace, level,
 }: {
   t: (key: string, params?: Record<string, string | number>) => string
   live: LiveMcpStatus
@@ -370,26 +371,56 @@ export function McpTopBar({
   /** 打开「添加专属 Server」（只在预设范围显示这个按钮）。 */
   onAddOwn: () => void
   onAddCustom: () => void
+  /** 面板当前工作区：工作区级关闭会计入启用/停用计数。 */
+  workspace: string | null
+  /** 统一编辑层级：工作区级不再显示预设遮蔽的单独设置徽标。 */
+  level: 'preset' | 'workspace'
 }): JSX.Element {
   const data = live.state === 'ready' ? live.data : null
   const presets = data?.presets ?? []
   const globals = data?.servers ?? []
-  const offCount = globals.filter(server => server.config.disabled).length
+  /** 当前工作区被关掉的 Server 名单。 */
+  const closedInWorkspace = new Set<string>(
+    workspace === null
+      ? []
+      : Object.entries(data?.workspaceClosed?.[workspace] ?? {})
+        .filter(([, on]) => on === false)
+        .map(([name]) => name),
+  )
   const maskedOf = (presetId: string): Set<string> => new Set(
     Object.entries(data?.masks?.[presetId] ?? {}).filter(([, on]) => on === false).map(([name]) => name),
   )
-  /** 该预设可见的 Server 数 = 未被它遮蔽的全局 + 它自带的行。 */
-  const visibleCount = (presetId: string): number => {
+  /**
+   * 当前工作区 + 指定预设下实际会渲染的行集合：全局行 + 该预设自带行。
+   * 计数必须按这份行集合求，不能只数 globals（会漏掉 presetServers/workspaceClosed）。
+   */
+  const rowsOf = (presetId: string): Array<{ enabled: boolean }> => {
     const masked = maskedOf(presetId)
-    return globals.filter(server => !masked.has(server.serverName)).length + (data?.presetServers?.[presetId] ?? []).length
+    const rows = globals.map(server => ({
+      enabled: mcpEffectiveEnabled({
+        configDisabled: server.config.disabled,
+        masked: presetId !== '' && masked.has(server.serverName),
+        workspaceClosed: closedInWorkspace.has(server.serverName),
+      }),
+    }))
+    if (presetId !== '') {
+      for (const row of data?.presetServers?.[presetId] ?? []) {
+        rows.push({ enabled: mcpEffectiveEnabled({ workspaceClosed: closedInWorkspace.has(row.serverName) }) })
+      }
+    }
+    return rows
+  }
+  /** 该预设下已启用的 Server 数（= 实际渲染行里有效启用的数量）。 */
+  const visibleCount = (presetId: string): number => {
+    return rowsOf(presetId).filter(row => row.enabled).length
   }
   const chips: Array<{ id: string; label: string; count: number; overrides: number; icon: JSX.Element }> = [
-    { id: '', label: t('presetAll'), count: globals.length, overrides: 0, icon: <CatAllIcon size={16} /> },
+    { id: '', label: t('presetAll'), count: visibleCount(''), overrides: 0, icon: <CatAllIcon size={16} /> },
     ...presets.map(preset => ({
       id: preset.id,
       label: preset.name ?? preset.id,
       count: visibleCount(preset.id),
-      overrides: maskedOf(preset.id).size,
+      overrides: level === 'preset' ? maskedOf(preset.id).size : 0,
       icon: <IconAgentPresetOutlineRegular size={15} />,
     })),
   ]
@@ -399,13 +430,17 @@ export function McpTopBar({
     : live.state === 'loading'
       ? { tone: 'pending', label: t('statChecking'), title: '' }
       : { tone: 'warn', label: t('mcpConnDown'), title: t('mcpLiveUnavailable') }
+  /** 当前范围实际渲染的行：计数与列表筛选同源。 */
+  const scopeRows = rowsOf(scope)
+  const onCount = scopeRows.filter(row => row.enabled).length
+  const offCount = scopeRows.length - onCount
   return (
     <div className={css.topbar}>
       {presets.length > 0 && (
         <div className={css.chipRow} role="group" aria-label={t('mcpScopeTitle')}>
           {chips.map(chip => (
             <button
-              key={chip.id === '' ? '__all__' : chip.id}
+              key={chip.id === '' ? '\u0000all' : chip.id}
               type="button"
               className={`${css.catItem} ${scope === chip.id ? css.catItemActive : ''}`}
               data-active={scope === chip.id || undefined}
@@ -442,8 +477,8 @@ export function McpTopBar({
         </div>
         <div className={css.statusSeg} role="group" aria-label={t('statusAll')}>
           {([
-            ['all', t('statusAll'), globals.length],
-            ['on', t('statusOn'), globals.length - offCount],
+            ['all', t('statusAll'), scopeRows.length],
+            ['on', t('statusOn'), onCount],
             ['off', t('statusOff'), offCount],
           ] as const).map(([value, label, count]) => (
             <button

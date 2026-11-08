@@ -14,15 +14,18 @@
  * `mcp__<server>__<tool>` 工具。与 `mcp-tool-disable` 同一套缝，不碰内核源码。
  */
 
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { readPluginDoc, writePluginDoc } from '../vendor/prompt-customizer/db.js'
 import { join, resolve } from 'node:path'
-import { agentsHome } from './home-paths.ts'
+import type { Fiber } from '@deepseek-ai/cordis'
+import { normalizeCwd } from './home-paths.ts'
+import { optionalService } from './context-utils.ts'
+import { cwdOfScope, liveAgents } from './scope-context.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 
 /** 运行时上下文在类型上放宽（与其它 host 模块同惯例）。 */
 type PluginContext = any
 
-const LEDGER_FILE = '.workspace-mcp.json'
 const LEDGER_KEY = 'mcp/workspace-close'
 const MAX_WORKSPACES = 64
 
@@ -35,10 +38,6 @@ export interface WorkspaceMcpLedger {
 /** 装配对象里本模块用到的字段。 */
 interface PromptAssemblyLike {
   tools?: Array<{ name?: unknown }>
-}
-
-function ledgerPath(): string {
-  return join(agentsHome(), 'skills', LEDGER_FILE)
 }
 
 /** 归一化任意输入（脏字段丢弃，路径按 resolve 规整）。 */
@@ -57,7 +56,7 @@ function normalize(input: unknown): WorkspaceMcpLedger {
         if (typeof serverName !== 'string' || serverName === '' || typeof state !== 'boolean') continue
         entries[serverName] = state
       }
-      workspaces[resolve(cwd)] = entries
+      workspaces[normalizeCwd(cwd)] = entries
     }
   }
   return { version: 1, workspaces }
@@ -86,7 +85,7 @@ async function writeLedger(next: WorkspaceMcpLedger): Promise<void> {
 
 /** 某个工作区被关闭的 server 名单。 */
 export function closedInWorkspace(ledger: WorkspaceMcpLedger, cwd: string): Set<string> {
-  const table = ledger.workspaces[resolve(cwd)]
+  const table = ledger.workspaces[normalizeCwd(cwd)]
   if (table === undefined) return new Set()
   const closed = new Set<string>()
   for (const [serverName, state] of Object.entries(table)) {
@@ -109,7 +108,7 @@ export async function closedServersInWorkspace(cwd: string): Promise<Set<string>
  */
 export async function setWorkspaceServer(cwd: string, serverName: string, enabled: boolean): Promise<WorkspaceMcpLedger> {
   const ledger = await readLedger()
-  const key = resolve(cwd)
+  const key = normalizeCwd(cwd)
   const current = { ...ledger.workspaces[key] ?? {} }
   if (enabled) delete current[serverName]
   else current[serverName] = false
@@ -133,7 +132,7 @@ function normalizeToolDisable(input: unknown): WorkspaceToolDisableLedger {
       if (typeof cwd !== 'string' || cwd.trim() === '') continue
       if (!Array.isArray(list)) continue
       const names = [...new Set(list.filter((n): n is string => typeof n === 'string' && n.startsWith('mcp__') && n.length > 5))]
-      workspaces[resolve(cwd)] = names
+      workspaces[normalizeCwd(cwd)] = names
     }
   }
   return { version: 1, workspaces }
@@ -161,14 +160,14 @@ export function workspaceToolDisabledLedger(): WorkspaceToolDisableLedger {
 /** 某工作区被禁用的工具全名集合（预览等只读消费方用）。 */
 export async function disabledToolsInWorkspace(cwd: string): Promise<Set<string>> {
   const ledger = toolCache ?? await readToolDisableLedger()
-  return new Set(ledger.workspaces[resolve(cwd)] ?? [])
+  return new Set(ledger.workspaces[normalizeCwd(cwd)] ?? [])
 }
 
 /** 设置「某工作区 × 某工具」的启用/禁用；enabled=true 移除（回落）。 */
 export async function setWorkspaceToolDisabled(cwd: string, fullName: string, enabled: boolean): Promise<WorkspaceToolDisableLedger> {
   if (typeof fullName !== 'string' || !fullName.startsWith('mcp__')) throw new Error('fullName must be an mcp__ tool name')
   const ledger = await readToolDisableLedger()
-  const key = resolve(cwd)
+  const key = normalizeCwd(cwd)
   const current = new Set(ledger.workspaces[key] ?? [])
   if (enabled) current.delete(fullName)
   else current.add(fullName)
@@ -188,11 +187,10 @@ function serverOfToolName(fullName: string): string | undefined {
   return separator <= 0 ? undefined : rest.slice(0, separator)
 }
 
-/** 该次装配所属会话的 cwd（取不到返回 undefined）。 */
-function assemblyCwd(context: unknown): string | undefined {
-  const cwd = (context as { agent?: { session?: { header?: { cwd?: unknown } } } } | undefined)
-    ?.agent?.session?.header?.cwd
-  return typeof cwd === 'string' && cwd.trim() !== '' ? resolve(cwd) : undefined
+/** 该次装配所属会话的 cwd（0.2.2 的 AssembleContext 只有 scope，无 agent）。 */
+function assemblyCwd(ctx: unknown, context: unknown): string | undefined {
+  const cwd = cwdOfScope(ctx, context)
+  return cwd === undefined ? undefined : normalizeCwd(cwd)
 }
 
 /**
@@ -224,9 +222,10 @@ function installAgentRestrictions(ctx: PluginContext): () => void {
     const ledger = cache
     const cwd = agent?.session?.header?.cwd
     const hasCwd = typeof cwd === 'string' && cwd.trim() !== ''
-    const closed = ledger !== undefined && hasCwd ? closedInWorkspace(ledger, cwd) : new Set<string>()
+    const key = hasCwd ? normalizeCwd(cwd) : ''
+    const closed = ledger !== undefined && hasCwd ? closedInWorkspace(ledger, key) : new Set<string>()
     const disabledTools = hasCwd
-      ? new Set<string>((toolCache ?? { version: 1, workspaces: {} }).workspaces[resolve(cwd)] ?? [])
+      ? new Set<string>((toolCache ?? { version: 1, workspaces: {} }).workspaces[key] ?? [])
       : new Set<string>()
     const tools = agent.ctx.get?.('tools')
     if (typeof tools?.restrict !== 'function') return
@@ -237,16 +236,16 @@ function installAgentRestrictions(ctx: PluginContext): () => void {
           const serverName = serverOfToolName(name)
           return disabledTools.has(name) || (serverName !== undefined && closed.has(serverName))
         })
-    const key = deny.join('\u0000')
+    const denyKey = deny.join('\u0000')
     const current = installed.get(agent)
-    if (current?.key === key) return
+    if (current?.key === denyKey) return
     if (current !== undefined) {
       installed.delete(agent)
       try { current.dispose() } catch { /* 已被宿主回收 */ }
     }
     if (deny.length === 0) return
     try {
-      installed.set(agent, { key, dispose: tools.restrict({ deny }) })
+      installed.set(agent, { key: denyKey, dispose: tools.restrict({ deny }) })
     } catch (error) {
       // 作用域内注册（预设自带行）会被 restrict 拒绝：逐名尝试，跳过那部分。
       const disposers: Array<() => void> = []
@@ -255,7 +254,7 @@ function installAgentRestrictions(ctx: PluginContext): () => void {
       }
       if (disposers.length > 0) {
         installed.set(agent, {
-          key,
+          key: denyKey,
           dispose: () => { for (const dispose of disposers) { try { dispose() } catch { /* 已释放 */ } } },
         })
       } else {
@@ -267,7 +266,7 @@ function installAgentRestrictions(ctx: PluginContext): () => void {
   const syncAll = (): void => {
     for (const agent of [...installed.keys()]) sync(agent)
     try {
-      const list = ctx?.get?.('agents')?.list?.()
+      const list = optionalService<any>(ctx, 'agents')?.list?.()
       for (const agent of Array.isArray(list) ? list : []) sync(agent)
     } catch { /* agents 服务缺席 */ }
   }
@@ -323,9 +322,9 @@ function installAssembleFilter(ctx: PluginContext): void {
       if ((noClose && noTools) || !Array.isArray(assembly?.tools)) {
         return next()
       }
-      const cwd = assemblyCwd(context)
+      const cwd = assemblyCwd(ctx, context)
       if (cwd === undefined) return next()
-      const closed = closedInWorkspace(ledger, cwd)
+      const closed = ledger === undefined ? new Set<string>() : closedInWorkspace(ledger, cwd)
       const disabledTools = new Set<string>((toolLedger ?? { version: 1, workspaces: {} }).workspaces[cwd] ?? [])
       if (closed.size === 0 && disabledTools.size === 0) return next()
       for (let index = assembly.tools.length - 1; index >= 0; index -= 1) {
@@ -348,13 +347,6 @@ function json(res: any, status: number, body: unknown): void {
   res.end(JSON.stringify(body))
 }
 
-/** 只允许本机回环访问（与其它路由一致）。 */
-function loopback(req: any): boolean {
-  const address = req?.socket?.remoteAddress
-  return typeof address === 'string'
-    && (address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1')
-}
-
 /** 读请求体（带上限）。 */
 async function readBody(req: any): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
@@ -372,8 +364,9 @@ async function readBody(req: any): Promise<Record<string, unknown>> {
 
 /** 处理一条请求；`onChanged` 在账本写盘后触发 agent 作用域重算。 */
 async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => void): Promise<void> {
-  if (!loopback(req)) {
-    json(res, 403, { error: 'loopback-only' })
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
     return
   }
   const url = new URL(req.url ?? '/', 'http://localhost')
@@ -390,7 +383,7 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
         workspaceToolDisabled: toolLedger.workspaces,
         ...cwd === null || cwd.trim() === '' ? {} : {
           closed: [...closedInWorkspace(ledger, cwd.trim())],
-          toolDisabled: [...(toolLedger.workspaces[resolve(cwd.trim())] ?? [])],
+          toolDisabled: [...(toolLedger.workspaces[normalizeCwd(cwd.trim())] ?? [])],
         },
       })
       return
@@ -405,7 +398,7 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
       if (cwd.trim() === '' || serverName.trim() === '') throw new Error('cwd and serverName are required')
       const ledger = await setWorkspaceServer(cwd, serverName, enabled)
       onChanged?.()
-      json(res, 200, { ok: true, cwd: resolve(cwd), serverName, enabled, workspaces: ledger.workspaces })
+      json(res, 200, { ok: true, cwd: normalizeCwd(cwd), serverName, enabled, workspaces: ledger.workspaces })
       return
     }
     const matchTools = /^\/workspace\/(.+)\/tools$/.exec(rest)
@@ -418,7 +411,7 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
       if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
       const next = await setWorkspaceToolDisabled(cwd, fullName, enabled)
       onChanged?.()
-      json(res, 200, { ok: true, cwd: resolve(cwd), name: fullName, enabled, workspaceToolDisabled: next.workspaces })
+      json(res, 200, { ok: true, cwd: normalizeCwd(cwd), name: fullName, enabled, workspaceToolDisabled: next.workspaces })
       return
     }
     json(res, 404, { error: `no route for ${method} ${rest}` })
@@ -433,65 +426,220 @@ async function handle(ctx: PluginContext, req: any, res: any, onChanged?: () => 
  */
 export function applyMcpWorkspaceScope(ctx: PluginContext): void {
   const syncAgents = installAgentRestrictions(ctx)
+  const resync = (): void => {
+    syncAgents()
+    for (const agent of liveAgents(ctx)) void syncAgentWorkspace(ctx, agent)
+  }
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: ROUTE_PREFIX,
-    handler: (req: any, res: any) => { void handle(ctx, req, res, syncAgents) },
+    handler: (req: any, res: any) => { void handle(ctx, req, res, resync) },
   }), 'triad: mcp workspace scope routes')
   // 先把账本读进内存，装配 / restrict 的快通道才成立（第一次读盘放在挂载期）。
   void Promise.all([readLedger(), readToolDisableLedger()]).then(() => syncAgents()).catch(() => {})
   installAssembleFilter(ctx)
-  installWorkspaceRows(ctx)
+  installWorkspaceMounts(ctx)
 }
 
+/* ── 工作区专属 MCP 行：按 agent/session 作用域挂载 ───────────────────── */
+
+const MCP_CLIENT_MODULE = '@deepseek-ai/dsh-mcp-client'
+
+/** 一个 agent 的工作区挂载记录。 */
+interface WorkspaceMountRecord {
+  cwd: string
+  state: 'pending' | 'mounting' | 'mounted' | 'failed' | 'empty'
+  key: string
+  rows: Array<{ serverName: string; state: 'pending' | 'mounted' | 'failed'; error?: string }>
+  fibers: Fiber[]
+  error?: string
+}
+
+const workspaceMounts = new WeakMap<object, WorkspaceMountRecord>()
+let mountContext: PluginContext | undefined
+let mountingPlugin: { namespace: unknown; plugin: any } | undefined
+
 /**
- * 工作区专属 MCP 行：会话建好后，把该工作区 `.mcp.json` 里的
- * mcp-client 行挂进加载器（`agent/created` 时按会话 cwd 挂，销毁时回收）。
+ * 取 mcp-client 的插件模块（共享宿主已加载的同一份模块实例）。
  *
- * 行 id 带工作区路径哈希，与 profile patch 里的全局行互不挤占；
- * serverName 同样加后缀，于是同一个 anysearch 可以在两个工作区各配一份。
- * @param ctx - 宿主上下文。
+ * 不能 `import '@deepseek-ai/dsh-mcp-client'`：宿主包只发源码，装进 profile
+ * 的插件运行时解析不到。Loader 的 entry 在加载后保存 `moduleNamespace`，
+ * 直接复用它的导出对象即可拿到带 `inject` / `Config` 的原插件。
  */
-function installWorkspaceRows(ctx: PluginContext): void {
-  /** 已挂的行：entryId → 回收函数。 */
-  const mounted = new Map<string, () => void>()
-  const sync = async (cwd: string): Promise<void> => {
-    const loader = typeof ctx?.get === 'function' ? ctx.get('loader') : undefined
-    if (typeof loader?.create !== 'function') return
-    const rows = await readWorkspaceRows(cwd)
-    const wanted = new Set(rows.map((row) => row.entryId))
-    // 回收该工作区已消失的行。
-    for (const [entryId, dispose] of [...mounted.entries()]) {
-      if (wanted.has(entryId)) continue
-      if (!entryId.startsWith(`${WORKSPACE_ROW_PREFIX}${pathHash(resolve(cwd))}-`)) continue
-      dispose()
-      mounted.delete(entryId)
+async function mcpClientPluginOf(ctx: PluginContext): Promise<any | undefined> {
+  if (mountingPlugin !== undefined) return mountingPlugin.plugin
+  const loader = optionalService<any>(ctx, 'loader')
+  try {
+    for (const entry of loader?.entries?.() ?? []) {
+      if (entry?.options?.name !== MCP_CLIENT_MODULE) continue
+      if (entry.moduleNamespace === undefined) continue
+      const plugin = loader.unwrapExports?.(entry.moduleNamespace) ?? entry.moduleNamespace
+      if (plugin !== null && (typeof plugin === 'function' || typeof plugin?.apply === 'function')) {
+        mountingPlugin = { namespace: entry.moduleNamespace, plugin }
+        return plugin
+      }
     }
-    for (const row of rows) {
-      if (mounted.has(row.entryId)) continue
-      try {
-        const handle = await loader.create({
-          id: row.entryId,
-          name: '@deepseek-ai/dsh-mcp-client',
-          config: row.config,
-        })
-        mounted.set(row.entryId, () => { void handle?.dispose?.() })
-      } catch (error) {
-        ctx.logger?.warn?.(`[mcp-workspace-scope] 挂载 ${row.serverName} 失败: ${error instanceof Error ? error.message : String(error)}`)
+  } catch {
+    // loader 视图不可用：尝试 import()。
+  }
+  try {
+    if (typeof loader?.import === 'function') {
+      const namespace = await loader.import(MCP_CLIENT_MODULE)
+      const plugin = loader.unwrapExports?.(namespace) ?? namespace
+      if (plugin !== null && (typeof plugin === 'function' || typeof plugin?.apply === 'function')) {
+        mountingPlugin = { namespace, plugin }
+        return plugin
+      }
+    }
+  } catch {
+    // 没有可复用的 mcp-client 模块：状态保持 pending（不退回全局挂载）。
+  }
+  return undefined
+}
+
+/** 一个 `.mcp.json` 键 → 合法 serverName（非法字符归一为 `_`）。 */
+function serverNameOfKey(name: string): string | undefined {
+  const cleaned = name.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32)
+  return cleaned === '' ? undefined : cleaned
+}
+
+/** 把 `.mcp.json` 的条目收敛成 mcp-client 接受的 config（丢弃未知字段）。 */
+function mcpClientConfigOf(entry: Record<string, unknown>, serverName: string): Record<string, unknown> {
+  const hasUrl = typeof entry.url === 'string' && entry.url !== ''
+  const transport = entry.transport === 'streamable-http' || entry.transport === 'stdio'
+    ? entry.transport
+    : hasUrl ? 'streamable-http' : 'stdio'
+  const config: Record<string, unknown> = { serverName, transport }
+  const copyNumber = (key: string): void => {
+    if (typeof entry[key] === 'number') config[key] = entry[key]
+  }
+  if (transport === 'stdio') {
+    config.command = typeof entry.command === 'string' ? entry.command : ''
+    if (Array.isArray(entry.args)) config.args = entry.args.filter((arg): arg is string => typeof arg === 'string')
+    if (entry.env !== null && typeof entry.env === 'object' && !Array.isArray(entry.env)) {
+      config.env = Object.fromEntries(Object.entries(entry.env as Record<string, unknown>)
+        .filter(([, value]) => typeof value === 'string'))
+    }
+    if (typeof entry.cwd === 'string' && entry.cwd !== '') config.cwd = entry.cwd
+  } else {
+    config.url = typeof entry.url === 'string' ? entry.url : ''
+    if (entry.headers !== null && typeof entry.headers === 'object' && !Array.isArray(entry.headers)) {
+      config.headers = Object.fromEntries(Object.entries(entry.headers as Record<string, unknown>)
+        .filter(([, value]) => typeof value === 'string'))
+    }
+  }
+  copyNumber('toolCallTimeoutMs')
+  copyNumber('startupTimeoutMs')
+  copyNumber('closeTimeoutMs')
+  return config
+}
+
+/** 销毁一个 agent 的全部工作区 MCP fiber。 */
+async function disposeWorkspaceMount(agent: object): Promise<void> {
+  const record = workspaceMounts.get(agent)
+  if (record === undefined) return
+  workspaceMounts.delete(agent)
+  for (const fiber of record.fibers) {
+    try { await fiber.dispose?.() } catch { /* 已由宿主回收 */ }
+  }
+  record.fibers = []
+}
+
+/** 同步一个 agent 的工作区 MCP（cwd 匹配的 `.mcp.json` → agent 作用域实例）。 */
+async function syncAgentWorkspace(ctx: PluginContext, agent: any): Promise<void> {
+  const cwd = agent?.session?.header?.cwd
+  if (typeof cwd !== 'string' || cwd.trim() === '') return
+  const keyCwd = normalizeCwd(cwd)
+  let rows: WorkspaceRow[]
+  try {
+    rows = await readWorkspaceRows(keyCwd)
+  } catch {
+    rows = []
+  }
+  const key = JSON.stringify(rows.map((row) => [row.serverName, row.config]))
+  const previous = workspaceMounts.get(agent)
+  if (previous !== undefined && previous.key === key && previous.state !== 'mounting') return
+  await disposeWorkspaceMount(agent)
+
+  const record: WorkspaceMountRecord = {
+    cwd: keyCwd,
+    state: rows.length === 0 ? 'empty' : 'mounting',
+    key,
+    rows: rows.map((row) => ({ serverName: row.serverName, state: 'pending' })),
+    fibers: [],
+  }
+  workspaceMounts.set(agent, record)
+  if (rows.length === 0) return
+  const plugin = await mcpClientPluginOf(ctx)
+  if (plugin === undefined) {
+    record.state = 'pending'
+    record.error = 'mcp-client-runtime-unavailable'
+    return
+  }
+  for (const row of rows) {
+    const state = record.rows.find((item) => item.serverName === row.serverName)
+    try {
+      const fiber = await agent.ctx.plugin(plugin, row.config)
+      record.fibers.push(fiber)
+      if (state !== undefined) state.state = 'mounted'
+    } catch (error) {
+      if (state !== undefined) {
+        state.state = 'failed'
+        state.error = error instanceof Error ? error.message : String(error)
       }
     }
   }
-  ctx.effect(() => {
-    const off = ctx.on('agent/created', ({ agent }: any) => {
-      const cwd = agent?.session?.header?.cwd
-      if (typeof cwd === 'string' && cwd.trim() !== '') void sync(cwd).catch(() => {})
-    })
-    return () => {
-      off()
-      for (const dispose of mounted.values()) dispose()
-      mounted.clear()
+  record.state = record.rows.some((item) => item.state === 'failed')
+    ? 'failed'
+    : record.rows.every((item) => item.state === 'mounted') ? 'mounted' : 'pending'
+}
+
+/**
+ * 工作区 MCP 的挂载状态（`/api/triad/mcp-status` 的 `workspaceMcp` 字段）。
+ * 无会话时固定 `pending`，且没有任何全局实例 —— 不泄漏到别的会话。
+ */
+export function workspaceMcpMountStatus(): {
+  state: 'pending' | 'mounted' | 'failed' | 'empty'
+  reason?: string
+  agents: Array<{ id: string; cwd: string; state: string; rows: Array<{ serverName: string; state: string; error?: string }>; error?: string }>
+} {
+  const agents = mountContext === undefined ? [] : liveAgents(mountContext)
+  const views = agents.map((agent: any) => {
+    const record = workspaceMounts.get(agent)
+    return {
+      id: typeof agent?.session?.header?.id === 'string' ? agent.session.header.id : '',
+      cwd: typeof agent?.session?.header?.cwd === 'string' ? normalizeCwd(agent.session.header.cwd) : '',
+      state: record?.state ?? 'pending',
+      rows: record?.rows ?? [],
+      ...record?.error === undefined ? {} : { error: record.error },
     }
-  }, 'triad: mcp workspace rows')
+  })
+  if (views.length === 0) return { state: 'pending', reason: 'no-session', agents: [] }
+  const state = views.some((view) => view.state === 'failed')
+    ? 'failed'
+    : views.some((view) => view.state === 'mounted') ? 'mounted'
+      : views.every((view) => view.state === 'empty') ? 'empty' : 'pending'
+  return { state, agents: views }
+}
+
+/** 安装按 agent 作用域挂载（无会话不挂、不写全局 loader）。 */
+function installWorkspaceMounts(ctx: PluginContext): void {
+  mountContext = ctx
+  const sync = (agent: any): void => {
+    void syncAgentWorkspace(ctx, agent).catch((error) => {
+      ctx.logger?.warn?.(`[mcp-workspace-scope] 工作区 MCP 挂载失败: ${error instanceof Error ? error.message : String(error)}`)
+    })
+  }
+  ctx.effect(() => {
+    const offCreated = ctx.on?.('agent/created', ({ agent }: any) => { sync(agent) })
+    const offDisposed = ctx.on?.('agent/disposed', ({ agent }: any) => { void disposeWorkspaceMount(agent) })
+    for (const agent of liveAgents(ctx)) sync(agent)
+    return () => {
+      try { offCreated?.() } catch { /* 已卸载 */ }
+      try { offDisposed?.() } catch { /* 已卸载 */ }
+      for (const agent of liveAgents(ctx)) void disposeWorkspaceMount(agent)
+    }
+  }, 'triad: mcp workspace agent mounts')
 }
 
 /** 供状态接口合并：当前账本（同步读内存副本）。 */
@@ -501,34 +649,22 @@ export function workspaceMcpLedger(): WorkspaceMcpLedger {
 
 /* ── 工作区专属 MCP 行：`<ws>/.mcp.json` ─────────────────────────── */
 
-/** 挂载行 id 前缀（回收时按它区分本模块挂的行）。 */
-const WORKSPACE_ROW_PREFIX = 'wsmcp-'
-
 /** 一个工作区行定义。 */
 interface WorkspaceRow {
   /** 目标工作区绝对路径。 */
   workspace: string
-  /** 该工作区内的唯一 id（`wsmcp-<hash>-<在文件里的序号>`）。 */
-  entryId: string
-  /** 挂载用 serverName（带工作区哈希，避免与全局同名行冲突）。 */
+  /** 挂载用 serverName（agent 作用域内唯一即可，不再加全局哈希）。 */
   serverName: string
-  /** 原始 config（serverName 会被替换成上面那个）。 */
+  /** 收敛后的 mcp-client config。 */
   config: Record<string, unknown>
-}
-
-/** djb2 路径哈希（与其它模块一致的 8 位十六进制）。 */
-function pathHash(path: string): string {
-  let hash = 5381
-  for (let index = 0; index < path.length; index += 1) hash = ((hash << 5) + hash + path.charCodeAt(index)) >>> 0
-  return hash.toString(16).padStart(8, '0')
 }
 
 /**
  * 把工作区 `.mcp.json` 转成内部行。
  *
  * `.mcp.json` 是主流 agent 的通用格式：`{ "mcpServers": { <name>: {command|url,…} } }`。
- * 我们读的时候转一下 —— 键名当 serverName 并加工作区哈希后缀（同名跨工作区不冲突），
- * 其余字段原样透传给 mcp-client（`command/args/env/cwd` 或 `url/headers`）。
+ * 键名直接作为 serverName —— agent 作用域按会话隔离，同名 server 在不同
+ * 会话里可以各自存在，不需要再拼全局唯一的路径哈希。
  * @param workspace - 工作区绝对路径。
  * @param text - 文件内容。
  * @returns 行定义列表（非法 JSON/非对象返回空，不让一个坏文件拖垮整轮挂载）。
@@ -543,26 +679,16 @@ function parseWorkspaceRows(workspace: string, text: string): WorkspaceRow[] {
   if (document === null || typeof document !== 'object' || Array.isArray(document)) return []
   const servers = (document as { mcpServers?: unknown }).mcpServers
   if (servers === null || typeof servers !== 'object' || Array.isArray(servers)) return []
-  const hash = pathHash(workspace)
   const rows: WorkspaceRow[] = []
-  let index = 0
   for (const [name, raw] of Object.entries(servers as Record<string, unknown>)) {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
     const entry = raw as Record<string, unknown>
     const hasCommand = typeof entry.command === 'string' && entry.command !== ''
     const hasUrl = typeof entry.url === 'string' && entry.url !== ''
     if (!hasCommand && !hasUrl) continue
-    // 透明传输：用户写的字段原样给 mcp-client，只补 transport 与 serverName。
-    const scoped = `${name.slice(0, 20)}-${hash}`
-    const config: Record<string, unknown> = {
-      ...entry,
-      serverName: scoped,
-      transport: typeof entry.transport === 'string' && entry.transport !== ''
-        ? entry.transport
-        : hasUrl ? 'streamable-http' : 'stdio',
-    }
-    rows.push({ workspace, entryId: `${WORKSPACE_ROW_PREFIX}${hash}-${String(index)}`, serverName: scoped, config })
-    index += 1
+    const serverName = serverNameOfKey(name)
+    if (serverName === undefined) continue
+    rows.push({ workspace, serverName, config: mcpClientConfigOf(entry, serverName) })
   }
   return rows
 }

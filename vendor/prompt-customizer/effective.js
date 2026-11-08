@@ -1,224 +1,165 @@
 /**
- * 预设 override 生效视图 + 阶段过滤。
- *
- * 0.9.0 起全局层停用：提示词必须按具体 agent 预设修改，生效配置就是该预设
- * override 里**存在的字段**（空缺 = 无定制 = 官方默认）。replace / inject /
- * tools 沿用「非空才生效」（空对象 / 空列表视同未设置）；三份段屏蔽名单
- * （sections / sectionsBootstrap / sectionsCompaction）例外 —— **空数组 =
- * 显式接管为空**（用户在该预设下解除全部屏蔽；客户端 editView 的 `??`
- * 语义与此一致）。
+ * 预设 override 生效视图 + 阶段过滤。所有阶段字段名/状态映射都来自 model.js 的
+ * PHASES 唯一表，不再手写三份 if/else。
  */
+import { PHASES, phaseOfStatus, phaseOf, normalizeEntry, entryMatches, uniqueEntries } from './model.js'
 
-/** 非空数组才视为有效覆盖值（inject 用；屏蔽名单不适用，见上）。 */
+function entryList(value) {
+  return Array.isArray(value) ? value.map(normalizeEntry).filter((entry) => entry !== undefined) : []
+}
 function hasList(value) {
   return Array.isArray(value) && value.length > 0
 }
-
-/** 非空对象（至少一个键）才视为有效覆盖值。 */
-function hasDict(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
-}
-
-/** 工具配置整体是否携带至少一条有效规则（含 bootstrap / compaction 目录，
- *  exclude 或 add 任一非空即算）。 */
 function hasTools(tools) {
   if (tools === null || typeof tools !== 'object') return false
-  return hasList(tools.exclude) || hasList(tools.add) || hasTools(tools.bootstrap) || hasTools(tools.compaction)
+  if (hasList(tools.exclude) || hasList(tools.add)) return true
+  return PHASES.some((phase) => phase.toolField !== undefined && hasTools(tools[phase.toolField]))
+}
+/** 阶段名是否可识别：`always`（跨阶段）或 PHASES 里的名义阶段。 */
+function knownPhase(value) {
+  return value === 'always' || phaseOf(value) !== undefined
+}
+/** 条目是否可用：对象、有名字、phase 可识别；未知 phase 的条目直接忽略（绝不静默当 always）。 */
+function usableItem(item) {
+  if (item === null || typeof item !== 'object') return false
+  if (typeof item.name !== 'string' || item.name === '') return false
+  return item.phase === undefined || knownPhase(item.phase)
+}
+function mergeEntryLists(left, right) {
+  return uniqueEntries([...(Array.isArray(left) ? left : []), ...(Array.isArray(right) ? right : [])])
 }
 
-/**
- * 一份预设 override 的生效配置视图：override 中存在的字段整体生效；空缺的
- * 字段 = 空值（无定制），**不再回落全局层** —— 0.9.0 起全局层停用（提示词
- * 必须按具体 agent 预设修改），config.yaml 顶层的提示词字段只是停用前留下
- * 的历史数据，运行时一律不读。replace / inject / tools 沿用「非空才生效」
- * （空对象 / 空列表视同未设置）；三份段屏蔽名单（sections /
- * sectionsBootstrap / sectionsCompaction）例外 —— **空数组 = 显式接管为空**
- * （用户在该预设下解除全部屏蔽；与客户端 editView 的 `??` 语义一致）。
- */
+/** 注入条目是否被本阶段屏蔽：有 source 按身份，无 source 按名字兜底。 */
+function injectDenied(denied, item) {
+  const entry = normalizeEntry(item)
+  if (entry === undefined) return false
+  return denied.some((candidate) => candidate.name === entry.name
+    && (entry.source === undefined || entryMatches(candidate, entry)))
+}
+
+/** 一份 override 的生效配置：空缺字段 = 无定制。 */
 export function effectiveConfig(ovr) {
-  return {
-    sections: Array.isArray(ovr?.sections) ? ovr.sections : [],
-    sectionsBootstrap: Array.isArray(ovr?.sectionsBootstrap) ? ovr.sectionsBootstrap : [],
-    sectionsCompaction: Array.isArray(ovr?.sectionsCompaction) ? ovr.sectionsCompaction : [],
-    contexts: Array.isArray(ovr?.contexts) ? ovr.contexts : [],
-    contextsBootstrap: Array.isArray(ovr?.contextsBootstrap) ? ovr.contextsBootstrap : [],
-    contextsCompaction: Array.isArray(ovr?.contextsCompaction) ? ovr.contextsCompaction : [],
-    replace: hasDict(ovr?.replace) ? ovr.replace : {},
-    inject: hasList(ovr?.inject) ? ovr.inject : [],
-    tools: hasTools(ovr?.tools) ? ovr.tools : {},
+  const out = {}
+  for (const phase of PHASES) {
+    out[phase.sectionField] = entryList(ovr?.[phase.sectionField])
+    out[phase.contextField] = entryList(ovr?.[phase.contextField])
   }
+  out.replacements = Array.isArray(ovr?.replacements) ? ovr.replacements.filter(usableItem) : []
+  out.inject = Array.isArray(ovr?.inject) ? ovr.inject.filter(usableItem) : []
+  out.tools = hasTools(ovr?.tools) ? ovr.tools : {}
+  return out
 }
 
-/**
- * 合并「预设级」与「工作区级」两层 override：工作区级优先。
- *  - replace / inject 按名字合并（工作区同名条目覆盖预设，其余保留）；
- *  - tools 的 exclude / add / bootstrap / compaction 按子字段覆盖；
- *  - 其余字段（三份段屏蔽名单、标量）工作区声明了就整体取代预设。
- * 返回的仍是「原始 override 形状」，交给 effectiveConfig 归一。
- */
+/** 合并预设级与工作区级：工作区可新增隐藏/替换/注入，不能移除预设已有的控制（候选超集）。 */
 export function mergeOverrideLayers(presetOvr, workspaceOvr) {
   const base = presetOvr !== null && typeof presetOvr === 'object' ? presetOvr : {}
   const ws = workspaceOvr !== null && typeof workspaceOvr === 'object' ? workspaceOvr : {}
   const out = { ...base }
-  for (const [key, value] of Object.entries(ws)) {
-    if (value === undefined || value === null) continue
-    if (key === 'replace') { out.replace = { ...(base.replace ?? {}), ...value }; continue }
-    if (key === 'inject') {
-      const byName = new Map()
-      const order = []
-      for (const item of Array.isArray(base.inject) ? base.inject : []) {
-        if (item === null || typeof item !== 'object' || typeof item.name !== 'string') continue
-        if (!byName.has(item.name)) order.push(item.name)
-        byName.set(item.name, item)
-      }
-      for (const item of Array.isArray(value) ? value : []) {
-        if (item === null || typeof item !== 'object' || typeof item.name !== 'string') continue
-        if (!byName.has(item.name)) order.push(item.name)
-        byName.set(item.name, item)
-      }
-      out.inject = order.map((name) => byName.get(name))
-      continue
-    }
-    if (key === 'tools') {
-      const bt = base.tools !== null && typeof base.tools === 'object' ? base.tools : {}
-      const merged = { ...bt }
-      for (const [k, v] of Object.entries(value !== null && typeof value === 'object' ? value : {})) {
-        if (k === 'bootstrap' || k === 'compaction') merged[k] = { ...(bt[k] ?? {}), ...(v ?? {}) }
-        else merged[k] = v
-      }
-      out.tools = merged
-      continue
-    }
-    out[key] = value
+  // 破坏式更新：旧的全局 replace 字典不再属于任何一层。
+  delete out.replace
+  for (const phase of PHASES) {
+    out[phase.sectionField] = mergeEntryLists(base[phase.sectionField], ws[phase.sectionField])
+    out[phase.contextField] = mergeEntryLists(base[phase.contextField], ws[phase.contextField])
   }
+  out.replacements = [...(Array.isArray(base.replacements) ? base.replacements : []), ...(Array.isArray(ws.replacements) ? ws.replacements : [])]
+  out.inject = [...(Array.isArray(base.inject) ? base.inject : []), ...(Array.isArray(ws.inject) ? ws.inject : [])]
+  const bt = base.tools !== null && typeof base.tools === 'object' ? base.tools : {}
+  const wt = ws.tools !== null && typeof ws.tools === 'object' ? ws.tools : {}
+  const tools = { ...bt, exclude: mergeEntryLists(bt.exclude, wt.exclude), add: mergeEntryLists(bt.add, wt.add) }
+  for (const phase of PHASES) {
+    if (phase.toolField === undefined) continue
+    const b = bt[phase.toolField] !== null && typeof bt[phase.toolField] === 'object' ? bt[phase.toolField] : {}
+    const w = wt[phase.toolField] !== null && typeof wt[phase.toolField] === 'object' ? wt[phase.toolField] : {}
+    tools[phase.toolField] = { exclude: mergeEntryLists(b.exclude, w.exclude), add: mergeEntryLists(b.add, w.add) }
+  }
+  out.tools = tools
   return out
 }
 
-/**
- * 选出当前阶段生效的注入段：常驻期注入（`always`）始终注入；其余注入按
- * 阶段模式匹配 —— bootstrap（未晋级）→ `bootstrap`，active（已晋级）→
- * `active`，compact（压缩后仍未晋级）→ `compaction`。每个阶段的注入集
- * 互相独立（各自的 order 空间），用于「每阶段独立名单 + 虚拟 order」。
- * 传入 `status`（阶段投影 statusOf 的结果 `{ promoted, boundary }`），
- * 不再沿用旧的布尔 promoted（旧的 compaction 窗口被硬塞进 bootstrap 期，
- * 无法独立排序）。
- */
+/** 当前阶段生效的注入段：always + 本阶段。 */
 export function filterInjectByPhase(injectList, status) {
-  const mode = status.promoted ? 'active' : status.boundary >= 0 ? 'compaction' : 'bootstrap'
-  return (injectList ?? []).filter((item) => {
-    const phase = item.phase === 'bootstrap' || item.phase === 'active' || item.phase === 'compaction' ? item.phase : 'always'
-    return phase === 'always' || phase === mode
+  const phase = phaseOfStatus(status)
+  return (Array.isArray(injectList) ? injectList : []).filter((item) => {
+    if (item === null || typeof item !== 'object') return false
+    const itemPhase = item?.phase === undefined ? 'always' : item.phase
+    if (typeof itemPhase !== 'string' || !knownPhase(itemPhase)) return false
+    return itemPhase === 'always' || itemPhase === phase
   })
 }
 
-/**
- * 选出当前阶段生效的工具过滤配置（三态）：三个阶段**各用自己那份名单，互不
- * 继承** —— 已晋级 → 静态 `exclude`，未晋级 → `bootstrap.exclude`，压缩后仍未
- * 晋级 → `compaction.exclude`；空名单就表示「该阶段什么都不隐藏」。
- *
- * 早期版本让阶段名单在为空时回落静态字段，看起来省了一份重复配置，实际是拿
- * 走了阶段独立性：界面按三个阶段分别勾选，而引导期的勾选状态既反映不了静态
- * 名单里已隐藏的工具（显示成"可见"、模型其实看不见），往引导期名单里加一项又
- * 会让整个静态名单在该阶段失效（其它工具的隐藏一起蒸发）。
- * `status` 是阶段投影 statusOf 的结果 `{ promoted, boundary }`。
- */
+/** 当前阶段生效的替换条目：always + 本阶段。 */
+export function filterReplacementsByPhase(replacements, status) {
+  const phase = phaseOfStatus(status)
+  return (Array.isArray(replacements) ? replacements : []).filter((item) => {
+    if (item === null || typeof item !== 'object') return false
+    const itemPhase = item?.phase === undefined ? 'always' : item.phase
+    if (typeof itemPhase !== 'string' || !knownPhase(itemPhase)) return false
+    return itemPhase === 'always' || itemPhase === phase
+  })
+}
+
+/** 当前阶段生效的工具过滤配置。 */
 export function pickToolsFilter(toolsCfg, status) {
-  if (!status.promoted) {
-    if (status.boundary >= 0) {
-      return { exclude: toolsCfg?.compaction?.exclude ?? [], add: toolsCfg?.compaction?.add ?? [] }
-    }
-    return { exclude: toolsCfg?.bootstrap?.exclude ?? [], add: toolsCfg?.bootstrap?.add ?? [] }
+  const phase = phaseOfStatus(status)
+  const phaseTools = phaseOf(phase)?.toolField
+  const scoped = phaseTools === undefined ? toolsCfg : toolsCfg?.[phaseTools]
+  return {
+    exclude: scoped?.exclude ?? [],
+    add: scoped?.add ?? [],
   }
-  return { exclude: toolsCfg?.exclude ?? [], add: toolsCfg?.add ?? [] }
 }
 
-/**
- * 黑名单过滤（装配钩子与 inventory 共用）：把 `exclude` 里的工具从目录里拿掉。
- *
- * 刻意不支持「白名单 / 封闭式允许清单」：include 一旦生效就让 exclude 完全失效，
- * 而且它会把目录冻结在点名的几个上 —— 别的插件以后新增的工具一律看不见。「只留
- * 这几个」用 exclude 反选即可，无需第二套语义。
- *
- * 「把被裁掉但注册表里仍有的工具加回该阶段」是另一条独立通道（`add` 名单），由
- * 装配钩子在过滤**之后**从注册表查回 schema 追加 —— 见 lib/index.js，不在这里。
- */
-export function applyToolFilter(tools, { exclude }) {
-  const excludeSet = new Set(exclude ?? [])
-  if (excludeSet.size > 0) return tools.filter((tool) => !excludeSet.has(tool.name))
-  return tools
-}
-
-/**
- * 每阶段独立段屏蔽（与工具目录三态对称）：压缩受控期在「压缩后仍未晋级」
- * 时生效且优先于引导期；引导期在未晋级时生效；否则常驻期。三态互不继承：
- * 每个状态只返回自己那份名单（常驻期 = `sections`，引导期 = `sectionsBootstrap`，
- * 压缩受控期 = `sectionsCompaction`），一个阶段的屏蔽绝不波及另一个阶段。
- * 返回该阶段生效的屏蔽段名（完整名单）。
- */
+/** 每阶段独立的段屏蔽名单（返回 EntryRef[]）。 */
 export function pickSectionsForStatus(config, status) {
-  const resident = config?.sections
-  const compaction = config?.sectionsCompaction
-  const bootstrap = config?.sectionsBootstrap
-  if (!status.promoted && status.boundary >= 0) return Array.isArray(compaction) ? compaction : []
-  if (!status.promoted) return Array.isArray(bootstrap) ? bootstrap : []
-  return Array.isArray(resident) ? resident : []
+  const phase = phaseOfStatus(status)
+  const field = phaseOf(phase)?.sectionField
+  return field === undefined || !Array.isArray(config?.[field]) ? [] : config[field]
 }
 
-/** 与 pickSectionsForStatus 对称：运行时上下文的三阶段独立屏蔽名单。 */
+/** 每阶段独立的上下文屏蔽名单（返回 EntryRef[]）。 */
 export function pickContextsForStatus(config, status) {
-  const resident = config?.contexts
-  const compaction = config?.contextsCompaction
-  const bootstrap = config?.contextsBootstrap
-  if (!status.promoted && status.boundary >= 0) return Array.isArray(compaction) ? compaction : []
-  if (!status.promoted) return Array.isArray(bootstrap) ? bootstrap : []
-  return Array.isArray(resident) ? resident : []
+  const phase = phaseOfStatus(status)
+  const field = phaseOf(phase)?.contextField
+  return field === undefined || !Array.isArray(config?.[field]) ? [] : config[field]
 }
 
-/**
- * 段级策略：屏蔽 → 替换 → 注入 → 排序，作用于任意来源的基础段列表。
- *
- * 瀑布流装配与 assemble 强制覆盖（forceSections）共用同一份实现 —— 输入
- * `baseSections` 可以是瀑布流里其它插件过滤后的段，也可以是注册表
- * `layers.merge()` 的原始段定义。后一种输入就是「以本插件为准」的关键：
- * 预设插件的阶段裁段与宿主的 complete 整段接管都发生在瀑布流内/后，
- * 而强制覆盖在方法边界用这份原始定义重建 sections，前两者再无机会改写。
- * 条目只需 { name, text }；order 在映射时按数组序补上（与注册表顺序一致），
- * 保证稳定排序，与注入段的虚拟 order 空间一致。
- */
+/** 段级策略：屏蔽 → 阶段替换 → 注入 → 排序。 */
 export function applySectionPolicy(baseSections, cfg, status) {
-  const denied = new Set(pickSectionsForStatus(cfg, status))
-  const replace = cfg.replace ?? {}
+  const denied = pickSectionsForStatus(cfg, status)
+  const replacements = filterReplacementsByPhase(cfg.replacements, status)
   const injectList = filterInjectByPhase(cfg.inject, status)
   let sections = baseSections
-    .filter((section) => !denied.has(section.name))
-    .map((section, i) =>
-      Object.hasOwn(replace, section.name) ? { ...section, order: i, text: replace[section.name] } : { ...section, order: i },
-    )
-  for (const item of injectList) {
-    // 被屏蔽的段直接跳过 —— 上面已经把它们过滤掉了。
-    if (denied.has(item.name)) continue
-    const index = sections.findIndex((section) => section.name === item.name)
-    if (index >= 0) {
-      // 已存在的段：覆盖 order 来控制拼接顺序。文本按「本阶段注入文本 → 该
-      // 段当前文本」取（后者可能已被全局 replace 改过）—— injectList 已经按
-      // 阶段筛过，所以带 phase 的文本只作用在本阶段，三个阶段各改各的；全局
-      // replace 字典是跨阶段的（旧语义），只在没有阶段文本时生效。
-      sections[index] = {
-        ...sections[index],
-        text: item.text ? item.text : sections[index].text,
-        order: item.order,
+    .filter((section) => !denied.some((entry) => entryMatches(entry, section)))
+    .map((section, i) => {
+      // 后写覆盖前写：工作区层追加在预设层之后，同名同阶段的替换以工作区为准。
+      let replacement
+      for (let index = replacements.length - 1; index >= 0; index--) {
+        if (entryMatches(replacements[index], section)) {
+          replacement = replacements[index]
+          break
+        }
       }
-    } else if (item.custom === true || Object.hasOwn(replace, item.name) || item.text) {
-      // 装配里没有这个名字：只有「本插件自撰的 custom 段」「被替换的段」
-      // 「自带文本的注入段」才允许新建条目。只带 order 的空文本系统名必须
-      // 跳过 —— 它通常来自快照里混进的别的预设独有段名（并集池会带回来），
-      // 新建就变成一条空白幽灵段，实打实进最终提示词。
-      sections.push({ name: item.name, order: item.order, text: item.text || replace[item.name] })
+      return replacement === undefined
+        ? { ...section, order: i }
+        : { ...section, order: i, text: replacement.text }
+    })
+  for (const item of injectList) {
+    if (item === null || typeof item !== 'object' || typeof item.name !== 'string') continue
+    if (injectDenied(denied, item)) continue
+    const index = sections.findIndex((section) => section.name === item.name && entryMatches(item, section))
+    const itemText = typeof item.text === 'string' ? item.text : ''
+    if (index >= 0) {
+      sections[index] = { ...sections[index], text: itemText || sections[index].text, order: item.order }
+    } else if (item.custom === true || itemText) {
+      const entry = normalizeEntry(item)
+      sections.push({
+        name: item.name,
+        ...entry?.source === undefined ? {} : { source: entry.source },
+        order: item.order,
+        text: itemText,
+      })
     }
   }
-  // 虚拟 order 排序：order 缺省按 0，稳定排序保持系统段原始相对顺序；
-  // 注入段携带各自的 order（120+ 落在系统段之后，或被重排到任意断点），
-  // 以 order 升序决定注入顺序 —— 与「每阶段独立名单」配合即每阶段独立序。
   sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   return sections
 }

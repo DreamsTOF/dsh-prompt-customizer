@@ -14,6 +14,7 @@
  */
 
 import { effectiveConfig, pickToolsFilter } from './effective.js'
+import { normalizeEntry } from './model.js'
 
 /** 会改变阶段、或需要重新读取配置的会话事件。 */
 const RELEVANT_EVENTS = new Set([
@@ -77,19 +78,27 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
   }
 
   const desiredDeny = (agent) => {
-    let presetId
-    try {
-      presetId = presetOf(agent)
-    } catch {
-      presetId = undefined
+    let cfg
+    try { cfg = readConfig(agent) } catch { return [] }
+    // 兼容两种读取口：返回整份 Config（含 overrides）时先按预设取 override；
+    // 返回已合并好的生效配置（预设+工作区）时直接使用。
+    if (cfg !== null && typeof cfg === 'object' && cfg.overrides !== null && typeof cfg.overrides === 'object') {
+      let presetId
+      try { presetId = presetOf(agent) } catch { presetId = undefined }
+      cfg = effectiveConfig(presetId === undefined || presetId === '' ? undefined : cfg.overrides?.[presetId])
     }
-    if (typeof presetId !== 'string' || presetId === '') return []
-    const cfg = effectiveConfig(readConfig()?.overrides?.[presetId])
     const filter = pickToolsFilter(cfg.tools, phaseOf(agent))
     const names = globalToolNames(ctx)
     return [...new Set(
       (Array.isArray(filter.exclude) ? filter.exclude : [])
-        .filter(name => typeof name === 'string' && names.has(name)),
+        .map((entry) => normalizeEntry(entry))
+        .filter((entry) => entry !== undefined
+          && names.has(entry.name)
+          && (entry.source === undefined
+            || entry.source.kind === 'global'
+            || entry.source.kind === 'workspace'
+            || entry.source.kind === 'provider'))
+        .map((entry) => entry.name),
     )]
   }
 

@@ -17,12 +17,26 @@ import { IconAgentPresetOutlineRegular } from '@deepseek-ai/dsh-client-ui-primit
 // 预设 chips 行直接复用能力面板（SKILL / MCP）的类名：三处「Agent 预设」几何一致。
 import { css } from '../skills/styles.js'
 import { payloadOf, dropOnPhase } from './dnd.ts'
-import { DICT, type Translate } from './locales.ts'
+import { type Translate } from './locales.ts'
 import { s } from './styles.ts'
-import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
+import {
+  PHASES,
+  PHASE_KEYS,
+  PHASE_LABEL_KEY,
+  hasContent,
+  sameEntry,
+  type AgentPresetInfo,
+  type Config,
+  type ContextField,
+  type EntryRef,
+  type Inventory,
+  type PhaseKey,
+  type PhaseViews,
+  type Preview,
+  type SectionField,
+} from './types.ts'
 import { editView, overrideView, type ConfigPatch } from './presets.ts'
-import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from '../../../vendor/prompt-customizer/sectionOps.mjs'
-import { ZH_SECTIONS } from '../../../vendor/prompt-customizer/zh/index.mjs'
+import { mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from './phase-ops.ts'
 import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
@@ -36,32 +50,27 @@ const CONFIG_SET_URL = '/api/prompt-customizer/config/set'
 const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
 const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
-const EXPORT_URL = '/api/prompt-customizer/export'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
 
-/** 三阶段预览装配（模型视角）：左栏列表与右栏预览的统一数据源。 */
-type PhaseViews = Record<PhaseViewKey, Preview | null>
-
-/** 三套名义装配的共享布局：顺序固定，refresh 按此并行拉取。 */
-const VIEW_KEYS: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
-
-/** 编辑草稿里可能出现的字段（与服务端 /config/apply 的 APPLY_FIELDS 一致）。 */
-const DRAFT_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
+/** 编辑草稿里可能出现的字段（与服务端 /config/apply 的 APPLY_FIELDS 一致，由 PHASES 派生）。 */
+const DRAFT_FIELDS: string[] = [
+  ...PHASES.flatMap((phase) => [phase.sectionField, phase.contextField]),
+  'replacements',
+  'inject',
+  'tools',
+]
 
 /** 面板顶层模式：提示词 / 工具 / 预设（预览常驻右栏，不再是独立模式）。 */
 type PanelMode = 'sections' | 'tools' | 'presets'
 
-/** 可编辑的配置字段（含每阶段独立段屏蔽名单）。 */
-type EditField = 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools'
+/** 可编辑的配置字段（含每阶段独立段 / 上下文名单）。 */
+type EditField = SectionField | ContextField | 'replacements' | 'inject' | 'tools'
 
 /** 编辑域草稿：提示词/工具两栏共享的未保存字段 + 脏标记。
  *  只记录用户实际编辑过的字段（首次编辑只写那一项），保存时也只提交这些
  *  字段 —— 未编辑的字段继续回落全局 / 继承，避免一次保存冻结全部继承值。 */
-interface EditDraft {
-  sections?: Config['sections']
-  sectionsBootstrap?: Config['sectionsBootstrap']
-  sectionsCompaction?: Config['sectionsCompaction']
-  replace?: Config['replace']
+interface EditDraft extends Partial<Record<SectionField | ContextField, EntryRef[]>> {
+  replacements?: Config['replacements']
   inject?: Config['inject']
   tools?: Config['tools']
   dirty: boolean
@@ -81,13 +90,15 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 配置写入计数：每次成功写配置后 +1，驱动预览重载。
   const [version, setVersion] = useState(0)
   // 三阶段视图：左栏列表与右栏预览共用；左右两栏的阶段 Tab 联动切换同一份。
-  const [phase, setPhase] = useState<PhaseViewKey>('bootstrap')
+  const [phase, setPhase] = useState<PhaseKey>('bootstrap')
   // 拖拽悬停中的阶段 Tab：高亮提示「松手 = 复制到该阶段」（处理由挂载中的列表负责）。
-  const [dropPhase, setDropPhase] = useState<PhaseViewKey | null>(null)
+  const [dropPhase, setDropPhase] = useState<PhaseKey | null>(null)
   // 草稿预览的同步序号：每次发起同步 +1，过期响应（已保存 / 再次编辑后）
   // 直接丢弃，绝不覆盖新数据。
   const syncSeq = useRef(0)
   const refreshSeq = useRef(0)
+  // 当前刷新请求的 scope 键：切换编辑目标 / 层级 / 工作区后，在途旧响应直接丢弃。
+  const scopeKeyRef = useRef('')
   // 编辑目标：agent 预设 id。0.9.0 起「全部 Agent」入口已移除 —— 提示词必须
   // 按具体预设修改；列表到达后默认选中第一个可用预设（见下方 effect）。
   const [target, setTarget] = useState<string | undefined>(undefined)
@@ -103,7 +114,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
-  const [exporting, setExporting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,10 +135,20 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 返回 Promise：手动刷新后可以链上草稿补同步（见「刷新」按钮）。
   const refresh = (): Promise<void> => {
     const seq = ++refreshSeq.current
+    // scope 键 = 层级 + 预设 + 工作区：响应回来时若已切换目标，整包丢弃。
+    const scopeKey = `${level}\u0000${target ?? ''}\u0000${level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''}`
+    scopeKeyRef.current = scopeKey
     // 提示词/工具严格按具体预设：未选定预设前不发无 scope 请求（避免并集串台）。
-    if (level === 'preset' && target === undefined) return Promise.resolve()
+    if (level === 'preset' && target === undefined) {
+      setPhases(null)
+      setInv(null)
+      return Promise.resolve()
+    }
     const wsSel = level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''
     const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ''}${wsSel === '' ? '' : `${target ? '&' : '?'}workspace=${encodeURIComponent(wsSel)}`}`
+    // 先清空三阶段再发请求：切换目标期间绝不能拿上一份装配当当前目标。
+    setPhases(null)
+    setInv(null)
     // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。
     const params = (phase: string): string =>
       `${qs}${qs ? '&' : '?'}phase=${phase}&t=${Date.now()}`
@@ -144,28 +164,33 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
           failures.push(`${phase}: ${String(error instanceof Error ? error.message : error)}`)
           return null
         })
-    return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
+    return Promise.all([...PHASE_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
       if (body.ok === false) throw new Error(body.error ?? 'inventory failed')
       return body
     }).catch((error: unknown) => {
       failures.push(String(error instanceof Error ? error.message : error))
       return null
     })])
-      .then(([boot, comp, act, inventoryData]) => {
-        if (seq !== refreshSeq.current) return
-        setPhases({ bootstrap: boot, compaction: comp, active: act })
+      .then((responses) => {
+        const inventoryData = responses[responses.length - 1] as unknown as Inventory | null
+        if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return
+        const views = { ...({} as PhaseViews) }
+        PHASE_KEYS.forEach((key, index) => { views[key] = responses[index] as Preview | null })
+        setPhases(views)
         setInv(inventoryData as Inventory)
         setError(failures.length ? failures.join('\n') : null)
       })
       .catch((e: unknown) => {
-        if (seq !== refreshSeq.current) return
-        setPhases({ bootstrap: null, compaction: null, active: null })
+        if (seq !== refreshSeq.current || scopeKey !== scopeKeyRef.current) return
+        const empty = {} as PhaseViews
+        for (const key of PHASE_KEYS) empty[key] = null
+        setPhases(empty)
         setError(String(e instanceof Error ? e.message : e))
       })
   }
   // 挂载时与切换编辑目标后：清单与三阶段预览切到对应 scope。
   // version 入依赖：保存/写配置成功后 +1，驱动重新拉取（否则一直显示保存前的装配）。
-  useEffect(() => { void refresh() }, [target, version])
+  useEffect(() => { void refresh() }, [target, version, level, workspace, currentWorkspace])
 
   // 草稿实时预览：把未保存的编辑草稿补丁 POST 给 /preview（服务端只在内存里
   // 叠加，磁盘不动），只刷新当前阶段视图 —— 预览随改随动；保存后的 GET 全量
@@ -181,9 +206,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     if (Object.keys(patch).length === 0) return
     const seq = ++syncSeq.current
     // scope 走查询串（服务端 previewTarget 只认 query）：草稿补丁必须落在
-    // 当前编辑的预设上，否则生效视图为空、预览退回官方原样。
-    const wsSel2 = level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''
-    const scopeQs = `${target !== undefined ? `?scope=${encodeURIComponent(target)}` : ''}${wsSel2 === '' ? '' : `${target !== undefined ? '&' : '?'}workspace=${encodeURIComponent(wsSel2)}`}`
+    // 当前编辑的预设上，否则生效视图为空、预览退回官方原样。工作区级不走
+    // 草稿实时预览（上面已提前返回）。
+    const scopeQs = target !== undefined ? `?scope=${encodeURIComponent(target)}` : ''
     fetch(PREVIEW_URL + scopeQs, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -208,7 +233,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     const timer = setTimeout(syncDraftPreview, 600)
     return () => { clearTimeout(timer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, phase, target])
+  }, [draft, phase, target, level, workspace, currentWorkspace])
 
   // 枚举已安装的 agent 预设（roster 实时读取），给顶部预设 Tab 供货。
   // 抽成函数：保存预设成功后也要立即刷新 Tab 行。
@@ -263,17 +288,20 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const base = level === 'workspace'
     ? overrideView(cfg, wsKey !== undefined ? workspaceOverrides[wsKey] : undefined)
     : editView(cfg, target)
-  const view: Config = draft
-    ? {
-        ...base,
-        sections: draft.sections ?? base.sections,
-        sectionsBootstrap: draft.sectionsBootstrap ?? base.sectionsBootstrap,
-        sectionsCompaction: draft.sectionsCompaction ?? base.sectionsCompaction,
-        replace: draft.replace ?? base.replace,
-        inject: draft.inject ?? base.inject,
-        tools: draft.tools ?? base.tools,
-      }
-    : base
+  const view: Config = (() => {
+    if (draft === null) return base
+    const next: Config = {
+      ...base,
+      replacements: draft.replacements ?? base.replacements,
+      inject: draft.inject ?? base.inject,
+      tools: draft.tools ?? base.tools,
+    }
+    for (const phase of PHASES) {
+      next[phase.sectionField] = draft[phase.sectionField] ?? base[phase.sectionField]
+      next[phase.contextField] = draft[phase.contextField] ?? base[phase.contextField]
+    }
+    return next
+  })()
   // 三态基座始终用「所选预设」的逐阶段装配（预设超集）。工作区级不能拿当前会话
   // 视图顶替：会话可能属于别的预设，会把该预设的专属段/工具漏掉（如 ptc 的 tools:ptc-only）。
   const ep: PhaseViews | null = phases
@@ -311,10 +339,10 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const save = (): void => {
     if (draft === null || saving) return
     if (level === 'workspace' && wsKey === undefined) { showFlash(t('workspaceRequired'), 'err'); return }
-    const EDITED_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
     const patch: Record<string, unknown> = {}
-    for (const field of EDITED_FIELDS) {
-      if (Object.hasOwn(draft, field)) patch[field] = draft[field]
+    const edited = draft as unknown as Record<string, unknown>
+    for (const field of DRAFT_FIELDS) {
+      if (Object.hasOwn(edited, field)) patch[field] = edited[field]
     }
     setSaving(true)
     fetch(CONFIG_APPLY_URL, {
@@ -377,48 +405,40 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     writePatch(patch)
   }
 
-  // 运行时上下文显隐：直接落盘（不经草稿）。三态同步开启时三阶段一起写。
-  const toggleContext = (name: string, hide: boolean): void => {
-    // 只按“当前阶段”真实存在的上下文计算：只在引导期注入的，另两态不显示/不写。
-    const rows = ((((phases as any)?.[phase]?.baseContexts) ?? ((inv as any)?.contexts ?? []))) as Array<{ name: string; blocked?: boolean; active?: boolean }>
-    const hidden = new Set<string>(rows.filter((c) => c.blocked === true || c.active === false).map((c) => c.name))
-    if (hide) hidden.add(name); else hidden.delete(name)
-    const arr = [...hidden]
-    const phaseKey = phase === 'bootstrap' ? 'contextsBootstrap' : phase === 'compaction' ? 'contextsCompaction' : 'contexts'
-    const patch: any = syncAll ? { contexts: arr, contextsBootstrap: arr, contextsCompaction: arr } : { [phaseKey]: arr }
-    writePatchLayered(patch as ConfigPatch)
+  // 运行时上下文显隐：直接落盘（不经草稿）。每个阶段只用各自的 baseContexts
+  // 计算 hidden；三态同步要求三阶段都就绪（缺一态绝不把该阶段当空集写掉）。
+  const toggleContext = (entry: EntryRef, hide: boolean): void => {
+    const keys = syncAll ? PHASE_KEYS : [phase]
+    const patch: ConfigPatch = {}
+    for (const key of keys) {
+      const view = phases?.[key]
+      const base = view?.baseContexts
+      if (view === null || view === undefined || !Array.isArray(base)) {
+        showFlash(t('contextsNotReady'), 'err')
+        return
+      }
+      const hidden = base
+        .filter((context) => context.blocked === true || context.active === false)
+        .map((context) => ({ name: context.name, ...(context.source === undefined ? {} : { source: context.source }) }))
+      const index = hidden.findIndex((candidate) => sameEntry(candidate, entry))
+      if (hide) {
+        if (index < 0) hidden.push(entry)
+      } else if (index >= 0) {
+        hidden.splice(index, 1)
+      }
+      const field = PHASES.find((descriptor) => descriptor.key === key)!.contextField
+      patch[field] = hidden
+    }
+    writePatchLayered(patch)
   }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField
 
-  // 「中文提示词」开关（头部工具栏）：开 = 把名字对得上译本（lib/zh/）的段
-  // 一次性覆盖为中文，关 = 清掉这些段的替换文本回归英文 —— 两个方向都走编辑
-  // 草稿（edit），与手动编辑同一条保存路径。状态从配置探测（zhApplied）。
-  // 三阶段装配未就绪时拒绝执行（否则会把对应阶段的注入条目当作空集写掉）。
-  const zhOn = zhApplied(view, ZH_SECTIONS)
-  // 「中文提示词」开启时，从池里加入的段优先用译本文本：没进过面板的段（如
-  // agent 作用域注册的 tool:subagent / context:file-reference）也能一键接管
-  // 成中文。译本缺席或函数译本返回空 = 保持池里原文。
-  const poolText = (name: string, fallback: string): string => {
-    if (!zhOn) return fallback
-    const entry = (ZH_SECTIONS as Record<string, unknown>)[name]
-    const zh = typeof entry === 'function' ? (entry as (source: string) => unknown)(fallback) : entry
-    return typeof zh === 'string' && zh !== '' ? zh : fallback
-  }
-  const toggleZh = (): void => {
-    if (ep === null || ep.bootstrap === null || ep.active === null || ep.compaction === null) {
-      showFlash(t('zhNotReady'), 'err')
-      return
-    }
-    edit('inject', zhOn ? zhRevertInjectEntries(view, ep, ZH_SECTIONS) : zhMergedInjectEntries(view, ep, ZH_SECTIONS))
-    showFlash(zhOn ? t('zhReverted') : t('zhApplied'))
-  }
-
-  /** 该段是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」还是「必须带正文」。 */
-  const nativeIn = (key: PhaseViewKey, name: string): boolean | null => {
+  /** 该条目是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」还是「必须带正文」。 */
+  const nativeIn = (key: PhaseKey, entry: EntryRef): boolean | null => {
     const view = ep?.[key]
     if (view === undefined || view === null) return null
-    return (view.baseSections ?? []).some((sec) => sec.name === name)
+    return (view.baseSections ?? []).some((section) => sameEntry(section, entry))
   }
 
   // 「三态同步」开关（头部工具栏）：勾选瞬间即按常驻期的并集行集覆写另外两态
@@ -428,7 +448,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const toggleSyncAll = (on: boolean): void => {
     setSyncAll(on)
     if (!on) return
-    if (ep === null || VIEW_KEYS.some((key) => ep[key] === null)) {
+    if (ep === null || PHASE_KEYS.some((key) => ep[key] === null)) {
       showFlash(t('syncNotReady'), 'err')
       return
     }
@@ -439,9 +459,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     }
     edit('inject', mirrorPhaseInjectEntries(view, rows, nativeIn))
     const denied = mirroredDeniedLists(rows)
-    edit('sections', denied.sections)
-    edit('sectionsBootstrap', denied.sectionsBootstrap)
-    edit('sectionsCompaction', denied.sectionsCompaction)
+    for (const descriptor of PHASES) edit(descriptor.sectionField, denied[descriptor.sectionField])
     const skipped = mirrorSkippedNames(rows, nativeIn)
     showFlash(skipped.length > 0
       ? `${t('syncApplied')} ${t('syncSkippedDynamic', { names: skipped.join('、') })}`
@@ -496,30 +514,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 命名空间、处理重复行 id、并把来源组成拍成不再跟随升级的快照。导出把决定权
   // 交回用户，不再替宿主做它没暴露的事。
   // 状态 hook 已声明在组件顶部（所有提前 return 之前），这里只保留动作。
-  const exportCurrentPreset = (): void => {
-    if (exporting) return
-    setExporting(true)
-    fetch(`${EXPORT_URL}?scope=${encodeURIComponent(target)}`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? t('exportPresetFail'))
-        const filename = `prompt-customizer-${String(body.target ?? target)}.json`
-        const text = JSON.stringify(body, null, 2)
-        // 复用 preset-io 的落盘门面：桌面壳走原生保存框，浏览器走下载链接。
-        const io = makeIoEnv()
-        void io.saveText(filename, text).then((outcome) => {
-          if (outcome.kind === 'saved') showFlash(t('exportPresetOk', { name: filename }), 'ok')
-          else if (outcome.kind === 'unavailable') {
-            io.download(filename, text)
-            showFlash(t('exportPresetOk', { name: filename }), 'ok')
-          }
-          // cancelled：用户主动取消，不提示。
-        })
-      })
-      .catch((e: unknown) => showFlash(`${t('exportPresetFail')}：${String(e instanceof Error ? e.message : e)}`, 'err'))
-      .finally(() => setExporting(false))
-  }
-
   // 全量备份：整库（全部提示词配置 + 工作区 override + 目录池 + 账本）导出为 JSON。
   const backupAll = (): void => {
     if (backingUp) return
@@ -572,9 +566,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const modeBtn = (key: PanelMode, label: string): ReactElement =>
     h('button', { key, style: mode === key ? s.segBtnActive : s.segBtn, onClick: () => switchMode(key) }, label)
 
-  // 阶段按钮命名（头部合并控制：引导期 / 常驻期 / 压缩受控期）。
-  const stageLabel = (key: PhaseViewKey): string =>
-    key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
+  // 阶段按钮命名（唯一来源：PHASE_LABEL_KEY 表）。
+  const stageLabel = (key: PhaseKey): string => t(PHASE_LABEL_KEY[key])
   const draftDirty = draft?.dirty === true
 
   /**
@@ -585,7 +578,8 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const targetChip = (id: string, label: string, icon: ReactElement, broken?: string): ReactElement => {
     const active = target === id
     const bad = broken !== undefined && broken !== ''
-    const customized = Object.keys(cfg?.overrides?.[id] ?? {}).length
+    // 只统计「非空」字段：空数组 / 空对象不算定制（否则每个预设都显示满计数）。
+    const customized = Object.values(cfg?.overrides?.[id] ?? {}).filter(hasContent).length
     return h('button', {
       key: id,
       type: 'button',
@@ -634,7 +628,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       ]),
       h('div', { style: s.headActions }, [
         mode === 'sections' || mode === 'tools'
-          ? h('div', { style: s.seg }, VIEW_KEYS.map((key) => h('button', {
+          ? h('div', { style: s.seg }, PHASE_KEYS.map((key) => h('button', {
               key,
               style: dropPhase === key
                 ? (phase === key ? s.segBtnDropActive : s.segBtnDrop)
@@ -673,20 +667,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
               t('syncAllPhases'),
             ])
           : null,
-        mode === 'sections'
-          ? h('label', {
-              style: { ...s.muted, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', whiteSpace: 'nowrap' },
-              title: t('zhHint'),
-            }, [
-              h('input', {
-                type: 'checkbox',
-                checked: zhOn,
-                onChange: toggleZh,
-                style: { margin: 0, cursor: 'pointer' },
-              }),
-              t('zhSwitch'),
-            ])
-          : null,
         h('button', {
           style: draft?.dirty ? s.saveBtnDirty : s.saveBtn,
           disabled: !draft?.dirty || saving,
@@ -722,7 +702,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     h('div', { key: 'body', style: s.body },
       mode === 'sections'
         ? [
-            h(SectionsPane, { key: 'sections', cfg: view, inv, phases: ep, phase, syncAll, t, poolText, write: edit }),
+            h(SectionsPane, { key: 'sections', cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
             h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext }),
           ]
         : mode === 'tools'

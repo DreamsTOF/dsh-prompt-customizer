@@ -1,80 +1,76 @@
 import Schema from './schemastery.mjs'
-import { DEFAULT_ENV_BLOCKLIST } from './vars.js'
+import { PHASES } from './model.js'
 
 /** 本插件的设置命名空间（小写 kebab-case）。 */
 export const NS = 'prompt-customizer'
 
+/** name+source 条目身份：source 是注册层，id 是预设/会话/provider 标识。 */
+const SourceSchema = Schema.object({
+  kind: Schema.string().required(),
+  id: Schema.string(),
+}).default(undefined)
+const Entry = Schema.object({
+  name: Schema.string().required(),
+  source: SourceSchema,
+})
+const entryList = () => Schema.array(Entry).default([])
+const InjectItem = Schema.object({
+  name: Schema.string().required(),
+  source: SourceSchema,
+  order: Schema.number().default(120),
+  text: Schema.string().required(),
+  phase: Schema.string().default('always'),
+  custom: Schema.boolean().default(false),
+})
+const ReplaceItem = Schema.object({
+  name: Schema.string().required(),
+  source: SourceSchema,
+  phase: Schema.string().default('always'),
+  text: Schema.string().required(),
+})
+const toolList = () => Schema.array(Entry).default([])
+const toolObject = () => {
+  const phaseTools = Object.fromEntries(PHASES.filter((phase) => phase.toolField !== undefined).map((phase) => [phase.toolField, Schema.object({
+    exclude: toolList(),
+    add: toolList(),
+  }).default({})]))
+  return Schema.object({
+    exclude: toolList(),
+    add: toolList(),
+    ...phaseTools,
+  }).default({})
+}
+
+/** 一份 override 的完整字段集，由 PHASES 唯一表生成（不再三份手抄）。 */
+function overrideShape() {
+  const phaseFields = Object.fromEntries(PHASES.flatMap((phase) => [
+    [phase.sectionField, entryList()],
+    [phase.contextField, entryList()],
+  ]))
+  return {
+    ...phaseFields,
+    replacements: Schema.array(ReplaceItem).default([]),
+    inject: Schema.array(InjectItem).default([]),
+    tools: toolObject(),
+  }
+}
+
 /**
- * 插件的配置 schema，同时作为设置命名空间的 schema。
- * GUI 的编辑以这个形状写入 `~/.dsh/settings.yaml`。
+ * 插件配置。提示词定制只存在于 overrides[预设 id] 与 workspaceOverrides[cwd]；
+ * 顶层保留 forceSections / envBlocklist / 预设快照库这些全局字段。
  */
-export const Config = Schema.object({
-  // 按名称屏蔽这些提示词段：常驻期（晋级后）的独立屏蔽名单。
-  sections: Schema.array(Schema.string()).default([]),
-  // 每阶段独立段屏蔽（与 tools 阶段化对称）：引导期 / 压缩受控期各自的
-  // 屏蔽名单。三态互不继承、互不影响 —— 一个阶段的屏蔽不波及另一个阶段。
-  sectionsBootstrap: Schema.array(Schema.string()).default([]),
-  sectionsCompaction: Schema.array(Schema.string()).default([]),
-  // 运行时上下文（会并入系统提示词的部分）的屏蔽名单：三阶段独立，与段对称。
-  contexts: Schema.array(Schema.string()).default([]),
-  contextsBootstrap: Schema.array(Schema.string()).default([]),
-  contextsCompaction: Schema.array(Schema.string()).default([]),
-  // 按名称替换某个段的文本（保持原顺序）。
-  replace: Schema.dict(Schema.string()).default({}),
-  // 注入 / 覆盖段（按 名称 + 顺序 + 文本）。`custom` 标记本插件生成的段
-  // （隐藏标记，用于识别其为可删除，跨预设依然成立，不依赖名字碰撞）。
-  // `phase` 控制阶段生效：`always` 恒定；`bootstrap` 只在会话未晋级时注入；
-  // `compaction` 只在「压缩后仍未晋级」时注入（独立于 bootstrap，拥有自己的
-  // order 空间）；`active` 只在晋级后注入（晋级 = 首个 durable 的 tool/call
-  // 或 assistant/message；compaction 之后复位，subagent 视为已晋级）。
-  inject: Schema.array(Schema.object({
-    name: Schema.string().required(),
-    order: Schema.number().default(120),
-    text: Schema.string().required(),
-    phase: Schema.string().default('always'),
-    custom: Schema.boolean().default(false),
-  })).default([]),
-  // 工具目录过滤：只有 exclude 黑名单（列出的工具对模型隐藏）。三份名单对应三个
-  // 阶段，各管各的、互不继承：`exclude` 只在已晋级（常驻期）生效，`bootstrap`
-  // 只在未晋级（引导期）生效，`compaction` 只在「compaction 之后仍未晋级」的
-  // 阶段生效；空名单 = 该阶段什么都不隐藏。没有白名单语义 —— 见 lib/effective.js
-  // 的 applyToolFilter 注释。
-  tools: Schema.object({
-    exclude: Schema.array(Schema.string()).default([]),
-    // 该阶段要「加回来」的工具：被该阶段裁掉、但注册表里仍有的，装配时查回
-    // schema 追加。注册表里没有的（别的预设独有）加不进来。
-    add: Schema.array(Schema.string()).default([]),
-    bootstrap: Schema.object({
-      exclude: Schema.array(Schema.string()).default([]),
-      add: Schema.array(Schema.string()).default([]),
-    }).default({}),
-    compaction: Schema.object({
-      exclude: Schema.array(Schema.string()).default([]),
-      add: Schema.array(Schema.string()).default([]),
-    }).default({}),
-  }).default({}),
-  // 强制覆盖（默认开）：包装宿主的 assemble，直接从注册表原始段重建最终
-  // 提示词段 —— 预设插件的阶段裁段（实测 liangshen / warmupbetter 等 preset
-  // 过滤器全部 prepend: true）与宿主 complete 整段接管都无法再改写结果；
-  // tools / contexts 保持宿主与预设行为。设 false 退回瀑布流内过滤。
+const ConfigObject = Schema.object({
+  ...overrideShape(),
+  // 强制覆盖（默认开）：从注册表重建最终提示词段，避免预设插件的阶段裁段/complete 接管。
   forceSections: Schema.boolean().default(true),
-  // process.env 变量黑名单：env 全量注册为提示词变量（{{env_xxx}}），命中
-  // 本名单的键不注册 —— env 里常有密钥，进了提示词就会随请求发给模型。
-  // 条目支持 `*` 通配、大小写不敏感；预填常见密钥类键，界面可增删。
-  envBlocklist: Schema.array(Schema.string()).default(DEFAULT_ENV_BLOCKLIST),
-  // 预设：完整的定制快照（提示词 + 工具配置，含每阶段独立名单与阶段目录）。
+  // env 变量黑名单：默认空（全部可注入），条目支持 glob、大小写不敏感，界面可增删。
+  envBlocklist: Schema.array(Schema.string()).default([]),
+  // 预设快照：完整捕获一份 override（含各阶段独立条目与相对顺序）。
   presets: Schema.array(Schema.object({
     id: Schema.string().required(),
     name: Schema.string().required(),
     data: Schema.object({
-      sections: Schema.array(Schema.string()),
-      // 每阶段独立段屏蔽名单：缺省 = 旧文件，应用时保留当前值不抹掉。
-      sectionsBootstrap: Schema.array(Schema.string()),
-      sectionsCompaction: Schema.array(Schema.string()),
-      replace: Schema.dict(Schema.string()),
-      // 相对顺序：每个条目记录它应跟随的前一段，以及这段属于哪个阶段
-      // （缺省 always = 旧快照的单一全局序；同名不同 phase 的条目 = 该段在
-      // 多个阶段各有自己的位置）。
+      ...overrideShape(),
       order: Schema.array(Schema.object({
         name: Schema.string().required(),
         after: Schema.string(),
@@ -82,86 +78,34 @@ export const Config = Schema.object({
         custom: Schema.boolean().default(false),
         phase: Schema.string(),
       })),
-      tools: Schema.object({
-        exclude: Schema.array(Schema.string()),
-        add: Schema.array(Schema.string()),
-        bootstrap: Schema.object({
-          exclude: Schema.array(Schema.string()),
-          add: Schema.array(Schema.string()),
-        }),
-        compaction: Schema.object({
-          exclude: Schema.array(Schema.string()),
-          add: Schema.array(Schema.string()),
-        }),
-      }),
     }),
   })).default([]),
-  // 当前已应用预设的 id（同一时间只有一个生效）。
   activePreset: Schema.string(),
-  // 按 agent 预设 id 的字段级覆盖：某个 agent 预设的 override 中，非空的
-  // 字段整体接管全局默认，空缺 / 空列表的字段继续回落全局。键是
-  // dsh-agent-presets 的预设目录名（即会话 header.agentPreset 记录的 id）。
-  overrides: Schema.dict(Schema.object({
-    sections: Schema.array(Schema.string()),
-    sectionsBootstrap: Schema.array(Schema.string()),
-    sectionsCompaction: Schema.array(Schema.string()),
-    contexts: Schema.array(Schema.string()),
-    contextsBootstrap: Schema.array(Schema.string()),
-    contextsCompaction: Schema.array(Schema.string()),
-    replace: Schema.dict(Schema.string()),
-    inject: Schema.array(Schema.object({
-      name: Schema.string().required(),
-      order: Schema.number().default(120),
-      text: Schema.string().required(),
-      phase: Schema.string().default('always'),
-      custom: Schema.boolean().default(false),
-    })),
-    tools: Schema.object({
-      exclude: Schema.array(Schema.string()),
-      add: Schema.array(Schema.string()),
-      bootstrap: Schema.object({
-        exclude: Schema.array(Schema.string()),
-        add: Schema.array(Schema.string()),
-      }),
-      compaction: Schema.object({
-        exclude: Schema.array(Schema.string()),
-        add: Schema.array(Schema.string()),
-      }),
-    }),
-  })).default({}),
+  // 按 agent 预设 id 的字段级覆盖：非空字段整体接管，空缺字段回落到官方默认。
+  overrides: Schema.dict(Schema.object(overrideShape())).default({}),
 })
 
-/**
- * 工作区级 override：`{ "<工作区绝对 cwd>": <与 overrides 值同形状> }`。
- * 与预设级区别：预设级按 agent 预设 id 存、只覆盖该预设作用域可见项；工作区级按
- * 工作区 cwd 存，作用于该工作区所有会话、可覆盖会话里全部段/工具，且在合并时
- * 覆盖预设级（同名后者胜）。
- */
-export const WorkspaceOverrides = Schema.dict(Schema.object({
-  sections: Schema.array(Schema.string()),
-  sectionsBootstrap: Schema.array(Schema.string()),
-  sectionsCompaction: Schema.array(Schema.string()),
-  contexts: Schema.array(Schema.string()),
-  contextsBootstrap: Schema.array(Schema.string()),
-  contextsCompaction: Schema.array(Schema.string()),
-  replace: Schema.dict(Schema.string()),
-  inject: Schema.array(Schema.object({
-    name: Schema.string().required(),
-    order: Schema.number().default(120),
-    text: Schema.string().required(),
-    phase: Schema.string().default('always'),
-    custom: Schema.boolean().default(false),
-  })),
-  tools: Schema.object({
-    exclude: Schema.array(Schema.string()),
-    add: Schema.array(Schema.string()),
-    bootstrap: Schema.object({
-      exclude: Schema.array(Schema.string()),
-      add: Schema.array(Schema.string()),
-    }),
-    compaction: Schema.object({
-      exclude: Schema.array(Schema.string()),
-      add: Schema.array(Schema.string()),
-    }),
-  }),
-}))
+/** 旧 replace 字典不属于新模型（破坏式更新）；解析时直接丢弃，绝不进入生效配置。 */
+function stripLegacyReplace(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+  const next = { ...value }
+  delete next.replace
+  if (Array.isArray(next.presets)) {
+    next.presets = next.presets.map((preset) => preset !== null && typeof preset === 'object' && preset.data !== null && typeof preset.data === 'object'
+      ? { ...preset, data: stripLegacyReplace(preset.data) }
+      : preset)
+  }
+  if (next.overrides !== null && typeof next.overrides === 'object' && !Array.isArray(next.overrides)) {
+    next.overrides = Object.fromEntries(Object.entries(next.overrides).map(([id, override]) => [id, stripLegacyReplace(override)]))
+  }
+  return next
+}
+
+export const Config = Schema.transform(ConfigObject, stripLegacyReplace)
+
+/** 工作区级 override：按工作区绝对 cwd 存，与 overrides 同形状，运行时覆盖预设级。 */
+const WorkspaceOverridesObject = Schema.dict(Schema.object(overrideShape()))
+export const WorkspaceOverrides = Schema.transform(WorkspaceOverridesObject, (value) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+  return Object.fromEntries(Object.entries(value).map(([cwd, override]) => [cwd, stripLegacyReplace(override)]))
+})

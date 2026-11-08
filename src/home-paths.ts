@@ -39,3 +39,17 @@ export function dshHome(): string {
 export function agentsHome(): string {
   return resolveRoot(undefined, 'DSH_AGENTS_HOME', resolve(homedir(), '.agents'))
 }
+
+/**
+ * 工作区路径的唯一归一口径：先 `resolve` 成绝对路径；Windows 上再转小写
+ * （同一目录经不同 API 返回的大小写并不稳定，账本按字符串键会分裂成两份）。
+ *
+ * 只用于账本键 / 去重 / 比较；需要回传给宿主做文件操作时，小写路径在
+ * Windows 上仍然合法（文件系统大小写不敏感）。
+ * @param cwd - 任意工作区路径。
+ * @returns 归一后的绝对路径。
+ */
+export function normalizeCwd(cwd: string): string {
+  const resolved = resolve(cwd)
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}

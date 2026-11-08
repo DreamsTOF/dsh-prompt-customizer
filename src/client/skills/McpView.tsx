@@ -3,7 +3,8 @@
  *
  * 搜索、计数分段、连接状态与刷新/添加按钮都在顶栏（McpTopBar）；这里只负责
  * 两个列表块：「继承的全局 Server」（预设层开关 = 遮蔽）与「该预设专属 Server」，
- * 每张卡片带工具级 chips（绿 = 启用、灰 = 禁用，点一下即切换）。
+ * 每张卡片带工具级 chips（绿 = 启用、灰 = 禁用，点一下即切换）；卡片主开关
+ * 按 level 落账：预设级 = 遮蔽全局条目，工作区级 = 在当前工作区关闭该 Server。
  */
 import { useEffect, useState } from 'react'
 import {
@@ -13,8 +14,12 @@ import { ConfirmDialog } from '../confirm-dialog'
 import { LockGlyph } from './icons.js'
 import { McpPasteAdd } from './McpAddModal.js'
 import {
-  isToolRegistrationPending, type LiveMcpState, type LiveMcpStatus, type LiveMcpTool,
+  isToolRegistrationPending, type LiveMcpServer, type LiveMcpStatus, type LiveMcpTool, type PresetMcpRowWire,
 } from './mcp-live.js'
+import {
+  detectMcpFormat, mcpEffectiveEnabled, mcpToggleTarget, normalizeMcpFormatCapabilities,
+  ungroupedWorkspaceTools, workspaceDisabledToolsFor, type McpConfigFormat, type McpFormatCapabilities,
+} from './mcp-state.js'
 import { css } from './styles.js'
 /**
  * 工具 chips：卡片上列出该 MCP 提供的**全部**工具名，绿 = 启用、灰 = 禁用，
@@ -39,7 +44,6 @@ export function McpToolChips({ t, serverName, tools, disabledTools, locked, busy
   busy: string | null
   onToggle: (fullName: string, enabled: boolean) => void
 }): JSX.Element | null {
-  const prefix = `mcp__${serverName}__`
   const names = mcpToolNames(tools, disabledTools)
   if (names.length === 0) return null
   const off = new Set(disabledTools)
@@ -48,7 +52,6 @@ export function McpToolChips({ t, serverName, tools, disabledTools, locked, busy
       {names.map((name) => {
         const disabled = off.has(name)
         const isLocked = locked?.has(name) === true
-        const short = name.startsWith(prefix) ? name.slice(prefix.length) : name
         const description = tools.find(tool => tool.name === name)?.description ?? ''
         return (
           <button
@@ -66,7 +69,7 @@ export function McpToolChips({ t, serverName, tools, disabledTools, locked, busy
             onClick={() => { onToggle(name, disabled) }}
           >
             {isLocked && <LockGlyph size={9} />}
-            {short}
+            {name}
           </button>
         )
       })}
@@ -109,7 +112,17 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
   const [toolBusy, setToolBusy] = useState<string | null>(null)
   /** 全局条目删除确认（null=关闭）。 */
   const [removeReq, setRemoveReq] = useState<string | null>(null)
-  const [editState, setEditState] = useState<{ serverName: string; text: string; source: 'global' | 'preset' | 'workspace'; preset?: string; workspace?: string } | null>(null)
+  const [editState, setEditState] = useState<{
+    serverName: string
+    text: string
+    source: 'global' | 'preset' | 'workspace'
+    preset?: string
+    workspace?: string
+    /** 服务端返回的格式；缺省时按文本形态兜底（不按 source 猜）。 */
+    format: McpConfigFormat
+    /** 服务端返回的编辑能力（可切换的格式等）。 */
+    capabilities?: McpFormatCapabilities
+  } | null>(null)
   const [wsNames, setWsNames] = useState<string[]>([])
   /** 预设专属行移除确认（null=关闭）。 */
   const [removeOwnReq, setRemoveOwnReq] = useState<string | null>(null)
@@ -147,21 +160,24 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
    * 预设自带的卡只看预设层 —— 与继承来的全局 Server 彻底分离（不同名前缀也不会互相牵连）。 */
   const globalOff = ready?.toolDisabled ?? {}
   const presetTables = ready?.toolDisabledByPreset ?? {}
-  const workspaceDisabledTools = new Set<string>(workspace !== null ? (ready?.workspaceToolDisabled?.[workspace] ?? []) : [])
+  /** 工作区级工具禁用账本：新接口按 server 分组优先，旧接口只做名单求交（不解析前缀）。 */
+  const workspaceToolLedger = {
+    byServer: ready?.workspaceToolDisabledByServer,
+    flat: ready?.workspaceToolDisabled,
+  }
   /**
    * 某条「行」的有效禁用集合（同名也彻底独立）：
    *   inherit（继承的全局行）= 全局层 ∪ inherit 条目；own（预设自带行）= 仅 own 条目。
    * 两条行各记一份账，互不牵连 —— 撤掉其中一条时另一条的设置各自生效。
    */
-  const offOf = (serverName: string, owner: 'own' | 'inherit'): string[] => {
+  const offOf = (serverName: string, owner: 'own' | 'inherit', tools: LiveMcpTool[]): string[] => {
     const entry = presetTables[scope]?.[serverName]
     let base: string[]
     if (owner === 'own') base = entry?.own ?? []
     else if (scope === '') base = globalOff[serverName] ?? []
     else base = [...new Set([...(globalOff[serverName] ?? []), ...(entry?.inherit ?? [])])]
     if (level === 'workspace') {
-      const prefix = `mcp__${serverName}__`
-      base = [...new Set([...base, ...[...workspaceDisabledTools].filter(n => n.startsWith(prefix))])]
+      base = [...new Set([...base, ...workspaceDisabledToolsFor(workspaceToolLedger, workspace, serverName, tools)])]
     }
     return base
   }
@@ -236,9 +252,22 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
     void fetch(`/api/triad/mcp-edit?${qs.toString()}`, { headers: { accept: 'application/json' } })
       .then((response) => response.json())
       .then((body) => {
-        const payload = body as { ok?: boolean; text?: string; error?: string } | null
-        if (payload?.ok === true) setEditState({ serverName, text: String(payload.text ?? ''), source, preset: extra?.preset, workspace: extra?.workspace })
-        else setError(String(payload?.error ?? 'load mcp config failed'))
+        const payload = body as {
+          ok?: boolean; text?: string; error?: string; format?: unknown; capabilities?: unknown
+        } | null
+        if (payload?.ok === true) {
+          const text = String(payload.text ?? '')
+          const format = payload.format === 'json' || payload.format === 'yaml' ? payload.format : detectMcpFormat(text)
+          setEditState({
+            serverName,
+            text,
+            source,
+            preset: extra?.preset,
+            workspace: extra?.workspace,
+            format,
+            capabilities: normalizeMcpFormatCapabilities(payload.capabilities),
+          })
+        } else setError(String(payload?.error ?? 'load mcp config failed'))
       })
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
   }
@@ -307,6 +336,31 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
     }
     putTools(serverName, [fullName], enabled, source)
   }
+  /**
+   * 工作区级批量工具启停：工作区层只接受单个工具名，逐条顺序写，避免并发覆盖账本。
+   * @param names - 工具全名。
+   * @param enabled - true = 启用（从工作区账本移除）。
+   */
+  const putWorkspaceTools = (names: string[], enabled: boolean): void => {
+    if (names.length === 0 || toolBusy !== null || busy !== null) return
+    if (workspace === null) { setError('no active workspace'); return }
+    setToolBusy(names[0]!)
+    setError(null)
+    void (async () => {
+      for (const name of names) {
+        const response = await fetch(`/api/triad/mcp-workspace-scope/workspace/${encodeURIComponent(workspace)}/tools`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ name, enabled }),
+        })
+        const body = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null
+        if (!(response.ok && body?.ok === true)) throw new Error(body?.error ?? String(response.status))
+      }
+      onRefresh()
+    })()
+      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)) })
+      .finally(() => { setToolBusy(null) })
+  }
   const removeOwn = (serverName: string): void => {
     if (busy !== null) return
     setBusy(`own:${serverName}`)
@@ -344,17 +398,43 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       .finally(() => { setBusy(null) })
   }
 
-  /* 过滤：搜索命中 serverName 或工具名；状态档在全局层看启用状态、预设层看遮蔽。 */
+  /** 卡片主开关的写目标：工作区级写 workspace close，预设级写 mask / global。 */
+  const target = mcpToggleTarget(level, scope, workspace)
+  /** 全局行的有效启用态：config.disabled → 当前预设 mask → 当前工作区关闭。 */
+  const globalRowEnabled = (server: LiveMcpServer): boolean => mcpEffectiveEnabled({
+    configDisabled: server.config.disabled,
+    masked: scope !== '' && masked.has(server.serverName),
+    workspaceClosed: closedInWorkspace.has(server.serverName),
+  })
+  /** 预设自带行的有效启用态：只受当前工作区关闭影响。 */
+  const ownRowEnabled = (row: PresetMcpRowWire): boolean =>
+    mcpEffectiveEnabled({ workspaceClosed: closedInWorkspace.has(row.serverName) })
+  const statusMatch = (enabled: boolean): boolean =>
+    status === 'all' || (status === 'on' ? enabled : !enabled)
+
+  /* 过滤：搜索命中 serverName 或工具名；状态档统一按 effectiveEnabled 判定。 */
   const needle = query.trim().toLowerCase()
   const shownGlobals = globals.filter(server => (needle === ''
     || server.serverName.toLowerCase().includes(needle)
     || server.tools.some(tool => tool.name.toLowerCase().includes(needle)))
-    && (status === 'all'
-      || (scope === '' ? (status === 'off' ? server.config.disabled : !server.config.disabled)
-        : (status === 'off' ? masked.has(server.serverName) : !masked.has(server.serverName)))))
+    && statusMatch(globalRowEnabled(server)))
   const shownOwn = ownRows.filter(row => needle === ''
     || row.serverName.toLowerCase().includes(needle)
     || row.summary.toLowerCase().includes(needle))
+  const shownOwnFiltered = shownOwn.filter(row => statusMatch(ownRowEnabled(row)))
+  /** 旧扁平账本里无法归到卡片的工具名：原样展示，不按 `mcp__` 前缀猜归属。 */
+  const attributedWorkspaceTools = new Set<string>()
+  if (level === 'workspace') {
+    for (const server of globals) {
+      for (const name of workspaceDisabledToolsFor(workspaceToolLedger, workspace, server.serverName, server.tools)) attributedWorkspaceTools.add(name)
+    }
+    for (const row of ownRows) {
+      for (const name of workspaceDisabledToolsFor(workspaceToolLedger, workspace, row.serverName, row.tools ?? [])) attributedWorkspaceTools.add(name)
+    }
+  }
+  const unattributedWorkspaceTools = level === 'workspace'
+    ? ungroupedWorkspaceTools(workspaceToolLedger, workspace, attributedWorkspaceTools)
+    : []
 
 
   return (
@@ -362,6 +442,7 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       {editState !== null && (
         <Modal open onClose={() => setEditState(null)} closeLabel={t('close')} title={t('mcpEditTitle')}>
           <McpPasteAdd
+            key={`${editState.source}:${editState.preset ?? ''}:${editState.workspace ?? ''}:${editState.serverName}`}
             t={t}
             onAdded={() => { setEditState(null); onRefresh() }}
             onCancel={() => setEditState(null)}
@@ -370,7 +451,8 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
             editSource={editState.source}
             editPreset={editState.preset}
             editWorkspace={editState.workspace}
-            editFormat={editState.source === 'global' ? 'yaml' : 'json'}
+            editFormat={editState.format}
+            editCapabilities={editState.capabilities}
             onEdited={() => { setEditState(null); onRefresh() }}
           />
         </Modal>
@@ -378,11 +460,13 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
       {/* 当前编辑层提示行（与技能页 hintRow 同构） */}
       <div className={css.hintRow}>
         <span className={css.hintRowText}>
-          {scope === ''
-            ? t('mcpScopeHintAll')
-            : t('mcpScopeHintScoped', { name: scoped?.name ?? scope })}
+          {level === 'workspace'
+            ? t('mcpScopeHintWorkspace', { path: workspace ?? '' })
+            : scope === ''
+              ? t('mcpScopeHintAll')
+              : t('mcpScopeHintScoped', { name: scoped?.name ?? scope })}
         </span>
-        {scope !== '' && masked.size > 0 && (
+        {level === 'preset' && scope !== '' && masked.size > 0 && (
           <button type="button" className={css.presetReset} disabled={busy !== null} onClick={clearMasks}>
             {t('presetReset')}
           </button>
@@ -393,6 +477,13 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
 
       {/* 遮蔽诊断：账本写了但运行期没拒到工具/安装报错时，明确说出来 */}
       {maskWarn !== null && <p className={css.error} role="alert">{maskWarn}</p>}
+
+      {/* 旧扁平账本里无法归到卡片的工具：原样展示服务端结构，不在客户端按前缀猜归属 */}
+      {unattributedWorkspaceTools.length > 0 && (
+        <p className={css.mcpEmptyList} role="status">
+          {t('mcpWorkspaceToolLedgerRaw', { names: unattributedWorkspaceTools.join('、') })}
+        </p>
+      )}
 
       {/* 添加/启用后的自动等待：面板在轮询，用户不用再手动点「刷新」 */}
       {waitingTools.length > 0 && (
@@ -427,12 +518,28 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                 {shownGlobals.map((server) => {
                   const isMasked = masked.has(server.serverName)
                   const covered = ownNames.has(server.serverName)
-                  const offTools = offOf(server.serverName, 'inherit')
+                  const offTools = offOf(server.serverName, 'inherit', server.tools)
                   const lockedTools = lockedOf(server.serverName)
                   const listed = server.tools.length
                   const pendingReg = isToolRegistrationPending(server.toolCount, listed)
                   /** 被「全部 Agent」层一票否决的工具数（预设视图里才可能 > 0）。 */
                   const lockedCount = mcpToolNames(server.tools, offTools).filter(name => lockedTools.has(name)).length
+                  /** 工作区级主开关写 workspace close；预设级写 mask / global（toggleTarget 统一）。 */
+                  const workspaceClosed = closedInWorkspace.has(server.serverName)
+                  const switchOn = target === null
+                    ? false
+                    : target.kind === 'workspace'
+                      ? !workspaceClosed
+                      : target.kind === 'mask' ? !isMasked : !server.config.disabled
+                  const switchDisabled = busy !== null || target === null
+                    || (target.kind === 'global' && !server.config.editable)
+                  const switchLabel = target === null
+                    ? t('mcpWorkspaceDisableHint')
+                    : target.kind === 'workspace'
+                      ? (workspaceClosed ? t('mcpWorkspaceEnable') : t('mcpWorkspaceDisable'))
+                      : target.kind === 'mask'
+                        ? (isMasked ? t('enableSkill') : t('mcpPresetMasked'))
+                        : t('mcpLiveDisabled')
                   return (
                     <section key={`global-${server.serverName}`} className={css.mcpRecCard}>
                       <div className={css.mcpRecCardHead}>
@@ -470,30 +577,32 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                           </span>
                         </span>
                         <Tooltip
-                          label={scope === ''
-                            ? (server.config.disabled ? t('enableSkill') : t('mcpLiveDisabled'))
-                            : covered
+                          label={target?.kind === 'workspace'
+                            ? (workspaceClosed ? t('mcpWorkspaceEnableHint') : t('mcpWorkspaceDisableHint'))
+                            : target?.kind === 'mask' && covered
                               ? t('mcpPresetCoveredSwitchHint')
-                              : isMasked ? t('enableSkill') : t('mcpPresetMasked')}
+                              : switchLabel}
                           side="bottom"
                           delayMs={500}
                         >
                           <button
                             type="button"
                             role="switch"
-                            aria-checked={scope === '' ? !server.config.disabled : !isMasked}
-                            aria-label={scope === '' ? t('mcpLiveDisabled') : t('mcpPresetMasked')}
-                            className={`${css.toggle} ${(scope === '' ? server.config.disabled : isMasked) ? css.toggleOff : css.toggleOn}`}
+                            aria-checked={switchOn}
+                            aria-label={switchLabel}
+                            className={`${css.toggle} ${switchOn ? css.toggleOn : css.toggleOff}`}
                             /* 预设层：即使该预设自带同名 Server，也允许遮蔽全局这一条 ——
                              * 遮蔽是「本预设不要全局那份」的持久表达，等自带的被移除后即刻生效。 */
-                            disabled={busy !== null || (scope === '' && !server.config.editable)}
+                            disabled={switchDisabled}
                             onClick={() => {
-                              if (scope === '') {
+                              if (target === null) return
+                              if (target.kind === 'global') {
                                 const nextDisabled = !server.config.disabled
                                 toggleGlobal(server.serverName, nextDisabled)
                                 // 启用 = 重新拉起进程并注册工具：开始轮询，别让用户等 / 手点刷新。
                                 if (!nextDisabled) onWatchTools([server.serverName])
-                              } else setMasked(server.serverName, isMasked)
+                              } else if (target.kind === 'mask') setMasked(server.serverName, isMasked)
+                              else toggleWorkspaceServer(server.serverName, workspaceClosed)
                             }}
                           >
                             <span className={css.toggleKnob} aria-hidden="true" />
@@ -523,19 +632,6 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                                 : isMasked ? t('mcpPresetMasked') : t('mcpPresetMaskState')}
                           </span>
                         </span>
-                        {/* 工作区级关闭：只影响当前工作区，换工作区照常注入。 */}
-                        {workspace !== null && level === 'workspace' && (
-                          <button
-                            type="button"
-                            className={css.mcpCardDelete}
-                            data-closed={closedInWorkspace.has(server.serverName) || undefined}
-                            title={closedInWorkspace.has(server.serverName) ? t('mcpWorkspaceEnableHint') : t('mcpWorkspaceDisableHint')}
-                            disabled={busy !== null}
-                            onClick={() => { toggleWorkspaceServer(server.serverName, closedInWorkspace.has(server.serverName)) }}
-                          >
-                            {closedInWorkspace.has(server.serverName) ? t('mcpWorkspaceEnable') : t('mcpWorkspaceDisable')}
-                          </button>
-                        )}
                         {scope === '' && server.config.editable ? (
                           <button type="button" className={css.mcpCardDelete} title={t('mcpEdit')} disabled={busy !== null} onClick={() => { openEdit(server.serverName) }}>
                             {t('mcpEdit')}
@@ -578,20 +674,20 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                 >
                   <span className={css.bundleIcon} aria-hidden="true"><IconAgentPresetOutlineRegular size={16} /></span>
                   <span className={css.bundleName}>{t('mcpPresetOwnSection')}</span>
-                  <span className={css.bundleCount}>{shownOwn.length}</span>
+                  <span className={css.bundleCount}>{shownOwnFiltered.length}</span>
                   <IconChevronDownOutlineRegular className={css.chevron} size={13} aria-hidden="true" />
                 </button>
               </header>
               {ownOpen && (<>
               <p className={css.mcpEmptyList}>{t('mcpPresetOwnHint')}</p>
               {scoped?.trust === 'system' && <p className={css.mcpEmptyList}>{t('mcpPresetStorageHint')}</p>}
-              {shownOwn.length === 0 ? (
+              {shownOwnFiltered.length === 0 ? (
                 <p className={css.mcpEmptyList}>{ownRows.length === 0 ? t('mcpPresetOwnEmpty') : t('mcpListFilteredEmpty')}</p>
               ) : (
                 <div className={css.mcpRecGrid}>
-                  {shownOwn.map(row => {
+                  {shownOwnFiltered.map(row => {
                     /* 预设自带的这条行只认 own 条目：全局行/继承行的设置与它互不影响。 */
-                    const offOwn = offOf(row.serverName, 'own')
+                    const offOwn = offOf(row.serverName, 'own', row.tools ?? [])
                     /** 一键全禁/全开：一次请求带上该行的全部工具名。 */
                     const ownToolNames = (row.tools ?? []).map(tool => tool.name)
                     const allDisabled = ownToolNames.length > 0 && ownToolNames.every(name => offOwn.includes(name))
@@ -603,9 +699,11 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                           <span className={css.mcpRecCardTags}>
                             <span className={css.mcpRecCatTag}>{row.transport}</span>
                             <span className={css.mcpRecCatTag}>
-                              {(row.registeredCount ?? 0) > 0 ? row.registeredCount : (row.tools?.length ?? 0)} {t('mcpLiveToolsOf')}
+                              {row.registeredCount === undefined
+                                ? t('mcpToolsUnknown')
+                                : `${row.registeredCount > 0 ? row.registeredCount : (row.tools?.length ?? 0)} ${t('mcpLiveToolsOf')}`}
                             </span>
-                            {isToolRegistrationPending(row.registeredCount ?? 0, row.tools?.length ?? 0) && (
+                            {row.registeredCount !== undefined && isToolRegistrationPending(row.registeredCount, row.tools?.length ?? 0) && (
                               <span className={css.mcpRecCatTag} data-off="true" title={t('mcpToolsPendingRegTip')}>
                                 {t('mcpToolsPendingReg')}
                               </span>
@@ -638,8 +736,11 @@ export function McpView({ t, live, scope, query, status, onRefresh, waitingTools
                             aria-checked={!allDisabled}
                             aria-label={t('mcpToolAllAria', { name: row.serverName })}
                             className={`${css.toggle} ${allDisabled ? css.toggleOff : css.toggleOn}`}
-                            disabled={busy !== null || toolBusy !== null || ownToolNames.length === 0}
-                            onClick={() => { putTools(row.serverName, ownToolNames, allDisabled, 'own') }}
+                            disabled={busy !== null || toolBusy !== null || ownToolNames.length === 0 || (level === 'workspace' && workspace === null)}
+                            onClick={() => {
+                              if (level === 'workspace') putWorkspaceTools(ownToolNames, allDisabled)
+                              else putTools(row.serverName, ownToolNames, allDisabled, 'own')
+                            }}
                           >
                             <span className={css.toggleKnob} aria-hidden="true" />
                           </button>

@@ -90,11 +90,6 @@ export const css = {
   mcpAddTypeActive: 'skm-mcp-add-type-active',
   mcpToolSearch: 'skm-mcp-tool-search',
   mcpToolSearchInput: 'skm-mcp-tool-search-input',
-  mcpLogRow: 'skm-mcp-log-row',
-  mcpLogDot: 'skm-mcp-log-dot',
-  mcpLogBody: 'skm-mcp-log-body',
-  mcpLogText: 'skm-mcp-log-text',
-  mcpLogClear: 'skm-mcp-log-clear',
   mcpConfigGrid: 'skm-mcp-config-grid',
   mcpConfigCard: 'skm-mcp-config-card',
   mcpConfigHead: 'skm-mcp-config-head',
@@ -204,6 +199,7 @@ export const css = {
   skillCardFoot: 'skm-skill-card-foot',
   skillFootLabel: 'skm-skill-foot-label',
   skillFootIcon: 'skm-skill-foot-icon',
+  skillFootIconDanger: 'skm-skill-foot-icon-danger',
   skillCardActions: 'skm-skill-card-actions',
   // Skills Hub 页面结构
   hub: 'skm-hub',
@@ -246,6 +242,7 @@ export const css = {
   topbarActions: 'skm-topbar-actions',
   healthInline: 'skm-health-inline',
   addCard: 'skm-add-card',
+  addCardActive: 'skm-add-card-active',
   addCardHead: 'skm-add-card-head',
   addCardIcon: 'skm-add-card-icon',
   addCardTitle: 'skm-add-card-title',
@@ -340,7 +337,6 @@ export const css = {
   mainScroll: 'skm-main-scroll',
   hubSection: 'skm-hub-section',
   hubSectionHead: 'skm-hub-section-head',
-  skillGridList: 'skm-skill-grid-list',
   noResult: 'skm-no-result',
   // 归入技能包弹窗（卡片化）
   assignModal: 'skm-assign-modal',
@@ -502,7 +498,6 @@ export const SHEET = `
 
 /* ── 技能卡片（Skills Hub 风格）：双列网格；列表视图切单列宽卡 ── */
 .skm-skill-grid{list-style:none;margin:8px 0 0;padding:0;width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;box-sizing:border-box}
-.skm-skill-grid-list{grid-template-columns:minmax(0,1fr)}
 .skm-skill-grid > .skm-status{grid-column:1/-1;padding-top:4px}
 .skm-skill-card{position:relative;min-width:0;display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:16px;background:var(--dsw-alias-bg-base,#fff);padding:14px 16px 0;overflow:hidden;opacity:0;animation:skm-card-in 260ms cubic-bezier(.2,.7,.3,1.06) forwards;animation-delay:calc(var(--skm-i,0)*40ms);transition:border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}
 .skm-skill-card:hover{border-color:var(--dsw-alias-border-l3,rgba(0,0,0,.16));box-shadow:0 3px 14px rgba(16,24,40,.08);transform:translateY(-1px)}
@@ -692,18 +687,6 @@ export const SHEET = `
 .skm-mcp-tool-search-input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:12.5px;line-height:18px;color:var(--dsw-alias-label-primary,#1f2430);font-family:inherit}
 .skm-mcp-tool-search-input::placeholder{color:var(--dsw-alias-label-caption,#adb2b8)}
 /* 连接日志行 */
-.skm-mcp-log-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.05))}
-.skm-mcp-log-row:first-child{border-top:none}
-.skm-mcp-log-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#3d6be5)}
-.skm-mcp-log-dot[data-kind='enable']{background:#2fb26b}
-.skm-mcp-log-dot[data-kind='disable']{background:var(--dsw-alias-state-warn-primary,#e8a33d)}
-.skm-mcp-log-dot[data-kind='remove']{background:var(--dsw-alias-state-error-primary,#e0434b)}
-.skm-mcp-log-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.skm-mcp-log-text{font-size:12.5px;line-height:18px;color:var(--dsw-alias-label-primary,#1f2430)}
-.skm-mcp-log-text strong{font-weight:600}
-.skm-mcp-log-clear{flex:none;display:inline-flex;align-items:center;height:28px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.12));border-radius:999px;background:transparent;padding:0 12px;font-size:12px;line-height:17px;font-family:inherit;color:var(--dsw-alias-label-secondary,#61666b);cursor:pointer;transition:border-color 140ms ease,color 140ms ease,transform 140ms ease}
-.skm-mcp-log-clear:hover{border-color:var(--dsw-alias-border-l3,rgba(0,0,0,.18));color:var(--dsw-alias-label-primary,#1f2430)}
-.skm-mcp-log-clear:active{transform:scale(.96)}
 /* 配置模板卡 */
 .skm-mcp-config-grid{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .skm-mcp-config-card{flex:none;min-width:0;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.08));border-radius:14px;background:var(--dsw-alias-bg-base,#fff);padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.03);transition:border-color 160ms ease,box-shadow 160ms ease}

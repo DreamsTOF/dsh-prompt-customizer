@@ -58,7 +58,12 @@ test('reset 的结果（有既有文件 / 无既有文件）', async () => {
       label: 'reset 清空全部定制并关闭 forceSections',
       prepare: (dataDir) => {
         const db = openDb(path.join(dataDir, 'prompt-customizer.db'))
-        setDoc(db, 'config', { forceSections: true, sections: ['a'], replace: { b: 'B' }, overrides: { liangshen: { sections: ['c'] } } })
+        setDoc(db, 'config', {
+          forceSections: true,
+          sections: [{ name: 'a' }],
+          replacements: [{ name: 'b', phase: 'always', text: 'B' }],
+          overrides: { liangshen: { sections: [{ name: 'c' }] } },
+        })
         return db
       },
       check: (res, db) => {
@@ -66,7 +71,7 @@ test('reset 的结果（有既有文件 / 无既有文件）', async () => {
         assert.equal(res.body.ok, true)
         // 只剩 forceSections: false —— 其余全部清空
         assert.deepEqual(res.body.config.sections, [])
-        assert.deepEqual(res.body.config.replace, {})
+        assert.deepEqual(res.body.config.replacements, [])
         assert.deepEqual(res.body.config.overrides, {})
         assert.equal(res.body.config.forceSections, false)
         // DB 里的文档也确实是这份最小状态（不依赖内存缓存）

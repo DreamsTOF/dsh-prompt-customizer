@@ -87,7 +87,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-当前版本 **1.0.0**（破坏式：存储迁移到 SQLite、新增工作区级自定义），对齐 **DSH 0.2.2-rc.1**。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+当前版本 **1.4.0**（破坏式：统一 `PHASES` 阶段表 + `{name, source}` 条目身份；工作区级=预设候选超集；MCP 热重载改宿主 `mcpManager`），对齐 **DSH 0.2.2-rc.1**。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 

@@ -12,9 +12,9 @@
  * 文件选择；成功 / 失败 / 取消都有面板内消息条提示。
  */
 import { createElement as h, useEffect, useRef, useState, type ReactElement, type ChangeEvent } from 'react'
-import type { Config, Inventory, PhaseViewKey, Preview, Preset } from './types.ts'
+import { PHASE_KEYS, entryKey, type Config, type EntryRef, type Inventory, type PhaseViews, type Preset } from './types.ts'
 import type { Translate } from './locales.ts'
-import { addImportedPresets, applyPresetData, buildPresetData, genId, mergeSections, PART_ORDER, removePreset, type ConfigPatch } from './presets.ts'
+import { addImportedPresets, applyPresetData, buildPresetData, genId, mergeSections, removePreset, type ConfigPatch } from './presets.ts'
 import { decodePresetExport, exportPresetFile, importPresetFile } from './preset-io.ts'
 import { s } from './styles.ts'
 
@@ -42,8 +42,8 @@ function useNotice(): { notice: Notice | null; show: (kind: Notice['kind'], text
 export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklist, applyLevel, applyTargetName }: {
   cfg: Config
   inv: Inventory | null
-  /** Panel 并行拉取的三阶段装配：快照只捕获当前装配里真实存在的段。 */
-  phases: Record<PhaseViewKey, Preview | null> | null
+  /** Panel 并行拉取的三阶段装配。 */
+  phases: PhaseViews | null
   t: Translate
   /** 应用预设：完整补丁一次落盘（显式意图，不经草稿）。 */
   writePatch: (patch: ConfigPatch) => void
@@ -62,19 +62,19 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   // Web 回退用的隐藏文件输入（tauri 不可用时才点它）。
   const fileRef = useRef<HTMLInputElement | null>(null)
 
-  const blockedNames = new Set(cfg.sections ?? [])
-  // 快照的捕获宇宙 = 当前预设三个阶段装配里真实存在的段名。「本系统全部提示词」
-  // 是跨预设只增不减的并集池，直接拿它当捕获集合会把别的预设独有段名灌进快照，
-  // 应用回来就是一条条空白幽灵段。装配数据未就绪（宇宙为空）时不过滤，避免捕获成空。
-  const assemblyNames = new Set<string>()
-  for (const key of PART_ORDER) {
-    for (const sec of phases?.[key]?.baseSections ?? []) assemblyNames.add(sec.name)
+  // 清单本身已按当前预设 scope 过滤（不再有跨预设累积池），直接用清单 + 注入
+  // 构建快照捕获宇宙；屏蔽名单按 name+source 的条目身份匹配。
+  const blockedKeys = new Set((cfg.sections ?? []).map((entry) => entryKey(entry)))
+  const merged = mergeSections(inv, cfg, blockedKeys)
+  // 应用时的「当前系统条目」= 清单条目 ∪ 三阶段真实基座（过滤掉预设里根本没有的条目）。
+  // 传 Map（键 → 条目）以便补丁里写回带 source 的完整身份。
+  const currentEntries = new Map<string, EntryRef>()
+  for (const section of merged) currentEntries.set(entryKey(section), { name: section.name, ...(section.source === undefined ? {} : { source: section.source }) })
+  for (const key of PHASE_KEYS) {
+    for (const section of phases?.[key]?.baseSections ?? []) {
+      currentEntries.set(entryKey(section), { name: section.name, ...(section.source === undefined ? {} : { source: section.source }) })
+    }
   }
-  const mergedAll = mergeSections(inv, cfg, blockedNames)
-  const merged = assemblyNames.size === 0
-    ? mergedAll
-    : mergedAll.filter((sec) => sec.source === 'custom' || assemblyNames.has(sec.name))
-  const currentNames = new Set(merged.map((sec) => sec.name))
 
   // 把当前定制捕获为新预设（完整快照）。绝对顺序会被转成相对形式
   //（每段记录它应跟随的前一段），因此预设可以跨不同提示词移植。
@@ -89,7 +89,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   // 列表中的当前段被屏蔽、只有预设的「激活段」被解除屏蔽）。四个定制字段以
   // 一个补丁写入当前编辑目标；快照库（presets / activePreset）永远保持在全局。
   const applyPreset = (preset: Preset): void => {
-    writePatch(applyPresetData(preset.data, cfg, currentNames))
+    writePatch(applyPresetData(preset.data, cfg, currentEntries))
     // 工作区级应用不改「活动预设」这个库概念；仅预设级应用时标记。
     if (applyLevel !== 'workspace') writeGlobal('activePreset', preset.id)
   }

@@ -8,6 +8,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { readMaskLedger, writeMaskLedger } from './mcp-mask-ledger.ts'
 import { readToolLedger, writeToolLedger } from './mcp-tool-disable.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 
 type PluginContext = any
 const ROUTE = '/api/triad/mcp-apply-all'
@@ -16,14 +17,9 @@ function json(res: any, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
   res.end(JSON.stringify(body))
 }
-function loopback(req: any): boolean {
-  const address = req?.socket?.remoteAddress
-  return typeof address === 'string'
-    && (address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1')
-}
-
-async function handle(_ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!loopback(req)) { json(res, 403, { ok: false, error: 'loopback-only' }); return }
+async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) { rejectUntrusted(res, trust); return }
   if ((req.method ?? 'GET') !== 'POST') { json(res, 405, { ok: false, error: 'POST only' }); return }
   try {
     const mask = readMaskLedger(true)

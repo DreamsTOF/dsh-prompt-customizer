@@ -30,7 +30,9 @@ function harness(t, { exclude = [], live = true } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-shadow-'))
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }))
   if (exclude.length > 0) {
-    setDoc(openDb(path.join(dataDir, 'prompt-customizer.db')), 'config', { overrides: { standard: { tools: { exclude } } } })
+    setDoc(openDb(path.join(dataDir, 'prompt-customizer.db')), 'config', {
+      overrides: { standard: { tools: { exclude: exclude.map((name) => ({ name })) } } },
+    })
   }
   const routes = new Map()
   const defsFor = (scope) => (scope === AGENT ? agentDefs() : presetDefs())

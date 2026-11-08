@@ -12,16 +12,20 @@
  * 换 Tab / 换模式时旧列表卸载、新列表注册，任何时刻只有一个处理者。
  */
 import type { DragEvent as ReactDragEvent } from 'react'
-import type { PhaseViewKey } from './types.ts'
+import type { EntrySource, PhaseKey } from './types.ts'
 
 /** 载荷种类：段行 / 工具行。 */
 export type DragKind = 'section' | 'tool'
 /** 来源：某个阶段列表，或「全部」只读池。 */
-export type DragFrom = PhaseViewKey | 'pool'
+export type DragFrom = PhaseKey | 'pool'
 
 export interface DragPayload {
   kind: DragKind
   name: string
+  /** 条目来源：同名不同源按 name+source 分开操作。 */
+  source?: EntrySource
+  /** 工具同名多行（live / preset 两态）的展示区分后缀。 */
+  keySuffix?: string
   from: DragFrom
   /** 段行当前文本（拖到别的阶段时作为该阶段的注入文本）；工具不用。 */
   text?: string
@@ -45,7 +49,7 @@ export function isPanelDrag(event: DragEvent): boolean {
 }
 
 let current: DragPayload | null = null
-let phaseDrop: ((key: PhaseViewKey, payload: DragPayload) => void) | null = null
+let phaseDrop: ((key: PhaseKey, payload: DragPayload) => void) | null = null
 
 /** 拖起：登记载荷 + 写 dataTransfer（写不进去也能靠内存载荷继续）。 */
 export function beginDrag(event: ReactDragEvent, payload: DragPayload): void {
@@ -78,12 +82,12 @@ export function acceptsDrop(event: ReactDragEvent, kind: DragKind): boolean {
 }
 
 /** 当前挂载的列表（段 / 工具）把「拖到阶段 Tab」的处理函数注册进来。 */
-export function setPhaseDropHandler(next: ((key: PhaseViewKey, payload: DragPayload) => void) | null): void {
+export function setPhaseDropHandler(next: ((key: PhaseKey, payload: DragPayload) => void) | null): void {
   phaseDrop = next
 }
 
 /** 阶段 Tab 被投放：交给当前挂载的列表处理（没有列表就什么都不做）。 */
-export function dropOnPhase(key: PhaseViewKey, payload: DragPayload | null): void {
+export function dropOnPhase(key: PhaseKey, payload: DragPayload | null): void {
   if (payload === null) return
   phaseDrop?.(key, payload)
 }

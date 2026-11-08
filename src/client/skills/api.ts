@@ -1,12 +1,21 @@
 /**
  * skills/api — /api/skill-manager 与 /api/skill-toggles 的类型化请求封装。
  */
-import type {
-  HealthReport, HealthView, InstallInput, PresetStatus, SkillSnapshot, ToggleStatus,
+import {
+  isValidPresetId,
+  type HealthReport, type HealthView, type InstallInput, type PresetStatus, type SkillSnapshot, type ToggleStatus,
 } from './types.js'
 /** ---------------------------------------------------------------- API */
 
 export const SKILL_API_BASE = '/api/skill-manager'
+
+/**
+ * 写预设账本前的 API 层校验：空串是「全部 Agent」哨兵，绝不能落成真实 preset id。
+ * @param presetId - 目标预设 id。
+ */
+export function assertPresetId(presetId: string): void {
+  if (!isValidPresetId(presetId)) throw new Error(`invalid preset id: ${JSON.stringify(presetId)}`)
+}
 
 export async function skillRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(SKILL_API_BASE + path, options)
@@ -63,8 +72,9 @@ export const skillApi = {
         }
         return body as PresetStatus
       }),
-  setPresetSkillEnabled: (presetId: string, name: string, enabled: boolean): Promise<{ ok: boolean }> =>
-    fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/skills/${encodeURIComponent(name)}`, {
+  setPresetSkillEnabled: (presetId: string, name: string, enabled: boolean): Promise<{ ok: boolean }> => {
+    assertPresetId(presetId)
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/skills/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { accept: 'application/json', 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),
@@ -72,9 +82,11 @@ export const skillApi = {
       .then((body) => {
         if (!body.ok) throw new Error(body.error || 'toggle failed')
         return body
-      }),
-  setPresetBundleEnabled: (presetId: string, bundleId: string, enabled: boolean): Promise<{ ok: boolean }> =>
-    fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/bundles/${encodeURIComponent(bundleId)}`, {
+      })
+  },
+  setPresetBundleEnabled: (presetId: string, bundleId: string, enabled: boolean): Promise<{ ok: boolean }> => {
+    assertPresetId(presetId)
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/bundles/${encodeURIComponent(bundleId)}`, {
       method: 'PUT',
       headers: { accept: 'application/json', 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),
@@ -82,16 +94,19 @@ export const skillApi = {
       .then((body) => {
         if (!body.ok) throw new Error(body.error || 'toggle failed')
         return body
-      }),
-  resetPreset: (presetId: string): Promise<{ ok: boolean }> =>
-    fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/reset`, {
+      })
+  },
+  resetPreset: (presetId: string): Promise<{ ok: boolean }> => {
+    assertPresetId(presetId)
+    return fetch(`/api/skill-toggles/presets/${encodeURIComponent(presetId)}/reset`, {
       method: 'POST',
       headers: { accept: 'application/json' },
     }).then((response) => response.json() as Promise<{ ok: boolean; error?: string }>)
       .then((body) => {
         if (!body.ok) throw new Error(body.error || 'reset failed')
         return body
-      }),
+      })
+  },
   /** 工作区级开关：全部工作区覆盖（按 cwd）。 */
   workspaceStatus: (): Promise<{ workspaces: Record<string, Record<string, boolean>> }> =>
     fetch('/api/skill-toggles/workspaces', { headers: { accept: 'application/json' } })
@@ -118,6 +133,16 @@ export const skillApi = {
     }).then((response) => response.json() as Promise<{ ok: boolean; error?: string }>)
       .then((body) => {
         if (!body.ok) throw new Error(body.error || 'toggle failed')
+        return body
+      }),
+  /** 清空某工作区的全部技能开关覆盖（按 cwd，回落预设/全局）。 */
+  resetWorkspace: (cwd: string): Promise<{ ok: boolean }> =>
+    fetch(`/api/skill-toggles/workspaces/${encodeURIComponent(cwd)}/reset`, {
+      method: 'POST',
+      headers: { accept: 'application/json' },
+    }).then((response) => response.json() as Promise<{ ok: boolean; error?: string }>)
+      .then((body) => {
+        if (!body.ok) throw new Error(body.error || 'reset failed')
         return body
       }),
   createBundle: (name: string, categories: string[] = []): Promise<Record<string, never>> =>

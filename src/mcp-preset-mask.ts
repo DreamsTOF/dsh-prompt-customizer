@@ -30,8 +30,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { loopbackAllowed, writeJsonResponse } from './mcp-recommended.ts'
+import { writeJsonResponse } from './mcp-recommended.ts'
 import { listPresetServers } from './mcp-presets.ts'
+import { optionalService } from './context-utils.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 import {
   computeDenyNames,
   isPresetId,
@@ -108,7 +110,7 @@ interface InstallerState {
 
 /** 预设 id（服务或组合缺失时返回 undefined）。 */
 function presetOf(ctx: PluginContext, agent: AgentLike): string | undefined {
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   if (presets?.composedPreset === undefined) return undefined
   try {
     const id = presets.composedPreset(agent.ctx)
@@ -231,7 +233,7 @@ async function installAgent(ctx: PluginContext, state: InstallerState, agent: Ag
 
 /** 对全部活动 agent 重装（账本变更 / 工具集变更）。 */
 function reinstallAll(ctx: PluginContext, state: InstallerState, onlyPreset?: string): void {
-  const agents = ctx.get?.('agents')
+  const agents = optionalService(ctx, 'agents')
   const list: AgentLike[] = typeof agents?.list === 'function' ? agents.list() : []
   for (const agent of list) {
     if (agent === undefined || agent === null) continue
@@ -263,7 +265,7 @@ export async function applyMcpPresetMask(ctx: PluginContext): Promise<void> {
       releasePatches(state, agent)
       agentOutcome.delete(agent.id)
     }
-    const agents = ctx.get?.('agents')
+    const agents = optionalService(ctx, 'agents')
     if (typeof agents?.list === 'function') for (const agent of agents.list()) install(agent)
     const offCreated = ctx.on('agent/created', ({ agent }: { agent: AgentLike }) => { install(agent) })
     const offDisposed = ctx.on('agent/disposed', ({ agent }: { agent: AgentLike }) => { remove(agent) })
@@ -302,8 +304,9 @@ export async function applyMcpPresetMask(ctx: PluginContext): Promise<void> {
 
 /** 处理一条 PUT /api/triad/mcp-masks/<preset>/<serverName>。 */
 async function handle(ctx: PluginContext, state: InstallerState, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!loopbackAllowed(req)) {
-    writeJsonResponse(res, 403, { error: 'loopback-only' })
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
     return
   }
   const url = new URL(req.url ?? '/', 'http://localhost')

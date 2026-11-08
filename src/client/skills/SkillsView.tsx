@@ -14,22 +14,24 @@ import { CloudUpIcon, FolderBlueIcon, TagIcon } from './icons.js'
 import { SkillCard } from './SkillCard.js'
 import { css } from './styles.js'
 import { ALL_PRESETS } from './types.js'
-import type { BundleInfo, ConfirmState, HealthView, PanelState, PresetRow, SkillInfo } from './types.js'
+import type { BundleInfo, ConfirmState, HealthView, PanelState, PresetRow, SkillEnableScope, SkillInfo } from './types.js'
 
 export function SkillsView({
-  t, state, health, activePreset, presets, presetOverride, resetActivePreset, openMenu, setOpenMenu,
+  t, state, health, scope, scopeOverrideCount, presets, onResetScope, openMenu, setOpenMenu,
   refresh, noResults, visibleBundleAll, expanded, renameTarget, setRenameTarget, renaming, submitRename,
-  bundleEnabledIn, toggling, viewMode, setCatFilter, activeCat, toggleExpanded, renamedFlash, openInstallFor,
+  bundleEnabledIn, toggling, setCatFilter, activeCat, toggleExpanded, renamedFlash, openInstallFor,
   skillEnabledIn, skillLockedReason, scopeLabel, toggleSkill, toggleBundle, openViewer, removeFromBundle,
   pruneBundle, openCatEditor, setConfirm, setAssignTarget, looseOpen, setLooseExpanded, visibleLooseAll,
 }: {
   t: (key: string, params?: Record<string, string | number>) => string
   state: PanelState
   health: HealthView
-  activePreset: string
+  /** 技能开关的完整作用域（与面板动作共用同一个对象）。 */
+  scope: SkillEnableScope
+  /** 该作用域已有的覆盖项数：>0 才显示「清空单独设置」。 */
+  scopeOverrideCount: number
   presets: PresetRow[]
-  presetOverride: Record<string, boolean>
-  resetActivePreset: () => void
+  onResetScope: (scope: SkillEnableScope) => void
   openMenu: string | null
   setOpenMenu: Dispatch<SetStateAction<string | null>>
   refresh: () => void
@@ -42,7 +44,6 @@ export function SkillsView({
   submitRename: (event: FormEvent<HTMLFormElement>) => Promise<void>
   bundleEnabledIn: (bundle: BundleInfo) => boolean
   toggling: Set<string>
-  viewMode: 'grid' | 'list'
   setCatFilter: Dispatch<SetStateAction<string | null>>
   activeCat: string | null
   toggleExpanded: (bundleId: string) => void
@@ -63,6 +64,8 @@ export function SkillsView({
   setLooseExpanded: Dispatch<SetStateAction<boolean>>
   visibleLooseAll: SkillInfo[]
 }): JSX.Element {
+  const showReset = scopeOverrideCount > 0
+    && (scope.level === 'workspace' ? scope.cwd !== null : scope.presetId !== ALL_PRESETS)
   return (
     <>
           {/* 同步问题明细：只读健康扫描发现 error 级问题时展示（顶栏健康指示悬停看全量） */}
@@ -80,13 +83,15 @@ export function SkillsView({
           {/* 预设提示行：当前编辑层说明 + 清空该预设的单独设置 */}
           <div className={css.hintRow}>
             <span className={css.hintRowText}>
-              {activePreset === ALL_PRESETS
-                ? t('presetHintAll')
-                : t('presetHintScoped', { name: presets.find((preset) => preset.id === activePreset)?.name ?? activePreset })}
+              {scope.level === 'workspace'
+                ? t('workspaceHint', { path: scope.cwd ?? '' })
+                : scope.presetId === ALL_PRESETS
+                  ? t('presetHintAll')
+                  : t('presetHintScoped', { name: presets.find((preset) => preset.id === scope.presetId)?.name ?? scope.presetId })}
             </span>
-            {activePreset !== ALL_PRESETS && Object.keys(presetOverride).length > 0 && (
-              <button type="button" className={css.presetReset} onClick={resetActivePreset}>
-                {t('presetReset')}
+            {showReset && (
+              <button type="button" className={css.presetReset} onClick={() => { onResetScope(scope) }}>
+                {scope.level === 'workspace' ? t('workspaceReset') : t('presetReset')}
               </button>
             )}
           </div>
@@ -113,7 +118,6 @@ export function SkillsView({
                     const renamingThis = renameTarget?.bundleId === bundle.id
                     const bundleEnabled = bundleEnabledIn(bundle)
                     const bundleToggling = toggling.has(`bundle:${bundle.id}`)
-                    const gridClass = viewMode === 'list' ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid
                     const missing = bundle.missingSkills ?? []
                     const bundleCats = bundle.categories ?? []
                     const emptyBundle = bundle.skillCount === 0
@@ -183,7 +187,7 @@ export function SkillsView({
                             <Menu
                               open={openMenu === `bundle:${bundle.id}`}
                               onClose={() => { setOpenMenu(null) }}
-                              onSelect={(id) => {
+                              onSelect={(id: string) => {
                                 setOpenMenu(null)
                                 if (id === 'enable') toggleBundle(bundle, true)
                                 else if (id === 'disable') toggleBundle(bundle, false)
@@ -245,7 +249,7 @@ export function SkillsView({
                           </div>
                         )}
                         {openView && (
-                          <ul className={gridClass} data-renamed={renamedFlash === bundle.id ? 'true' : undefined}>
+                          <ul className={css.skillGrid} data-renamed={renamedFlash === bundle.id ? 'true' : undefined}>
                             {bundle.skills.length === 0 ? (
                               <li className={css.bundleEmpty}>
                                 <span className={css.bundleEmptyTitle}>{t('bundleEmptyTitle')}</span>
@@ -291,7 +295,7 @@ export function SkillsView({
                         </button>
                       </header>
                       {looseOpen && (
-                        <ul className={viewMode === 'list' ? `${css.skillGrid} ${css.skillGridList}` : css.skillGrid}>
+                        <ul className={css.skillGrid}>
                           {visibleLooseAll.map((skill, index) => (
                             <SkillCard key={skill.name} skill={skill} bundleId={null} bundleName={null}
                               enabled={skillEnabledIn(skill.name)}

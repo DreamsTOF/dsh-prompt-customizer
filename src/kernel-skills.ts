@@ -20,8 +20,10 @@
  */
 
 import { basename, dirname, resolve } from 'node:path'
-import { currentRootPaths } from './skill-roots.ts'
+import { currentRootPaths, userSkillRoots, workspaceSkillRoots } from './skill-roots.ts'
 import { isSkillMaskStub } from './skill-mask-provider.ts'
+import { normalizeCwd } from './home-paths.ts'
+import { isSkillName } from './ids.ts'
 
 /** 运行时上下文在类型上放宽（与其它 host 模块同惯例）。 */
 type PluginContext = any
@@ -99,7 +101,7 @@ function sessionCandidates(ctx: PluginContext): SessionCandidate[] {
     if (typeof cwd !== 'string' || cwd.trim() === '') continue
     if (typeof id !== 'string' || id === '') continue
     const createdAt = typeof header?.createdAt === 'number' ? header.createdAt : 0
-    out.push({ agent, id, cwd: resolve(cwd), createdAt })
+    out.push({ agent, id, cwd: normalizeCwd(cwd), createdAt })
   }
   out.sort((left, right) => right.createdAt - left.createdAt)
   return out
@@ -145,12 +147,10 @@ function isWritableDir(dir: string | undefined): boolean {
 async function scanWorkspaceSkills(cwd: string, hidden: ReadonlySet<string> | undefined): Promise<KernelSkillView[]> {
   const { readdir, stat } = await import('node:fs/promises')
   const { join } = await import('node:path')
-  const { dshHome, agentsHome } = await import('./home-paths.ts')
+  // 根集合只有 skill-roots.ts 一份：工作区两处 + 用户两处，顺序即优先级。
   const roots: Array<{ dir: string; source: string }> = [
-    { dir: join(cwd, '.dsh', 'skills'), source: 'project-dsh' },
-    { dir: join(cwd, '.agents', 'skills'), source: 'project-agents' },
-    { dir: join(dshHome(), 'skills'), source: 'user-dsh' },
-    { dir: join(agentsHome(), 'skills'), source: 'user-agents' },
+    ...workspaceSkillRoots(cwd).map((root) => ({ dir: root.path, source: root.label })),
+    ...userSkillRoots().map((root) => ({ dir: root.path, source: root.label })),
   ]
   const views: KernelSkillView[] = []
   const seen = new Set<string>()
@@ -176,7 +176,7 @@ async function scanWorkspaceSkills(cwd: string, hidden: ReadonlySet<string> | un
       const front = match === null ? '' : match[1]!
       const name = (/^name:\s*(.+)$/m.exec(front)?.[1] ?? dir).trim().replace(/^['"]|['"]$/g, '')
       const description = (/^description:\s*(.+)$/m.exec(front)?.[1] ?? '').trim().replace(/^['"]|['"]$/g, '')
-      if (name === '' || seen.has(name)) continue
+      if (!isSkillName(name) || seen.has(name)) continue
       if (hidden?.has(name) === true) continue
       seen.add(name)
       let fileCount = 0
@@ -210,8 +210,8 @@ async function scanWorkspaceSkills(cwd: string, hidden: ReadonlySet<string> | un
 /** 启动目录：profile 的 cwd，缺失时回落进程 cwd（无会话时的项目根依据）。 */
 function launchCwd(ctx: PluginContext): string {
   const fromProfile = ctx?.profileContext?.cwd
-  if (typeof fromProfile === 'string' && fromProfile.trim() !== '') return resolve(fromProfile)
-  return resolve(process.cwd())
+  if (typeof fromProfile === 'string' && fromProfile.trim() !== '') return normalizeCwd(fromProfile)
+  return normalizeCwd(process.cwd())
 }
 
 /**
@@ -239,8 +239,8 @@ async function listKernelSkills(
   const global = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined
   const service = scoped ?? global
   if (typeof service?.list !== 'function') return []
-  const cwd = cwdOverride !== undefined && cwdOverride !== ''
-    ? cwdOverride
+  const cwd = cwdOverride !== undefined && cwdOverride.trim() !== ''
+    ? normalizeCwd(cwdOverride)
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   // scope key 就是 agent 对象本身：内核建 agent 时 `createScope(loopCtx, this)`
   // （`core/agent/src/agent.ts:104`）、遮蔽层用 `createScope(ctx, agent)`
@@ -276,7 +276,7 @@ export async function kernelSkillViews(
   // 挂在预设行里）。面板要能配置任意工作区，因此内核给不出条目时按同一套根规则
   // 兜底扫描 —— 目标工作区明确时也走兜底，避免拿到别的会话的项目根。
   const targetCwd = cwd !== undefined && cwd !== ''
-    ? cwd
+    ? normalizeCwd(cwd)
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   // 我们的工作区扫描是对内核的升级：内核 `snapshot().complete` 不覆盖工作区 skills/MCP，
   // 所以不做“内核够不够完整”的启发式判断——始终扫描，再与内核条目按名字合并。
@@ -340,10 +340,10 @@ export async function workspaceRoots(ctx: PluginContext): Promise<string[]> {
   const seen = new Set<string>()
   const out: string[] = []
   const push = (dir: string): void => {
-    const key = resolve(dir).toLowerCase()
+    const key = normalizeCwd(dir)
     if (seen.has(key)) return
     seen.add(key)
-    out.push(resolve(dir))
+    out.push(key)
   }
   // 用户侧登记的工作区（侧边栏里那些）—— 没开过会话的也要能选。
   const registry = typeof ctx?.get === 'function' ? ctx.get('workspaceRegistry') : undefined

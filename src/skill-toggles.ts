@@ -51,6 +51,10 @@ import { presetTrustOf } from './mcp-presets.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 import { kernelSkillSummaries, setHiddenSkillReader } from './kernel-skills.ts'
 import { SKILL_MASK_PROVIDER } from './skill-mask-provider.ts'
+import { isPresetId, isSkillName } from './ids.ts'
+import { normalizeCwd } from './home-paths.ts'
+import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
+import { optionalService } from './context-utils.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -151,16 +155,6 @@ export interface HiddenSkillsFile {
   hidden: string[]
 }
 
-/** preset id 形状(与 dsh-agent-presets 的目录名规则一致)。 */
-function isPresetId(value: string): boolean {
-  return /^[a-z0-9][a-z0-9-]*$/.test(value)
-}
-
-/** 技能名形状(与内核 SKILL_NAME 一致)。 */
-function isSkillName(value: string): boolean {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
-}
-
 /** 账本路径(与 .bundles.json 同目录:managedRoot)。 */
 function presetLedgerPath(): string {
   return join(managedRoot(), PRESET_FILE)
@@ -228,13 +222,14 @@ function normalizeWorkspaceLedger(input: unknown): WorkspaceSkillsFile {
   if (raw !== null && typeof raw === 'object') {
     for (const [cwd, table] of Object.entries(raw as Record<string, unknown>)) {
       if (typeof cwd !== 'string' || cwd === '') continue
+      const key = normalizeCwd(cwd)
       if (table === null || typeof table !== 'object') continue
       const entries: Record<string, boolean> = {}
       for (const [skillName, state] of Object.entries(table as Record<string, unknown>)) {
         if (!isSkillName(skillName) || typeof state !== 'boolean') continue
         entries[skillName] = state
       }
-      workspaces[cwd] = entries
+      workspaces[key] = entries
     }
   }
   return { version: 1, workspaces }
@@ -256,8 +251,9 @@ async function writeWorkspaceLedger(next: WorkspaceSkillsFile): Promise<void> {
 /** 写入一批「工作区 → 技能 → 开关」；enabled=true 删除覆盖（回落预设/全局）。 */
 async function setWorkspaceSkills(cwd: string, names: readonly string[], enabled: boolean): Promise<number> {
   if (typeof cwd !== 'string' || cwd === '') throw new Error('workspace cwd is required')
+  const key = normalizeCwd(cwd)
   const current = await readWorkspaceLedger()
-  const table = { ...(current.workspaces[cwd] ?? {}) }
+  const table = { ...(current.workspaces[key] ?? {}) }
   let changed = 0
   for (const skillName of names) {
     if (!isSkillName(skillName)) continue
@@ -270,8 +266,8 @@ async function setWorkspaceSkills(cwd: string, names: readonly string[], enabled
   }
   if (changed === 0) return 0
   const workspaces = { ...current.workspaces }
-  if (Object.keys(table).length === 0) delete workspaces[cwd]
-  else workspaces[cwd] = table
+  if (Object.keys(table).length === 0) delete workspaces[key]
+  else workspaces[key] = table
   await writeWorkspaceLedger({ version: 1, workspaces })
   return changed
 }
@@ -576,6 +572,52 @@ async function status(ctx: PluginContext): Promise<{ skills: Record<string, bool
   return { skills, bundles }
 }
 
+/**
+ * 某个（预设, 工作区）视角下的**有效**启用状态。
+ *
+ * 三层优先级固定为 工作区 > 预设 > 全局：
+ *  - 全局隐藏（hidden 账本）是基底；
+ *  - 预设层 `false` 关闭，`true`/缺省继承；
+ *  - 工作区层显式 `true` 可以把预设/全局关掉的技能重新打开（同名覆盖语义）。
+ *
+ * @param ctx - 宿主上下文。
+ * @param presetId - 预设 id；省略表示只看全局/工作区。
+ * @param workspace - 工作区 cwd；省略表示不叠加工作区层。
+ * @returns 与 `/status` 同形状的有效状态。
+ */
+async function effectiveStatus(
+  ctx: PluginContext,
+  presetId?: string,
+  workspace?: string,
+): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
+  const base = await status(ctx)
+  if (presetId === undefined && workspace === undefined) return base
+  const presetTable = presetId === undefined ? {} : ((await readLedger()).presets[presetId] ?? {})
+  const wsKey = workspace === undefined || workspace.trim() === '' ? undefined : normalizeCwd(workspace)
+  const wsTable = wsKey === undefined ? {} : ((await readWorkspaceLedger()).workspaces[wsKey] ?? {})
+  const names = new Set<string>([...Object.keys(presetTable), ...Object.keys(wsTable)])
+  if (names.size === 0) return base
+  const skills = { ...base.skills }
+  for (const name of names) {
+    let disabled: boolean
+    if (Object.hasOwn(wsTable, name)) disabled = wsTable[name] === false
+    else if (Object.hasOwn(presetTable, name)) disabled = presetTable[name] === false
+    else continue
+    // 只在目录里真实存在的技能上覆盖；账本里的脏名字不往响应里加。
+    if (skills[name] === undefined) continue
+    skills[name] = !disabled
+  }
+  // 技能包状态由成员技能重新投影（成员可能被预设/工作区单独打开或关闭）。
+  const bundles = { ...base.bundles }
+  const ledger = await readBundles(managedRoot())
+  const alias = await skillNameIndex()
+  for (const record of ledger.bundles) {
+    const states = record.skills.map((skillName) => skills[alias.get(skillName) ?? skillName])
+    bundles[record.id] = states.length === 0 || states.every((state) => state !== false)
+  }
+  return { skills, bundles }
+}
+
 /** ── 预设闸门:把「该预设下被关掉的技能」在 agent 层遮成不可调用 ─────────── */
 
 /**
@@ -634,7 +676,7 @@ function installGlobalMask(ctx: PluginContext): any {
 
 function installMask(ctx: PluginContext, agent: any): any {
   const presetOf = (): string => {
-    const presets = ctx.get?.('agentPresets')
+    const presets = optionalService(ctx, 'agentPresets')
     if (presets?.composedPreset === undefined) return ''
     try { return presets.composedPreset(agent.ctx) ?? '' } catch { return '' }
   }
@@ -648,7 +690,8 @@ function installMask(ctx: PluginContext, agent: any): any {
         name: MASK_PROVIDER,
         list: async () => {
           const presetId = presetOf()
-          const cwd = typeof agent?.session?.header?.cwd === 'string' ? agent.session.header.cwd : ''
+          const rawCwd = typeof agent?.session?.header?.cwd === 'string' ? agent.session.header.cwd : ''
+          const cwd = rawCwd === '' ? '' : normalizeCwd(rawCwd)
           // 三层优先级：工作区 > 预设 > 全局。工作区显式 true 可覆盖预设/全局的关闭。
           const globalHidden = await readHidden()
           const presetTable = presetId !== '' ? ((await readLedger()).presets[presetId] ?? {}) : {}
@@ -688,7 +731,7 @@ function installMask(ctx: PluginContext, agent: any): any {
  * 仍由随安装的 bundle 声明 = system。
  */
 export async function readPresetRoster(ctx: PluginContext): Promise<Array<Record<string, unknown>>> {
-  const presets = ctx.get?.('agentPresets')
+  const presets = optionalService(ctx, 'agentPresets')
   if (presets?.list === undefined) return []
   try {
     const rows = await presets.list()
@@ -701,6 +744,9 @@ export async function readPresetRoster(ctx: PluginContext): Promise<Array<Record
         ...typeof row?.name === 'string' ? { name: row.name } : {},
         ...typeof row?.description === 'string' ? { description: row.description } : {},
         ...typeof row?.order === 'number' ? { order: row.order } : {},
+        // 激活失败诊断必须透传：面板据此提示「该预设的组合行挂不起来」，
+        // 丢掉 broken 会让坏预设看起来和好预设一样。
+        ...typeof row?.broken === 'string' && row.broken !== '' ? { broken: row.broken } : {},
       }))
       .filter((row: any) => row.id !== '')
   } catch (error: any) {
@@ -710,39 +756,6 @@ export async function readPresetRoster(ctx: PluginContext): Promise<Array<Record
 }
 
 /** ── HTTP plumbing (same contract as skill-manager) ─────────────────────── */
-
-function isLoopbackAddress(address: string | undefined): boolean {
-  if (typeof address !== 'string') return false
-  const a = address.toLowerCase()
-  if (a === '::1') return true
-  const ipv4 = a.startsWith('::ffff:') ? a.slice(7) : a
-  const octets = ipv4.split('.')
-  return octets.length === 4 && octets[0] === '127'
-    && octets.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
-}
-
-function hostNameOf(value: string | undefined): string | null {
-  if (typeof value !== 'string') return null
-  const host = value.trim().toLowerCase()
-  if (host.startsWith('[')) {
-    const close = host.indexOf(']')
-    if (close <= 1) return null
-    const suffix = host.slice(close + 1)
-    if (suffix !== '' && !/^:\d+$/.test(suffix)) return null
-    return host.slice(1, close)
-  }
-  const firstColon = host.indexOf(':')
-  const lastColon = host.lastIndexOf(':')
-  if (firstColon !== lastColon) return null
-  return firstColon === -1 ? host : host.slice(0, firstColon)
-}
-
-function loopbackAllowed(req: IncomingMessage): boolean {
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false
-  const host = hostNameOf(req.headers.host)
-  if (host === null) return false
-  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-}
 
 function json(res: ServerResponse, status: number, value: unknown): void {
   const body = JSON.stringify(value)
@@ -783,8 +796,9 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 
 /** Route dispatch for one /api/skill-toggles request. */
 async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!loopbackAllowed(req)) {
-    json(res, 403, { error: 'loopback-only' })
+  const trust = requireTrustedRequest(ctx, req)
+  if (!trust.ok) {
+    rejectUntrusted(res, trust)
     return
   }
   const url = new URL(req.url ?? '/', 'http://localhost')
@@ -792,7 +806,20 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
   const method = req.method ?? 'GET'
   try {
     if (method === 'GET' && (rest === '' || rest === '/status')) {
-      json(res, 200, await status(ctx))
+      const presetId = url.searchParams.get('preset') ?? undefined
+      const workspace = url.searchParams.get('workspace') ?? undefined
+      const effective = await effectiveStatus(ctx, presetId, workspace)
+      const scoped = presetId !== undefined || workspace !== undefined
+      json(res, 200, scoped
+        ? {
+            ...effective,
+            scope: {
+              ...presetId === undefined ? {} : { preset: presetId },
+              ...workspace === undefined ? {} : { workspace: normalizeCwd(workspace) },
+            },
+            global: await status(ctx),
+          }
+        : effective)
       return
     }
     const matchSkill = /^\/skills\/([^/]+)$/.exec(rest)
@@ -889,7 +916,7 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
       const skillName = decodeURIComponent(matchWsSkill[2]!)
       if (!isSkillName(skillName)) throw new Error(`invalid skill name ${JSON.stringify(skillName)}`)
       const changed = await setWorkspaceSkills(cwd, [skillName], enabled)
-      json(res, 200, { ok: true, workspace: cwd, name: skillName, enabled, changed })
+      json(res, 200, { ok: true, workspace: normalizeCwd(cwd), name: skillName, enabled, changed })
       return
     }
     const matchWsBundle = /^\/workspaces\/([^/]+)\/bundles\/([^/]+)$/.exec(rest)
@@ -903,19 +930,20 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
       const record = ledger.bundles.find(bundle => bundle.id === bundleId)
       if (record === undefined) throw new Error(`bundle ${JSON.stringify(bundleId)} not found`)
       const changed = await setWorkspaceSkills(cwd, await canonicalSkillNames(record.skills), enabled)
-      json(res, 200, { ok: true, workspace: cwd, id: bundleId, enabled, changed })
+      json(res, 200, { ok: true, workspace: normalizeCwd(cwd), id: bundleId, enabled, changed })
       return
     }
     const matchWsReset = /^\/workspaces\/([^/]+)\/reset$/.exec(rest)
     if (method === 'POST' && matchWsReset !== null) {
       const cwd = decodeURIComponent(matchWsReset[1]!)
       const current = await readWorkspaceLedger()
-      if (current.workspaces[cwd] !== undefined) {
+      const key = normalizeCwd(cwd)
+      if (current.workspaces[key] !== undefined) {
         const workspaces = { ...current.workspaces }
-        delete workspaces[cwd]
+        delete workspaces[key]
         await writeWorkspaceLedger({ version: 1, workspaces })
       }
-      json(res, 200, { ok: true, workspace: cwd })
+      json(res, 200, { ok: true, workspace: key })
       return
     }
     json(res, 404, { error: `no route for ${method} ${rest}` })

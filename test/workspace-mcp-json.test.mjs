@@ -127,7 +127,7 @@ test('工作区 MCP：首次新建 .mcp.json，后续合并且同名不覆盖', 
   }
 })
 
-test('工作区 MCP：读回时转成内部行（带工作区后缀，保留 command/args/env）', async () => {
+test('工作区 MCP：读回时转成 agent 作用域 config（保留 command/args/env）', async () => {
   const box = mkdtempSync(join(tmpdir(), 'pc-ws-mcpjson-'))
   const workspace = join(box, 'ws')
   mkdirSync(workspace, { recursive: true })
@@ -142,9 +142,9 @@ test('工作区 MCP：读回时转成内部行（带工作区后缀，保留 com
     const { readWorkspaceRows } = await import('../src/mcp-workspace-scope.ts')
     const rows = await readWorkspaceRows(workspace)
     assert.equal(rows.length, 2, '缺 command/url 的条目跳过')
-    const byOriginal = Object.fromEntries(rows.map((row) => [row.serverName.replace(/-[0-9a-f]{8}$/, ''), row]))
+    const byOriginal = Object.fromEntries(rows.map((row) => [row.serverName, row]))
     assert.ok(byOriginal.anysearch !== undefined, '按原键名可识别')
-    assert.match(byOriginal.anysearch.serverName, /^anysearch-[0-9a-f]{8}$/, '带工作区哈希后缀')
+    assert.equal(byOriginal.anysearch.serverName, 'anysearch', 'agent 作用域内直接使用原键名（不再加全局哈希）')
     assert.equal(byOriginal.anysearch.config.transport, 'streamable-http')
     assert.equal(byOriginal.anysearch.config.url, 'https://api.anysearch.com/mcp')
     assert.deepEqual(byOriginal.anysearch.config.headers, { Authorization: 'Bearer x' })

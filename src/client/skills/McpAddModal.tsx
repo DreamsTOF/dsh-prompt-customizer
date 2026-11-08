@@ -3,7 +3,9 @@
  */
 import { useState } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { GuideArtIconSmall } from './icons.js'
+import {
+  detectMcpFormat, mcpFormatOptions, type McpConfigFormat, type McpFormatCapabilities,
+} from './mcp-state.js'
 import { css } from './styles.js'
 
 /**
@@ -11,7 +13,7 @@ import { css } from './styles.js'
  * 先「校验并预览」（宿主解析，带行号报错），确认后写入目标（全局 patch / 预设）。
  * 一次粘贴可含多个 server；已存在的 serverName 自动跳过。
  */
-export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat }: {
+export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat, editCapabilities }: {
   t: (key: string, params?: Record<string, string | number>) => string
   /** 目标预设；undefined = 全局 profile patch。 */
   presetId?: string
@@ -30,10 +32,21 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
   editSource?: 'global' | 'preset' | 'workspace'
   editPreset?: string
   editWorkspace?: string
-  /** 编辑回显格式：global 用 yaml（保留 !!js），preset/workspace 用 json。 */
-  editFormat?: 'json' | 'yaml'
+  /** 服务端返回的编辑格式；缺省时按文本形态兜底（不按 source 猜）。 */
+  editFormat?: McpConfigFormat
+  /** 服务端返回的编辑能力（可切换的格式）。 */
+  editCapabilities?: McpFormatCapabilities
 }): JSX.Element {
-  const [format, setFormat] = useState<'json' | 'yaml'>(editServer !== undefined ? (editFormat ?? 'yaml') : 'json')
+  /** 编辑入口不再按「global=YAML / preset=JSON」推断：用服务端 format，其次看文本形态。 */
+  const initialFormat: McpConfigFormat = editServer !== undefined
+    ? (editFormat ?? detectMcpFormat(editText ?? ''))
+    : 'json'
+  const [format, setFormat] = useState<McpConfigFormat>(initialFormat)
+  /** 编辑模式且服务端未声明能力时只保留当前格式，避免切到宿主不接受的格式。 */
+  const formatOptions = mcpFormatOptions(
+    editCapabilities,
+    editServer !== undefined ? [initialFormat] : ['json', 'yaml'],
+  )
   const [text, setText] = useState(editText ?? '')
   const [reload, setReload] = useState(false)
   const [busy, setBusy] = useState<'preview' | 'add' | null>(null)
@@ -66,7 +79,7 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
   const reset = (): void => { setErrors([]); setWarnings([]); setNotice(null); setPreview(null) }
 
   // 切换 JSON / YAML：把当前文本按目标格式实际改写（调用宿主 /mcp-format 互转），而不是只改标签。
-  const switchFormat = (next: 'json' | 'yaml'): void => {
+  const switchFormat = (next: McpConfigFormat): void => {
     if (next === format) return
     if (text.trim() === '') { setFormat(next); reset(); return }
     setBusy('preview')
@@ -103,9 +116,9 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
     // 编辑模式：改全局 profile patch 里该 server 的 config（复用 remove+append，带 .bak）。
     if (editServer !== undefined) {
       const payload = editSource === 'preset'
-        ? { source: 'preset', preset: editPreset, serverName: editServer, format: 'json' as const, text, reload }
+        ? { source: 'preset', preset: editPreset, serverName: editServer, format, text, reload }
         : editSource === 'workspace'
-          ? { source: 'workspace', workspace: editWorkspace, serverName: editServer, format: 'json' as const, text, reload }
+          ? { source: 'workspace', workspace: editWorkspace, serverName: editServer, format, text, reload }
           : { serverName: editServer, format, text, reload }
       void call('/api/triad/mcp-edit', payload)
         .then((body) => {
@@ -152,7 +165,7 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
       </p>
       <div className={css.installRow}>
         <div className={css.mcpAddTypeRow} role="group" aria-label={t('mcpPasteFormat')}>
-          {(['json', 'yaml'] as const).filter((value) => !(editServer !== undefined && (editSource === 'preset' || editSource === 'workspace') && value === 'yaml')).map(value => (
+          {formatOptions.map(value => (
             <button
               key={value}
               type="button"
@@ -261,14 +274,3 @@ export function McpAddModal({ t, open, onClose, onAdded }: {
     </Modal>
   )
 }
-
-/** 指南面板 logo：小书块。 */
-export function GuideArtIconSmall(): JSX.Element {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="1.5" y="2" width="13" height="12" rx="2.5" fill="var(--dsw-alias-state-business-primary,#3d6be5)" />
-      <path d="M4.5 5h7M4.5 8h7M4.5 11h4.5" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
-

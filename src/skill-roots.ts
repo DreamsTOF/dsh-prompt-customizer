@@ -26,7 +26,7 @@
 
 import { readdir, stat } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'
-import { agentsHome, dshHome } from './home-paths.ts'
+import { agentsHome, dshHome, normalizeCwd } from './home-paths.ts'
 
 /** 根的来源标签（与内核 source 同名，便于对照）。 */
 export type SkillRootLabel = 'project-dsh' | 'project-agents' | 'user-dsh' | 'user-agents'
@@ -52,9 +52,10 @@ export function userSkillRoots(): SkillRoot[] {
 
 /** 单个工作区的两个技能根（`.dsh` 先于 `.agents`，同名时 `.dsh` 胜）。 */
 export function workspaceSkillRoots(workspace: string): SkillRoot[] {
+  const normalized = normalizeCwd(workspace)
   return [
-    { path: join(workspace, '.dsh', 'skills'), label: 'project-dsh', workspace },
-    { path: join(workspace, '.agents', 'skills'), label: 'project-agents', workspace },
+    { path: join(normalized, '.dsh', 'skills'), label: 'project-dsh', workspace: normalized },
+    { path: join(normalized, '.agents', 'skills'), label: 'project-agents', workspace: normalized },
   ]
 }
 
@@ -111,8 +112,8 @@ export async function workspaceDirs(ctx: PluginContext): Promise<string[]> {
   const seen = new Set<string>()
   const out: string[] = []
   for (const cwd of [...agentCwds(ctx), launchCwd(ctx)]) {
-    const root = await findProjectRoot(cwd)
-    const key = root.toLowerCase()
+    const root = normalizeCwd(await findProjectRoot(cwd))
+    const key = normalizeCwd(root)
     if (seen.has(key)) continue
     seen.add(key)
     out.push(root)
@@ -136,7 +137,7 @@ export async function resolveSkillRoots(ctx: PluginContext): Promise<SkillRoot[]
   const seen = new Set<string>()
   const unique: SkillRoot[] = []
   for (const root of roots) {
-    const key = root.path.toLowerCase()
+    const key = normalizeCwd(root.path)
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(root)
@@ -174,9 +175,9 @@ export function currentRootPaths(): string[] {
 
 /** 该路径属于哪个根（用于把技能目录映射回来源标签）。 */
 export function rootOfPath(path: string): SkillRoot | undefined {
-  const target = resolve(path).toLowerCase()
+  const target = normalizeCwd(path)
   return cachedRoots.find((root) => {
-    const base = resolve(root.path).toLowerCase()
+    const base = normalizeCwd(root.path)
     return target === base || target.startsWith(`${base}${sep}`)
   })
 }

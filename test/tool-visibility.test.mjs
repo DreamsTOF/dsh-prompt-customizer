@@ -51,8 +51,8 @@ test('阶段化工具目录：bootstrap / active 各自安装 restrict', () => {
       overrides: {
         standard: {
           tools: {
-            bootstrap: { exclude: ['bash'] },
-            exclude: ['edit'],
+            bootstrap: { exclude: [{ name: 'bash', source: { kind: 'global' } }] },
+            exclude: [{ name: 'edit', source: { kind: 'global' } }],
           },
         },
       },
@@ -77,10 +77,26 @@ test('阶段化工具目录：配置里不存在的工具名不会送进 restric
   const h = harness()
   const visibility = createPhaseToolVisibility({
     ctx: h.ctx,
-    readConfig: () => ({ overrides: { standard: { tools: { exclude: ['missing-tool', 'bash'] } } } }),
+    readConfig: () => ({ overrides: { standard: { tools: { exclude: [{ name: 'missing-tool' }, { name: 'bash', source: { kind: 'global' } }] } } } }),
     phaseOf: () => ({ promoted: true, boundary: -1 }),
     presetOf: () => 'standard',
   })
   visibility.sync(h.agent)
   assert.deepEqual(h.restricts, [['bash']], '只提交注册表里真实存在的工具名')
+})
+
+test('阶段化工具目录：readConfig 返回已合并的生效配置（工作区 exclude 也生效）', () => {
+  const h = harness()
+  const visibility = createPhaseToolVisibility({
+    ctx: h.ctx,
+    readConfig: () => ({
+      tools: {
+        exclude: [{ name: 'edit', source: { kind: 'workspace' } }],
+        bootstrap: { exclude: [] },
+      },
+    }),
+    phaseOf: () => ({ promoted: true, boundary: -1 }),
+  })
+  visibility.sync(h.agent)
+  assert.deepEqual(h.restricts, [['edit']], '工作区级 tools.exclude 通过 restrict 收窄')
 })

@@ -20,51 +20,59 @@
  * 勾选 / 文本编辑一律经 persistRows 一次写全三个阶段（inject + 三份屏蔽名单），
  * 所以三态列表与文本恒等，不再逐阶段各写一份。
  *
- * 全部阶段状态逻辑来自 lib/sectionOps.mjs（纯函数，node --test 单测直接
- * 覆盖同一份代码）。
+ * 全部阶段状态逻辑来自 phase-ops.ts（纯函数，node --test 单测直接覆盖同一份
+ * 代码）；条目身份统一为 name+source。
  */
 import { createElement as h, useEffect, useRef, useState, type ChangeEvent, type DragEvent as ReactDragEvent, type ReactElement } from 'react'
-import type { Config, Inventory, PhaseViewKey, Preview } from './types.ts'
+import {
+  PHASES,
+  PHASE_KEYS,
+  PHASE_LABEL_KEY,
+  entryKey,
+  sameEntry,
+  type Config,
+  type ContextField,
+  type EntryRef,
+  type Inventory,
+  type PhaseKey,
+  type PhaseViews,
+  type SectionField,
+} from './types.ts'
 import type { Translate } from './locales.ts'
-import { PART_ORDER } from './presets.ts'
-import { injectPhaseOf, deniedNames, blockPatch, phaseInjectEntries, phaseRows, reorderInsert, injectedAt, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from '../../../vendor/prompt-customizer/sectionOps.mjs'
+import {
+  blockPatch,
+  injectedAt,
+  mirrorPhaseInjectEntries,
+  mirrorSkippedNames,
+  mirroredDeniedLists,
+  mirroredRows,
+  phaseInjectEntries,
+  phaseRows,
+  reorderInsert,
+  type PhaseRow,
+} from './phase-ops.ts'
 import { acceptsDrop, beginDrag, dropOnPhase, finishDrag, payloadOf, setPhaseDropHandler, type DragPayload } from './dnd.ts'
 import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
 
-/** Panel 并行拉取的三阶段装配。 */
-type PhaseViews = Record<PhaseViewKey, Preview | null>
-
-/** 屏幕上一条可交互的段行。 */
-interface PartRow {
-  name: string
-  text: string
-  replaced: boolean
-  custom: boolean
-  /** 本阶段的用户替换文本（空串 = 本阶段没改过文本）—— 三个阶段各一份，互不影响。 */
-  override: string
-  /** 该阶段自己的屏蔽名单是否屏蔽了此段：勾选框 = 未屏蔽（注入模型）。 */
-  blocked: boolean
-}
+type PartRow = PhaseRow
 
 /** 三态过滤：全部 / 已启用（未屏蔽）/ 已停用（被屏蔽）。 */
 export type TriState = 'all' | 'on' | 'off'
 
-/** 编辑态的键：段名之外还要带阶段，否则三个部分里同名的行会同时展开编辑器。 */
-const editKey = (key: PhaseViewKey, name: string): string => `${key}:${name}`
+/** 编辑态的键：阶段 + 条目身份，否则同名不同源 / 不同阶段会同时展开编辑器。 */
+const editKey = (key: PhaseKey, entry: EntryRef): string => `${key}:${entryKey(entry)}`
 
-export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, write }: {
+export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
   /** 当前阶段（状态在 Panel 持有，头部阶段按钮统一切换）。 */
-  phase: PhaseViewKey
+  phase: PhaseKey
   /** 三态同步（默认关）：三个阶段共用同一份并集行集，增删 / 排序 / 勾选 / 文本编辑一次写全三态。 */
   syncAll?: boolean
   t: Translate
-  /** 从池加入时的文本取值（缺省用池原文；Panel 在「中文提示词」开启时换成译本）。 */
-  poolText?: (name: string, fallback: string) => string
-  write: (field: 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools', value: unknown) => void
+  write: (field: SectionField | ContextField | 'replacements' | 'inject' | 'tools', value: unknown) => void
 }): ReactElement {
   const [filter, setFilter] = useState<TriState>('all')
   const [editing, setEditing] = useState<string | null>(null)
@@ -81,28 +89,28 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   useDragAutoScroll(scrollRef)
 
   // ── 三态同步（syncAll）：三态共用同一份并集行集 ────────────────────────
-  /** 该段是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」
+  /** 该条目是否在目标阶段的装配输入（base 视图）里：镜像时据此决定「只写 order」
    *  还是「必须带正文」。null = 该阶段视图未就绪（镜像整段跳过，绝不把缺失的
    *  阶段当空集写掉）。 */
-  const nativeIn = (key: PhaseViewKey, name: string): boolean | null => {
+  const nativeIn = (key: PhaseKey, entry: EntryRef): boolean | null => {
     const view = phases?.[key]
     if (view === undefined || view === null) return null
-    return (view.baseSections ?? []).some((sec) => sec.name === name)
+    return (view.baseSections ?? []).some((section) => sameEntry(section, entry))
   }
   /** 三阶段装配是否都就绪（缺一态就不做镜像）。 */
-  const mirrorReady = (): boolean => PART_ORDER.every((key) => nativeIn(key, '') !== null)
-  /** 并集行集：常驻期行序为骨架，其余两态独有的段追加在尾部（同名段以原生那阶段为准）。 */
+  const mirrorReady = (): boolean => PHASE_KEYS.every((key) => phases?.[key] !== null && phases?.[key] !== undefined)
+  /** 并集行集：常驻期行序为骨架，其余两态独有的段追加在尾部（同名同源以原生那阶段为准）。 */
   const mirrorRows = (): PartRow[] => mirroredRows(cfg, phases, nativeIn)
-  const rowsOf = (key: PhaseViewKey): PartRow[] =>
+  const rowsOf = (key: PhaseKey): PartRow[] =>
     syncAll === true ? mirrorRows() : phaseRows(cfg, phases?.[key] ?? null, key)
 
   // 屏蔽 / 恢复一个段（blockPatch 只动本阶段自己的名单）。写入严格落在当前
   // 编辑目标的草稿里 —— 预设之间互相独立：在 A 预设里的任何改动对 B 预设与
   // 全局默认零影响。
-  const applyBlock = (key: PhaseViewKey, name: string, blocked: boolean): void => {
-    const patch = blockPatch(cfg, key, name, blocked)
+  const applyBlock = (key: PhaseKey, entry: EntryRef, blocked: boolean): void => {
+    const patch = blockPatch(cfg, key, entry, blocked)
     for (const [field, value] of Object.entries(patch)) {
-      write(field as 'sections' | 'sectionsBootstrap' | 'sectionsCompaction', value)
+      write(field as SectionField, value)
     }
   }
 
@@ -115,152 +123,165 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     }
     write('inject', mirrorPhaseInjectEntries(cfg, rows, nativeIn))
     const denied = mirroredDeniedLists(rows)
-    write('sections', denied.sections)
-    write('sectionsBootstrap', denied.sectionsBootstrap)
-    write('sectionsCompaction', denied.sectionsCompaction)
+    for (const descriptor of PHASES) write(descriptor.sectionField, denied[descriptor.sectionField])
   }
 
-  // 该阶段中某名字是否在该阶段的装配输入里（判断加入是「解除屏蔽」还是「凭空注入」）。
-  const inBaseOf = (key: PhaseViewKey, name: string): boolean => nativeIn(key, name) === true
+  // 该条目是否在该阶段的装配输入里（判断加入是「解除屏蔽」还是「凭空注入」）。
+  const inBaseOf = (key: PhaseKey, entry: EntryRef): boolean => nativeIn(key, entry) === true
 
   // 持久化一个阶段的有序列表（写回 inject）：每行一条注入项、order 为连续整数；
   // 系统行空文本（仅 order 覆盖），custom 行保留文本；其它阶段的注入项原样保留。
-  const persistPhase = (key: PhaseViewKey, rows: PartRow[]): void => {
+  const persistPhase = (key: PhaseKey, rows: PartRow[]): void => {
     write('inject', phaseInjectEntries(cfg, key, rows))
   }
 
   /** 持久化一份有序行集：三态同步 = 一次写全三个阶段，否则只写当前阶段。 */
-  const persistRows = (key: PhaseViewKey, rows: PartRow[]): void => {
+  const persistRows = (key: PhaseKey, rows: PartRow[]): void => {
     if (syncAll === true) persistMirror(rows)
     else persistPhase(key, rows)
   }
 
-  const toggleBlocked = (key: PhaseViewKey, name: string): void => {
+  const toggleBlocked = (key: PhaseKey, row: PartRow): void => {
     if (syncAll === true) {
       const rows = rowsOf(key)
-      const row = rows.find((item) => item.name === name)
-      if (row === undefined) return
-      persistMirror(rows.map((item) => (item.name === name ? { ...item, blocked: !item.blocked } : item)))
+      const target = rows.find((item) => sameEntry(item, row))
+      if (target === undefined) return
+      persistMirror(rows.map((item) => (sameEntry(item, row) ? { ...item, blocked: !item.blocked } : item)))
       return
     }
-    applyBlock(key, name, !deniedNames(cfg, key).includes(name))
+    applyBlock(key, row, !row.blocked)
   }
 
   // 上移/下移一格（数组交换后重排整个阶段）。
-  const moveRow = (key: PhaseViewKey, index: number, dir: -1 | 1): void => {
+  const moveRow = (key: PhaseKey, index: number, dir: -1 | 1): void => {
     const rows = rowsOf(key)
     const target = index + dir
     if (target < 0 || target >= rows.length) return
     const next = rows.slice()
     const [item] = next.splice(index, 1)
-    next.splice(target, 0, item)
+    next.splice(target, 0, item!)
     persistRows(key, next)
   }
 
-  // 从该阶段移除一个段：删掉它在本阶段的注入条目，以及跨阶段生效（always）的
-  // 条目 —— 预设应用 / 导入产生的自定义段就是 always。随后解除该阶段屏蔽。
-  const removeFromPart = (key: PhaseViewKey, name: string): void => {
+  // 从该阶段移除一个段：只删本阶段的注入条目；若它仍靠 always 条目存在，
+  // 则改写本阶段屏蔽名单（不能删 always —— 那等于三态一起删）。
+  const removeFromPart = (key: PhaseKey, row: PartRow): void => {
     if (syncAll === true) {
-      persistMirror(rowsOf(key).filter((row) => row.name !== name))
+      persistMirror(rowsOf(key).filter((item) => !sameEntry(item, row)))
       return
     }
-    const phaseOfItem = injectPhaseOf(key)
-    const inject = (cfg.inject ?? []).filter((x) => {
-      if (x.name !== name) return true
-      const itemPhase = x.phase ?? 'always'
-      return !(itemPhase === phaseOfItem || itemPhase === 'always')
-    })
+    const inject = (cfg.inject ?? []).filter((item) => !((item.phase ?? 'always') === key && sameEntry(item, row)))
+    const stillAlways = inject.some((item) => (item.phase ?? 'always') === 'always' && sameEntry(item, row))
     write('inject', inject)
-    applyBlock(key, name, false)
+    if (stillAlways) applyBlock(key, row, true)
   }
 
-  // 文本编辑按阶段生效：编辑态的键是「阶段 + 段名」。写入走 persistPhase
-  //（本阶段的注入条目带 text），绝不碰全局 replace 字典。
-  const startReplace = (key: PhaseViewKey, row: PartRow): void => {
-    setEditing(editKey(key, row.name))
+  // 文本编辑按阶段生效：编辑态的键是「阶段 + 条目身份」。写入走 persistPhase
+  //（本阶段的注入条目带 text），绝不碰全局替换字典。
+  const startReplace = (key: PhaseKey, row: PartRow): void => {
+    setEditing(editKey(key, row))
     setDraft(row.override || row.text)
   }
-  const commitReplace = (key: PhaseViewKey, row: PartRow): void => {
-    const patchRow = (r: PartRow): PartRow => (r.name !== row.name ? r : { ...r, override: draft, text: draft })
-    // 三态同步：替换文本一次写全三个阶段（同名行 = 同一份文本）。
+  const commitReplace = (key: PhaseKey, row: PartRow): void => {
+    const patchRow = (candidate: PartRow): PartRow =>
+      sameEntry(candidate, row) ? { ...candidate, override: draft, text: draft } : candidate
+    // 三态同步：替换文本一次写全三个阶段（同名同源行 = 同一份文本）。
     persistRows(key, rowsOf(key).map(patchRow))
     setEditing(null)
   }
-  const restoreReplace = (key: PhaseViewKey, row: PartRow): void => {
-    const next = rowsOf(key).map((r) =>
-      r.name !== row.name ? r : { ...r, override: '', text: r.custom ? r.text : '' },
+  const restoreReplace = (key: PhaseKey, row: PartRow): void => {
+    const next = rowsOf(key).map((candidate) =>
+      sameEntry(candidate, row) ? { ...candidate, override: '', text: candidate.custom ? candidate.text : '' } : candidate,
     )
     persistRows(key, next)
-    // 遗留的全局替换条目（旧版 UI 的产物）：只在本部分还原时一并清除。
-    if (!row.custom && Object.hasOwn(cfg.replace ?? {}, row.name)) {
-      const rest = { ...(cfg.replace ?? {}) }
-      delete rest[row.name]
-      write('replace', rest)
-    }
+    // 阶段化替换条目：只清除本阶段（含 always）对这条目生效的替换。
+    const rest = (cfg.replacements ?? []).filter((item) => !(
+      sameEntry(item, row)
+      && ((item.phase ?? 'always') === 'always' || (item.phase ?? 'always') === key)
+    ))
+    if (rest.length !== (cfg.replacements ?? []).length) write('replacements', rest)
   }
 
-  const addSection = (name: string, text: string, phase: PhaseViewKey): void => {
+  const addSection = (name: string, text: string, phase: PhaseKey): void => {
+    const row: PartRow = { name, text, replaced: false, custom: true, override: text, blocked: false }
     if (syncAll === true) {
       // 三态同步：新段一次建进三个阶段（并集行集尾部，带自撰正文）。
-      persistMirror([...rowsOf(phase), { name, text, replaced: false, custom: true, override: text, blocked: false }])
+      persistMirror([...rowsOf(phase), row])
       return
     }
-    const inject = (cfg.inject ?? []).slice()
-    inject.push({ name, order: 120 + inject.length, text, phase, custom: true })
-    write('inject', inject)
+    // order 由 phaseInjectEntries 统一生成连续值，绝不从 120 之类的魔法数起步。
+    write('inject', phaseInjectEntries(cfg, phase, [...rowsOf(phase), row]))
   }
 
-  // 从「全部」池把一个段加入某阶段（拖动或点按池里的小按钮）。该阶段已有的
-  // 段只是移到末尾；新段带上池里的原文（注入条目带文本，服务端才会把它真正
-  // 建出来）。动态段没有可带的原文，给出说明。`copiedFrom` 非空 = 从别的阶段
-  // 复制过来的，给一条「已复制」反馈。
-  const addFromPool = (key: PhaseViewKey, name: string, text: string, copiedFrom?: string): void => {
-    if (text === '' || text.startsWith('<')) {
-      setNotice(t('sectionDynamicNoAdd', { name }))
+  /** 服务端 dynamic 标记：只认布尔值；undefined = 宿主不支持，界面不得猜。 */
+  const dynamicOf = (entry: EntryRef): boolean | undefined => {
+    for (const key of PHASE_KEYS) {
+      const section = (phases?.[key]?.baseSections ?? []).find((candidate) => sameEntry(candidate, entry))
+      if (section !== undefined && typeof section.dynamic === 'boolean') return section.dynamic
+    }
+    const poolSection = (inv?.sections ?? []).find((candidate) => sameEntry(candidate, entry))
+    return typeof poolSection?.dynamic === 'boolean' ? poolSection.dynamic : undefined
+  }
+
+  // 从「全部」池把一个段加入某阶段。动态段（服务端 dynamic=true）没有可带的
+  // 原文；宿主不提供 dynamic 标记时禁用加入并提示，绝不用文本前缀猜测。
+  const addFromPool = (key: PhaseKey, entry: EntryRef, text: string, copiedFrom?: string): void => {
+    const dynamic = dynamicOf(entry)
+    if (dynamic === true) {
+      setNotice(t('sectionDynamicNoAdd', { name: entry.name }))
       return
     }
-    // 「中文提示词」开启时，池里的段优先用译本文本 —— 一键把没进过定制面板的
-    // 段（如 agent 作用域注册的 tool:subagent）接管成中文。
-    const body = poolText === undefined ? text : poolText(name, text)
+    if (dynamic === undefined) {
+      setNotice(t('sectionDynamicUnsupported', { name: entry.name }))
+      return
+    }
     setNotice(null)
     const rows = rowsOf(key)
-    const existing = rows.find((row) => row.name === name)
+    const existing = rows.find((row) => sameEntry(row, entry))
     // 三态同步下「加入」= 三态都出现且都开启（并集行集里重排到尾部 / 追加新行）。
     const next = existing !== undefined
-      ? [...rows.filter((row) => row.name !== name), syncAll === true ? { ...existing, blocked: false } : existing]
+      ? [...rows.filter((row) => !sameEntry(row, entry)), syncAll === true ? { ...existing, blocked: false } : existing]
       : [...rows, {
-          name,
+          name: entry.name,
+          ...(entry.source === undefined ? {} : { source: entry.source }),
           text: '',
-          replaced: Object.hasOwn(cfg.replace ?? {}, name),
+          replaced: (cfg.replacements ?? []).some((item) => sameEntry(item, entry)),
           custom: false,
-          override: body,
+          override: text,
           blocked: false,
         }]
-    if (syncAll !== true && existing === undefined && inBaseOf(key, name) && deniedNames(cfg, key).includes(name)) {
-      applyBlock(key, name, false)
+    if (syncAll !== true && (existing === undefined || existing.blocked) && inBaseOf(key, entry)) {
+      const patch = blockPatch(cfg, key, entry, false)
+      for (const [field, value] of Object.entries(patch)) write(field as SectionField, value)
     }
     persistRows(key, next)
-    if (copiedFrom !== undefined) setNotice(t('sectionCopied', { name, to: stageLabel(key), from: copiedFrom }))
+    if (copiedFrom !== undefined) setNotice(t('sectionCopied', { name: entry.name, to: stageLabel(key), from: copiedFrom }))
   }
 
   // ── 拖拽落地（手势定义见 dnd.ts）────────────────────────────────────
+  /** 拖拽载荷 → 条目身份（name + source）。 */
+  const entryOfPayload = (payload: { name: string; source?: EntryRef['source'] }): EntryRef => ({
+    name: payload.name,
+    ...(payload.source === undefined ? {} : { source: payload.source }),
+  })
+
   /** 从本阶段拿掉一段：注入进来的撤销注入，原生段则屏蔽掉（等价于取消勾选）。 */
-  const removeFromPhase = (name: string): void => {
+  const removeFromPhase = (entry: EntryRef): void => {
     const rows = rowsOf(phase)
-    const row = rows.find((item) => item.name === name)
+    const row = rows.find((item) => sameEntry(item, entry))
     if (row === undefined) return
     if (syncAll === true) {
       // 三态同步：原生段三态一起屏蔽；只靠注入存在的段三态一起撤销注入。
-      const native = PART_ORDER.some((key) => nativeIn(key, name) === true)
+      const native = PHASE_KEYS.some((key) => nativeIn(key, row) === true)
       persistMirror(row.custom || !native
-        ? rows.filter((item) => item.name !== name)
-        : rows.map((item) => (item.name === name ? { ...item, blocked: true } : item)))
-    } else if (row.custom || row.override !== '' || injectedNames.has(name)) {
-      removeFromPart(phase, name)
+        ? rows.filter((item) => !sameEntry(item, row))
+        : rows.map((item) => (sameEntry(item, row) ? { ...item, blocked: true } : item)))
+    } else if (row.custom || row.override !== '' || injectedNames.has(entryKey(row))) {
+      removeFromPart(phase, row)
     } else {
-      applyBlock(phase, name, true)
+      applyBlock(phase, row, true)
     }
-    setNotice(t('sectionRemoved', { name, from: stageLabel(phase) }))
+    setNotice(t('sectionRemoved', { name: row.name, from: stageLabel(phase) }))
   }
 
   /** 行上投放：同阶段 = 排序；别的阶段 / 池里来的 = 复制进本阶段（源不动）。 */
@@ -270,15 +291,16 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     event.preventDefault()
     event.stopPropagation()
     setDropMark(null)
-    if (payload.name === target.name) return
+    const entry = entryOfPayload(payload)
+    if (sameEntry(entry, target)) return
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     const pos = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
     if (payload.from === phase) {
-      const next = reorderInsert(rowsOf(phase), payload.name, target.name, pos)
+      const next = reorderInsert(rowsOf(phase), entry, target, pos)
       if (next !== null) { persistRows(phase, next); setNotice(null) }
       return
     }
-    addFromPool(phase, payload.name, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
+    addFromPool(phase, entry, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
   }
 
   /** 列表空白处投放：追加到本阶段末尾；池里拖来的 = 加入本阶段。 */
@@ -287,14 +309,15 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     if (payload === null || payload.kind !== 'section') return
     event.preventDefault()
     setDropMark(null)
+    const entry = entryOfPayload(payload)
     if (payload.from !== phase) {
-      addFromPool(phase, payload.name, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
+      addFromPool(phase, entry, payload.text ?? '', payload.from === 'pool' ? undefined : stageLabel(payload.from))
       return
     }
     const list = rowsOf(phase)
     const last = list[list.length - 1]
-    if (last === undefined || last.name === payload.name) return
-    const next = reorderInsert(list, payload.name, last.name, 'below')
+    if (last === undefined || sameEntry(last, entry)) return
+    const next = reorderInsert(list, entry, last, 'below')
     if (next !== null) persistRows(phase, next)
   }
 
@@ -306,7 +329,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     event.stopPropagation()
     setDropMark(null)
     if (payload.from !== phase) return
-    removeFromPhase(payload.name)
+    removeFromPhase(entryOfPayload(payload))
   }
 
   // 头部阶段 Tab 上的投放：复制到那个阶段（换 Tab / 换模式时旧列表卸载、
@@ -316,16 +339,15 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
       if (payload.kind !== 'section' || key === phase) return
       // 三态同步：段已经在三个阶段里了，拖到别的阶段 Tab 不再复制（只有池里来的要加入）。
       if (syncAll === true && payload.from !== 'pool') return
-      addFromPool(key, payload.name, payload.text ?? '', stageLabel(phase))
+      addFromPool(key, entryOfPayload(payload), payload.text ?? '', stageLabel(phase))
     })
     return () => setPhaseDropHandler(null)
   })
 
-  const stageLabel = (key: PhaseViewKey): string =>
-    key === 'bootstrap' ? t('phaseStageGuide') : key === 'compaction' ? t('phaseStageControlled') : t('phaseStageResident')
+  const stageLabel = (key: PhaseKey): string => t(PHASE_LABEL_KEY[key])
 
   // 该阶段的「段级定制没进最终提示词」警示（forceSections 关闭或失效时）。
-  const partNote = (key: PhaseViewKey): ReactElement | null => {
+  const partNote = (key: PhaseKey): ReactElement | null => {
     const view = phases?.[key]
     if (view === undefined || view === null) return null
     if (cfg.forceSections !== false) return null
@@ -339,26 +361,27 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
     return null
   }
 
-  const isEditing = (key: PhaseViewKey, row: PartRow): boolean => editing === editKey(key, row.name)
+  const isEditing = (key: PhaseKey, row: PartRow): boolean => editing === editKey(key, row)
 
-  const renderRow = (key: PhaseViewKey, row: PartRow, index: number, total: number): ReactElement | null => {
+  const renderRow = (key: PhaseKey, row: PartRow, index: number, total: number): ReactElement | null => {
     if (!rowVisible(row)) return null
-    const mark = dropMark !== null && dropMark.startsWith(`${row.name}:`) ? dropMark.slice(row.name.length + 1) : null
+    const identity = entryKey(row)
+    const mark = dropMark !== null && dropMark.startsWith(`${identity}:`) ? dropMark.slice(identity.length + 1) : null
     return h('div', {
-      key: row.name,
+      key: identity,
       style: {
         ...s.row,
         ...(row.blocked ? s.rowBlocked : {}),
         ...(mark === 'above' ? s.dropAbove : {}),
         ...(mark === 'below' ? s.dropBelow : {}),
-        ...(dragName === row.name ? s.dragging : {}),
+        ...(dragName === identity ? s.dragging : {}),
       },
       onDragOver: (event: ReactDragEvent) => {
         if (!acceptsDrop(event, 'section')) return
         event.preventDefault()
         event.stopPropagation()
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-        setDropMark(`${row.name}:${event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'}`)
+        setDropMark(`${identity}:${event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'}`)
       },
       onDrop: (event: ReactDragEvent) => dropOnRow(event, row),
     }, [
@@ -368,15 +391,21 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
         title: t('drag'),
         style: s.dragHandle,
         onDragStart: (event: ReactDragEvent) => {
-          setDragName(row.name)
-          beginDrag(event, { kind: 'section', name: row.name, from: key, text: row.override || row.text })
+          setDragName(identity)
+          beginDrag(event, {
+            kind: 'section',
+            name: row.name,
+            ...(row.source === undefined ? {} : { source: row.source }),
+            from: key,
+            text: row.override || row.text,
+          })
         },
         onDragEnd: () => { setDragName(null); setDropMark(null); finishDrag() },
       }, '⠿'),
       h('input', {
         type: 'checkbox',
         checked: !row.blocked,
-        onChange: () => toggleBlocked(key, row.name),
+        onChange: () => toggleBlocked(key, row),
         title: row.blocked ? t('blockedOn') : t('blockedOff'),
         style: { margin: 0, cursor: 'pointer', flex: 'none' },
       }),
@@ -385,9 +414,10 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
           h('span', { style: s.code }, row.name),
           h('span', { style: s.orderTag }, '#' + index),
           h('span', { style: row.custom ? s.badgeCustom : s.badgeSystem }, row.custom ? t('manual') : t('system')),
+          row.source === undefined ? null : h('span', { style: s.badgeSystem }, `${row.source.kind}${row.source.id === undefined ? '' : `:${row.source.id}`}`),
           // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
           // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
-          agentScoped.has(row.name) ? h('span', { style: s.badgeSystem, title: t('agentScopedHint') }, t('agentScoped')) : null,
+          agentScoped.has(identity) ? h('span', { style: s.badgeSystem, title: t('agentScopedHint') }, t('agentScoped')) : null,
           row.replaced ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           row.blocked ? h('span', { style: s.badgeBlocked }, t('blockedOn')) : null,
         ]),
@@ -397,22 +427,22 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
               h('div', { style: s.injectRow }, [
                 h('button', { style: s.mini, onClick: () => commitReplace(key, row) }, t('save')),
                 h('button', { style: s.mini, onClick: () => setDraft('') }, t('clearInput')),
-                !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name))
+                !row.custom && row.replaced
                   ? h('button', { style: s.mini, onClick: () => restoreReplace(key, row) }, t('restore'))
                   : null,
               ]),
             ])
-          : h('div', { style: s.preview }, String(row.override || row.text || '').slice(0, 140) || (row.custom ? t('empty') : t('dynamic'))),
+          : h('div', { style: s.preview }, String(row.override || row.text || '').slice(0, 140) || (row.dynamic === true ? t('dynamic') : t('empty'))),
       ]),
       h('div', { style: s.arrowCol }, [
         h('button', { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t('moveUp') }, '↑'),
         h('button', { style: s.arrow, disabled: index === total - 1, onClick: () => moveRow(key, index, 1), title: t('moveDown') }, '↓'),
       ]),
       isEditing(key, row) ? null : h('button', { style: s.mini, onClick: () => startReplace(key, row) }, t('replace')),
-      !isEditing(key, row) && !row.custom && (row.override || Object.hasOwn(cfg.replace ?? {}, row.name))
+      !isEditing(key, row) && !row.custom && row.replaced
         ? h('button', { style: s.mini, onClick: () => restoreReplace(key, row) }, t('restore'))
         : null,
-      row.custom ? h('button', { style: s.mini, onClick: () => removeFromPart(key, row.name), title: t('delete') }, t('delete')) : null,
+      row.custom ? h('button', { style: s.mini, onClick: () => removeFromPart(key, row), title: t('delete') }, t('delete')) : null,
     ])
   }
 
@@ -420,13 +450,13 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
   const rows = rowsOf(phase)
   /** 三态同步下建不到其它阶段的动态段（行集里显示、装配里没有）：给出说明。 */
   const mirrorSkipped = syncAll === true && mirrorReady() ? mirrorSkippedNames(rows, nativeIn) : []
-  /** 本阶段有注入条目（= 被显式加进来过）的段名：拖回池时用来自动选「撤销注入」还是「屏蔽」。 */
+  /** 本阶段有注入条目（= 被显式加进来过）的条目身份键：拖回池时用来自动选「撤销注入」还是「屏蔽」。 */
   const injectedNames = injectedAt(cfg, phase).names
-  /** 只在 agent 作用域注册的段名（预览把它们并进来了，带 scope 标记）：行上标「会话级」。 */
+  /** 只在 agent 作用域注册的段（预览把它们并进来了，带 scope 标记）：行上标「会话级」。 */
   const agentScoped = new Set<string>()
   for (const view of Object.values(phases ?? {})) {
     for (const section of view?.baseSections ?? []) {
-      if (section.scope === 'agent') agentScoped.add(section.name)
+      if (section.scope === 'agent') agentScoped.add(entryKey(section))
     }
   }
   const onCount = rows.filter((row) => !row.blocked).length
@@ -458,7 +488,7 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
       rows.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,
       addOpen
         ? h(InjectForm, {
-            onAdd: (name, text) => { addSection(name, text, injectPhaseOf(phase)); setAddOpen(false) },
+            onAdd: (name, text) => { addSection(name, text, phase); setAddOpen(false) },
             phaseLabel: stageLabel(phase),
             t,
           })
@@ -481,15 +511,24 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, poolText, wr
         h('div', { style: { ...s.muted, marginBottom: 4 } }, t('sectionsFourHint')),
         poolSections.length === 0 ? h('div', { style: s.muted }, t('empty')) : null,
         poolSections.map((sec) => h('div', {
-          key: sec.name,
+          key: entryKey(sec),
           style: { ...s.row, opacity: 0.92 },
           draggable: true,
           title: t('drag'),
-          onDragStart: (event: ReactDragEvent) => beginDrag(event, { kind: 'section', name: sec.name, from: 'pool', text: sec.text ?? '' }),
+          onDragStart: (event: ReactDragEvent) => beginDrag(event, {
+            kind: 'section',
+            name: sec.name,
+            ...(sec.source === undefined ? {} : { source: sec.source }),
+            from: 'pool',
+            text: sec.text ?? '',
+          }),
           onDragEnd: finishDrag,
         }, [
           h('div', { style: s.rowBody }, [
-            h('div', { style: s.rowTitle }, h('span', { style: s.code }, sec.name)),
+            h('div', { style: s.rowTitle }, [
+              h('span', { style: s.code }, sec.name),
+              sec.source === undefined ? null : h('span', { style: s.badgeSystem }, `${sec.source.kind}${sec.source.id === undefined ? '' : `:${sec.source.id}`}`),
+            ]),
             h('div', { style: s.preview }, String(sec.text ?? '').slice(0, 140) || t('dynamic')),
           ]),
         ])),

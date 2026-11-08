@@ -29,9 +29,12 @@ import { SkillViewer, VIEWER_FONT_SIZES, readViewerPrefs, writeViewerPrefs } fro
 import { SkillsView } from './SkillsView.js'
 import { css, ensureStyles } from './styles.js'
 import { McpTopBar, PanelHead, SkillTopBar } from './TopBar.js'
-import { ALL_PRESETS, UNCATEGORIZED, sortCategories } from './types.js'
+import {
+  ALL_PRESETS, UNCATEGORIZED, bundleVisibleInList, enabledStateAt, skillOverridesAt, sortCategories,
+} from './types.js'
 import type {
-  BundleInfo, CollectedFile, ConfirmState, HealthView, InstallState, PanelState, PresetRow, SkillInfo, ViewerState,
+  AddScope, BundleInfo, CollectedFile, ConfirmState, HealthView, InstallState, PanelState, PresetRow, SkillEnableScope,
+  SkillEnableTables, SkillInfo, ViewerState,
 } from './types.js'
 const SKILL_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
@@ -136,7 +139,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const [toggles, setToggles] = useState<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }>({ skills: {}, bundles: {} })
   // 切换进行中的 key（避免重复点击）
   const [toggling, setToggling] = useState<Set<string>>(new Set())
-  // Agent 预设分类：名单 + 各预设覆盖 + 当前选中的预设（'*' = 全部 Agent）
+  // Agent 预设分类：名单 + 各预设覆盖 + 当前选中的预设（'' = 全部 Agent）
   const [presets, setPresets] = useState<PresetRow[]>([])
   const [overrides, setOverrides] = useState<Record<string, Record<string, boolean>>>({})
   const [workspaceOverrides, setWorkspaceOverrides] = useState<Record<string, Record<string, boolean>>>({})
@@ -145,7 +148,6 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<'all' | 'bundles' | 'loose'>('all')
   const [sortAsc, setSortAsc] = useState(true)
-  const [viewMode] = useState<'grid' | 'list'>('grid')
   /** 左栏分类 / 筛选：启用状态 + Agent 预设（分类切换由左栏「Agent 预设分类」驱动）。 */
   const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off'>('all')
   /** 技能包分类筛选：null = 不筛；分类名或 UNCATEGORIZED = 只看该类。 */
@@ -373,88 +375,86 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     }
   }
 
+  // 技能开关的完整作用域：层级 + 预设 + 工作区（按 cwd）。读与写共用同一个对象。
+  const effectiveWorkspace = workspace ?? currentWorkspace
+  const scope: SkillEnableScope = { level, presetId: activePreset, cwd: effectiveWorkspace }
+
   const toggleSkill = (skill: SkillInfo, enabled: boolean): void => {
-    if (level === 'workspace') {
-      const cwd = workspace ?? currentWorkspace
-      if (cwd === null) { pushToast('err', 'no active workspace'); return }
-      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(cwd, skill.name, enabled))
+    if (scope.level === 'workspace') {
+      if (scope.cwd === null) { pushToast('err', 'no active workspace'); return }
+      void runToggle(`skill:${skill.name}`, () => skillApi.setWorkspaceSkillEnabled(scope.cwd!, skill.name, enabled))
       return
     }
-    if (activePreset === ALL_PRESETS) {
+    if (scope.presetId === ALL_PRESETS) {
       void runToggle(`skill:${skill.name}`, () => skillApi.setSkillEnabled(skill.name, enabled))
       return
     }
     void runToggle(
       `skill:${skill.name}`,
-      () => skillApi.setPresetSkillEnabled(activePreset, skill.name, enabled),
+      () => skillApi.setPresetSkillEnabled(scope.presetId, skill.name, enabled),
     )
   }
 
   const toggleBundle = (bundle: BundleInfo, enabled: boolean): void => {
-    if (level === 'workspace') {
-      const cwd = workspace ?? currentWorkspace
-      if (cwd === null) { pushToast('err', 'no active workspace'); return }
-      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(cwd, bundle.id, enabled))
+    if (scope.level === 'workspace') {
+      if (scope.cwd === null) { pushToast('err', 'no active workspace'); return }
+      void runToggle(`bundle:${bundle.id}`, () => skillApi.setWorkspaceBundleEnabled(scope.cwd!, bundle.id, enabled))
       return
     }
-    if (activePreset === ALL_PRESETS) {
+    if (scope.presetId === ALL_PRESETS) {
       void runToggle(`bundle:${bundle.id}`, () => skillApi.setBundleEnabled(bundle.id, enabled))
       return
     }
     void runToggle(
       `bundle:${bundle.id}`,
-      () => skillApi.setPresetBundleEnabled(activePreset, bundle.id, enabled),
+      () => skillApi.setPresetBundleEnabled(scope.presetId, bundle.id, enabled),
     )
   }
 
-  /** 该预设下被单独关掉的技能（'*' 视图下为空表）。 */
-  const effectiveWorkspace = workspace ?? currentWorkspace
-  const presetOverride = level === 'workspace'
-    ? (effectiveWorkspace !== null ? (workspaceOverrides[effectiveWorkspace] ?? {}) : {})
-    : (activePreset === ALL_PRESETS ? {} : (overrides[activePreset] ?? {}))
-
-  /**
-   * 任一预设下技能的开关值（与 skillEnabledIn 同规则，供左栏分类计数）。
-   *  - 「全部 Agent」：直接读全局层（SKILL.md frontmatter）；
-   *  - 某个预设：全局层关掉的仍显示为关（预设层无法打开全局关掉的技能），
-   *    否则看该预设是否有 false 覆盖。
-   */
-  const skillEnabledAt = (presetId: string, name: string): boolean => {
-    if (toggles.skills[name] === false) return false
-    if (presetId === ALL_PRESETS) return true
-    return (overrides[presetId] ?? {})[name] !== false
+  /** 三层开关账本：全部读取/计数都从这里按同一个 scope 求值。 */
+  const enableTables: SkillEnableTables = {
+    skills: toggles.skills,
+    overrides,
+    workspaceOverrides,
   }
+  /** 当前作用域真正会写入/清理的那层覆盖（按钮显示与动作共用）。 */
+  const scopeOverrides = skillOverridesAt(scope, enableTables)
+  const scopeOverrideCount = Object.keys(scopeOverrides).length
 
-  /** 某预设下已启用的技能数（左栏「Agent 预设分类」计数）。 */
+  /** 某个预设（叠加当前层级/工作区）下已启用的技能数。 */
   const enabledCountFor = (presetId: string): number => {
+    const target: SkillEnableScope = { level: scope.level, presetId, cwd: scope.cwd }
     let n = 0
-    for (const bundle of bundles) for (const skill of bundle.skills) if (skillEnabledAt(presetId, skill.name)) n += 1
-    for (const skill of loose) if (skillEnabledAt(presetId, skill.name)) n += 1
+    for (const bundle of bundles) for (const skill of bundle.skills) if (enabledStateAt(target, skill.name, enableTables)) n += 1
+    for (const skill of loose) if (enabledStateAt(target, skill.name, enableTables)) n += 1
     return n
   }
 
-  /**
-   * 当前视图里一个技能的开关值。
-   *  - 「全部 Agent」：直接读全局层（SKILL.md frontmatter）；
-   *  - 某个预设：全局层关掉的仍显示为关（预设层无法打开全局关掉的技能），
-   *    否则看该预设是否有 false 覆盖。
-   */
-  const skillEnabledIn = (name: string): boolean => skillEnabledAt(activePreset, name)
+  /** 当前视图里一个技能的开关值（工作区 > 预设 > 全局）。 */
+  const skillEnabledIn = (name: string): boolean => enabledStateAt(scope, name, enableTables)
 
   /** 技能包在当前视图下的开关值：内部技能全开才算开。 */
-  const bundleEnabledIn = (bundle: BundleInfo): boolean => {
-    if (activePreset === ALL_PRESETS) return toggles.bundles[bundle.id] !== false
-    return bundle.skills.every((skill) => skillEnabledIn(skill.name))
-  }
+  const bundleEnabledIn = (bundle: BundleInfo): boolean =>
+    bundle.skills.length > 0 && bundle.skills.every((skill) => skillEnabledIn(skill.name))
 
   /** 预设视图下，被全局层禁用的技能行锁住开关（预设层只能收窄，无法打开）。 */
   const skillLockedReason = (name: string): string | undefined =>
-    activePreset !== ALL_PRESETS && toggles.skills[name] === false ? t('presetLockedByGlobal') : undefined
+    scope.level === 'preset' && scope.presetId !== ALL_PRESETS && toggles.skills[name] === false
+      ? t('presetLockedByGlobal')
+      : undefined
 
-  /** 清空当前预设的全部单独设置。 */
-  const resetActivePreset = (): void => {
-    if (activePreset === ALL_PRESETS) return
-    void runToggle(`reset:${activePreset}`, () => skillApi.resetPreset(activePreset))
+  /**
+   * 清空当前作用域的全部单独设置：预设级清 preset 账，工作区级按 cwd 清 workspace 账。
+   * @param target - 与按钮显示共用的同一个 scope 对象。
+   */
+  const resetScope = (target: SkillEnableScope): void => {
+    if (target.level === 'workspace') {
+      if (target.cwd === null) return
+      void runToggle(`reset:workspace:${target.cwd}`, () => skillApi.resetWorkspace(target.cwd!))
+      return
+    }
+    if (target.presetId === ALL_PRESETS) return
+    void runToggle(`reset:${target.presetId}`, () => skillApi.resetPreset(target.presetId))
   }
 
   // 「应用到所有预设」：把「全部」视图的技能启停覆盖到每个预设（清空各预设 per-preset 覆盖，令其全部继承全部/全局）。
@@ -770,10 +770,12 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
 
   const bundles = state.status === 'ready' ? state.snapshot.bundles : []
   const loose = state.status === 'ready' ? state.snapshot.loose : []
-  /** 当前作用域 pill 文案：「全部 Agent」视图 = 全局（Global），预设视图 = 预设名。 */
-  const scopeLabel = activePreset === ALL_PRESETS
-    ? t('scopeAll')
-    : (presets.find((preset) => preset.id === activePreset)?.name ?? activePreset)
+  /** 当前作用域 pill 文案：工作区级 = 工作区，预设级 = 全局 / 预设名。 */
+  const scopeLabel = level === 'workspace'
+    ? t('scopeWorkspace')
+    : activePreset === ALL_PRESETS
+      ? t('scopeAll')
+      : (presets.find((preset) => preset.id === activePreset)?.name ?? activePreset)
 
   /* ── Skills Hub 派生数据：搜索 / Agent 预设 / 状态 / 排序 ── */
   const q = query.trim().toLowerCase()
@@ -786,10 +788,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     // 「全部」= 不分启用状态一律显示。旧实现在这里也 return on，于是技能一关卡片就
     // 当场从列表里消失，想再打开只能切到「已停用」档去捞 —— 关掉即隐身。
     if (statusFilter === 'all') return true
-    // 启用态按当前视图计算：全部 Agent = 全局层，预设视图 = 预设层（含全局锁定）。
-    const on = activePreset === ALL_PRESETS
-      ? toggles.skills[skill.name] !== false
-      : skillEnabledAt(activePreset, skill.name)
+    // 启用态按当前 scope 计算（工作区 > 预设 > 全局），与卡片开关同一规则。
+    const on = enabledStateAt(scope, skill.name, enableTables)
     return statusFilter === 'on' ? on : !on
   }
   const sortedSkills = (list: SkillInfo[]): SkillInfo[] => [...list].sort((a, b) => {
@@ -824,6 +824,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     return counts
   })()
   const categoryList = sortCategories(categoryCounts)
+  /** 分类候选只从现有技能包派生（不再内置一组写死的中文分类）。 */
+  const categorySuggestions = categoryList.filter((cat) => cat !== UNCATEGORIZED)
   /** 至少要有一个真分类（未分类桶不算）才值得占一行顶栏空间。 */
   const hasCategories = categoryList.some((cat) => cat !== UNCATEGORIZED)
   /** 选中的分类被最后一个包摘掉时自动回落「全部」，不留一个筛不出东西的死状态。 */
@@ -836,9 +838,11 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const visibleBundleAll = (sourceFilter === 'loose' ? [] : bundles)
     .filter((bundle) => catMatch(bundle))
     .map((bundle) => ({ ...bundle, skills: filteredSkills(bundle.skills) }))
-    .filter((bundle) => bundle.skills.length > 0 || (bundle.skillCount === 0 && !filtering))
+    .filter((bundle) => bundleVisibleInList(bundle, filtering))
   const visibleLooseAll = sourceFilter === 'bundles' || activeCat !== null ? [] : filteredSkills(loose)
-  const totalSkills = bundles.reduce((n, bundle) => n + bundle.skillCount, 0) + loose.length
+  /** 实际渲染集合的技能数：不含账本里已失效的引用。 */
+  const allSkills = [...bundles.flatMap((bundle) => bundle.skills), ...loose]
+  const totalSkills = allSkills.length
   const bundleCount = bundles.length
   /** 同步状态卡展示模型：ok=绿点全健康；issue=橙点带数量；unavailable=灰点待检测（旧 host 未加载新路由）；loading=检测中。 */
   const healthView = health.state === 'ok'
@@ -848,19 +852,9 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
       : health.state === 'unavailable'
         ? { tone: 'pending', label: t('statPending'), title: t('statPending') }
         : { tone: 'idle', label: t('statChecking'), title: '' }
-  const enabledCount = (() => {
-    let n = 0
-    for (const bundle of bundles) for (const skill of bundle.skills) if (toggles.skills[skill.name] !== false) n += 1
-    for (const skill of loose) if (toggles.skills[skill.name] !== false) n += 1
-    return n
-  })()
-  /** 当前被全局层关掉的技能数（顶栏「已停用」计数；与「已启用」同一口径）。 */
-  const disabledCount = (() => {
-    let n = 0
-    for (const bundle of bundles) for (const skill of bundle.skills) if (toggles.skills[skill.name] === false) n += 1
-    for (const skill of loose) if (toggles.skills[skill.name] === false) n += 1
-    return n
-  })()
+  const enabledCount = allSkills.filter((skill) => enabledStateAt(scope, skill.name, enableTables)).length
+  /** 当前作用域下停用的技能数（顶栏「已停用」计数；与「已启用」同一口径）。 */
+  const disabledCount = allSkills.length - enabledCount
   const noResults = visibleBundleAll.length === 0 && visibleLooseAll.length === 0
 
   const trimmedName = installName.trim()
@@ -917,7 +911,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             activePreset={activePreset}
             setActivePreset={setActivePreset}
             presets={presets}
-            overrides={overrides}
+            overrides={level === 'workspace' ? {} : overrides}
             enabledCountFor={enabledCountFor}
             totalSkills={totalSkills}
             enabledCount={enabledCount}
@@ -959,17 +953,19 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             onRefresh={() => { mcpRefreshLive() }}
             onAddOwn={() => { setMcpAddOwnOpen(true) }}
             onAddCustom={() => { setMcpAddOpen(true) }}
+            workspace={effectiveWorkspace}
+            level={level}
           />
         )}
 
         {/* ── 主区 ── */}
         <div className={css.hubMain}>
-        {kind === 'skill' && activePreset === ALL_PRESETS ? (
+        {kind === 'skill' && level === 'preset' && activePreset === ALL_PRESETS ? (
           <div style={{ padding: '4px 12px 0' }}>
             <button type="button" className={css.toolButton} title={t('applyAllHint')} onClick={() => { void applySkillsToAllPresets() }}>{t('applyAll')}</button>
           </div>
         ) : null}
-        {kind === 'mcp' && mcpScope === '' ? (
+        {kind === 'mcp' && level === 'preset' && mcpScope === '' ? (
           <div style={{ padding: '4px 12px 0' }}>
             <button type="button" className={css.toolButton} title={t('mcpApplyAllHint')} onClick={() => { void applyMcpToAllPresets() }}>{t('mcpApplyAll')}</button>
           </div>
@@ -988,7 +984,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             onWatchTools={(names) => { watchMcpTools(names) }}
             addOwnOpen={mcpAddOwnOpen}
             onCloseAddOwn={() => { setMcpAddOwnOpen(false) }}
-            workspace={workspace ?? currentWorkspace}
+            workspace={effectiveWorkspace}
             level={level}
           />
         ) : (
@@ -996,10 +992,10 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             t={t}
             state={state}
             health={health}
-            activePreset={activePreset}
+            scope={scope}
+            scopeOverrideCount={scopeOverrideCount}
             presets={presets}
-            presetOverride={presetOverride}
-            resetActivePreset={resetActivePreset}
+            onResetScope={resetScope}
             openMenu={openMenu}
             setOpenMenu={setOpenMenu}
             refresh={refresh}
@@ -1012,7 +1008,6 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
             submitRename={submitRename}
             bundleEnabledIn={bundleEnabledIn}
             toggling={toggling}
-            viewMode={viewMode}
             setCatFilter={setCatFilter}
             activeCat={activeCat}
             toggleExpanded={toggleExpanded}
@@ -1071,7 +1066,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
           <input className={css.inlineInput} value={newBundleName} placeholder={t('newBundlePlaceholder')}
             aria-label={t('newBundlePlaceholder')} autoFocus disabled={creatingBundle}
             onChange={(event) => { setNewBundleName(event.currentTarget.value) }} />
-          <CategoryEditor value={newBundleCats} onChange={setNewBundleCats} label={t('newBundle')} />
+          <CategoryEditor value={newBundleCats} onChange={setNewBundleCats} label={t('newBundle')} suggestions={categorySuggestions} />
           <div className={css.inlineForm}>
             <Button variant="primary" type="submit" disabled={creatingBundle || newBundleName.trim() === ''}>{t('create')}</Button>
             <Button variant="outline" type="button" disabled={creatingBundle} onClick={() => { setNewBundleOpen(false); setNewBundleCats([]) }}>{t('cancel')}</Button>
@@ -1087,7 +1082,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
         title={t('bundleCatEditTitle', { name: catTarget?.name ?? '' })}
       >
         <div className={css.stackForm}>
-          <CategoryEditor value={catDraft} onChange={setCatDraft} label={t('bundleCatEdit')} />
+          <CategoryEditor value={catDraft} onChange={setCatDraft} label={t('bundleCatEdit')} suggestions={categorySuggestions} />
           <div className={css.inlineForm}>
             <Button variant="primary" type="button" disabled={savingCats} onClick={() => { void submitCategories() }}>{t('bundleCatDone')}</Button>
             <Button variant="outline" type="button" disabled={savingCats} onClick={() => { setCatTarget(null) }}>{t('cancel')}</Button>

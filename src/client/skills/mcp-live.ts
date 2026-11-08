@@ -32,6 +32,11 @@ export interface PresetMcpRowWire {
   summary: string
   /** 该 server 的工具（活动 agent 作用域 ∪ 名单缓存；无数据时缺省）。 */
   tools?: LiveMcpTool[]
+  /**
+   * 实际注册的工具数（由 mcp-status 富化，不含名单缓存）。
+   * 缺省 = 该预设当前没有活动会话，工具数未知 —— 面板不能显示成 0。
+   */
+  registeredCount?: number
 }
 export interface LiveMcpState {
   at: string
@@ -51,6 +56,8 @@ export interface LiveMcpState {
   workspaceClosed?: Record<string, Record<string, boolean>>
   /** 工作区级工具禁用账本：`{ 工作区绝对路径: mcp__ 工具全名[] }`。 */
   workspaceToolDisabled?: Record<string, string[]>
+  /** 新接口：工作区级工具禁用账本按 server 分组（优先于扁平结构）。 */
+  workspaceToolDisabledByServer?: Record<string, Record<string, string[]>>
   /** 工具级禁用·全局层镜像：serverName → 禁用工具全名（所有预设生效）。 */
   toolDisabled?: Record<string, string[]>
   /** 工具级禁用·预设层镜像（按「行」分账）：presetId → serverName → { own, inherit }。 */

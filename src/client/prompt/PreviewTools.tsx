@@ -4,27 +4,38 @@
 import { createElement as h, type ReactElement } from 'react'
 import type { Translate } from './locales.ts'
 import { s } from './styles.ts'
+import { entryKey, type EntrySource, type PreviewTool } from './types.ts'
 
-/** 预览工具条目：对象形态或纯字符串工具名（统一归一化为对象）。 */
-export type PreviewTool = { name: string; description: string } | string
-
-/** 把字符串形态的条目补全为 { name, description: '' }。 */
-
-function norm(tool: PreviewTool): { name: string; description: string } {
-  return typeof tool === 'string' ? { name: tool, description: '' } : tool
+/** 把字符串形态的条目补全为 { name }。 */
+function norm(tool: PreviewTool | string): { name: string; description: string; source?: EntrySource; keySuffix?: string } {
+  if (typeof tool === 'string') return { name: tool, description: '' }
+  return {
+    name: tool.name,
+    description: tool.description ?? '',
+    ...(tool.source === undefined ? {} : { source: tool.source }),
+    ...(tool.keySuffix === undefined ? {} : { keySuffix: tool.keySuffix }),
+  }
 }
 
-export function PreviewTools({ tools, t }: { tools: PreviewTool[]; t: Translate }): ReactElement {
+export function PreviewTools({ tools, t }: { tools: Array<PreviewTool | string>; t: Translate }): ReactElement {
   if (tools.length === 0) return h('div', { style: s.muted }, t('empty'))
   return h('div', { style: s.list }, [
     h('div', { style: s.rowTitle }, [
       h('span', { style: s.orderTag }, `${tools.length} ${t('previewToolCount')}`),
     ]),
-    tools.map((tool) => {
-      const { name, description } = norm(tool)
-      return h('div', { key: name, style: s.row }, [
+    tools.map((tool, index) => {
+      const { name, description, source, keySuffix } = norm(tool)
+      // 同名不同源 / 同名多态都要分行：key 用 name+source+keySuffix+序号。
+      const identity = `${entryKey({ name, ...(source === undefined ? {} : { source }) })}:${index}:${keySuffix ?? ''}`
+      return h('div', { key: identity, style: s.row }, [
         h('div', { style: s.rowBody }, [
-          h('div', { style: s.rowTitle }, h('span', { style: s.code }, name)),
+          h('div', { style: s.rowTitle }, [
+            h('span', { style: s.code }, name),
+            source === undefined
+              ? null
+              : h('span', { style: s.badgeSystem }, `${source.kind}${source.id === undefined ? '' : `:${source.id}`}`),
+            keySuffix === undefined ? null : h('span', { style: s.badgeSystem }, keySuffix),
+          ]),
           h('div', { style: s.preview }, String(description ?? '').slice(0, 140)),
         ]),
       ])

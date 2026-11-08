@@ -16,6 +16,10 @@ export interface SkillInfo {
   dir?: string
   /** 来源标签（内核 `SkillSource`：user-agents / project-dsh / bundled / runtime …）。 */
   root?: string
+  /** 宿主提供的来源桶（workspace / global 或 `{kind,label}`）；缺省时按 `root` 的 SkillSource 映射。 */
+  origin?: string | { kind?: string; origin?: string; scope?: string; label?: string }
+  /** 宿主提供的注册层（workspace / global / project / user）；与 origin 二选一。 */
+  scope?: string
   /** 该技能是否落在可写根（决定「删除」能否真的删掉文件；显隐对所有来源一致）。 */
   deletable?: boolean
   /** 内核 invocation 策略：模型可调用 / 用户可调用（仅展示）。 */
@@ -45,9 +49,6 @@ export type PanelState =
   | { status: 'ready'; snapshot: SkillSnapshot }
 /** ---------------------------------------------------------------- 技能包分类 */
 
-/** 建议分类：点一下就挂上；也允许自己写，账本里存的就是字符串本身。 */
-export const PRESET_BUNDLE_CATEGORIES = ['开发', '设计', '办公协同', '文档知识', '数据', '自动化', '运维', '其他']
-
 /** 分类筛选里代表「没挂任何分类的包」的哨兵值（不会是合法分类名）。 */
 export const UNCATEGORIZED = '\u0000none'
 
@@ -62,8 +63,157 @@ export function sortCategories(counts: Map<string, number>): string[] {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
     .map((entry) => entry[0])
 }
-/** 「全部 Agent」虚拟预设的哨兵 id（不会与真实 preset id 冲突：真实 id 不含 *）。 */
-export const ALL_PRESETS = '*'
+/** 「全部 Agent」虚拟预设的哨兵 id：空串，真实 preset id 的首字符必须是 a-z0-9。 */
+export const ALL_PRESETS = ''
+
+/**
+ * preset id 是否合法：内核 agent-preset schema 只要求 string（任意非空），
+ * 不能按目录名规则过滤自定义预设。空串是 `ALL_PRESETS` 哨兵，因此不可能与真实 id 撞上。
+ * API 层写 preset 账本前统一走它校验。
+ */
+export function isValidPresetId(value: string): boolean {
+  return value.trim() !== ''
+}
+
+/* ---------------------------------------------------------------- 技能来源 */
+
+/**
+ * 内核 `SkillSource` 枚举 → 面板的二桶来源。
+ *
+ * 宿主以后若直接在 `skill.origin` / `skill.scope` 上给出来源桶，优先用显式字段；
+ * 否则在这里集中映射。未知来源原样展示（不猜成 global）。
+ */
+const SKILL_SOURCE_ORIGINS: Record<string, 'workspace' | 'global'> = {
+  'project-dsh': 'workspace',
+  'project-agents': 'workspace',
+  'user-dsh': 'global',
+  'user-agents': 'global',
+  bundled: 'global',
+  runtime: 'global',
+  custom: 'global',
+  // 宿主显式 origin 字段可能直接是桶名。
+  workspace: 'workspace',
+  global: 'global',
+  project: 'workspace',
+  user: 'global',
+}
+
+/** 技能来源的展示模型：known 桶用本地化文案，unknown 原样显示 source。 */
+export type SkillOrigin =
+  | { kind: 'workspace' | 'global'; label?: undefined }
+  | { kind: 'unknown'; label: string }
+
+/**
+ * 解析一个技能的来源桶。
+ * @param skill - 技能摘要。
+ * @returns 无来源字段时 undefined；未知来源返回 kind=unknown + 原始标签。
+ */
+export function skillOriginOf(skill: SkillInfo): SkillOrigin | undefined {
+  const raw = skill.origin ?? skill.scope
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const mapped = SKILL_SOURCE_ORIGINS[raw.trim()]
+    return mapped === undefined ? { kind: 'unknown', label: raw.trim() } : { kind: mapped }
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    const bucket = [raw.kind, raw.origin, raw.scope]
+      .find((value): value is string => typeof value === 'string' && value.trim() !== '')
+    const label = typeof raw.label === 'string' && raw.label.trim() !== '' ? raw.label.trim() : undefined
+    if (bucket !== undefined) {
+      const mapped = SKILL_SOURCE_ORIGINS[bucket.trim()]
+      return mapped === undefined ? { kind: 'unknown', label: label ?? bucket.trim() } : { kind: mapped }
+    }
+    if (label !== undefined) return { kind: 'unknown', label }
+  }
+  if (skill.root === undefined || skill.root.trim() === '') return undefined
+  const source = skill.root.trim()
+  const mapped = SKILL_SOURCE_ORIGINS[source]
+  return mapped === undefined ? { kind: 'unknown', label: source } : { kind: mapped }
+}
+
+/* ---------------------------------------------------------------- 技能开关作用域 */
+
+/** 技能开关的编辑层级。 */
+export type SkillLevel = 'preset' | 'workspace'
+
+/**
+ * 技能开关的完整作用域：层级 + 预设 + 工作区（按 cwd）。
+ * 「按钮显示」与「按钮动作」共用同一个对象，避免两层各读一套状态。
+ */
+export interface SkillEnableScope {
+  level: SkillLevel
+  presetId: string
+  cwd: string | null
+}
+
+/** 三层开关账本（由 /api/skill-toggles 系列接口提供）。 */
+export interface SkillEnableTables {
+  /** 全局层：name → enabled。 */
+  skills: Record<string, boolean>
+  /** 预设层：presetId → name → enabled（显式 false = 该预设下关闭）。 */
+  overrides: Record<string, Record<string, boolean>>
+  /** 工作区层：cwd → name → enabled（显式 true 可覆盖预设/全局的关闭）。 */
+  workspaceOverrides: Record<string, Record<string, boolean>>
+}
+
+/**
+ * 某作用域下一个技能的开关值。
+ *
+ * 宿主闸门的真实优先级是「工作区 > 预设 > 全局」：工作区显式 true 也能打开
+ * 预设/全局关掉的技能，所以这里不能用「全局 false 一票否决」的旧模型。
+ *
+ * @param scope - 编辑作用域。
+ * @param name - 技能名。
+ * @param tables - 三层账本。
+ * @returns 该作用域下是否启用。
+ */
+export function enabledStateAt(scope: SkillEnableScope, name: string, tables: SkillEnableTables): boolean {
+  if (scope.level === 'workspace' && scope.cwd !== null) {
+    const workspace = tables.workspaceOverrides[scope.cwd] ?? {}
+    if (Object.hasOwn(workspace, name)) return workspace[name] !== false
+  }
+  if (scope.presetId !== ALL_PRESETS) {
+    const preset = tables.overrides[scope.presetId] ?? {}
+    if (Object.hasOwn(preset, name)) return preset[name] !== false
+  }
+  return tables.skills[name] !== false
+}
+
+/**
+ * 该作用域实际会写入/清理的那层覆盖表（用于「清空单独设置」按钮的显示）。
+ *
+ * @param scope - 编辑作用域。
+ * @param tables - 三层账本。
+ * @returns 该作用域的覆盖表；「全部 Agent」或工作区未定时为空表。
+ */
+export function skillOverridesAt(
+  scope: SkillEnableScope,
+  tables: SkillEnableTables,
+): Record<string, boolean> {
+  if (scope.level === 'workspace') {
+    return scope.cwd === null ? {} : (tables.workspaceOverrides[scope.cwd] ?? {})
+  }
+  return scope.presetId === ALL_PRESETS ? {} : (tables.overrides[scope.presetId] ?? {})
+}
+
+/**
+ * 技能包是否需要在列表里保留一行。
+ *
+ * 空包必须保留（否则新建后无处可点）；账本里的成员全部失效（missingSkills>0）
+ * 的包也必须保留，否则用户看不到「清理失效引用」入口。只有真正带筛选条件时，
+ * 才允许隐藏「没有成员、也没有失效引用、也不是空包」的包。
+ *
+ * @param bundle - 技能包。
+ * @param filtering - 当前是否带搜索/状态筛选。
+ * @returns 是否渲染该技能包。
+ */
+export function bundleVisibleInList(
+  bundle: Pick<BundleInfo, 'skills' | 'skillCount' | 'missingSkills'>,
+  filtering: boolean,
+): boolean {
+  return bundle.skills.length > 0
+    || (bundle.missingSkills?.length ?? 0) > 0
+    || (bundle.skillCount === 0 && !filtering)
+}
 export type ConfirmState =
   | { kind: 'bundle'; bundle: BundleInfo }
   | { kind: 'skill'; name: string; dir?: string }

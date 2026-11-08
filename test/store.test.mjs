@@ -23,33 +23,33 @@ function dbStore(dir, warn) {
 test('DB store：写入读回 + schema 补默认值', () => {
   const dir = tmpdir('pc-store-')
   const { db, store } = dbStore(dir)
-  store.setField('sections', ['a', 'b'])
-  assert.deepEqual(store.readResolved().sections, ['a', 'b'])
+  store.setField('sections', [{ name: 'a' }, { name: 'b' }])
+  assert.deepEqual(store.readResolved().sections, [{ name: 'a' }, { name: 'b' }])
   assert.deepEqual(store.readResolved().tools, { exclude: [], add: [], bootstrap: { exclude: [], add: [] }, compaction: { exclude: [], add: [] } })
   // 存放在同一 DB 的 doc('config') 里；不再有 config.yaml。
-  assert.deepEqual(getDoc(db, 'config'), { sections: ['a', 'b'] })
+  assert.deepEqual(getDoc(db, 'config'), { sections: [{ name: 'a' }, { name: 'b' }] })
   assert.equal(fs.existsSync(path.join(dir, 'config.yaml')), false)
 })
 
 test('DB store：删除字段（undefined）从文档里移除', () => {
   const dir = tmpdir('pc-store-')
   const { db, store } = dbStore(dir)
-  store.setField('sections', ['a'])
-  store.setField('replace', { a: 'x' })
-  store.setField('replace', undefined)
-  assert.equal(getDoc(db, 'config').replace, undefined)
-  assert.deepEqual(store.readResolved().replace, {})
-  assert.deepEqual(getDoc(db, 'config').sections, ['a'])
+  store.setField('sections', [{ name: 'a' }])
+  store.setField('replacements', [{ name: 'a', phase: 'always', text: 'x' }])
+  store.setField('replacements', undefined)
+  assert.equal(getDoc(db, 'config').replacements, undefined)
+  assert.deepEqual(store.readResolved().replacements, [])
+  assert.deepEqual(getDoc(db, 'config').sections, [{ name: 'a' }])
 })
 
 test('DB store：坏文档（schema 非法）回落到 last-good', () => {
   const dir = tmpdir('pc-store-')
   const { db, store } = dbStore(dir, () => {})
-  store.setField('sections', ['good'])
-  assert.deepEqual(store.readResolved().sections, ['good'])
-  // replace 值非字符串是 schemastery 明确拒绝的形状 → 回落 last-good。
-  setDoc(db, 'config', { replace: { a: 42 } })
-  assert.deepEqual(store.readResolved().sections, ['good'], 'last-good')
+  store.setField('sections', [{ name: 'good' }])
+  assert.deepEqual(store.readResolved().sections, [{ name: 'good' }])
+  // 名单里的条目缺 name 是 schemastery 明确拒绝的形状 → 回落 last-good。
+  setDoc(db, 'config', { sections: [{ source: { kind: 'global' } }] })
+  assert.deepEqual(store.readResolved().sections, [{ name: 'good' }], 'last-good')
 })
 
 // ── readLegacySection：仅排查用（破坏式后不再迁移）─────────────────────────
