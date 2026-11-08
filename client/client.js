@@ -1614,6 +1614,9 @@ function descriptorOf(key) {
 function sectionFieldOf(key) {
   return descriptorOf(key).sectionField;
 }
+function contextFieldOf(key) {
+  return descriptorOf(key).contextField;
+}
 function toolFieldOf(key) {
   return descriptorOf(key).toolField ?? "static";
 }
@@ -1622,6 +1625,20 @@ function acceptsInjectFor(key, phase) {
 }
 function sectionEntries(cfg, key) {
   return normalizeList(cfg?.[sectionFieldOf(key)]);
+}
+function contextEntries(cfg, key) {
+  return normalizeList(cfg?.[contextFieldOf(key)]);
+}
+function contextPatch(cfg, key, entry, hidden) {
+  const field = contextFieldOf(key);
+  const current2 = contextEntries(cfg, key);
+  const index = current2.findIndex((item) => sameEntry(item, entry));
+  if (hidden) {
+    if (index < 0) current2.push({ name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } });
+  } else if (index >= 0) {
+    current2.splice(index, 1);
+  }
+  return { [field]: current2 };
 }
 function normalizeList(list) {
   const out = [];
@@ -3783,27 +3800,16 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   };
   const toggleContext = (entry, hide) => {
     const keys = syncAll ? PHASE_KEYS : [phase];
-    const patch = {};
     for (const key of keys) {
-      const view2 = phases?.[key];
-      const base2 = view2?.baseContexts;
-      if (view2 === null || view2 === void 0 || !Array.isArray(base2)) {
+      const phaseView = phases?.[key];
+      const base2 = phaseView?.baseContexts;
+      if (phaseView === null || phaseView === void 0 || !Array.isArray(base2)) {
         showFlash(t("contextsNotReady"), "err");
         return;
       }
-      const hidden = base2.filter((context) => context.blocked === true || context.active === false).map((context) => ({ name: context.name, ...context.source === void 0 ? {} : { source: context.source } }));
-      const index = hidden.findIndex((candidate) => sameEntry(candidate, entry));
-      if (hide) {
-        if (index < 0) {
-          hidden.push({ name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } });
-        }
-      } else if (index >= 0) {
-        hidden.splice(index, 1);
-      }
-      const field = PHASES.find((descriptor) => descriptor.key === key).contextField;
-      patch[field] = hidden;
+      const patch = contextPatch(view, key, entry, hide);
+      for (const [field, value] of Object.entries(patch)) edit(field, value);
     }
-    writePatchLayered(patch);
   };
   const writeGlobal = writeField;
   const nativeIn = (key, entry) => {

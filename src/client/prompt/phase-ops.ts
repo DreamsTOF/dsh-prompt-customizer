@@ -65,6 +65,24 @@ export function contextEntries(cfg: Config | null | undefined, key: PhaseKey): E
   return normalizeList(cfg?.[contextFieldOf(key)])
 }
 
+/** 运行时上下文显隐：只改本阶段 contexts 名单，不立即落盘。 */
+export function contextPatch(
+  cfg: Config | null | undefined,
+  key: PhaseKey,
+  entry: EntryRef,
+  hidden: boolean,
+): Partial<Record<ContextField, EntryRef[]>> {
+  const field = contextFieldOf(key)
+  const current = contextEntries(cfg, key)
+  const index = current.findIndex((item) => sameEntry(item, entry))
+  if (hidden) {
+    if (index < 0) current.push({ name: entry.name, ...(entry.source === undefined ? {} : { source: entry.source }) })
+  } else if (index >= 0) {
+    current.splice(index, 1)
+  }
+  return { [field]: current }
+}
+
 function normalizeList(list: Array<EntryRef | string> | undefined | null): EntryRef[] {
   const out: EntryRef[] = []
   const seen = new Set<string>()

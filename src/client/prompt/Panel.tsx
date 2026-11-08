@@ -36,7 +36,7 @@ import {
   type SectionField,
 } from './types.ts'
 import { editView, overrideView, type ConfigPatch } from './presets.ts'
-import { mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from './phase-ops.ts'
+import { contextPatch, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from './phase-ops.ts'
 import { SectionsPane } from './SectionsPane.tsx'
 import { ToolsPane } from './ToolsPane.tsx'
 import { PresetsPane, SettingsPane } from './PresetsPane.tsx'
@@ -406,33 +406,21 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     writePatch(patch)
   }
 
-  // 运行时上下文显隐：直接落盘（不经草稿）。每个阶段只用各自的 baseContexts
-  // 计算 hidden；三态同步要求三阶段都就绪（缺一态绝不把该阶段当空集写掉）。
+  // 运行时上下文显隐：和提示词/工具一样进草稿，统一保存时一次落盘；不立即刷新。
+  // 每个阶段只用各自的 baseContexts 计算 hidden；三态同步要求三阶段都就绪
+  // （缺一态绝不把该阶段当空集写掉）。
   const toggleContext = (entry: EntryRef, hide: boolean): void => {
     const keys = syncAll ? PHASE_KEYS : [phase]
-    const patch: ConfigPatch = {}
     for (const key of keys) {
-      const view = phases?.[key]
-      const base = view?.baseContexts
-      if (view === null || view === undefined || !Array.isArray(base)) {
+      const phaseView = phases?.[key]
+      const base = phaseView?.baseContexts
+      if (phaseView === null || phaseView === undefined || !Array.isArray(base)) {
         showFlash(t('contextsNotReady'), 'err')
         return
       }
-      const hidden = base
-        .filter((context) => context.blocked === true || context.active === false)
-        .map((context) => ({ name: context.name, ...(context.source === undefined ? {} : { source: context.source }) }))
-      const index = hidden.findIndex((candidate) => sameEntry(candidate, entry))
-      if (hide) {
-        if (index < 0) {
-          hidden.push({ name: entry.name, ...(entry.source === undefined ? {} : { source: entry.source }) })
-        }
-      } else if (index >= 0) {
-        hidden.splice(index, 1)
-      }
-      const field = PHASES.find((descriptor) => descriptor.key === key)!.contextField
-      patch[field] = hidden
+      const patch = contextPatch(view, key, entry, hide)
+      for (const [field, value] of Object.entries(patch)) edit(field as ContextField, value)
     }
-    writePatchLayered(patch)
   }
   // 预设库（presets / activePreset）永远保持在全局字段，不分作用域。
   const writeGlobal = writeField

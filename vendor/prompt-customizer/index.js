@@ -84,6 +84,22 @@ function matchesAny(entries, candidate) {
   return (Array.isArray(entries) ? entries : []).some((entry) => entryMatches(entry, candidate))
 }
 
+/**
+ * 过滤工具自己注册的运行时上下文：`tool:<name>:depth` 只有在对应工具仍在
+ * 当前候选目录且上下文当前有实际文本时才显示。工具/提供方被移除后，宿主的
+ * 空文本注册项不再污染面板。
+ */
+export function filterRuntimeContexts(contexts, tools = []) {
+  const names = new Set((Array.isArray(tools) ? tools : []).map((item) => String(item?.name ?? item?.tool ?? '')))
+  return (Array.isArray(contexts) ? contexts : []).filter((context) => {
+    const name = String(context?.name ?? '')
+    const match = /^tool:(.+):depth$/.exec(name)
+    if (match === null) return true
+    const toolName = match[1]
+    return toolName !== '' && names.has(toolName) && String(context?.text ?? '') !== ''
+  })
+}
+
 /** 会话 id：source {kind:'agent'} 的 id。 */
 function sessionIdOf(agent) {
   const id = agent?.session?.header?.id ?? agent?.session?.id ?? agent?.id
@@ -1597,7 +1613,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   return {
     ok: true,
     config: previewCfg,
-    contexts: (assembled.contexts ?? [])
+    contexts: filterRuntimeContexts(assembled.contexts ?? [], baseTools)
       .filter((item) => !matchesAny(previewContextsDenied, item))
       .map(context => ({
         name: context.name,
@@ -1647,7 +1663,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     // 独立名单」，被屏蔽 / 被隐藏的条目仍保留在此可反选。
     baseSections,
     baseTools,
-    baseContexts: Array.isArray(baseView.contexts) ? baseView.contexts : [],
+    baseContexts: filterRuntimeContexts(baseView.contexts, baseTools),
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),
   }
@@ -1745,7 +1761,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       phase,
       createdAt: typeof agent.session?.header?.createdAt === 'number' ? agent.session.header.createdAt : undefined,
     },
-    contexts: (assembled.contexts ?? []).map(context => ({
+    contexts: filterRuntimeContexts(assembled.contexts ?? [], actualTools).map(context => ({
       name: context.name,
       text: renderSection(context, assembled.variables ?? {}, diagnostics),
       ...(context.source === undefined ? {} : { source: context.source }),
@@ -1756,7 +1772,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
     tools: actualTools,
     baseSections,
     baseTools: union.rows,
-    baseContexts: Array.isArray(baseView.contexts) ? baseView.contexts : [],
+    baseContexts: filterRuntimeContexts(baseView.contexts, actualTools),
     registryTools: union.registryTools,
     registryTotal: union.registryTools.length,
     takenOverBy: assembled && typeof assembled === 'object'

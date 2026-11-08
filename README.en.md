@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.0** (removes the workspace-level prompt/tool layer; single-preset editing, single-preset import/export, and manual empty-override cleanup; workspaces remain for MCP / skills / cwd), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.0.1** (single-preset editing; fixes stale tool-owned runtime-context filtering and draft context visibility), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 
