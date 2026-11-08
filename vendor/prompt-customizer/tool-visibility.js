@@ -82,7 +82,9 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
     try { cfg = readConfig(agent) } catch { return [] }
     // 兼容两种读取口：返回整份 Config（含 overrides）时先按预设取 override；
     // 返回已合并好的生效配置（预设+工作区）时直接使用。
-    if (cfg !== null && typeof cfg === 'object' && cfg.overrides !== null && typeof cfg.overrides === 'object') {
+    if (cfg !== null && typeof cfg === 'object'
+      && cfg.overrides !== null && typeof cfg.overrides === 'object'
+      && Object.keys(cfg.overrides).length > 0) {
       let presetId
       try { presetId = presetOf(agent) } catch { presetId = undefined }
       cfg = effectiveConfig(presetId === undefined || presetId === '' ? undefined : cfg.overrides?.[presetId])
