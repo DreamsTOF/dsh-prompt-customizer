@@ -18,8 +18,6 @@ import os from 'node:os'
 import path from 'node:path'
 
 const SCHEMA = `
-DROP TABLE IF EXISTS catalog_section;
-DROP TABLE IF EXISTS catalog_tool;
 CREATE TABLE IF NOT EXISTS doc (
   key  TEXT PRIMARY KEY,
   json TEXT NOT NULL

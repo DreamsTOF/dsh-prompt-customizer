@@ -98,7 +98,7 @@ function harness(t, { live = true, toolMask } = {}) {
   return { request, ctx }
 }
 
-test('预设预览：右栏纯预设，左栏 baseTools 标出 agent 新增与被插件遮蔽的工具', async (t) => {
+test('预设预览：右栏纯预设，不并入任何会话 agent 作用域条目', async (t) => {
   const h = harness(t)
   const res = await h.request('preview?scope=standard&phase=active')
   assert.equal(res.statusCode, 200)
@@ -107,10 +107,10 @@ test('预设预览：右栏纯预设，左栏 baseTools 标出 agent 新增与�
   // 预设预览仍是纯预设可见集：agent 新增 / 被别的插件遮蔽的项都不进右栏。
   assert.ok(!res.body.tools.some(tool => tool.name === 'undo_last_edit'))
   const byName = new Map(res.body.baseTools.map(tool => [tool.name, tool]))
-  assert.equal(byName.get('undo_last_edit')?.scope, 'agent')
-  assert.equal(byName.get('write')?.maskedByPlugin, true)
-  assert.equal(byName.get('edit')?.maskedByPlugin, true)
-  assert.equal(res.body.registryTotal, 5)
+  assert.equal(byName.get('undo_last_edit'), undefined)
+  assert.notEqual(byName.get('write')?.maskedByPlugin, true)
+  assert.notEqual(byName.get('edit')?.maskedByPlugin, true)
+  assert.equal(res.body.registryTotal, 4)
 })
 
 test('预设预览：本插件自己的 MCP 遮蔽会计入可见性与标记', async (t) => {

@@ -85,37 +85,37 @@ function harness(t, { live = true, restrict = [] } = {}) {
   return { request }
 }
 
-test('提示词段按宿主规范 order 排序（含 agent 作用域段，而非数组/追加序）', async (t) => {
+test('提示词段按宿主规范 order 排序（纯预设，不并入会话 agent 作用域段）', async (t) => {
   const h = harness(t)
   const preview = await h.request('preview?scope=standard&phase=active')
   assert.deepEqual(
     preview.body.baseSections.map((section) => section.name),
-    ['persona', 'tool:read', 'tool:undo_last_edit', 'tool:write', 'mcp:servers'],
-    'baseSections 必须按注册 order (0,1100,1150,1200,3100) 排序',
+    ['persona', 'tool:read', 'tool:write', 'mcp:servers'],
+    'baseSections 必须按注册 order (0,1100,1200,3100) 排序，且不含会话专属段',
   )
   const inventory = await h.request('inventory')
   assert.deepEqual(
     inventory.body.sections.map((section) => section.name),
-    ['persona', 'tool:read', 'tool:undo_last_edit', 'tool:write', 'mcp:servers'],
+    ['persona', 'tool:read', 'tool:write', 'mcp:servers'],
     '清单 / 池子也必须同样有序',
   )
 })
 
-test('工具按宿主最终目录顺序排序，agent 作用域新增项追加在后', async (t) => {
+test('工具按宿主最终目录顺序排序，纯预设不含会话 agent 新增项', async (t) => {
   const h = harness(t)
   const preview = await h.request('preview?scope=standard&phase=active')
   assert.deepEqual(
     preview.body.baseTools.map((tool) => tool.name),
-    ['mid', 'zeta', 'alpha', 'agent_only'],
-    'baseTools 跟随 assembled.tools 顺序；agent_only 无宿主顺序，按名字落到尾部',
+    ['mid', 'zeta', 'alpha'],
+    'baseTools 跟随 assembled.tools 顺序；agent_only 不属于纯预设预览',
   )
 })
 
-test('被别的插件 restrict 的工具带 maskedByPlugin 标记（客户端据此移出启用列表）', async (t) => {
+test('纯预设预览不读取 live 视图的 restrict 标记', async (t) => {
   const h = harness(t, { restrict: ['alpha'] })
   const preview = await h.request('preview?scope=standard&phase=active')
   const alpha = preview.body.baseTools.find((tool) => tool.name === 'alpha')
-  assert.equal(alpha?.maskedByPlugin, true, 'alpha 在预设注册表里但被 live 视图 restrict 掉')
+  assert.notEqual(alpha?.maskedByPlugin, true, '预设预览不把 live 视图的 restrict 当作预设状态')
   // 未被遮蔽的工具不带该标记。
   assert.notEqual(preview.body.baseTools.find((tool) => tool.name === 'mid')?.maskedByPlugin, true)
 })

@@ -3,7 +3,6 @@ export const DICT = {
   zh: {
     nav: '提示词定制',
     previewPreset: '来源：当前模式预设。提示词、工具及顺序按此预设独立装配，不匹配或更改已有对话。',
-    previewUnresolved: '会话变量 {names} 尚未绑定，保留模板引用；提示词与工具目录仍可查看和编辑。',
     runtimeContexts: '运行时上下文（可显隐；host 并入系统提示词的部分）',
     loading: '加载中…',
     tabsSections: '提示词',
@@ -112,7 +111,6 @@ export const DICT = {
     previewFail: '该阶段装配失败（scope 挂载失败或预设插件异常），请切换目标或查看服务日志。',
     previewToolsHint: '模型实际可见的工具目录（按所选阶段运行预设的全部装配规则，含原生阶段裁剪）：',
     previewToolsCount: '注册表',
-    previewSessionOverlay: '左栏已并入当前会话的会话级条目；右栏仍是编辑目标预设的纯装配。',
     toolAgentScoped: '会话级',
     toolAgentScopedHint: '该工具由插件在 agent 自己的作用域注册（不是预设注册表项）；本插件的阶段过滤无法拒绝作用域内名字，因此只能查看。',
     toolExecutorScoped: '执行器包装',
@@ -152,7 +150,6 @@ export const DICT = {
   en: {
     nav: 'Prompt Customizer',
     previewPreset: 'Source: selected mode preset. Sections, tools and ordering are assembled independently; existing conversations are neither matched nor changed.',
-    previewUnresolved: 'Session variables {names} are not bound and remain template references. Sections and tools are still available for editing.',
     runtimeContexts: 'Runtime contexts (toggleable; the part the host folds into the system prompt)',
     loading: 'Loading…',
     tabsSections: 'Sections',
@@ -261,7 +258,6 @@ export const DICT = {
     previewFail: 'Assembly for this phase failed (scope mount error or a preset plugin threw); switch target or check the server log.',
     previewToolsHint: 'Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):',
     previewToolsCount: 'of registry',
-    previewSessionOverlay: 'The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset.',
     toolAgentScoped: 'session-level',
     toolAgentScopedHint: 'Registered by a plugin in the agent\'s own scope (not a preset registry entry); this plugin\'s phase filter cannot deny scope-local names, so this row is read-only.',
     toolExecutorScoped: 'executor wrapper',

@@ -81,9 +81,9 @@ function harness(t, { exclude = [], live = true } = {}) {
   return { request, ctx }
 }
 
-test('同名遮蔽：插件 read 与原生 read 拆成两行（插件=锁定可见，原生=遮蔽池）', async (t) => {
+test('同名遮蔽：当前会话里插件 read 与原生 read 拆成两行（插件=锁定可见，原生=遮蔽池）', async (t) => {
   const h = harness(t)
-  const preview = await h.request('preview?scope=standard&phase=active')
+  const preview = await h.request('session')
   const reads = preview.body.baseTools.filter((tool) => tool.name === 'read')
   assert.equal(reads.length, 2, '同名 read 应出现两条')
   const plugin = reads.find((tool) => tool.state === 'locked-agent')

@@ -1511,46 +1511,10 @@ async function previewTarget(ctx, req, body = null) {
 }
 
 /** Assemble one leased mode revision; unresolved session variables stay in the template. */
-/**
- * 只收集一个 scope 的**预过滤**段与工具原文，不碰累积登记表。
- *
- * 与 buildPreview 的区别：重扫需要「真实并集却不想在收集过程中又往池子里
- * observe」——否则边扫边写会把上一轮的历史条目混进来，重扫就成了自证。
- */
-async function collectScopeBase(ctx, scopeKey, presetId) {
-  // 同预设有活动 agent 时，把 agent 作用域的段与工具也并入重扫结果 —— 否则
-  // 一次「重扫登记表」会把 dsh-hashline-edit / dsh-better-edit 这类只在
-  // agent/created 注册的条目全部清掉，面板又回到提取不全的状态。
-  const liveAgent = liveAgentForPreset(ctx, presetId)
-  const assembled = await ctx.systemPrompt.assemble({
-    scope: liveAgent ?? scopeKey,
-    ...(liveAgent === undefined ? {} : { agent: liveAgent }),
-    promptCustomizerPreset: presetId,
-    promptCustomizerPhase: 'active',
-    promptCustomizerBase: true,
-  })
-  const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
-  const byName = new Map()
-  for (const tool of [
-    ...toolSchemasOf(ctx, scopeKey),
-    ...(liveAgent === undefined ? [] : toolSchemasOf(ctx, liveAgent)),
-    ...(Array.isArray(baseView.tools) ? baseView.tools : []),
-  ]) {
-    if (tool?.name !== undefined) byName.set(String(tool.name), tool)
-  }
-  return {
-    sections: (Array.isArray(baseView.sections) ? baseView.sections : []).map((sec) => ({ name: sec.name, text: sec.text })),
-    // 0.2.2 起装配结果不再携带 tools：从注册表（预设 ∪ agent 实际视图）读；
-    // 测试 / 旧宿主没有 tools 服务时回落到装配 base 视图里的工具原文。
-    tools: [...byName.values()].map((tool) => ({ name: String(tool.name), description: typeof tool.description === 'string' ? tool.description : '' })),
-  }
-}
-
 async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patchTarget, toolMask) {
   const scopeKey = target?.scopeKey
   const hintId = target?.hintId
-  const liveAgent = liveAgentForPreset(ctx, hintId)
-  const configTargetId = hintId ?? (liveAgent === undefined ? undefined : presetIdOfAgent(ctx, liveAgent))
+  const configTargetId = hintId
   const workspace = typeof target?.workspace === 'string' && target.workspace !== '' ? target.workspace : undefined
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
@@ -1589,45 +1553,15 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const previewDenied = pickSectionsForStatus(previewCfg, phaseStatus)
   const previewContextsDenied = pickContextsForStatus(previewCfg, phaseStatus)
   const previewReplacements = filterReplacementsByPhase(previewCfg.replacements, phaseStatus)
-  // 左栏的「基座」：纯预设 base 段 + 同预设活动 agent 的 agent 作用域段。
-  // 右栏最终装配仍用上面的纯预设装配（预设预览保持纯净）；右栏之外的列表
-  // 需要看见 agent 作用域新增的段，否则它们不可编辑 / 不可解释。
-  let liveBaseSections = []
-  let liveFinalTools = []
-  if (liveAgent !== undefined) {
-    try {
-      const liveHint = {
-        scope: liveAgent,
-        agent: liveAgent,
-        promptCustomizerPreset: configTargetId,
-        promptCustomizerPresetScope: scopeKey,
-        promptCustomizerPhase: phase,
-        promptCustomizerBase: true,
-      }
-      if (patch !== undefined) {
-        liveHint.promptCustomizerPatch = patch
-        liveHint.promptCustomizerTarget = patchTarget
-      }
-      const liveAssembled = await ctx.systemPrompt.assemble(liveHint)
-      liveBaseSections = Array.isArray(liveAssembled?.promptCustomizerBaseView?.sections)
-        ? liveAssembled.promptCustomizerBaseView.sections
-        : []
-      liveFinalTools = Array.isArray(liveAssembled?.tools) ? liveAssembled.tools : []
-    } catch { /* agent 作用域读不到：退回纯预设列表 */ }
-  }
-  // 段的规范顺序：宿主注册的数值 order（预设作用域链 + 同预设活动 agent 作用域）。
-  // 用它给 base 列表排序，模型实收顺序即编辑列表顺序；用户拖动 / 注入仍走草稿序。
-  const sectionOrder = sectionOrderMap(ctx, liveAgent === undefined ? [scopeKey] : [liveAgent, scopeKey])
-  const baseSections = mergeAgentScopedSections(baseView.sections ?? [], liveBaseSections, previewDenied, previewReplacements, sectionOrder)
+  // 预设预览是纯预设装配：不读取任何具体会话的 agent 作用域条目。
+  // 段的规范顺序只取宿主注册的预设作用域链；用户拖动 / 注入仍走草稿序。
+  const sectionOrder = sectionOrderMap(ctx, [scopeKey])
+  const baseSections = mergeAgentScopedSections(baseView.sections ?? [], [], previewDenied, previewReplacements, sectionOrder)
   const finalTools = Array.isArray(assembled.tools) ? assembled.tools : []
-  // 有同预设活动会话时，用它的真实可见工具（含 agent 提供 / 执行器包装）作为排序与
-  // 执行器识别来源；否则用预设装配的结果。
-  const effectiveFinalTools = liveAgent !== undefined && liveFinalTools.length > 0 ? liveFinalTools : finalTools
-  const union = await buildToolUnion(ctx, scopeKey, liveAgent, previewCfg, phaseStatus, {
+  const union = await buildToolUnion(ctx, scopeKey, undefined, previewCfg, phaseStatus, {
     toolMask,
     presetId: configTargetId,
-    cwd: liveAgent?.session?.header?.cwd,
-    extraTools: effectiveFinalTools,
+    extraTools: finalTools,
   })
   const baseTools = union.rows
   const toolSourceByName = new Map(baseTools.map((row) => [row.name, row.source]))
@@ -1707,11 +1641,6 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     baseContexts: Array.isArray(baseView.contexts) ? baseView.contexts : [],
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),
-    /** 非空 = 左栏已并入该活动会话的 agent 作用域条目（右栏仍是纯预设装配）。 */
-    sessionOverlay: liveAgent === undefined ? undefined : {
-      id: String(liveAgent.session?.header?.id ?? liveAgent.id ?? ''),
-      presetId: configTargetId,
-    },
   }
 }
 

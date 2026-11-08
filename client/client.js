@@ -3450,10 +3450,6 @@ function PreviewPane({ t, phases, phase, sub, onToggleContext }) {
       phases === null ? (0, import_react8.createElement)("div", { style: s.muted }, t("loading")) : null,
       phases !== null && data === null ? (0, import_react8.createElement)("div", { style: s.error }, t("previewFail")) : null,
       data ? (0, import_react8.createElement)("div", { style: s.muted }, t("previewPreset")) : null,
-      data?.sessionOverlay !== void 0 ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("previewSessionOverlay")) : null,
-      data?.diagnostics?.length ? (0, import_react8.createElement)("div", { style: s.noticeWarn }, t("previewUnresolved", {
-        names: [...new Set(data.diagnostics.map((item) => `{{${item.variable}}}`))].join(", ")
-      })) : null,
       sub === "prompt" ? data ? [
         (0, import_react8.createElement)("div", { style: s.rowTitle }, [
           (0, import_react8.createElement)("span", { style: s.muted }, t("previewHint")),
@@ -3773,7 +3769,9 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       const hidden = base2.filter((context) => context.blocked === true || context.active === false).map((context) => ({ name: context.name, ...context.source === void 0 ? {} : { source: context.source } }));
       const index = hidden.findIndex((candidate) => sameEntry(candidate, entry));
       if (hide) {
-        if (index < 0) hidden.push(entry);
+        if (index < 0) {
+          hidden.push({ name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } });
+        }
       } else if (index >= 0) {
         hidden.splice(index, 1);
       }
@@ -4038,7 +4036,6 @@ var DICT = {
   zh: {
     nav: "\u63D0\u793A\u8BCD\u5B9A\u5236",
     previewPreset: "\u6765\u6E90\uFF1A\u5F53\u524D\u6A21\u5F0F\u9884\u8BBE\u3002\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u53CA\u987A\u5E8F\u6309\u6B64\u9884\u8BBE\u72EC\u7ACB\u88C5\u914D\uFF0C\u4E0D\u5339\u914D\u6216\u66F4\u6539\u5DF2\u6709\u5BF9\u8BDD\u3002",
-    previewUnresolved: "\u4F1A\u8BDD\u53D8\u91CF {names} \u5C1A\u672A\u7ED1\u5B9A\uFF0C\u4FDD\u7559\u6A21\u677F\u5F15\u7528\uFF1B\u63D0\u793A\u8BCD\u4E0E\u5DE5\u5177\u76EE\u5F55\u4ECD\u53EF\u67E5\u770B\u548C\u7F16\u8F91\u3002",
     runtimeContexts: "\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\uFF08\u53EF\u663E\u9690\uFF1Bhost \u5E76\u5165\u7CFB\u7EDF\u63D0\u793A\u8BCD\u7684\u90E8\u5206\uFF09",
     loading: "\u52A0\u8F7D\u4E2D\u2026",
     tabsSections: "\u63D0\u793A\u8BCD",
@@ -4147,7 +4144,6 @@ var DICT = {
     previewFail: "\u8BE5\u9636\u6BB5\u88C5\u914D\u5931\u8D25\uFF08scope \u6302\u8F7D\u5931\u8D25\u6216\u9884\u8BBE\u63D2\u4EF6\u5F02\u5E38\uFF09\uFF0C\u8BF7\u5207\u6362\u76EE\u6807\u6216\u67E5\u770B\u670D\u52A1\u65E5\u5FD7\u3002",
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
-    previewSessionOverlay: "\u5DE6\u680F\u5DF2\u5E76\u5165\u5F53\u524D\u4F1A\u8BDD\u7684\u4F1A\u8BDD\u7EA7\u6761\u76EE\uFF1B\u53F3\u680F\u4ECD\u662F\u7F16\u8F91\u76EE\u6807\u9884\u8BBE\u7684\u7EAF\u88C5\u914D\u3002",
     toolAgentScoped: "\u4F1A\u8BDD\u7EA7",
     toolAgentScopedHint: "\u8BE5\u5DE5\u5177\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u6CE8\u518C\uFF08\u4E0D\u662F\u9884\u8BBE\u6CE8\u518C\u8868\u9879\uFF09\uFF1B\u672C\u63D2\u4EF6\u7684\u9636\u6BB5\u8FC7\u6EE4\u65E0\u6CD5\u62D2\u7EDD\u4F5C\u7528\u57DF\u5185\u540D\u5B57\uFF0C\u56E0\u6B64\u53EA\u80FD\u67E5\u770B\u3002",
     toolExecutorScoped: "\u6267\u884C\u5668\u5305\u88C5",
@@ -4187,7 +4183,6 @@ var DICT = {
   en: {
     nav: "Prompt Customizer",
     previewPreset: "Source: selected mode preset. Sections, tools and ordering are assembled independently; existing conversations are neither matched nor changed.",
-    previewUnresolved: "Session variables {names} are not bound and remain template references. Sections and tools are still available for editing.",
     runtimeContexts: "Runtime contexts (toggleable; the part the host folds into the system prompt)",
     loading: "Loading\u2026",
     tabsSections: "Sections",
@@ -4296,7 +4291,6 @@ var DICT = {
     previewFail: "Assembly for this phase failed (scope mount error or a preset plugin threw); switch target or check the server log.",
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
-    previewSessionOverlay: "The left list includes session-level entries from the current session; the right pane remains the pure assembly of the edit-target preset.",
     toolAgentScoped: "session-level",
     toolAgentScopedHint: "Registered by a plugin in the agent's own scope (not a preset registry entry); this plugin's phase filter cannot deny scope-local names, so this row is read-only.",
     toolExecutorScoped: "executor wrapper",

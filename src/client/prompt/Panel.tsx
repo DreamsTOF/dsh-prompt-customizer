@@ -422,7 +422,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
         .map((context) => ({ name: context.name, ...(context.source === undefined ? {} : { source: context.source }) }))
       const index = hidden.findIndex((candidate) => sameEntry(candidate, entry))
       if (hide) {
-        if (index < 0) hidden.push(entry)
+        if (index < 0) {
+          hidden.push({ name: entry.name, ...(entry.source === undefined ? {} : { source: entry.source }) })
+        }
       } else if (index >= 0) {
         hidden.splice(index, 1)
       }

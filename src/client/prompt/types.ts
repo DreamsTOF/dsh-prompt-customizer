@@ -267,7 +267,6 @@ export interface Preview {
   /** 当前会话视图的会话元数据；预设预览为空。 */
   session?: { id: string; presetId?: string; phase?: string; createdAt?: number } | null
   /** 非空 = 预设预览的左栏已并入该活动会话的 agent 作用域条目（右栏仍是纯预设装配）。 */
-  sessionOverlay?: { id: string; presetId?: string }
   diagnostics?: Array<{ name: string; variable: string; kind: 'session-variable' }>
   contexts?: Array<{ name: string; text: string }>
   scope?: unknown

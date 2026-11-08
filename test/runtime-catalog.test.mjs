@@ -98,12 +98,12 @@ async function inventoryOf(routes) {
 test('清单的首屏形状：模式清单不含对话专属段，只跑预览时也不凭空多段', async () => {
   const cases = [
     {
-      label: '模式清单并入同预设活动 agent 的会话级段并打标记',
+      label: '模式清单只反映纯预设，不并入同预设活动 agent 的会话级段',
       run: async (h) => {
         const body = await inventoryOf(h.routes)
         const names = body.sections.map(sec => sec.name)
-        assert.ok(names.includes(RUNTIME_ONLY.name))
-        assert.equal(body.sections.find(sec => sec.name === RUNTIME_ONLY.name)?.scope, 'agent')
+        assert.ok(!names.includes(RUNTIME_ONLY.name))
+        assert.equal(body.sections.some(sec => sec.scope === 'agent'), false)
         assert.ok(names.includes('persona') && names.includes('core'))
       },
     },
@@ -173,6 +173,6 @@ test('两条路径并存时同名只出现一次（并集去重）', async () =>
   await ctx.systemPrompt.assemble({ scope: 'preset:standard', promptCustomizerBase: true, promptCustomizerPhase: 'active' })
 
   const names = (await inventoryOf(routes)).sections.map((sec) => sec.name)
-  assert.equal(names.filter((name) => name === RUNTIME_ONLY.name).length, 1, '池子里同名段只该有一条')
+  assert.equal(names.includes(RUNTIME_ONLY.name), false, '纯预设清单不应出现会话专属段')
   assert.ok(names.includes('core') && names.includes('persona'))
 })

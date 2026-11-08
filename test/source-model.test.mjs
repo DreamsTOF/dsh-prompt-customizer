@@ -114,21 +114,22 @@ function harness(t, { config } = {}) {
   return { request }
 }
 
-test('preview baseSections / baseTools 按装配层带 global / preset(id) / agent(session) 来源', async (t) => {
+test('preview baseSections / baseTools 是纯预设装配，只带 global / preset 来源', async (t) => {
   const h = harness(t)
   const res = await h.request('preview?scope=standard&phase=active')
   assert.equal(res.status, 200)
+  assert.ok(Array.isArray(res.body.baseContexts), '每个阶段都必须返回 baseContexts（可为空数组）')
+  assert.equal(res.body.sessionOverlay, undefined, '预设预览不得带当前会话 overlay')
   const sectionSource = new Map(res.body.baseSections.map((section) => [section.name, section.source?.kind]))
   assert.equal(sectionSource.get('harness:identity'), 'global')
   assert.equal(sectionSource.get('deployment:persona'), 'preset')
-  assert.equal(sectionSource.get('tool:undo_last_edit'), 'agent')
+  assert.equal(sectionSource.get('tool:undo_last_edit'), undefined)
   assert.deepEqual(res.body.baseSections.find((section) => section.name === 'deployment:persona').source, P)
-  assert.deepEqual(res.body.baseSections.find((section) => section.name === 'tool:undo_last_edit').source, A)
 
   const toolSource = new Map(res.body.baseTools.map((tool) => [tool.name, tool.source?.kind]))
   assert.equal(toolSource.get('read'), 'global')
   assert.equal(toolSource.get('write'), 'preset')
-  assert.equal(toolSource.get('undo_last_edit'), 'agent')
+  assert.equal(toolSource.get('undo_last_edit'), undefined)
 })
 
 test('/session 最终 sections 走非 base 装配，base 只作为左栏 catalog；屏蔽按 source 命中', async (t) => {
