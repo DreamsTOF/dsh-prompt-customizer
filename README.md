@@ -87,7 +87,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-当前版本 **2.0.17**（单预设编辑；按 DSH 运行时契约泛化工具与提示词接管；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；修复解除工具屏蔽后仍被旧来源条目卡住）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+当前版本 **2.0.18**（单预设编辑；按 DSH 运行时契约泛化工具与提示词接管；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；解除工具屏蔽时清理旧来源条目）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 

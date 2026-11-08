@@ -2781,7 +2781,12 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     let exclude = excludeOf(key);
     let add = addOf(key);
     if (!isInCatalog(key, entry) && !listHas(add, entry)) add = listWith(add, entry);
-    exclude = hidden ? listHas(exclude, entry) ? exclude : listWith(exclude, entry) : listWithout(exclude, entry);
+    if (hidden) {
+      exclude = listHas(exclude, entry) ? exclude : listWith(exclude, entry);
+    } else {
+      const exact = listWithout(exclude, entry);
+      exclude = exact.length === exclude.length ? exclude.filter((item) => normalizeEntry(item)?.name !== entry.name) : exact;
+    }
     writeLists(key, exclude, add);
   };
   const rowsOf = (key) => {

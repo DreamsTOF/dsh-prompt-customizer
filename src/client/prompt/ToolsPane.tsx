@@ -178,9 +178,16 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     let exclude = excludeOf(key)
     let add = addOf(key)
     if (!isInCatalog(key, entry) && !listHas(add, entry)) add = listWith(add, entry)
-    exclude = hidden
-      ? (listHas(exclude, entry) ? exclude : listWith(exclude, entry))
-      : listWithout(exclude, entry)
+    if (hidden) {
+      exclude = listHas(exclude, entry) ? exclude : listWith(exclude, entry)
+    } else {
+      const exact = listWithout(exclude, entry)
+      // 解除屏蔽时兼容旧 source id / 旧来源写法：没有精确命中就按工具名清掉
+      // 该阶段的 exclude，避免“UI 已取消勾选但后端仍按旧条目隐藏”。
+      exclude = exact.length === exclude.length
+        ? exclude.filter((item) => normalizeEntry(item)?.name !== entry.name)
+        : exact
+    }
     writeLists(key, exclude, add)
   }
 

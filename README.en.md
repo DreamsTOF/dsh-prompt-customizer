@@ -75,7 +75,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.17** (single-preset editing; DSH runtime tool/prompt contracts, mask pool, workspace skill status, provider summary cache and write serialization; stale agent-source entries no longer block unhide), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.0.18** (single-preset editing; DSH runtime tool/prompt contracts, mask pool, workspace skill status, provider summary cache and write serialization; unhide clears stale source entries), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 
