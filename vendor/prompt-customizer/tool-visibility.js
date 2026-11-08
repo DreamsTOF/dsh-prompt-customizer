@@ -25,21 +25,6 @@ const RELEVANT_EVENTS = new Set([
   'agent-preset/selected',
 ])
 
-/** 当前 agent 可收窄工具名（agent 视图包含 preset/祖先层；条件工具也算）。 */
-function visibleToolNames(ctx, agent) {
-  try {
-    const service = ctx.get?.('tools')
-    const schemas = service?.schemas?.(agent) ?? agent?.ctx?.tools?.schemas?.(agent) ?? []
-    return new Set(
-      (Array.isArray(schemas) ? schemas : [])
-        .map(tool => (typeof tool?.name === 'string' ? tool.name : undefined))
-        .filter(name => name !== undefined),
-    )
-  } catch {
-    return new Set()
-  }
-}
-
 /** 当前活动 agent 列表（服务缺席时为空）。 */
 function activeAgents(ctx) {
   try {
@@ -51,6 +36,27 @@ function activeAgents(ctx) {
   } catch {
     return []
   }
+}
+
+/** 每个 agent 的工具名缓存：restrict 生效后 schemas() 会缩小，不能据此撤销 deny。 */
+const knownToolNames = new WeakMap()
+
+function rememberToolNames(ctx, agent) {
+  let names = knownToolNames.get(agent)
+  if (names === undefined) {
+    names = new Set()
+    knownToolNames.set(agent, names)
+  }
+  try {
+    const service = ctx.get?.('tools')
+    const schemas = service?.schemas?.(agent) ?? agent?.ctx?.tools?.schemas?.(agent) ?? []
+    for (const tool of Array.isArray(schemas) ? schemas : []) {
+      if (typeof tool?.name === 'string' && tool.name !== '') names.add(tool.name)
+    }
+  } catch {
+    /* 服务未就绪：等下次 tools/change 再补 */
+  }
+  return names
 }
 
 /**
@@ -94,7 +100,7 @@ export function createPhaseToolVisibility({ ctx, readConfig, phaseOf, presetOf }
       cfg = effectiveConfig(presetId === undefined || presetId === '' ? undefined : cfg.overrides?.[presetId])
     }
     const filter = pickToolsFilter(cfg.tools, phaseOf(agent))
-    const names = visibleToolNames(ctx, agent)
+    const names = rememberToolNames(ctx, agent)
     return [...new Set(
       (Array.isArray(filter.exclude) ? filter.exclude : [])
         .map((entry) => normalizeEntry(entry))

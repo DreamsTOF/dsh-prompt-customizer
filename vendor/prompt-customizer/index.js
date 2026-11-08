@@ -1638,7 +1638,11 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const finalTools = Array.isArray(assembled.tools) ? assembled.tools : []
   // 预设预览不做 live 段混合；工具目录例外：agent 作用域注册的工具（如
   // apply_patch / 客户端工具）也必须出现在“完整目录/遮蔽池”，否则会被误认为消失。
-  const catalogAgent = latestRootAgent(ctx)
+  // 只取当前编辑预设对应的活动会话，不能用“最新会话”顶替：否则编辑 A 预设时
+  // 会把 B 预设会话的 agent 工具混进 A 的完整目录。
+  const catalogAgent = configTargetId === undefined
+    ? latestRootAgent(ctx)
+    : liveAgentForPreset(ctx, configTargetId)
   const union = await buildToolUnion(ctx, scopeKey, undefined, previewCfg, phaseStatus, {
     toolMask,
     presetId: configTargetId,
