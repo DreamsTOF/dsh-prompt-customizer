@@ -52,6 +52,9 @@ interface KernelSkillSummary {
   invocation?: { modelInvocable?: boolean; userInvocable?: boolean }
 }
 
+/** 进程内真实摘要缓存：全局 mask 可能先于 UI 列表遮蔽，保留启用时的原摘要。 */
+const summaryCache = new Map<string, KernelSkillSummary>()
+
 /** vendor 技能管理器消费的视图（字段名与 `vendor/skill-manager/skills-host.js` 对齐）。 */
 export interface KernelSkillView {
   name: string
@@ -272,12 +275,26 @@ export async function kernelSkillViews(
 ): Promise<KernelSkillView[]> {
   const candidate = resolveViewSession(ctx, sessionId)
   const summaries = await listKernelSkills(ctx, candidate, cwd)
+  const globalSummariesForCache = await listKernelSkills(ctx, undefined, cwd)
+  for (const summary of [...summaries, ...globalSummariesForCache]) {
+    if (typeof summary?.name === 'string' && summary.name !== '' && !isSkillMaskStub(summary)) {
+      summaryCache.set(summary.name, summary)
+    }
+  }
   // 内核目录只在「有会话 + scope 命中预设层」时才完整（filesystem/office provider
   // 挂在预设行里）。面板要能配置任意工作区，因此内核给不出条目时按同一套根规则
   // 兜底扫描 —— 目标工作区明确时也走兜底，避免拿到别的会话的项目根。
   const targetCwd = cwd !== undefined && cwd !== ''
     ? normalizeCwd(cwd)
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
+  // 预设层禁用桩会遮住真实 summary；全局层单独读一次，按名字回填原摘要
+  // （预设层 mask 不应改变卡片描述，只改变启用状态）。
+  const globalSummaries = candidate === undefined ? [] : await listKernelSkills(ctx, undefined, targetCwd)
+  const globalByName = new Map(
+    globalSummaries
+      .filter((summary) => typeof summary?.name === 'string' && !isSkillMaskStub(summary))
+      .map((summary) => [summary.name, summary]),
+  )
   // 我们的工作区扫描是对内核的升级：内核 `snapshot().complete` 不覆盖工作区 skills/MCP，
   // 所以不做“内核够不够完整”的启发式判断——始终扫描，再与内核条目按名字合并。
   // 面板要展示“关闭”的技能（置灰而非隐身）：兜底扫描不按隐藏账本过滤。
@@ -300,6 +317,25 @@ export async function kernelSkillViews(
     if (isDisabledStub) {
       const real = scannedByName.get(name)
       if (real !== undefined) { views.push({ ...real }); continue }
+      const meta = globalByName.get(name) ?? summaryCache.get(name)
+      if (meta !== undefined) {
+        const dirPath = typeof meta.path === 'string' && meta.path !== '' ? dirname(meta.path) : undefined
+        const source = typeof meta.source === 'string' && meta.source !== '' ? meta.source : 'unknown'
+        views.push({
+          name,
+          dir: dirPath === undefined ? name : basename(dirPath),
+          description: typeof meta.description === 'string' ? meta.description : '',
+          compatibility: '',
+          fileCount: 0,
+          files: [],
+          root: source,
+          ...dirPath === undefined ? {} : { dirPath },
+          deletable: isWritableDir(dirPath),
+          ...typeof meta.invocation?.modelInvocable === 'boolean' ? { modelInvocable: meta.invocation.modelInvocable } : {},
+          ...typeof meta.invocation?.userInvocable === 'boolean' ? { userInvocable: meta.invocation.userInvocable } : {},
+        })
+        continue
+      }
     }
     // 内核给的是 SKILL.md 的绝对路径；技能目录 = 它的父目录。虚拟技能没有 path。
     const dirPath = typeof summary.path === 'string' && summary.path !== '' ? dirname(summary.path) : undefined
@@ -307,7 +343,7 @@ export async function kernelSkillViews(
     views.push({
       name,
       dir: dirPath === undefined ? name : basename(dirPath),
-      description: typeof summary.description === 'string' ? summary.description : '',
+      description: isDisabledStub ? '' : (typeof summary.description === 'string' ? summary.description : ''),
       compatibility: '',
       fileCount: 0,
       files: [],
