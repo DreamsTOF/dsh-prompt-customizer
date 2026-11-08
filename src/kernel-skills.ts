@@ -320,12 +320,15 @@ export async function kernelSkillViews(
     : candidate === undefined ? launchCwd(ctx) : candidate.cwd
   const cacheScope = candidate === undefined ? 'global' : String(candidate.presetId ?? candidate.id)
   const cacheKeyOf = (name: string): string => `${cacheScope}\u0000${targetCwd}\u0000${name}`
+  /** provider-only 技能不看 cwd；跨 workspace 回退用同一 preset+name 的宽 key。 */
+  const broadCacheKeyOf = (name: string): string => `${cacheScope}\u0000*${name}`
   let cacheDirty = false
   for (const summary of summaries) {
     if (typeof summary?.name === 'string' && summary.name !== '' && !isSkillMaskStub(summary)) {
       const key = cacheKeyOf(summary.name)
       if (summaryCache.get(key) === undefined) cacheDirty = true
       summaryCache.set(key, summary)
+      summaryCache.set(broadCacheKeyOf(summary.name), summary)
     }
   }
   if (cacheDirty) saveSummaryCache()
@@ -379,7 +382,9 @@ export async function kernelSkillViews(
     const isDisabledStub = isSkillMaskStub(summary)
     if (isDisabledStub) {
       if (existing !== undefined) continue
-      const meta = summaryCache.get(cacheKeyOf(name)) ?? globalByName.get(name)
+      const meta = summaryCache.get(cacheKeyOf(name))
+        ?? summaryCache.get(broadCacheKeyOf(name))
+        ?? globalByName.get(name)
       const view = summaryView(meta ?? summary, undefined)
       if (meta === undefined) view.description = ''
       views.push(view)

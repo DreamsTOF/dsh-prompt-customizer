@@ -2672,6 +2672,32 @@ function InjectForm({ onAdd, phaseLabel, t }) {
 
 // src/client/prompt/ToolsPane.tsx
 var import_react5 = require("react");
+
+// src/client/prompt/tool-pool.ts
+function toolStateOf(tool) {
+  return tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
+}
+function buildMaskedPool(tools) {
+  const map = /* @__PURE__ */ new Map();
+  for (const tool of tools) {
+    if (tool.name === "") continue;
+    const state = toolStateOf(tool);
+    if (state !== "masked-plugin" && state !== "masked-own") continue;
+    const entry = normalizeEntry(tool);
+    if (entry === void 0) continue;
+    const identity = entryKey(entry);
+    const existing = map.get(identity);
+    if (existing === void 0) {
+      map.set(identity, { entry, description: tool.description ?? "", states: /* @__PURE__ */ new Set([state]) });
+    } else {
+      existing.states.add(state);
+      if (existing.description === "" && (tool.description ?? "") !== "") existing.description = tool.description ?? "";
+    }
+  }
+  return [...map.values()].sort((left, right) => left.entry.name.localeCompare(right.entry.name));
+}
+
+// src/client/prompt/ToolsPane.tsx
 function entryOf(tool) {
   return normalizeEntry(tool);
 }
@@ -2742,16 +2768,12 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     return out;
   })();
   const inRegistry = (entry) => registry.some((candidate) => sameEntry(candidate, entry) || candidate.source === void 0 && candidate.name === entry.name);
-  const stateOf = (tool) => tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
+  const stateOf = (tool) => toolStateOf(tool);
   const isToggleable = (tool) => {
     const state = stateOf(tool);
     return state === "controllable" || state === "locked-agent";
   };
   const isLockedExec = (tool) => stateOf(tool) === "locked-executor";
-  const isMaskedRow = (tool) => {
-    const state = stateOf(tool);
-    return state === "masked-plugin" || state === "masked-own";
-  };
   const addToPhase = (key, entry, hidden) => {
     let exclude = excludeOf(key);
     let add = addOf(key);
@@ -2934,26 +2956,10 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     description: tool.description ?? "",
     keySuffix: tool.keySuffix
   }));
-  const readOnly = (() => {
-    const map = /* @__PURE__ */ new Map();
-    const consider = (tool) => {
-      if (tool.name === "" || !isMaskedRow(tool)) return;
-      const entry = normalizeEntry(tool);
-      if (entry === void 0) return;
-      const identity = entryKey(entry);
-      const state = stateOf(tool);
-      const existing = map.get(identity);
-      if (existing === void 0) {
-        map.set(identity, { entry, description: tool.description ?? "", states: /* @__PURE__ */ new Set([state]) });
-      } else {
-        existing.states.add(state);
-        if (existing.description === "" && (tool.description ?? "") !== "") existing.description = tool.description ?? "";
-      }
-    };
-    for (const tool of inv?.tools ?? []) consider(tool);
-    for (const key of PHASE_KEYS) for (const tool of catalogOf(key)) consider(tool);
-    return [...map.values()].sort((left, right) => left.entry.name.localeCompare(right.entry.name));
-  })();
+  const readOnly = buildMaskedPool([
+    ...inv?.tools ?? [],
+    ...PHASE_KEYS.flatMap((key) => catalogOf(key))
+  ]);
   const readOnlyGroups = (() => {
     const groups = /* @__PURE__ */ new Map();
     for (const row of readOnly) {
@@ -3217,11 +3223,11 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, writeGlobal
       currentEntries.set(entryKey(section), { name: section.name, ...section.source === void 0 ? {} : { source: section.source } });
     }
   }
-  const saveCurrent = () => {
+  const saveCurrent = async () => {
     const presetName = name.trim() || `${t("preset")} ${presets.length + 1}`;
     const data = buildPresetData(cfg, merged);
-    void writeGlobal("presets", [...presets, { id: genId(), name: presetName, data }]);
-    setName("");
+    const written = await writeGlobal("presets", [...presets, { id: genId(), name: presetName, data }]);
+    if (written) setName("");
   };
   const applyPreset = async (preset) => {
     const applied = await writePatch(applyPresetData(preset.data, cfg, currentEntries));
@@ -3896,10 +3902,12 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     showFlash(skipped.length > 0 ? `${t("syncApplied")} ${t("syncSkippedDynamic", { names: skipped.join("\u3001") })}` : t("syncApplied"));
   };
   const resetAll = () => {
-    fetch(CONFIG_RESET_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" }
-    }).then((r) => r.json()).then((body) => {
+    void enqueueWrite(async () => {
+      const response = await fetch(CONFIG_RESET_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" }
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "reset failed");
       setCfg(body.config);
       clearDraft();
@@ -3959,11 +3967,13 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       return;
     }
     if (!window.confirm(t("presetIoConfirm", { target }))) return;
-    fetch("/api/prompt-customizer/import", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ target, customization })
-    }).then((r) => r.json()).then((body) => {
+    void enqueueWrite(async () => {
+      const response = await fetch("/api/prompt-customizer/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, customization })
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "import failed");
       setCfg(body.config);
       setVersion((n) => n + 1);
@@ -3974,7 +3984,9 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     if (cleaning) return;
     if (!window.confirm(t("cleanupConfirm"))) return;
     setCleaning(true);
-    fetch("/api/prompt-customizer/overrides/cleanup", { method: "POST" }).then((r) => r.json()).then((body) => {
+    void enqueueWrite(async () => {
+      const response = await fetch("/api/prompt-customizer/overrides/cleanup", { method: "POST" });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "cleanup failed");
       setCfg(body.config);
       setVersion((n) => n + 1);
@@ -4012,11 +4024,13 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     }
     if (!window.confirm(t("restoreConfirm"))) return;
     setRestoring(true);
-    fetch("/api/prompt-customizer/restore", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(parsed)
-    }).then((r) => r.json()).then((body) => {
+    void enqueueWrite(async () => {
+      const response = await fetch("/api/prompt-customizer/restore", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsed)
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "restore failed");
       setCfg(body.config);
       if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);
@@ -4604,6 +4618,8 @@ function enabledStateAt(scope, name, tables) {
   if (scope.level === "workspace" && scope.cwd !== null) {
     const workspace = tables.workspaceOverrides[scope.cwd] ?? {};
     if (Object.hasOwn(workspace, name)) return workspace[name] !== false;
+    const workspaceBase = tables.workspaceSkills?.[name];
+    if (workspaceBase !== void 0) return workspaceBase !== false;
   }
   if (scope.presetId !== ALL_PRESETS) {
     const preset = tables.overrides[scope.presetId] ?? {};
@@ -7666,6 +7682,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const [reload, setReload] = (0, import_react15.useState)(0);
   const [workspace, setWorkspace] = (0, import_react15.useState)(null);
   const workspaceRef = (0, import_react15.useRef)(workspace);
+  const silentSeq = (0, import_react15.useRef)(0);
   (0, import_react15.useEffect)(() => {
     workspaceRef.current = workspace;
   }, [workspace]);
@@ -7733,6 +7750,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const [dropActive, setDropActive] = (0, import_react15.useState)(false);
   const fileInput = (0, import_react15.useRef)(null);
   const [toggles, setToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
+  const [workspaceToggles, setWorkspaceToggles] = (0, import_react15.useState)({ skills: {}, bundles: {} });
   const [toggling, setToggling] = (0, import_react15.useState)(/* @__PURE__ */ new Set());
   const [presets, setPresets] = (0, import_react15.useState)([]);
   const [overrides, setOverrides] = (0, import_react15.useState)({});
@@ -7799,28 +7817,34 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     setReload((value) => value + 1);
   };
   const silentSync = () => {
+    const seq = ++silentSeq.current;
     void skillApi.list(workspaceRef.current).then((snapshot) => {
+      if (seq !== silentSeq.current) return;
       setState((current2) => current2.status === "error" ? current2 : { status: "ready", snapshot });
     }, () => {
     });
     void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
+        if (seq !== silentSeq.current) return;
         setToggles({ skills: status.skills, bundles: status.bundles });
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} });
         setOverrides(status.overrides);
         setPresets(status.presets);
-        void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
+        void skillApi.workspaceStatus().then((s2) => {
+          if (seq === silentSeq.current) setWorkspaceOverrides(s2.workspaces);
+        }, () => {
         });
       },
       () => {
         void skillApi.toggleStatus(workspaceRef.current).then((status) => {
-          setToggles(status);
+          if (seq === silentSeq.current) setToggles(status);
         }, () => {
         });
       }
     );
     void skillApi.health().then(
       (report) => {
-        setHealth(report.ok ? { state: "ok", report } : { state: "issue", report });
+        if (seq === silentSeq.current) setHealth(report.ok ? { state: "ok", report } : { state: "issue", report });
       },
       () => {
       }
@@ -7846,6 +7870,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
     void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles });
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} });
         setOverrides(status.overrides);
         setPresets(status.presets);
         void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
@@ -7875,6 +7900,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
       (status) => {
         if (!current2) return;
         setToggles({ skills: status.skills, bundles: status.bundles });
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} });
         setOverrides(status.overrides);
         setPresets(status.presets);
         void skillApi.workspaceStatus().then((s2) => setWorkspaceOverrides(s2.workspaces), () => {
@@ -7998,7 +8024,8 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
   const enableTables = {
     skills: toggles.skills,
     overrides,
-    workspaceOverrides
+    workspaceOverrides,
+    workspaceSkills: workspaceToggles.skills
   };
   const scopeOverrides = skillOverridesAt(scope, enableTables);
   const scopeOverrideCount = Object.keys(scopeOverrides).length;

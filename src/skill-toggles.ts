@@ -852,9 +852,13 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
 
     // ── 预设层 ────────────────────────────────────────────────────────────
     if (method === 'GET' && rest === '/presets') {
+      const workspace = url.searchParams.get('workspace') ?? undefined
       const [roster, global, ledger] = await Promise.all([
         readPresetRoster(ctx), status(ctx), readLedger(),
       ])
+      const effective = workspace === undefined || workspace.trim() === ''
+        ? undefined
+        : await effectiveStatus(ctx, undefined, workspace)
       json(res, 200, {
         presets: roster,
         overrides: ledger.presets,
@@ -862,6 +866,10 @@ async function handle(ctx: PluginContext, req: IncomingMessage, res: ServerRespo
         // 绝不混进 preset 级 enabledStateAt（否则所有预设会被工作区关闭污染）。
         skills: global.skills,
         bundles: global.bundles,
+        ...(effective === undefined ? {} : {
+          workspaceSkills: effective.skills,
+          workspaceBundles: effective.bundles,
+        }),
       })
       return
     }

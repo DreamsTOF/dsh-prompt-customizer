@@ -37,6 +37,7 @@ import { acceptsDrop, beginDrag, finishDrag, payloadOf, setPhaseDropHandler, typ
 import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
 import type { TriState } from './SectionsPane.tsx'
+import { buildMaskedPool, toolStateOf } from './tool-pool.ts'
 
 /** 一次加回操作的反馈（ok = 已写入，warn = 什么都没改并说明原因）。 */
 type Notice = { kind: 'ok' | 'warn'; text: string }
@@ -163,12 +164,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   const inRegistry = (entry: EntryRef): boolean =>
     registry.some((candidate) => sameEntry(candidate, entry) || (candidate.source === undefined && candidate.name === entry.name))
 
-  const stateOf = (tool: ToolLike): ToolState => tool.state
-    ?? (tool.scope === 'agent' ? 'locked-agent'
-      : tool.scope === 'executor' ? 'locked-executor'
-        : tool.maskedByOwnPlugin === true ? 'masked-own'
-          : tool.maskedByPlugin === true ? 'masked-plugin'
-            : 'controllable')
+  const stateOf = (tool: ToolLike): ToolState => toolStateOf(tool)
   /** 可在阶段里勾选开关：普通预设工具 + agent 作用域工具（后者靠装配后过滤 tools 实现隐藏）。 */
   const isToggleable = (tool: ToolLike): boolean => {
     const state = stateOf(tool)
@@ -176,12 +172,6 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   }
   /** 执行器包装（如 PTC run_code）：模型可见但本插件不按阶段删，锁定。 */
   const isLockedExec = (tool: ToolLike): boolean => stateOf(tool) === 'locked-executor'
-  /** 只在只读「已遮蔽」池：被别的插件 / 本插件遮蔽，无法反开。 */
-  const isMaskedRow = (tool: ToolLike): boolean => {
-    const state = stateOf(tool)
-    return state === 'masked-plugin' || state === 'masked-own'
-  }
-
   // 把一个工具放进某阶段（复制语义，绝不改动其它阶段）：不在该阶段目录里就
   // 加进 add 名单；hidden 决定它在目标阶段是可见还是隐藏。
   const addToPhase = (key: PhaseKey, entry: EntryRef, hidden: boolean): void => {
@@ -400,26 +390,10 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   // 只读「完整目录 / 已遮蔽」：被别的插件遮蔽 / 被本插件 MCP 遮蔽的工具。
   // 来源 = 跨预设池 ∪ 当前阶段完整基座；同一 name+source 的多状态聚合一行。
   type Agg = { entry: EntryRef; description: string; states: Set<ToolState> }
-  const readOnly = (() => {
-    const map = new Map<string, Agg>()
-    const consider = (tool: ToolLike): void => {
-      if (tool.name === '' || !isMaskedRow(tool)) return
-      const entry = normalizeEntry(tool)
-      if (entry === undefined) return
-      const identity = entryKey(entry)
-      const state = stateOf(tool)
-      const existing = map.get(identity)
-      if (existing === undefined) {
-        map.set(identity, { entry, description: tool.description ?? '', states: new Set([state]) })
-      } else {
-        existing.states.add(state)
-        if (existing.description === '' && (tool.description ?? '') !== '') existing.description = tool.description ?? ''
-      }
-    }
-    for (const tool of inv?.tools ?? []) consider(tool)
-    for (const key of PHASE_KEYS) for (const tool of catalogOf(key)) consider(tool)
-    return [...map.values()].sort((left, right) => left.entry.name.localeCompare(right.entry.name))
-  })()
+  const readOnly: Agg[] = buildMaskedPool([
+    ...(inv?.tools ?? []),
+    ...PHASE_KEYS.flatMap((key) => catalogOf(key)),
+  ])
   // 按来源分组（global / preset / workspace / agent / executor / 未知）。
   const readOnlyGroups = (() => {
     const groups = new Map<string, { source?: EntrySource; rows: Agg[] }>()

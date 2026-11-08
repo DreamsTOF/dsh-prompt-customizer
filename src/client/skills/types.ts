@@ -153,6 +153,8 @@ export interface SkillEnableTables {
   overrides: Record<string, Record<string, boolean>>
   /** 工作区层：cwd → name → enabled（显式 true 可覆盖预设/全局的关闭）。 */
   workspaceOverrides: Record<string, Record<string, boolean>>
+  /** 指定 workspace 的生效基座（global + workspace，不含 preset 覆盖）。 */
+  workspaceSkills?: Record<string, boolean>
 }
 
 /**
@@ -170,6 +172,8 @@ export function enabledStateAt(scope: SkillEnableScope, name: string, tables: Sk
   if (scope.level === 'workspace' && scope.cwd !== null) {
     const workspace = tables.workspaceOverrides[scope.cwd] ?? {}
     if (Object.hasOwn(workspace, name)) return workspace[name] !== false
+    const workspaceBase = tables.workspaceSkills?.[name]
+    if (workspaceBase !== undefined) return workspaceBase !== false
   }
   if (scope.presetId !== ALL_PRESETS) {
     const preset = tables.overrides[scope.presetId] ?? {}
@@ -285,5 +289,8 @@ export interface PresetStatus extends ToggleStatus {
   presets: PresetRow[]
   /** presetId → { skillName: false } —— 只有显式 false 才是「该预设下关闭」。 */
   overrides: Record<string, Record<string, boolean>>
+  /** 指定 workspace 的生效基座，补齐 workspace 独有技能。 */
+  workspaceSkills?: Record<string, boolean>
+  workspaceBundles?: Record<string, boolean>
 }
 

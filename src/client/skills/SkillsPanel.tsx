@@ -62,6 +62,8 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const [workspace, setWorkspace] = useState<string | null>(null)
   /** 定时器/焦点回调里读取最新选择，避免空依赖闭包把工作区切回“跟随当前会话”。 */
   const workspaceRef = useRef<string | null>(workspace)
+  /** 静默轮询序号：切 workspace 后旧响应不能覆盖新状态。 */
+  const silentSeq = useRef(0)
   useEffect(() => { workspaceRef.current = workspace }, [workspace])
   /** 可选工作区清单（宿主按活动会话 cwd ∪ 启动目录给出）。 */
   const [workspaces, setWorkspaces] = useState<string[]>([])
@@ -140,6 +142,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
   const fileInput = useRef<HTMLInputElement>(null)
   // 技能/技能包开关状态（skillName → enabled；bundleId → enabled）
   const [toggles, setToggles] = useState<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }>({ skills: {}, bundles: {} })
+  const [workspaceToggles, setWorkspaceToggles] = useState<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }>({ skills: {}, bundles: {} })
   // 切换进行中的 key（避免重复点击）
   const [toggling, setToggling] = useState<Set<string>>(new Set())
   // Agent 预设分类：名单 + 各预设覆盖 + 当前选中的预设（'' = 全部 Agent）
@@ -227,24 +230,28 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
 
   /** 静默同步：不置 loading，直接替换数据（自动同步机制用）。 */
   const silentSync = (): void => {
+    const seq = ++silentSeq.current
     void skillApi.list(workspaceRef.current).then((snapshot) => {
+      if (seq !== silentSeq.current) return
       setState((current) => current.status === 'error'
         ? current
         : { status: 'ready', snapshot })
     }, () => { /* 保持当前显示 */ })
     void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
+        if (seq !== silentSeq.current) return
         setToggles({ skills: status.skills, bundles: status.bundles })
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} })
         setOverrides(status.overrides)
         setPresets(status.presets)
-        void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
+        void skillApi.workspaceStatus().then((s) => { if (seq === silentSeq.current) setWorkspaceOverrides(s.workspaces) }, () => {})
       },
       () => {
-        void skillApi.toggleStatus(workspaceRef.current).then((status) => { setToggles(status) }, () => { /* 保持当前显示 */ })
+        void skillApi.toggleStatus(workspaceRef.current).then((status) => { if (seq === silentSeq.current) setToggles(status) }, () => { /* 保持当前显示 */ })
       },
     )
     void skillApi.health().then(
-      (report) => { setHealth(report.ok ? { state: 'ok', report } : { state: 'issue', report }) },
+      (report) => { if (seq === silentSeq.current) setHealth(report.ok ? { state: 'ok', report } : { state: 'issue', report }) },
       () => { /* 保持当前显示 */ },
     )
   }
@@ -269,6 +276,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     void skillApi.presetStatus(workspaceRef.current).then(
       (status) => {
         setToggles({ skills: status.skills, bundles: status.bundles })
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} })
         setOverrides(status.overrides)
         setPresets(status.presets)
         void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
@@ -297,6 +305,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
       (status) => {
         if (!current) return
         setToggles({ skills: status.skills, bundles: status.bundles })
+        setWorkspaceToggles({ skills: status.workspaceSkills ?? {}, bundles: status.workspaceBundles ?? {} })
         setOverrides(status.overrides)
         setPresets(status.presets)
         void skillApi.workspaceStatus().then((s) => setWorkspaceOverrides(s.workspaces), () => {})
@@ -419,6 +428,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
     skills: toggles.skills,
     overrides,
     workspaceOverrides,
+    workspaceSkills: workspaceToggles.skills,
   }
   /** 当前作用域真正会写入/清理的那层覆盖（按钮显示与动作共用）。 */
   const scopeOverrides = skillOverridesAt(scope, enableTables)

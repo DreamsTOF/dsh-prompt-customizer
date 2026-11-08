@@ -80,11 +80,11 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, writ
 
   // 把当前定制捕获为新预设（完整快照）。绝对顺序会被转成相对形式
   //（每段记录它应跟随的前一段），因此预设可以跨不同提示词移植。
-  const saveCurrent = (): void => {
+  const saveCurrent = async (): Promise<void> => {
     const presetName = name.trim() || `${t('preset')} ${presets.length + 1}`
     const data = buildPresetData(cfg, merged)
-    void writeGlobal('presets', [...presets, { id: genId(), name: presetName, data }])
-    setName('')
+    const written = await writeGlobal('presets', [...presets, { id: genId(), name: presetName, data }])
+    if (written) setName('')
   }
 
   // 应用预设。补丁由纯函数助手计算（同名段覆盖、匹配不上的跳过、不在预设

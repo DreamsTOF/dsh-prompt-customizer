@@ -234,6 +234,20 @@ function sourceForTool(ctx, name, { role, presetId, agent, presetScopeKey }) {
     if (presetNames.has(name)) return presetSourceOf(presetId)
     return presetSourceOf(presetId)
   }
+  // 同名但 definition 对象不同 = agent 作用域遮蔽了预设/全局工具；schemas 只有名字，不能据此误归为 global。
+  if (hasDefinitionLayer) {
+    try {
+      const agentDefs = toolDefsOf(ctx, agent)
+      const globalDefs = toolDefsOf(ctx, undefined)
+      const presetDefs = toolDefsOf(ctx, presetScopeKey)
+      const agentDef = agentDefs?.get(name)
+      if (agentDef !== undefined
+        && ((globalDefs?.has(name) === true && globalDefs.get(name) !== agentDef)
+          || (presetDefs?.has(name) === true && presetDefs.get(name) !== agentDef))) {
+        return agentSourceOf(agent)
+      }
+    } catch { /* definitions 不可用：继续按名字回退 */ }
+  }
   if (agentNames.has(name) && !presetNames.has(name) && !globalNames.has(name)) return agentSourceOf(agent)
   if (presetOnlyNames.has(name)) return presetSourceOf(presetId)
   if (globalNames.has(name)) return { kind: 'global' }

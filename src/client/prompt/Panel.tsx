@@ -504,20 +504,19 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 恢复初始状态：服务端清空全部定制并关闭 forceSections（与不装插件等效）。
   // 二次确认由设置栏的调用点负责；成功后清草稿、重拉全部视图。
   const resetAll = (): void => {
-    fetch(CONFIG_RESET_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'reset failed')
-        setCfg(body.config as Config)
-        clearDraft()
-        setError(null)
-        setVersion((n) => n + 1)
-        showFlash(t('resetOk'))
+    void enqueueWrite(async () => {
+      const response = await fetch(CONFIG_RESET_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
       })
-      .catch((e: unknown) => setError(`${t('resetFail')}: ${e instanceof Error ? e.message : String(e)}`))
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'reset failed')
+      setCfg(body.config as Config)
+      clearDraft()
+      setError(null)
+      setVersion((n) => n + 1)
+      showFlash(t('resetOk'))
+    }).catch((e: unknown) => setError(`${t('resetFail')}: ${e instanceof Error ? e.message : String(e)}`))
   }
 
   // 切换模式：提示词 ↔ 工具是同一编辑域，草稿保留；切到预设即离开编辑域，
@@ -569,34 +568,32 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       return
     }
     if (!window.confirm(t('presetIoConfirm', { target }))) return
-    fetch('/api/prompt-customizer/import', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ target, customization }),
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'import failed')
-        setCfg(body.config as Config)
-        setVersion((n) => n + 1)
-        showFlash(t('presetIoImported'), 'ok')
+    void enqueueWrite(async () => {
+      const response = await fetch('/api/prompt-customizer/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target, customization }),
       })
-      .catch((e: unknown) => showFlash(`${t('presetIoFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'import failed')
+      setCfg(body.config as Config)
+      setVersion((n) => n + 1)
+      showFlash(t('presetIoImported'), 'ok')
+    }).catch((e: unknown) => showFlash(`${t('presetIoFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
   }
 
   const cleanupEmpty = (): void => {
     if (cleaning) return
     if (!window.confirm(t('cleanupConfirm'))) return
     setCleaning(true)
-    fetch('/api/prompt-customizer/overrides/cleanup', { method: 'POST' })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'cleanup failed')
-        setCfg(body.config as Config)
-        setVersion((n) => n + 1)
-        showFlash(t('cleanupOk', { n: Array.isArray(body.removed) ? body.removed.length : 0 }), 'ok')
-      })
-      .catch((e: unknown) => showFlash(`${t('cleanupFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
+    void enqueueWrite(async () => {
+      const response = await fetch('/api/prompt-customizer/overrides/cleanup', { method: 'POST' })
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'cleanup failed')
+      setCfg(body.config as Config)
+      setVersion((n) => n + 1)
+      showFlash(t('cleanupOk', { n: Array.isArray(body.removed) ? body.removed.length : 0 }), 'ok')
+    }).catch((e: unknown) => showFlash(`${t('cleanupFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
       .finally(() => setCleaning(false))
   }
 
@@ -630,22 +627,21 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     }
     if (!window.confirm(t('restoreConfirm'))) return
     setRestoring(true)
-    fetch('/api/prompt-customizer/restore', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(parsed),
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'restore failed')
-        setCfg(body.config as Config)
-        if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
-        clearDraft()
-        setError(null)
-        setVersion((n) => n + 1)
-        showFlash(t('restoreOk'), 'ok')
+    void enqueueWrite(async () => {
+      const response = await fetch('/api/prompt-customizer/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(parsed),
       })
-      .catch((e: unknown) => setError(`${t('restoreFail')}: ${e instanceof Error ? e.message : String(e)}`))
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'restore failed')
+      setCfg(body.config as Config)
+      if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
+      clearDraft()
+      setError(null)
+      setVersion((n) => n + 1)
+      showFlash(t('restoreOk'), 'ok')
+    }).catch((e: unknown) => setError(`${t('restoreFail')}: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => setRestoring(false))
   }
 

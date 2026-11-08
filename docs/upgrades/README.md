@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.16：回归清理
+
+- 屏蔽池、workspace 技能状态、provider 摘要、同名 tool source、配置写队列和静默轮询竞态补齐。
+- 完整记录见 [2.0.16-regression-cleanup.md](2.0.16-regression-cleanup.md)。
+
 ## 2.0.15：工具屏蔽池恢复
 
 - 修复完整目录过滤把 `masked-plugin`/`masked-own` 行一并吞掉导致屏蔽池消失。
