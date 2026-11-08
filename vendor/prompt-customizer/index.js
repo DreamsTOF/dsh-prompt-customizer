@@ -567,9 +567,14 @@ export function apply(ctx, entry = {}) {
           }
           const roster = ctx.get('agentPresets')
           const requested = queryOf(req).get('scope') ?? undefined
+          const fallbackId = typeof roster?.defaultId === 'string' && roster.defaultId !== '' ? roster.defaultId : undefined
           const targetId = requested !== undefined && requested !== ''
             ? requested
-            : String(roster?.defaultId ?? 'standard')
+            : fallbackId
+          if (targetId === undefined) {
+            writeJson(res, 400, { ok: false, error: 'scope (agent preset id) is required when the roster has no defaultId' })
+            return
+          }
           // 导出的是**用户写下的原文**：读 DB doc('config') 的原始文档，不补 schema 默认值。
           let raw = {}
           try {

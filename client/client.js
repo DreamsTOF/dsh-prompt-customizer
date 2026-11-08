@@ -1729,24 +1729,27 @@ function withPhaseAdd(tools, key, add) {
   if (target === "compaction") return { ...base, compaction: { ...base.compaction ?? {}, add } };
   return { ...base, add };
 }
-function editView(cfg, target) {
-  if (!target) return cfg;
-  const ovr = cfg.overrides?.[target] ?? {};
+function overrideView(cfg, ovr) {
+  const o = ovr ?? {};
   return {
-    sections: ovr.sections ?? [],
-    sectionsBootstrap: ovr.sectionsBootstrap ?? [],
-    sectionsCompaction: ovr.sectionsCompaction ?? [],
-    replace: ovr.replace ?? {},
-    inject: ovr.inject ?? [],
+    sections: o.sections ?? [],
+    sectionsBootstrap: o.sectionsBootstrap ?? [],
+    sectionsCompaction: o.sectionsCompaction ?? [],
+    replace: o.replace ?? {},
+    inject: o.inject ?? [],
     tools: {
-      exclude: ovr.tools?.exclude ?? [],
-      add: ovr.tools?.add ?? [],
-      bootstrap: ovr.tools?.bootstrap,
-      compaction: ovr.tools?.compaction
+      exclude: o.tools?.exclude ?? [],
+      add: o.tools?.add ?? [],
+      bootstrap: o.tools?.bootstrap,
+      compaction: o.tools?.compaction
     },
     presets: cfg.presets,
     activePreset: cfg.activePreset
   };
+}
+function editView(cfg, target) {
+  if (!target) return cfg;
+  return overrideView(cfg, cfg.overrides?.[target]);
 }
 function presetExportFilename(name) {
   const sanitized = String(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().replace(/[. ]+$/, "");
@@ -3379,7 +3382,6 @@ var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
 var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
 var EXPORT_URL = "/api/prompt-customizer/export";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
-var SESSION_URL = "/api/prompt-customizer/session";
 var VIEW_KEYS = ["bootstrap", "compaction", "active"];
 var DRAFT_FIELDS = ["sections", "sectionsBootstrap", "sectionsCompaction", "replace", "inject", "tools"];
 function Panel({ t, onClose, level = "preset", workspace }) {
@@ -3388,8 +3390,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [phases, setPhases] = (0, import_react9.useState)(null);
   const [agentPresets, setAgentPresets] = (0, import_react9.useState)([]);
   const [currentPreset, setCurrentPreset] = (0, import_react9.useState)(void 0);
-  const [sessionView, setSessionView] = (0, import_react9.useState)(null);
-  const [sessionLoading, setSessionLoading] = (0, import_react9.useState)(false);
   const [workspaceOverrides, setWorkspaceOverrides] = (0, import_react9.useState)({});
   const [currentWorkspace, setCurrentWorkspace] = (0, import_react9.useState)(void 0);
   const [mode, setMode] = (0, import_react9.useState)("sections");
@@ -3423,7 +3423,6 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const refresh = () => {
     const seq = ++refreshSeq.current;
     if (level === "preset" && target === void 0) return Promise.resolve();
-    setSessionLoading(true);
     const wsSel = level === "workspace" ? workspace ?? currentWorkspace ?? "" : "";
     const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ""}${wsSel === "" ? "" : `${target ? "&" : "?"}workspace=${encodeURIComponent(wsSel)}`}`;
     const params = (phase2) => `${qs}${qs ? "&" : "?"}phase=${phase2}&t=${Date.now()}`;
@@ -3435,30 +3434,20 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       failures.push(`${phase2}: ${String(error2 instanceof Error ? error2.message : error2)}`);
       return null;
     });
-    const grabSession = () => fetch(SESSION_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
-      if (body.ok === false) throw new Error(body.error ?? t("previewFail"));
-      return body;
-    }).catch((error2) => {
-      failures.push(`session: ${String(error2 instanceof Error ? error2.message : error2)}`);
-      return null;
-    });
     return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then((body) => {
       if (body.ok === false) throw new Error(body.error ?? "inventory failed");
       return body;
     }).catch((error2) => {
       failures.push(String(error2 instanceof Error ? error2.message : error2));
       return null;
-    }), grabSession()]).then(([boot, comp, act, inventoryData, sessionData]) => {
+    })]).then(([boot, comp, act, inventoryData]) => {
       if (seq !== refreshSeq.current) return;
       setPhases({ bootstrap: boot, compaction: comp, active: act });
       setInv(inventoryData);
-      setSessionView(sessionData);
-      setSessionLoading(false);
       setError(failures.length ? failures.join("\n") : null);
     }).catch((e) => {
       if (seq !== refreshSeq.current) return;
       setPhases({ bootstrap: null, compaction: null, active: null });
-      setSessionLoading(false);
       setError(String(e instanceof Error ? e.message : e));
     });
   };
@@ -3532,9 +3521,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     return (0, import_react9.createElement)("div", { style: { ...s.pRoot, padding: 16 } }, t("loading"));
   }
   const wsKey = workspace ?? currentWorkspace ?? void 0;
-  const wsTarget = target ?? "__workspace__";
-  const baseSource = level === "workspace" ? { ...cfg, overrides: { [wsTarget]: (wsKey !== void 0 ? workspaceOverrides[wsKey] : void 0) ?? {} } } : cfg;
-  const base = editView(baseSource, level === "workspace" ? wsTarget : target);
+  const base = level === "workspace" ? overrideView(cfg, wsKey !== void 0 ? workspaceOverrides[wsKey] : void 0) : editView(cfg, target);
   const view = draft ? {
     ...base,
     sections: draft.sections ?? base.sections,
@@ -3885,7 +3872,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       error ? (0, import_react9.createElement)("div", { style: s.error }, String(error)) : null,
       flash ? (0, import_react9.createElement)("div", { style: flashKind === "err" ? s.error : s.noticeOk }, flash) : null,
       target && agentPresets.find((p) => p.id === target)?.broken ? (0, import_react9.createElement)("div", { style: s.error }, t("brokenPreset")) : null,
-      inv?.scopeResolved === false && mode !== "presets" && mode !== "session" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
+      inv?.scopeResolved === false && mode !== "presets" ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("scopeFallback")) : null,
       level === "workspace" && currentWorkspace === void 0 ? (0, import_react9.createElement)("div", { style: s.noticeWarn }, t("workspaceNoSession")) : null
     ]),
     // ── 主体分栏（flex row：左栏列表 / 右栏预览）──
@@ -3992,12 +3979,6 @@ var DICT = {
     exportPresetHint: "\u628A\u300C{name}\u300D\u5728\u672C\u63D2\u4EF6\u91CC\u7684\u5168\u90E8\u5B9A\u5236\uFF08\u6BB5\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165\u3001\u4E09\u9636\u6BB5\u5DE5\u5177\u76EE\u5F55\u3001forceSections\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF09\u8FDE\u540C\u8BE5\u9884\u8BBE\u7684\u7EC4\u6210\u58F0\u660E\u5BFC\u51FA\u4E3A JSON\u3002\u53EA\u8BFB\u5BFC\u51FA\uFF0C\u4E0D\u6539\u52A8 DSH \u914D\u7F6E\uFF1B\u8981\u653E\u8FDB DSH \u8BF7\u81EA\u884C\u5E76\u5165 cordis \u914D\u7F6E\u3002",
     exportPreset: "\u5BFC\u51FA",
     exportPresetRunning: "\u5BFC\u51FA\u4E2D\u2026",
-    rescanCatalog: "\u91CD\u626B\u767B\u8BB0\u8868",
-    rescanCatalogHint: "\u9010\u4E2A\u6302\u8F7D\u5DF2\u58F0\u660E\u7684 agent \u9884\u8BBE\uFF0C\u8DD1\u4E00\u6B21\u88C5\u914D\uFF0C\u7528\u771F\u5B9E\u770B\u5230\u7684\u6BB5\u4E0E\u5DE5\u5177**\u6574\u4F53\u66FF\u6362**\u7D2F\u79EF\u767B\u8BB0\u8868 \u2014\u2014 \u5220\u6389\u90A3\u4E9B\u5DF2\u7ECF\u4E0D\u5B58\u5728\u3001\u5374\u8FD8\u7559\u5728\u5217\u8868\u91CC\u80FD\u88AB\u62D6\u52A8\u7684\u5386\u53F2\u6761\u76EE\u3002\u8017\u65F6\u53EF\u89C2\uFF08\u6BCF\u4E2A\u9884\u8BBE\u8981\u6302\u8F7D\u6574\u68F5\u63D2\u4EF6\u6811\uFF09\u3002",
-    rescanCatalogRunning: "\u6B63\u5728\u91CD\u626B\u6240\u6709 agent \u9884\u8BBE\u2026",
-    rescanCatalogOk: "\u91CD\u626B\u5B8C\u6210\uFF1A\u5DE5\u5177 {toolsBefore} \u2192 {toolsAfter}\uFF08\u6E05\u6389 {toolsRemoved}\uFF09\uFF0C\u6BB5 {sectionsBefore} \u2192 {sectionsAfter}\uFF08\u6E05\u6389 {sectionsRemoved}\uFF09",
-    rescanCatalogEmpty: "\u91CD\u626B\u6CA1\u6709\u6210\u529F\u4EFB\u4F55\u9884\u8BBE\uFF0C\u5DF2\u4FDD\u7559\u73B0\u6709\u767B\u8BB0\u8868\uFF08\u672A\u6E05\u7A7A\uFF09\u3002",
-    rescanCatalogFail: "\u91CD\u626B\u5931\u8D25",
     exportTargetDefault: "\u9ED8\u8BA4\u9884\u8BBE",
     exportPresetOk: "\u5DF2\u5BFC\u51FA {name}",
     exportPresetFail: "\u5BFC\u51FA\u5931\u8D25",
@@ -4328,13 +4309,7 @@ var DICT = {
     applyToPreset: 'Apply writes to: preset "{name}"',
     applyToWorkspace: 'Apply writes to: workspace "{name}"',
     draftBadge: "Preview includes unsaved draft",
-    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)",
-    rescanCatalog: "Rescan registry",
-    rescanCatalogHint: "Mount every declared agent preset once, run one assembly, and replace the accumulated catalog with what is actually there \u2014 removing stale rows that no longer exist but can still be dragged. Slow: each preset mounts a whole plugin tree.",
-    rescanCatalogRunning: "Rescanning all agent presets\u2026",
-    rescanCatalogOk: "Rescan done: tools {toolsBefore} \u2192 {toolsAfter} ({toolsRemoved} removed), sections {sectionsBefore} \u2192 {sectionsAfter} ({sectionsRemoved} removed)",
-    rescanCatalogEmpty: "No preset scanned successfully \u2014 the existing catalog was kept (not cleared).",
-    rescanCatalogFail: "Rescan failed"
+    previewSyncFail: "Live preview sync failed (retries on next edit, or press Refresh)"
   }
 };
 

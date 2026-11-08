@@ -50,6 +50,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { presetTrustOf } from './mcp-presets.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
 import { kernelSkillSummaries, setHiddenSkillReader } from './kernel-skills.ts'
+import { SKILL_MASK_PROVIDER } from './skill-mask-provider.ts'
 
 /** Stable Cordis plugin name fragment (triad host apply). */
 export const name = 'skill-toggles'
@@ -81,7 +82,7 @@ const HIDDEN_FILE = '.hidden-skills.json'
 const ROUTE_PREFIX = '/api/skill-toggles'
 const MAX_BODY_BYTES = 256 * 1024
 /** 闸门 provider 在每个 agent 层里的名字(同层唯一即可)。 */
-const MASK_PROVIDER = 'triad-preset-mask'
+const MASK_PROVIDER = SKILL_MASK_PROVIDER
 /** 账本里 preset 条目上限(preset 名单本身十几条量级)。 */
 const MAX_PRESET_ENTRIES = 50
 

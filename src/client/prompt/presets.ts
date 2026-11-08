@@ -327,24 +327,28 @@ export function toggleTool(name: string, currentlyHidden: boolean, toolsCfg: Too
  * **不再叠显示全局继承值**（运行时已不读它，显示了会误导）。`presets` 与
  * `activePreset` 永远来自全局 —— 预设快照库本身不分作用域。
  */
-export function editView(cfg: Config, target: string | undefined): Config {
-  if (!target) return cfg
-  const ovr = cfg.overrides?.[target] ?? {}
+/** 把一份 override 原文变成编辑显示视图（工作区级直接传工作区 override，不伪造预设 id）。 */
+export function overrideView(cfg: Config, ovr: OverrideData | undefined): Config {
+  const o = ovr ?? {}
   return {
-    sections: ovr.sections ?? [],
-    sectionsBootstrap: ovr.sectionsBootstrap ?? [],
-    sectionsCompaction: ovr.sectionsCompaction ?? [],
-    replace: ovr.replace ?? {},
-    inject: ovr.inject ?? [],
+    sections: o.sections ?? [],
+    sectionsBootstrap: o.sectionsBootstrap ?? [],
+    sectionsCompaction: o.sectionsCompaction ?? [],
+    replace: o.replace ?? {},
+    inject: o.inject ?? [],
     tools: {
-      exclude: ovr.tools?.exclude ?? [],
-      add: ovr.tools?.add ?? [],
-      bootstrap: ovr.tools?.bootstrap,
-      compaction: ovr.tools?.compaction,
+      exclude: o.tools?.exclude ?? [],
+      add: o.tools?.add ?? [],
+      bootstrap: o.tools?.bootstrap,
+      compaction: o.tools?.compaction,
     },
     presets: cfg.presets,
     activePreset: cfg.activePreset,
   }
+}
+export function editView(cfg: Config, target: string | undefined): Config {
+  if (!target) return cfg
+  return overrideView(cfg, cfg.overrides?.[target])
 }
 
 /**

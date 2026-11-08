@@ -20,7 +20,7 @@ import { payloadOf, dropOnPhase } from './dnd.ts'
 import { DICT, type Translate } from './locales.ts'
 import { s } from './styles.ts'
 import type { AgentPresetInfo, Config, Inventory, PhaseViewKey, Preview } from './types.ts'
-import { editView, type ConfigPatch } from './presets.ts'
+import { editView, overrideView, type ConfigPatch } from './presets.ts'
 import { zhMergedInjectEntries, zhRevertInjectEntries, zhApplied, mirroredRows, mirrorPhaseInjectEntries, mirroredDeniedLists, mirrorSkippedNames } from '../../../vendor/prompt-customizer/sectionOps.mjs'
 import { ZH_SECTIONS } from '../../../vendor/prompt-customizer/zh/index.mjs'
 import { SectionsPane } from './SectionsPane.tsx'
@@ -38,7 +38,6 @@ const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
 const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
 const EXPORT_URL = '/api/prompt-customizer/export'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
-const SESSION_URL = '/api/prompt-customizer/session'
 
 /** 三阶段预览装配（模型视角）：左栏列表与右栏预览的统一数据源。 */
 type PhaseViews = Record<PhaseViewKey, Preview | null>
@@ -50,7 +49,7 @@ const VIEW_KEYS: PhaseViewKey[] = ['bootstrap', 'compaction', 'active']
 const DRAFT_FIELDS = ['sections', 'sectionsBootstrap', 'sectionsCompaction', 'replace', 'inject', 'tools'] as const
 
 /** 面板顶层模式：提示词 / 工具 / 预设（预览常驻右栏，不再是独立模式）。 */
-type PanelMode = 'sections' | 'tools' | 'session' | 'presets'
+type PanelMode = 'sections' | 'tools' | 'presets'
 
 /** 可编辑的配置字段（含每阶段独立段屏蔽名单）。 */
 type EditField = 'sections' | 'sectionsBootstrap' | 'sectionsCompaction' | 'replace' | 'inject' | 'tools'
@@ -75,8 +74,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [phases, setPhases] = useState<PhaseViews | null>(null)
   const [agentPresets, setAgentPresets] = useState<AgentPresetInfo[]>([])
   const [currentPreset, setCurrentPreset] = useState<string | undefined>(undefined)
-  const [sessionView, setSessionView] = useState<Preview | null>(null)
-  const [sessionLoading, setSessionLoading] = useState(false)
   const [workspaceOverrides, setWorkspaceOverrides] = useState<Record<string, Config>>({})
   const [currentWorkspace, setCurrentWorkspace] = useState<string | undefined>(undefined)
   const [mode, setMode] = useState<PanelMode>('sections')
@@ -130,7 +127,6 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     const seq = ++refreshSeq.current
     // 提示词/工具严格按具体预设：未选定预设前不发无 scope 请求（避免并集串台）。
     if (level === 'preset' && target === undefined) return Promise.resolve()
-    setSessionLoading(true)
     const wsSel = level === 'workspace' ? (workspace ?? currentWorkspace ?? '') : ''
     const qs = `${target ? `?scope=${encodeURIComponent(target)}` : ''}${wsSel === '' ? '' : `${target ? '&' : '?'}workspace=${encodeURIComponent(wsSel)}`}`
     // 三阶段与清单都读取当前模式；累计池仅供添加参考，不替代预设装配。
@@ -148,37 +144,22 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
           failures.push(`${phase}: ${String(error instanceof Error ? error.message : error)}`)
           return null
         })
-    // 清单带 scope：当前模式的同名正文优先，其它历史条目只作为池子参考。
-    const grabSession = (): Promise<Preview | null> =>
-      fetch(SESSION_URL + `?t=${Date.now()}`)
-        .then((r) => r.json())
-        .then((body: Preview) => {
-          if (body.ok === false) throw new Error(body.error ?? t('previewFail'))
-          return body
-        })
-        .catch((error: unknown) => {
-          failures.push(`session: ${String(error instanceof Error ? error.message : error)}`)
-          return null
-        })
     return Promise.all([...VIEW_KEYS.map(grab), fetch(INVENTORY_URL + qs).then((r) => r.json()).then(body => {
       if (body.ok === false) throw new Error(body.error ?? 'inventory failed')
       return body
     }).catch((error: unknown) => {
       failures.push(String(error instanceof Error ? error.message : error))
       return null
-    }), grabSession()])
-      .then(([boot, comp, act, inventoryData, sessionData]) => {
+    })])
+      .then(([boot, comp, act, inventoryData]) => {
         if (seq !== refreshSeq.current) return
         setPhases({ bootstrap: boot, compaction: comp, active: act })
         setInv(inventoryData as Inventory)
-        setSessionView(sessionData)
-        setSessionLoading(false)
         setError(failures.length ? failures.join('\n') : null)
       })
       .catch((e: unknown) => {
         if (seq !== refreshSeq.current) return
         setPhases({ bootstrap: null, compaction: null, active: null })
-        setSessionLoading(false)
         setError(String(e instanceof Error ? e.message : e))
       })
   }
@@ -279,11 +260,9 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 冻结进 override。
   // 工作区级：把该工作区的 override 当作编辑源（叠在预设级之上、运行时工作区优先）。
   const wsKey = workspace ?? currentWorkspace ?? undefined
-  const wsTarget = target ?? '__workspace__'
-  const baseSource = level === 'workspace'
-    ? ({ ...cfg, overrides: { [wsTarget]: (wsKey !== undefined ? workspaceOverrides[wsKey] : undefined) ?? {} } } as Config)
-    : cfg
-  const base = editView(baseSource, level === 'workspace' ? wsTarget : target)
+  const base = level === 'workspace'
+    ? overrideView(cfg, wsKey !== undefined ? workspaceOverrides[wsKey] : undefined)
+    : editView(cfg, target)
   const view: Config = draft
     ? {
         ...base,
@@ -563,7 +542,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
 
   // 恢复：解析备份 JSON → 二次确认 → 整库替换。
   const restoreAll = (text: string): void => {
-    let parsed: { format?: unknown; docs?: unknown; catalog?: unknown }
+    let parsed: { format?: unknown; docs?: unknown }
     try { parsed = JSON.parse(text) } catch { showFlash(t('restoreBadFormat'), 'err'); return }
     if (parsed?.format !== 'dsh-prompt-customizer/backup@1' || parsed.docs === null || typeof parsed.docs !== 'object') {
       showFlash(t('restoreBadFormat'), 'err')
@@ -730,7 +709,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       target && agentPresets.find((p) => p.id === target)?.broken
         ? h('div', { style: s.error }, t('brokenPreset'))
         : null,
-      inv?.scopeResolved === false && mode !== 'presets' && mode !== 'session'
+      inv?.scopeResolved === false && mode !== 'presets'
         ? h('div', { style: s.noticeWarn }, t('scopeFallback'))
         : null,
       level === 'workspace' && currentWorkspace === undefined
