@@ -85,6 +85,30 @@ test('阶段化工具目录：配置里不存在的工具名不会送进 restric
   assert.deepEqual(h.restricts, [['bash']], '只提交注册表里真实存在的工具名')
 })
 
+test('阶段化工具目录：preset / agent / global 多个来源的工具都会进入 restrict', () => {
+  const h = harness()
+  const visibility = createPhaseToolVisibility({
+    ctx: h.ctx,
+    readConfig: () => ({
+      overrides: {
+        standard: {
+          tools: {
+            exclude: [
+              { name: 'bash', source: { kind: 'preset' } },
+              { name: 'edit', source: { kind: 'agent' } },
+              { name: 'read', source: { kind: 'global' } },
+            ],
+          },
+        },
+      },
+    }),
+    phaseOf: () => ({ promoted: true, boundary: -1 }),
+    presetOf: () => 'standard',
+  })
+  visibility.sync(h.agent)
+  assert.deepEqual(h.restricts, [['bash', 'edit', 'read']])
+})
+
 test('阶段化工具目录：readConfig 返回已合并的生效配置（工作区 exclude 也生效）', () => {
   const h = harness()
   const visibility = createPhaseToolVisibility({

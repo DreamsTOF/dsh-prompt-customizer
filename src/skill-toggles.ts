@@ -49,7 +49,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { presetTrustOf } from './mcp-presets.ts'
 import { currentRootPaths, currentSkillRoots } from './skill-roots.ts'
-import { kernelSkillSummaries, setHiddenSkillReader } from './kernel-skills.ts'
+import { kernelSkillSummaries, kernelSkillViews, setHiddenSkillReader } from './kernel-skills.ts'
 import { SKILL_MASK_PROVIDER } from './skill-mask-provider.ts'
 import { isPresetId, isSkillName } from './ids.ts'
 import { normalizeCwd } from './home-paths.ts'
@@ -525,10 +525,15 @@ async function setBundleEnabled(bundleId: string, enabled: boolean): Promise<num
  * frontmatter 开关仍然尊重（内核自己会把它算进 invocation，这里只额外叠加
  * 我们的隐藏账本，避免两套语义互相覆盖）。
  */
-async function status(ctx: PluginContext): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
+async function status(ctx: PluginContext, workspace?: string): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
   const skills: Record<string, boolean> = {}
   const hidden = await readHidden()
-  const summaries = await kernelSkillSummaries(ctx)
+  const viewList = workspace !== undefined && workspace.trim() !== ''
+    ? await kernelSkillViews(ctx, undefined, workspace)
+    : []
+  const summaries = viewList.length > 0
+    ? viewList.map((view) => ({ name: view.name }))
+    : await kernelSkillSummaries(ctx)
   if (summaries.length > 0) {
     for (const summary of summaries) {
       const name = typeof summary?.name === 'string' ? summary.name : ''
@@ -590,7 +595,7 @@ async function effectiveStatus(
   presetId?: string,
   workspace?: string,
 ): Promise<{ skills: Record<string, boolean>; bundles: Record<string, boolean> }> {
-  const base = await status(ctx)
+    const base = await status(ctx, workspace)
   if (presetId === undefined && workspace === undefined) return base
   const presetTable = presetId === undefined ? {} : ((await readLedger()).presets[presetId] ?? {})
   const wsKey = workspace === undefined || workspace.trim() === '' ? undefined : normalizeCwd(workspace)

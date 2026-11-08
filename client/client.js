@@ -3767,11 +3767,13 @@ function Panel({ t, onClose, level = "preset", workspace }) {
       if (Object.hasOwn(edited, field)) patch[field] = edited[field];
     }
     setSaving(true);
-    fetch(CONFIG_APPLY_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(level === "workspace" ? { level: "workspace", workspace: wsKey, patch } : { target, patch })
-    }).then((r) => r.json()).then((body) => {
+    void enqueueWrite(async () => {
+      const response = await fetch(CONFIG_APPLY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(level === "workspace" ? { level: "workspace", workspace: wsKey, patch } : { target, patch })
+      });
+      const body = await response.json();
       if (body?.ok !== true) throw new Error(body?.error ?? "save failed");
       setCfg(body.config);
       if (body.workspaceOverrides !== void 0) setWorkspaceOverrides(body.workspaceOverrides);

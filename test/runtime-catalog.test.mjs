@@ -166,16 +166,24 @@ test('真实 agent 预览列出会话级段，诊断预览不混入其它 agent'
   assert.ok(preview.sections.some(section => section.name === RUNTIME_ONLY.name))
 })
 
-test('预设清单也扫描当前 agent 作用域的工具（如 apply_patch）', async () => {
+test('预设清单也扫描当前 agent 作用域的多个工具', async () => {
   const { ctx, routes, dataDir } = makeCtx({
-    toolsByScope: (scope) => scope === AGENT ? [{ name: 'apply_patch', description: 'Edit files' }] : [],
+    toolsByScope: (scope) => scope === AGENT
+      ? [
+          { name: 'apply_patch', description: 'Edit files' },
+          { name: 'custom_agent_tool', description: 'Another agent tool' },
+          { name: 'another_tool', description: 'Third agent tool' },
+        ]
+      : [],
   })
   apply(ctx, { dataDir })
   const body = await inventoryOf(routes)
-  const row = body.tools.find((tool) => tool.name === 'apply_patch')
-  assert.ok(row)
-  assert.equal(row.state, 'locked-agent')
-  assert.equal(row.scope, 'agent')
+  const rows = body.tools.filter((tool) => ['apply_patch', 'custom_agent_tool', 'another_tool'].includes(tool.name))
+  assert.deepEqual(rows.map((tool) => tool.name), ['another_tool', 'apply_patch', 'custom_agent_tool'])
+  for (const row of rows) {
+    assert.equal(row.state, 'locked-agent')
+    assert.equal(row.scope, 'agent')
+  }
 })
 
 test('两条路径并存时同名只出现一次（并集去重）', async () => {

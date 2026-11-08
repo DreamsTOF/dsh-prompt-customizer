@@ -359,22 +359,23 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
       if (Object.hasOwn(edited, field)) patch[field] = edited[field]
     }
     setSaving(true)
-    fetch(CONFIG_APPLY_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(level === 'workspace' ? { level: 'workspace', workspace: wsKey, patch } : { target, patch }),
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body?.ok !== true) throw new Error(body?.error ?? 'save failed')
-        setCfg(body.config as Config)
-        if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
-        clearDraft()
-        setError(null)
-        setVersion((n) => n + 1)
-        showFlash(t('saveOk'))
+    // 保存也必须走同一条写队列：预设 Apply/Delete/Import 尚未完成时点保存，
+    // 不会和它们并发覆盖。
+    void enqueueWrite(async () => {
+      const response = await fetch(CONFIG_APPLY_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(level === 'workspace' ? { level: 'workspace', workspace: wsKey, patch } : { target, patch }),
       })
-      .catch((e: unknown) => setError(`${t('saveFail')}: ${e instanceof Error ? e.message : String(e)}`))
+      const body = await response.json()
+      if (body?.ok !== true) throw new Error(body?.error ?? 'save failed')
+      setCfg(body.config as Config)
+      if (body.workspaceOverrides !== undefined) setWorkspaceOverrides(body.workspaceOverrides as Record<string, Config>)
+      clearDraft()
+      setError(null)
+      setVersion((n) => n + 1)
+      showFlash(t('saveOk'))
+    }).catch((e: unknown) => setError(`${t('saveFail')}: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => setSaving(false))
   }
 
