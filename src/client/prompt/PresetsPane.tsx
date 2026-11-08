@@ -195,7 +195,7 @@ export function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envB
   ])
 }
 
-export function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }: {
+export function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, target, onExportPreset, onImportPreset, onCleanupEmpty, onBackupAll, onRestoreAll, backingUp, restoring, cleaning }: {
   cfg: Config
   inv: Inventory | null
   t: Translate
@@ -208,12 +208,19 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, 
   onBackupAll: () => void
   /** 恢复备份（传入备份 JSON 文本）。 */
   onRestoreAll: (text: string) => void
+  /** 当前编辑目标；缺省 = 不显示单预设导入导出。 */
+  target?: string
+  onExportPreset: () => void
+  onImportPreset: (text: string) => void
+  onCleanupEmpty: () => void
   backingUp: boolean
   restoring: boolean
+  cleaning: boolean
 }): ReactElement {
   // 黑名单「添加」输入框的暂存值。
   const [blockInput, setBlockInput] = useState('')
   const backupFileRef = useRef<HTMLInputElement | null>(null)
+  const presetFileRef = useRef<HTMLInputElement | null>(null)
 
   // 环境变量黑名单：全局字段，改动即写（与 forceSections 同一通道，不经草稿）。
   const removeBlockEntry = (entry: string): void => {
@@ -228,6 +235,29 @@ export function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, 
 
   return h('div', { style: s.colRight }, [
     h('div', { style: { ...s.colRightScroll, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12, alignContent: 'start' } }, [
+      target === undefined ? null : h('div', { style: s.injectBox }, [
+        h('div', { style: s.rowTitle }, t('presetIoTitle')),
+        h('div', { style: s.muted }, t('presetIoHint')),
+        h('div', { style: s.injectRow }, [
+          h('button', { style: s.mini, onClick: onExportPreset }, t('presetExport')),
+          h('button', { style: s.mini, onClick: () => presetFileRef.current?.click() }, t('presetImport')),
+          h('button', { style: s.mini, disabled: cleaning, onClick: onCleanupEmpty }, cleaning ? t('cleanupRunning') : t('cleanupEmpty')),
+          h('input', {
+            ref: presetFileRef,
+            type: 'file',
+            accept: '.json,application/json',
+            style: { display: 'none' },
+            onChange: (e: ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = () => onImportPreset(String(reader.result))
+              reader.readAsText(file)
+            },
+          }),
+        ]),
+      ]),
       h('div', { style: s.injectBox }, [
         h('div', { style: s.rowTitle }, t('backupTitle')),
         h('div', { style: s.muted }, t('backupHint')),

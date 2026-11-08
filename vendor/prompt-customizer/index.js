@@ -37,7 +37,7 @@ import {
 import { PHASES, PHASE_KEYS, phaseOf, phaseOfStatus, statusOfPhase, normalizeEntry, entryKey, entryMatches } from './model.js'
 import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js'
 import { createConfigStore } from './store.js'
-import { openDb, allDocs, replaceAllDocs } from './db.js'
+import { openDb, allDocs, replaceAllDocs, setDoc } from './db.js'
 import { createPhaseToolVisibility } from './tool-visibility.js'
 
 export const name = 'prompt-customizer'
@@ -290,8 +290,8 @@ export function apply(ctx, entry = {}) {
     warn: (message) => { try { ctx.logger?.warn?.(message) } catch { /* logger 缺席 */ } },
   })
   const read = () => store.readResolved()
-  // 工作区级 override（破坏式后与 config 同库、独立 doc）：按工作区绝对 cwd 存一份，
-  // 运行时叠加在预设级之上（工作区优先）。
+  // @archive 工作区级 override：源码保留供以后恢复参考；当前不读取、不写入、
+  // 不参与装配、不进备份。workspaceOverrides 数据字段休眠。
   const wsStore = createConfigStore({
     db,
     key: 'workspace-overrides',
@@ -337,10 +337,7 @@ export function apply(ctx, entry = {}) {
   // 阶段化工具目录：0.2.2 起由 agent 作用域 restrict 承担（装配瀑布流不再带 tools）。
   const toolVisibility = createPhaseToolVisibility({
     ctx,
-    readConfig: (agent) => effectiveConfig(mergeOverrideLayers(
-      read().overrides?.[presetOfAgent(agent) ?? ''],
-      workspaceOverrideFor(agent?.session?.header?.cwd),
-    )),
+    readConfig: (agent) => effectiveConfig(read().overrides?.[presetOfAgent(agent) ?? '']),
     phaseOf: (agent) => statusOf(phaseHandle ?? ctx.get('sessionProjections'), agent),
     presetOf: presetOfAgent,
   })
@@ -374,15 +371,8 @@ export function apply(ctx, entry = {}) {
     const id = typeof context?.promptCustomizerPreset === 'string'
       ? context.promptCustomizerPreset
       : presetOfAgent(context?.agent)
-    // 运行时生效配置：预设级 override，叠加工作区级 override。预览可显式指定
-    // promptCustomizerWorkspace（所选工作区），否则用会话 cwd。
-    const workspaceCwd = typeof context?.promptCustomizerWorkspace === 'string' && context.promptCustomizerWorkspace !== ''
-      ? context.promptCustomizerWorkspace
-      : context?.agent?.session?.header?.cwd
-    const workspaceOvr = workspaceOverrideFor(workspaceCwd)
     reportInvalidPhases(base.overrides?.[id], warnOnce)
-    reportInvalidPhases(workspaceOvr, warnOnce)
-    const cfg = effectiveConfig(mergeOverrideLayers(base.overrides?.[id], workspaceOvr))
+    const cfg = effectiveConfig(base.overrides?.[id])
     const phaseHint = typeof context?.promptCustomizerPhase === 'string'
       ? context.promptCustomizerPhase
       : undefined
@@ -611,10 +601,7 @@ export function apply(ctx, entry = {}) {
           // 宿主共享 webserver 的 req 是原始 IncomingMessage：没有 Express 的
           // query 属性，必须自行解析 URL 参数。
           const id = queryOf(req).get('scope') ?? undefined
-          const workspace = queryOf(req).get('workspace') ?? undefined
           const target = await acquireTarget(ctx, id)
-          if (workspace !== undefined && workspace !== '') target.workspace = workspace
-          if (workspace !== undefined && workspace !== '') target.workspaceOvr = workspaceOverrideFor(workspace)
           try {
             const preview = await buildPreview(ctx, read(), target, 'active', undefined, undefined, undefined, toolMask)
             const inventory = await buildInventory(ctx, read(), target.scopeKey, target.hintId, undefined, preview)
@@ -656,7 +643,6 @@ export function apply(ctx, entry = {}) {
             writeJson(res, 400, { ok: false, error: `unknown phase: ${target.invalidPhase}` })
             return
           }
-          if (typeof target.workspace === 'string' && target.workspace !== '') target.workspaceOvr = workspaceOverrideFor(target.workspace)
           try {
             const patch = body !== null && typeof body === 'object'
               && body.patch !== null && typeof body.patch === 'object' && !Array.isArray(body.patch)
@@ -715,7 +701,7 @@ export function apply(ctx, entry = {}) {
           const presetId = presetIdOfAgent(ctx, live)
           target = await acquireTarget(ctx, presetId)
           const status = statusOf(phaseHandle ?? ctx.get('sessionProjections'), live)
-          const preview = await buildSessionPreview(ctx, read(), target.scopeKey, { agent: live, presetId }, status, undefined, toolMask, workspaceOverrideFor(live?.session?.header?.cwd))
+          const preview = await buildSessionPreview(ctx, read(), target.scopeKey, { agent: live, presetId }, status, undefined, toolMask)
           writeJson(res, 200, { ...preview, scopeResolved: target.scopeResolved })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
@@ -795,14 +781,6 @@ export function apply(ctx, entry = {}) {
           const customization = overrides[targetId] !== null && typeof overrides[targetId] === 'object'
             ? overrides[targetId]
             : {}
-          // 来源预设的组成声明（只读参考，不打包成可执行的预设）。
-          let composition
-          if (typeof roster?.readDocument === 'function') {
-            try {
-              const doc = await roster.readDocument(targetId)
-              if (typeof doc?.content === 'string') composition = doc.content
-            } catch { /* 读不到组成不算失败：导出主体是定制 */ }
-          }
           writeJson(res, 200, {
             ok: true,
             format: 'dsh-prompt-customizer/export@1',
@@ -810,8 +788,6 @@ export function apply(ctx, entry = {}) {
             envBlocklist: Array.isArray(raw?.envBlocklist) ? raw.envBlocklist : [],
             forceSections: raw?.forceSections !== false,
             customization,
-            // 参考：该 agent 预设自己的组成（entry-list YAML），供人工比对。
-            composition,
           })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
@@ -826,11 +802,14 @@ export function apply(ctx, entry = {}) {
       path: '/api/prompt-customizer/backup',
       handler: async (_req, res) => {
         try {
+          const docs = allDocs(db)
+          // 工作区级提示词/工具已下线；休眠数据不进入备份包。
+          delete docs['workspace-overrides']
           writeJson(res, 200, {
             ok: true,
             format: 'dsh-prompt-customizer/backup@1',
             exportedAt: new Date().toISOString(),
-            docs: allDocs(db),
+            docs,
           })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
@@ -850,9 +829,14 @@ export function apply(ctx, entry = {}) {
             writeJson(res, 400, { ok: false, error: 'backup.docs object is required' })
             return
           }
-          replaceAllDocs(db, docs)
+          const restored = { ...docs }
+          delete restored['workspace-overrides']
+          // 休眠数据不进入备份，但恢复备份也不应删除它。
+          const dormantWorkspaceOverrides = allDocs(db)['workspace-overrides']
+          replaceAllDocs(db, restored)
+          if (dormantWorkspaceOverrides !== undefined) setDoc(db, 'workspace-overrides', dormantWorkspaceOverrides)
           toolVisibility.syncAll()
-          writeJson(res, 200, { ok: true, config: read(), workspaceOverrides: readWorkspaceOverrides() })
+          writeJson(res, 200, { ok: true, config: read() })
         } catch (error) {
           writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
         }
@@ -869,14 +853,7 @@ export function apply(ctx, entry = {}) {
       kind: 'exact',
       path: '/api/prompt-customizer/config',
       handler: async (_req, res) => {
-        let currentWorkspace
-        try { currentWorkspace = currentLiveAgent(ctx)?.session?.header?.cwd } catch { currentWorkspace = undefined }
-        writeJson(res, 200, {
-          ok: true,
-          config: read(),
-          workspaceOverrides: readWorkspaceOverrides(),
-          currentWorkspace: typeof currentWorkspace === 'string' && currentWorkspace !== '' ? currentWorkspace : undefined,
-        })
+        writeJson(res, 200, { ok: true, config: read() })
       },
     })
     ctx.effect(() => disposeConfig, 'prompt-customizer: config route')
@@ -973,28 +950,6 @@ export function apply(ctx, entry = {}) {
             return
           }
           const target = typeof body.target === 'string' && body.target.length > 0 ? body.target : undefined
-          // 工作区级：body { level: 'workspace', workspace: <cwd>, patch }，写 workspaceOverrides[cwd]。
-          if (body.level === 'workspace') {
-            const workspace = typeof body.workspace === 'string' && body.workspace.trim() !== '' ? path.resolve(body.workspace) : undefined
-            if (workspace === undefined) {
-              writeJson(res, 400, { ok: false, error: 'workspace (absolute cwd) is required for workspace-level apply' })
-              return
-            }
-            const rawWs = wsStore.raw() ?? {}
-            const cur = { ...(rawWs?.[workspace] ?? {}) }
-            for (const field of APPLY_FIELDS) {
-              if (!Object.hasOwn(patch, field)) continue
-              if (patch[field] === null) delete cur[field]
-              else cur[field] = patch[field]
-            }
-            const next = { ...(rawWs ?? {}) }
-            if (Object.keys(cur).length > 0) next[workspace] = cur
-            else delete next[workspace]
-            wsStore.writeSection(next)
-            toolVisibility.syncAll()
-            writeJson(res, 200, { ok: true, level: 'workspace', workspace, config: read(), workspaceOverrides: readWorkspaceOverrides() })
-            return
-          }
           if (target === undefined) {
             writeJson(res, 400, { ok: false, error: 'target (agent preset id) is required — prompts must be customized per preset, the global layer is retired in 0.9.0' })
             return
@@ -1011,6 +966,63 @@ export function apply(ctx, entry = {}) {
       },
     })
     ctx.effect(() => disposeConfigApply, 'prompt-customizer: config apply route')
+
+    // 单预设自定义导入：只导入本插件 overrides[target]，不触碰宿主预设定义。
+    const disposeConfigImport = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/import',
+      handler: async (req, res) => {
+        try {
+          const body = await readJsonBody(req)
+          const target = typeof body?.target === 'string' && body.target.length > 0 ? body.target : undefined
+          const customization = body?.customization
+          if (target === undefined || customization === null || typeof customization !== 'object' || Array.isArray(customization)) {
+            writeJson(res, 400, { ok: false, error: 'target and customization object are required' })
+            return
+          }
+          const raw = store.raw() ?? {}
+          const overrides = { ...(raw.overrides ?? {}) }
+          overrides[target] = customization
+          store.setField('overrides', overrides)
+          toolVisibility.syncAll()
+          writeJson(res, 200, { ok: true, target, config: read() })
+        } catch (error) {
+          writeJson(res, 400, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeConfigImport, 'prompt-customizer: config import route')
+
+    // 手动清理空 overrides：只删「所有字段都为空」的预设定制。
+    const disposeConfigCleanup = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/overrides/cleanup',
+      handler: async (_req, res) => {
+        try {
+          const raw = store.raw() ?? {}
+          const overrides = { ...(raw.overrides ?? {}) }
+          const isEmptyValue = (value) => {
+            if (value === null || value === undefined) return true
+            if (Array.isArray(value)) return value.length === 0
+            if (typeof value === 'object') return Object.values(value).every(isEmptyValue)
+            return false
+          }
+          const removed = []
+          for (const [id, value] of Object.entries(overrides)) {
+            if (isEmptyValue(value)) {
+              delete overrides[id]
+              removed.push(id)
+            }
+          }
+          store.setField('overrides', overrides)
+          toolVisibility.syncAll()
+          writeJson(res, 200, { ok: true, removed, config: read() })
+        } catch (error) {
+          writeJson(res, 500, { ok: false, error: String(error && error.message ? error.message : error) })
+        }
+      },
+    })
+    ctx.effect(() => disposeConfigCleanup, 'prompt-customizer: overrides cleanup route')
   }
 }
 
@@ -1499,7 +1511,6 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
 async function previewTarget(ctx, req, body = null) {
   const query = queryOf(req)
   const target = await acquireTarget(ctx, query.get('scope') ?? undefined)
-  const workspace = query.get('workspace') ?? (typeof body?.workspace === 'string' ? body.workspace : undefined)
   const rawPhase = body?.phase ?? query.get('phase')
   let phase
   let invalidPhase
@@ -1507,7 +1518,7 @@ async function previewTarget(ctx, req, body = null) {
     if (PHASE_KEYS.includes(rawPhase)) phase = rawPhase
     else invalidPhase = String(rawPhase)
   }
-  return { ...target, phase, invalidPhase, workspace: workspace ?? undefined }
+  return { ...target, phase, invalidPhase }
 }
 
 /** Assemble one leased mode revision; unresolved session variables stay in the template. */
@@ -1515,7 +1526,6 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const scopeKey = target?.scopeKey
   const hintId = target?.hintId
   const configTargetId = hintId
-  const workspace = typeof target?.workspace === 'string' && target.workspace !== '' ? target.workspace : undefined
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
   // 视图生效（AssembleContext 允许插件自定义字段）。
@@ -1527,7 +1537,6 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     // 请求预过滤视图（base）：本插件的过滤器把进入过滤前的段 / 工具原文
     // 连同屏蔽 / 隐藏标记一起附在装配结果上，作为面板两个栏的统一数据源。
     promptCustomizerBase: true,
-    ...(workspace === undefined ? {} : { promptCustomizerWorkspace: workspace }),
   }
   // 实时预览（UI 未保存草稿）：补丁挂进装配上下文，过滤器在 resolveTarget
   // 里把它叠加到目标层 —— 只读内存，磁盘不动。
@@ -1548,7 +1557,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   // 预过滤视图（base）：段来自装配 base 视图；工具目录 0.2.2 起改从注册表读。
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
   const phaseStatus = statusOfPhase(phase === undefined ? 'active' : phase) ?? statusOfPhase('active')
-  const previewCfg = effectiveConfig(mergeOverrideLayers(rawConfig?.overrides?.[configTargetId], target?.workspaceOvr))
+  const previewCfg = effectiveConfig(rawConfig?.overrides?.[configTargetId])
   const previewToolFilter = pickToolsFilter(previewCfg.tools, phaseStatus)
   const previewDenied = pickSectionsForStatus(previewCfg, phaseStatus)
   const previewContextsDenied = pickContextsForStatus(previewCfg, phaseStatus)
@@ -1649,7 +1658,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
  * 工具取该 agent 的完整可见集（含 agent 作用域注册与所有 restrict），
  * 段保留 agent 作用域标记，base 列表再补预设注册表里被其它插件遮蔽的工具。
  */
-async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, _catalog, toolMask, workspaceOvr) {
+async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status, _catalog, toolMask) {
   const agent = live.agent
   const presetId = live.presetId
   const hintExtra = presetId === undefined ? {} : {
@@ -1670,7 +1679,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
     : []
   const baseView = (baseAssembled && typeof baseAssembled === 'object' && baseAssembled.promptCustomizerBaseView) || {}
   const phase = phaseNameOf(status)
-  const cfg = effectiveConfig(mergeOverrideLayers(rawConfig?.overrides?.[presetId], workspaceOvr))
+  const cfg = effectiveConfig(rawConfig?.overrides?.[presetId])
   const denied = pickSectionsForStatus(cfg, status)
   const replacements = filterReplacementsByPhase(cfg.replacements, status)
   const presetNames = sectionNamesOf(ctx, presetScopeKey)

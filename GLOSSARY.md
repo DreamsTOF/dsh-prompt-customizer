@@ -24,10 +24,10 @@
 ## 预设与层级
 
 - **预设隔离（Preset Isolation）**：每个 agent 预设的段与工具互不混用；清单与预览只反映该预设的真实装配结果。
-- **预设级 / 工作区级（Preset / Workspace Level）**：定制作用的两层归属；工作区级覆盖预设级。
+- **预设级（Preset Level）**：提示词 / 工具定制的唯一活跃归属；按 agent 预设保存与生效。工作区级提示词/工具层已移除（源码归档、数据休眠）。
 - **三态（Three Phases）**：引导期（bootstrap）/ 压缩受控期（compaction）/ 常驻期（active）。
 - **三态同步（Three-phase Sync）**：打开后，对段、工具、运行时上下文的改动在三个阶段一起生效。
-- **工作区候选超集（Workspace Candidate Superset）**：工作区级清单 ⊇ 所选预设级清单；工作区可把预设条目置为隐藏（仍列出并标 blocked），但不能让它凭空消失。
+- **工作区级归档（Workspace-level Archive）**：工作区级提示词/工具源码保留在原目录备查，但不参与入口、构建装配、路由、备份或显示；`workspaceOverrides` 数据字段休眠。
 - **通用会话项（Generic Session Item）**：agent 作用域中**不属于任何已声明预设**的条目；只有这类条目才允许并入预设/工作区视图，避免跨预设串号。
 - **阶段化替换（Phase-scoped Replacement）**：只对已存在段生效、并按阶段（always/bootstrap/active/compaction）分别生效的文本替换；绝不新建段。
 - **阶段描述表（Phase Descriptor Table）**：三阶段唯一描述表（key、段字段、上下文字段、工具字段、状态）；所有模块从它派生，禁止各自手写三份映射。

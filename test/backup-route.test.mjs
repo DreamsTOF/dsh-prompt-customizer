@@ -43,7 +43,7 @@ test('整库备份导出全部 docs，恢复能整体还原', async () => {
   assert.equal(backup.body.ok, true)
   assert.equal(backup.body.format, 'dsh-prompt-customizer/backup@1')
   assert.deepEqual(backup.body.docs.config.overrides.standard.sections, ['x'])
-  assert.deepEqual(backup.body.docs['workspace-overrides']['/ws'].sections, ['y'])
+  assert.equal(backup.body.docs['workspace-overrides'], undefined, '工作区级已下线，休眠数据不进入备份')
 
   // 破坏当前数据后恢复
   setDoc(db, 'config', { forceSections: false, overrides: {} })

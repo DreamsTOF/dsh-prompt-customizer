@@ -51,6 +51,10 @@ export function effectiveConfig(ovr) {
 }
 
 /** 合并预设级与工作区级：工作区可新增隐藏/替换/注入，不能移除预设已有的控制（候选超集）。 */
+/**
+ * @archive 工作区级提示词/工具层已下线；保留合并实现供后续恢复参考，
+ * 当前活跃路径不再调用。
+ */
 export function mergeOverrideLayers(presetOvr, workspaceOvr) {
   const base = presetOvr !== null && typeof presetOvr === 'object' ? presetOvr : {}
   const ws = workspaceOvr !== null && typeof workspaceOvr === 'object' ? workspaceOvr : {}

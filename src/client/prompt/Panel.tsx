@@ -116,6 +116,7 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   const [flashKind, setFlashKind] = useState<'ok' | 'err'>('ok')
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [cleaning, setCleaning] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = (): void => {
@@ -508,15 +509,66 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
     setTarget(next)
   }
 
-  // 「导出当前预设配置」：只读导出该编辑目标的定制（overrides[target]）与
-  // 来源预设的组成声明，浏览器/桌面壳落盘为 JSON。
-  //
-  // 取代原「存为预设」：宿主 agentPresets 没有 authoring API（只有 list / read /
-  // select），预设是 profile patch 里一行的声明式配置；替用户造预设需要猜 Loader
-  // 命名空间、处理重复行 id、并把来源组成拍成不再跟随升级的快照。导出把决定权
-  // 交回用户，不再替宿主做它没暴露的事。
-  // 状态 hook 已声明在组件顶部（所有提前 return 之前），这里只保留动作。
-  // 全量备份：整库（全部提示词配置 + 工作区 override + 目录池 + 账本）导出为 JSON。
+  // 单预设定制导入/导出：只读写 overrides[target]，不涉及宿主预设定义。
+  const exportPreset = (): void => {
+    if (target === undefined) { showFlash(t('presetIoNoTarget'), 'err'); return }
+    fetch(`/api/prompt-customizer/export?scope=${encodeURIComponent(target)}`)
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'export failed')
+        const filename = `prompt-customizer-${target}.json`
+        const text = JSON.stringify(body, null, 2)
+        const io = makeIoEnv()
+        void io.saveText(filename, text).then((outcome) => {
+          if (outcome.kind === 'saved') showFlash(t('presetIoOk', { name: filename }), 'ok')
+          else if (outcome.kind === 'unavailable') { io.download(filename, text); showFlash(t('presetIoOk', { name: filename }), 'ok') }
+        })
+      })
+      .catch((e: unknown) => showFlash(`${t('presetIoFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
+  }
+
+  const importPreset = (text: string): void => {
+    if (target === undefined) { showFlash(t('presetIoNoTarget'), 'err'); return }
+    let parsed: { format?: unknown; customization?: unknown }
+    try { parsed = JSON.parse(text) } catch { showFlash(t('presetIoBadFormat'), 'err'); return }
+    const customization = parsed?.customization
+    if (parsed?.format !== 'dsh-prompt-customizer/export@1' || customization === null || typeof customization !== 'object' || Array.isArray(customization)) {
+      showFlash(t('presetIoBadFormat'), 'err')
+      return
+    }
+    if (!window.confirm(t('presetIoConfirm', { target }))) return
+    fetch('/api/prompt-customizer/import', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target, customization }),
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'import failed')
+        setCfg(body.config as Config)
+        setVersion((n) => n + 1)
+        showFlash(t('presetIoImported'), 'ok')
+      })
+      .catch((e: unknown) => showFlash(`${t('presetIoFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
+  }
+
+  const cleanupEmpty = (): void => {
+    if (cleaning) return
+    if (!window.confirm(t('cleanupConfirm'))) return
+    setCleaning(true)
+    fetch('/api/prompt-customizer/overrides/cleanup', { method: 'POST' })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok !== true) throw new Error(body?.error ?? 'cleanup failed')
+        setCfg(body.config as Config)
+        setVersion((n) => n + 1)
+        showFlash(t('cleanupOk', { n: Array.isArray(body.removed) ? body.removed.length : 0 }), 'ok')
+      })
+      .catch((e: unknown) => showFlash(`${t('cleanupFail')}: ${String(e instanceof Error ? e.message : e)}`, 'err'))
+      .finally(() => setCleaning(false))
+  }
+
+  // 全量备份：整库（全部提示词配置 + 目录池 + 账本）导出为 JSON。
   const backupAll = (): void => {
     if (backingUp) return
     setBackingUp(true)
@@ -736,6 +788,11 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
                 onRestoreAll: restoreAll,
                 backingUp,
                 restoring,
+                cleaning,
+                target,
+                onExportPreset: exportPreset,
+                onImportPreset: importPreset,
+                onCleanupEmpty: cleanupEmpty,
                 onReset: resetAll,
                 envBlocklist: cfg.envBlocklist ?? [],
               }),

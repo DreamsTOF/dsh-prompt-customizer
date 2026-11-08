@@ -4,11 +4,18 @@
 
 ## 当前兼容版本
 
-- 插件 **1.0.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）。
+- 插件 **2.0.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）。
 - 0.2.2-rc.1 的完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
 - 更早的 0.2.1-rc.2 适配记录见 [rc2-migration.md](rc2-migration.md)。
 
 ## 版本历史
+
+## 2.0.0：破坏式 —— 移除工作区级提示词/工具层
+
+- 只保留单预设编辑；工作区级提示词/工具的 UI、路由、运行时装配与备份全部移除。
+- `workspaceOverrides` 字段休眠：数据保留但不读、不写、不显示、不进备份。
+- 单预设导入/导出、全部预设备份包与手动清理空 overrides 留在设置页。
+- 完整记录见 [2.0.0-remove-workspace-level.md](2.0.0-remove-workspace-level.md)。
 
 ## 1.0.0：破坏式 —— 存储迁移 SQLite + 预设/工作区两级自定义
 

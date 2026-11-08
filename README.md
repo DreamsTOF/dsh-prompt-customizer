@@ -53,7 +53,7 @@
 
 - **提示词段管理**：屏蔽 / 替换 / 注入 / 拖动排序提示词段，右栏实时预览模型最终看到的系统提示词；新增「当前会话」只读视图，按活动会话自己的 agent 作用域展示真实提示词与工具目录（含插件动态注册 / 遮蔽的条目）。
 - **阶段与预设分层**：引导期、常驻期、压缩受控期各有独立的段名单、排序空间与工具目录；顶部按 agent 预设切换编辑目标，某个预设的定制只对该预设生效。
-- **两级自定义（1.0.0）**：**预设级**（按 agent 预设，覆盖该预设作用域可见项）与**工作区级**（按工作区 cwd，作用于该工作区全部会话、可控制会话里全部段/工具，并**覆盖预设级**）；面板顶部切换「预设级 / 工作区级」。
+- **单预设编辑（2.0.0）**：提示词 / 工具定制只按 **agent 预设** 保存与生效；工作区级提示词/工具层已移除（源码归档、数据休眠，不读不写不备份）。工作区概念仍用于 MCP / 技能 / cwd。
 - **工具目录**：按阶段隐藏或加回工具，面板同时显示「模型可见 / 注册表总数」，PTC / Code Mode 的 `run_code` 包装也能正确对照。
 - **技能管理**：技能包归组、ZIP / 文件夹导入、全局 / 预设两层开关、技能根与成员一致性体检。
 - **MCP 管理**：粘贴 JSON / YAML 接入、预设专属 Server 行、全局 / 预设双层遮蔽、工具级启停、推荐配置模板。
@@ -87,7 +87,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-当前版本 **1.4.1**（修复 web 端预设预览混入当前会话、旧 `catalog_section` DDL、上下文持久化与过期提示；核心模型见 1.4.0）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+当前版本 **2.0.0**（移除工作区级提示词/工具层，只保留单预设编辑、单预设导入导出与手动清理空 overrides；工作区继续用于 MCP / 技能 / cwd）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 
@@ -99,7 +99,7 @@ dsh plugin --profile web add /path/to/dsh-prompt-customizer
 
 ## 配置位置
 
-- **统一为单文件 SQLite**：`~/.dsh/prompt-customizer/prompt-customizer.db`（WAL，使用 Node 内建 `node:sqlite`，无外部依赖）。提示词配置、跨预设目录池、工作区级 override、MCP 与技能各账本都在这一个库里；宿主配置文件（`cordis.patch.yml` / `.mcp.json`）与技能根下的 `.bundles.json` 仍保持文件。
+- **统一为单文件 SQLite**：`~/.dsh/prompt-customizer/prompt-customizer.db`（WAL，使用 Node 内建 `node:sqlite`，无外部依赖）。预设定制、MCP 与技能各账本都在这一个库里；工作区级提示词/工具数据作为休眠字段保留但不读不写。宿主配置文件（`cordis.patch.yml` / `.mcp.json`）与技能根下的 `.bundles.json` 仍保持文件。
 - **破坏式更新（1.0.0）**：旧版 `config.yaml` / `catalog.yaml` 及各 JSON 账本**不再读取、不迁移**（文件原样保留）；升级到 1.0.0 需**重新配置**。详见 [docs/upgrades/1.0.0-sqlite-breaking.md](docs/upgrades/1.0.0-sqlite-breaking.md)。
 
 ## 开发

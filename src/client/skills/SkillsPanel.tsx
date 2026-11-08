@@ -971,7 +971,7 @@ export function SkillsPanel({ onClose, closing = false, anchor = null, onCardMou
           </div>
         ) : null}
         {kind === 'prompt' ? (
-          <PromptView level={level} workspace={workspace ?? currentWorkspace} />
+          <PromptView />
         ) : kind === 'mcp' ? (
           <McpView
             t={t}

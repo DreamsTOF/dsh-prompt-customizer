@@ -56,7 +56,8 @@ export function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspa
             </button>
           ))}
         </div>
-        {/* 统一层级切换：预设级 / 工作区级，三 tab 共用同一份。 */}
+        {/* 提示词已下线工作区级；层级切换只用于技能 / MCP。 */}
+        {kind !== 'prompt' && (
         <div className={css.kindTabs} role="tablist" aria-label={t('levelAria')} style={{ marginLeft: 8 }}>
           {([['preset', t('levelPreset')], ['workspace', t('levelWorkspace')]] as const).map(([value, label]) => (
             <button
@@ -72,9 +73,10 @@ export function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspa
             </button>
           ))}
         </div>
+        )}
         <span className={css.toolbarSpacer} />
         {/* 工作区选择器：技能目录与 MCP 注入都按它解析。 */}
-        {onWorkspace !== undefined && (
+        {kind !== 'prompt' && onWorkspace !== undefined && (
           <div className={css.dropWrap} data-drop="workspace" style={{ alignSelf: 'center', marginRight: 4 }}>
             <button
               type="button"

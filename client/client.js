@@ -3305,9 +3305,10 @@ function PresetsPane({ cfg, inv, phases, t, writePatch, writeGlobal, envBlocklis
     ])
   ]);
 }
-function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, onBackupAll, onRestoreAll, backingUp, restoring }) {
+function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, target, onExportPreset, onImportPreset, onCleanupEmpty, onBackupAll, onRestoreAll, backingUp, restoring, cleaning }) {
   const [blockInput, setBlockInput] = (0, import_react6.useState)("");
   const backupFileRef = (0, import_react6.useRef)(null);
+  const presetFileRef = (0, import_react6.useRef)(null);
   const removeBlockEntry = (entry) => {
     writeGlobal("envBlocklist", envBlocklist.filter((e) => e !== entry));
   };
@@ -3319,6 +3320,29 @@ function SettingsPane({ cfg, inv, t, writeGlobal, onReset, envBlocklist, onBacku
   };
   return (0, import_react6.createElement)("div", { style: s.colRight }, [
     (0, import_react6.createElement)("div", { style: { ...s.colRightScroll, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, alignContent: "start" } }, [
+      target === void 0 ? null : (0, import_react6.createElement)("div", { style: s.injectBox }, [
+        (0, import_react6.createElement)("div", { style: s.rowTitle }, t("presetIoTitle")),
+        (0, import_react6.createElement)("div", { style: s.muted }, t("presetIoHint")),
+        (0, import_react6.createElement)("div", { style: s.injectRow }, [
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: onExportPreset }, t("presetExport")),
+          (0, import_react6.createElement)("button", { style: s.mini, onClick: () => presetFileRef.current?.click() }, t("presetImport")),
+          (0, import_react6.createElement)("button", { style: s.mini, disabled: cleaning, onClick: onCleanupEmpty }, cleaning ? t("cleanupRunning") : t("cleanupEmpty")),
+          (0, import_react6.createElement)("input", {
+            ref: presetFileRef,
+            type: "file",
+            accept: ".json,application/json",
+            style: { display: "none" },
+            onChange: (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => onImportPreset(String(reader.result));
+              reader.readAsText(file);
+            }
+          })
+        ])
+      ]),
       (0, import_react6.createElement)("div", { style: s.injectBox }, [
         (0, import_react6.createElement)("div", { style: s.rowTitle }, t("backupTitle")),
         (0, import_react6.createElement)("div", { style: s.muted }, t("backupHint")),
@@ -3534,6 +3558,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   const [flashKind, setFlashKind] = (0, import_react9.useState)("ok");
   const [backingUp, setBackingUp] = (0, import_react9.useState)(false);
   const [restoring, setRestoring] = (0, import_react9.useState)(false);
+  const [cleaning, setCleaning] = (0, import_react9.useState)(false);
   const flashTimer = (0, import_react9.useRef)(null);
   const load = () => {
     fetch(CONFIG_URL + `?t=${Date.now()}`).then((r) => r.json()).then((body) => {
@@ -3831,6 +3856,65 @@ function Panel({ t, onClose, level = "preset", workspace }) {
     clearDraft();
     setTarget(next);
   };
+  const exportPreset = () => {
+    if (target === void 0) {
+      showFlash(t("presetIoNoTarget"), "err");
+      return;
+    }
+    fetch(`/api/prompt-customizer/export?scope=${encodeURIComponent(target)}`).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? "export failed");
+      const filename = `prompt-customizer-${target}.json`;
+      const text = JSON.stringify(body, null, 2);
+      const io = makeIoEnv();
+      void io.saveText(filename, text).then((outcome) => {
+        if (outcome.kind === "saved") showFlash(t("presetIoOk", { name: filename }), "ok");
+        else if (outcome.kind === "unavailable") {
+          io.download(filename, text);
+          showFlash(t("presetIoOk", { name: filename }), "ok");
+        }
+      });
+    }).catch((e) => showFlash(`${t("presetIoFail")}: ${String(e instanceof Error ? e.message : e)}`, "err"));
+  };
+  const importPreset = (text) => {
+    if (target === void 0) {
+      showFlash(t("presetIoNoTarget"), "err");
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      showFlash(t("presetIoBadFormat"), "err");
+      return;
+    }
+    const customization = parsed?.customization;
+    if (parsed?.format !== "dsh-prompt-customizer/export@1" || customization === null || typeof customization !== "object" || Array.isArray(customization)) {
+      showFlash(t("presetIoBadFormat"), "err");
+      return;
+    }
+    if (!window.confirm(t("presetIoConfirm", { target }))) return;
+    fetch("/api/prompt-customizer/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, customization })
+    }).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? "import failed");
+      setCfg(body.config);
+      setVersion((n) => n + 1);
+      showFlash(t("presetIoImported"), "ok");
+    }).catch((e) => showFlash(`${t("presetIoFail")}: ${String(e instanceof Error ? e.message : e)}`, "err"));
+  };
+  const cleanupEmpty = () => {
+    if (cleaning) return;
+    if (!window.confirm(t("cleanupConfirm"))) return;
+    setCleaning(true);
+    fetch("/api/prompt-customizer/overrides/cleanup", { method: "POST" }).then((r) => r.json()).then((body) => {
+      if (body?.ok !== true) throw new Error(body?.error ?? "cleanup failed");
+      setCfg(body.config);
+      setVersion((n) => n + 1);
+      showFlash(t("cleanupOk", { n: Array.isArray(body.removed) ? body.removed.length : 0 }), "ok");
+    }).catch((e) => showFlash(`${t("cleanupFail")}: ${String(e instanceof Error ? e.message : e)}`, "err")).finally(() => setCleaning(false));
+  };
   const backupAll = () => {
     if (backingUp) return;
     setBackingUp(true);
@@ -4023,6 +4107,11 @@ function Panel({ t, onClose, level = "preset", workspace }) {
           onRestoreAll: restoreAll,
           backingUp,
           restoring,
+          cleaning,
+          target,
+          onExportPreset: exportPreset,
+          onImportPreset: importPreset,
+          onCleanupEmpty: cleanupEmpty,
           onReset: resetAll,
           envBlocklist: cfg.envBlocklist ?? []
         })
@@ -4065,17 +4154,32 @@ var DICT = {
     previewToolCount: "\u4E2A\u5DE5\u5177",
     presetName: "\u914D\u7F6E\u540D\u79F0",
     backupTitle: "\u5B8C\u6574\u5907\u4EFD\uFF08\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177\uFF09",
-    backupHint: "\u6574\u5E93\u5BFC\u51FA\uFF1A\u6240\u6709\u9884\u8BBE\u4E0E\u5DE5\u4F5C\u533A\u7684\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u76EE\u5F55\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\u3001MCP/\u6280\u80FD\u8D26\u672C\uFF0C\u4E00\u4E2A JSON\u3002\u6062\u590D\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u6570\u636E\u3002",
+    backupHint: "\u5168\u90E8\u9884\u8BBE\u5B9A\u5236\u5BFC\u51FA\uFF1A\u6240\u6709\u9884\u8BBE\u7684\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u3001\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\u4E0E\u63D2\u4EF6\u8D26\u672C\uFF0C\u4E00\u4E2A JSON\u3002\u6062\u590D\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u6570\u636E\u3002",
     backupExport: "\u5BFC\u51FA\u5B8C\u6574\u5907\u4EFD",
     backupExportRunning: "\u5BFC\u51FA\u4E2D\u2026",
     backupRestore: "\u6062\u590D\u5907\u4EFD",
     backupRestoreRunning: "\u6062\u590D\u4E2D\u2026",
     backupOk: "\u5DF2\u5BFC\u51FA {name}",
     backupFail: "\u5BFC\u51FA\u5907\u4EFD\u5931\u8D25",
+    presetIoTitle: "\u5F53\u524D\u9884\u8BBE\u5BFC\u5165 / \u5BFC\u51FA",
+    presetIoHint: "\u53EA\u5904\u7406\u5F53\u524D\u9884\u8BBE\u7684\u5B9A\u5236\uFF08overrides\uFF09\uFF0C\u4E0D\u5305\u542B\u5BBF\u4E3B\u9884\u8BBE\u5B9A\u4E49\u3002",
+    presetExport: "\u5BFC\u51FA\u5F53\u524D\u9884\u8BBE",
+    presetImport: "\u5BFC\u5165\u5230\u5F53\u524D\u9884\u8BBE",
+    presetIoOk: "\u5DF2\u5BFC\u51FA {name}",
+    presetIoImported: "\u5DF2\u5BFC\u5165\u5F53\u524D\u9884\u8BBE\u5B9A\u5236",
+    presetIoFail: "\u9884\u8BBE\u5BFC\u5165/\u5BFC\u51FA\u5931\u8D25",
+    presetIoBadFormat: "\u4E0D\u662F\u6709\u6548\u7684\u9884\u8BBE\u5B9A\u5236\u6587\u4EF6",
+    presetIoNoTarget: "\u8BF7\u5148\u9009\u62E9\u4E00\u4E2A agent \u9884\u8BBE",
+    presetIoConfirm: "\u5C06\u628A\u6587\u4EF6\u4E2D\u7684\u5B9A\u5236\u5BFC\u5165\u5230\u9884\u8BBE\u300C{target}\u300D\uFF0C\u8986\u76D6\u8BE5\u9884\u8BBE\u73B0\u6709\u5B9A\u5236\u3002\u7EE7\u7EED\uFF1F",
+    cleanupEmpty: "\u6E05\u7406\u7A7A\u914D\u7F6E",
+    cleanupRunning: "\u6E05\u7406\u4E2D\u2026",
+    cleanupConfirm: "\u5220\u9664\u6240\u6709\u5B57\u6BB5\u90FD\u4E3A\u7A7A\u7684\u9884\u8BBE overrides\uFF1F\u4E0D\u4F1A\u5F71\u54CD\u6709\u5185\u5BB9\u7684\u914D\u7F6E\u3002",
+    cleanupOk: "\u5DF2\u6E05\u7406 {n} \u4EFD\u7A7A\u914D\u7F6E",
+    cleanupFail: "\u6E05\u7406\u7A7A\u914D\u7F6E\u5931\u8D25",
     restoreOk: "\u5DF2\u6062\u590D\u5907\u4EFD",
     restoreFail: "\u6062\u590D\u5907\u4EFD\u5931\u8D25",
     restoreBadFormat: "\u4E0D\u662F\u6709\u6548\u7684\u5907\u4EFD\u6587\u4EF6\uFF08\u683C\u5F0F\u4E0D\u5339\u914D\uFF09",
-    restoreConfirm: "\u6062\u590D\u5907\u4EFD\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177 / \u5DE5\u4F5C\u533A / \u8D26\u672C\u6570\u636E\uFF0C\u786E\u5B9A\u7EE7\u7EED\uFF1F",
+    restoreConfirm: "\u6062\u590D\u5907\u4EFD\u4F1A\u6574\u4F53\u8986\u76D6\u5F53\u524D\u5168\u90E8\u63D0\u793A\u8BCD / \u5DE5\u5177 / \u8D26\u672C\u6570\u636E\uFF0C\u786E\u5B9A\u7EE7\u7EED\uFF1F",
     save: "\u4FDD\u5B58",
     import: "\u5BFC\u5165",
     apply: "\u5E94\u7528",
@@ -4212,17 +4316,32 @@ var DICT = {
     previewToolCount: "tools",
     presetName: "Config name",
     backupTitle: "Full backup (all prompts / tools)",
-    backupHint: "Whole-DB export: prompts, tool catalog, env blocklist, and MCP/skill ledgers across every preset and workspace, in one JSON. Restore overwrites current data.",
+    backupHint: "All preset customizations: prompts, tools, env blocklist and plugin ledgers in one JSON. Restore overwrites current data.",
     backupExport: "Export full backup",
     backupExportRunning: "Exporting\u2026",
     backupRestore: "Restore backup",
     backupRestoreRunning: "Restoring\u2026",
     backupOk: "Exported {name}",
     backupFail: "Backup export failed",
+    presetIoTitle: "Current preset import / export",
+    presetIoHint: "Only the current preset customization (overrides); host preset definitions are not included.",
+    presetExport: "Export current preset",
+    presetImport: "Import into current preset",
+    presetIoOk: "Exported {name}",
+    presetIoImported: "Imported current preset customization",
+    presetIoFail: "Preset import/export failed",
+    presetIoBadFormat: "Not a valid preset customization file",
+    presetIoNoTarget: "Select an agent preset first",
+    presetIoConfirm: 'Import the customization into preset "{target}" and overwrite its current customization?',
+    cleanupEmpty: "Clean empty overrides",
+    cleanupRunning: "Cleaning\u2026",
+    cleanupConfirm: "Delete all preset overrides whose fields are empty? Non-empty configurations are untouched.",
+    cleanupOk: "Removed {n} empty configurations",
+    cleanupFail: "Cleaning empty overrides failed",
     restoreOk: "Backup restored",
     restoreFail: "Restore failed",
     restoreBadFormat: "Not a valid backup file (format mismatch)",
-    restoreConfirm: "Restoring will overwrite ALL current prompt / tool / workspace / ledger data. Continue?",
+    restoreConfirm: "Restoring will overwrite ALL current prompt / tool / ledger data. Continue?",
     save: "Save",
     import: "Import",
     apply: "Apply",
@@ -4366,8 +4485,8 @@ function applyPrompt(ctx) {
 
 // src/client/prompt/PromptView.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
-function PromptView({ level, workspace }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT(), level, workspace: workspace ?? void 0 }) });
+function PromptView() {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Panel, { t: promptT() }) });
 }
 
 // src/client/skills/types.ts
@@ -6905,7 +7024,7 @@ function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspaceValue
       },
       value
     )) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": t("levelAria"), style: { marginLeft: 8 }, children: [["preset", t("levelPreset")], ["workspace", t("levelWorkspace")]].map(([value, label]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    kind !== "prompt" && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: css.kindTabs, role: "tablist", "aria-label": t("levelAria"), style: { marginLeft: 8 }, children: [["preset", t("levelPreset")], ["workspace", t("levelWorkspace")]].map(([value, label]) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "button",
       {
         type: "button",
@@ -6921,7 +7040,7 @@ function PanelHead({ t, kind, onKind, level, onLevel, workspaces, workspaceValue
       value
     )) }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: css.toolbarSpacer }),
-    onWorkspace !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropWrap, "data-drop": "workspace", style: { alignSelf: "center", marginRight: 4 }, children: [
+    kind !== "prompt" && onWorkspace !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: css.dropWrap, "data-drop": "workspace", style: { alignSelf: "center", marginRight: 4 }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "button",
         {
@@ -8266,7 +8385,7 @@ function SkillsPanel({ onClose, closing = false, anchor = null, onCardMouseEnter
               kind === "mcp" && level === "preset" && mcpScope === "" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { padding: "4px 12px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: css.toolButton, title: t("mcpApplyAllHint"), onClick: () => {
                 void applyMcpToAllPresets();
               }, children: t("mcpApplyAll") }) }) : null,
-              kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, { level, workspace: workspace ?? currentWorkspace }) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+              kind === "prompt" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PromptView, {}) : kind === "mcp" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                 McpView,
                 {
                   t,

@@ -1,16 +1,16 @@
 /**
  * PromptView — 「提示词」顶层 tab 的内容。
  *
- * 直接复用上游面板本体（Panel）：头部模式切换 / 保存 / 刷新、agent 预设编辑目标、
- * 左栏勾选 + 右栏装配预览，全部保持原样；这里只提供撑满 tab 的容器与文案函数。
+ * 直接复用上游面板本体（Panel）：单预设的提示词 / 工具编辑、保存 / 刷新、
+ * 左栏勾选 + 右栏装配预览；工作区级提示词/工具层已归档下线。
  */
 import { Panel } from './Panel.tsx'
 import { promptT } from './index.ts'
 
-export function PromptView({ level, workspace }: { level: 'preset' | 'workspace'; workspace: string | null }): JSX.Element {
+export function PromptView(): JSX.Element {
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <Panel t={promptT()} level={level} workspace={workspace ?? undefined} />
+      <Panel t={promptT()} />
     </div>
   )
 }

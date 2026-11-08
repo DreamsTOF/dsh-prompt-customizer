@@ -88,7 +88,7 @@ const ROSTER = {
   readDocument: async (id) => ({ agentPreset: id, content: `- id: persona\n  name: '@deepseek-ai/dsh-persona'\n` }),
 }
 
-test('导出该目标的定制 + 来源组成 + 全局字段', async () => {
+test('导出该目标的定制 + 全局字段（不包含宿主预设组成）', async () => {
   const { routes } = await harness({ roster: ROSTER, config: CFG })
   const res = await get(routes[EXPORT], `${EXPORT}?scope=standard`)
 
@@ -99,7 +99,7 @@ test('导出该目标的定制 + 来源组成 + 全局字段', async () => {
   assert.deepEqual(res.body.customization, { sections: ['guidelines'], tools: { exclude: ['bash'] } })
   assert.equal(res.body.forceSections, true)
   assert.deepEqual(res.body.envBlocklist, ['SECRET_TOKEN'])
-  assert.match(res.body.composition, /dsh-persona/)
+  assert.equal(res.body.composition, undefined, '宿主预设定义不属于插件导出')
 })
 
 test('不给 scope 时回落到 roster 默认预设', async () => {
