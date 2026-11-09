@@ -10,6 +10,11 @@
 
 ## 版本历史
 
+## 2.0.20：预设隔离修复
+
+- 活跃 Agent 预设优先按 `composedPreset` 解析，修复预设投影未刷新时的跨预设串台。
+- 完整记录见 [2.0.20-preset-isolation.md](2.0.20-preset-isolation.md)。
+
 ## 2.0.19：MCP JSON 编辑恢复
 
 - 恢复全局 MCP 编辑的 JSON/YAML 双格式入口，宿主扫描和应用仍支持两种格式。

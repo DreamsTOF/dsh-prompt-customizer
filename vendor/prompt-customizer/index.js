@@ -1219,6 +1219,14 @@ function toolSchemasOf(ctx, scopeKey, mergeGlobal = false) {
 /** 该 agent 的预设 id：0.2.2 的 presetForSession 优先，旧宿主回落到 header / 投影。 */
 function presetIdOfAgent(ctx, agent) {
   const presets = ctx.get('agentPresets')
+  // DSH 0.2.2 的 agent 是自己组合层的 Context：先读 composedPreset，避免
+  // 投影尚未刷新时把多个会话都回落到同一个默认 preset。
+  if (typeof presets?.composedPreset === 'function' && agent?.ctx !== undefined) {
+    try {
+      const id = presets.composedPreset(agent.ctx)
+      if (typeof id === 'string' && id !== '') return id
+    } catch { /* 非组合层 agent：继续回落 */ }
+  }
   if (typeof presets?.presetForSession === 'function') {
     try {
       const id = presets.presetForSession(agent?.session)
