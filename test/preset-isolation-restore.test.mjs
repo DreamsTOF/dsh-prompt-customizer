@@ -20,6 +20,7 @@ function makeHarness() {
   const handlers = new Map()
   const onUnsubs = []
   const effects = []
+  const originals = new Map()
   let waterfall
 
   const tools = {
@@ -52,8 +53,10 @@ function makeHarness() {
     variable: () => () => {},
     layers: { merge: () => new Map() },
     assemble: async (context = {}) => {
+      const originalSections = sectionsFor(context.scope)
+      originals.set(context.scope, originalSections)
       const assembly = {
-        sections: sectionsFor(context.scope),
+        sections: originalSections,
         contexts: [],
         variables: {},
         tools: TOOL_NAMES.map((name) => ({ name, description: name })),
@@ -110,7 +113,7 @@ function makeHarness() {
     }
     for (const off of onUnsubs.splice(0)) off()
   }
-  return { ctx, sp, agentA, agentB, tools, restrictions, disposals, emit, uninstall }
+  return { ctx, sp, agentA, agentB, tools, originals, restrictions, disposals, emit, uninstall }
 }
 
 test('A/B 预设的提示词段和工具屏蔽互不影响，卸载后全部恢复', async () => {
@@ -145,6 +148,8 @@ test('A/B 预设的提示词段和工具屏蔽互不影响，卸载后全部恢�
     assert.deepEqual(namesB, ['custom-b', 'shared'], `B 预设不应混入 A：${JSON.stringify(namesB)}`)
     assert.equal(a.sections.find((section) => section.name === 'shared').text, 'A shared')
     assert.equal(b.sections.find((section) => section.name === 'shared').text, 'B shared')
+    assert.deepEqual(h.originals.get(h.agentA).map((section) => section.name), ['persona-a', 'shared'], '插件不能原地改宿主 A 的原文数组')
+    assert.deepEqual(h.originals.get(h.agentB).map((section) => section.name), ['persona-b', 'shared'], '插件不能原地改宿主 B 的原文数组')
 
     assert.deepEqual(h.restrictions, [['tool-0', 'tool-1'], ['tool-3']], 'A/B 工具屏蔽名单必须各自独立')
     const preA = await Promise.all(h.emit('tools/pre-execute', { agent: h.agentA, name: 'tool-0' }, async () => ({ kind: 'allow' })))

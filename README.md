@@ -87,7 +87,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-当前版本 **2.0.21**（单预设编辑；按 DSH 运行时契约泛化工具与提示词接管；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；MCP 全局编辑支持 JSON/YAML；活跃 Agent 预设按 `composedPreset` 精确归位；新增 A/B 预设提示词与工具隔离、卸载恢复回归）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+当前版本 **2.0.22**（单预设编辑；按 DSH 运行时契约泛化工具与提示词接管；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；MCP 全局编辑支持 JSON/YAML；活跃 Agent 预设按 `composedPreset` 精确归位；A/B 预设提示词与工具隔离、卸载恢复及原文不可变回归）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 
