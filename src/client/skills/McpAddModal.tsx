@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
-  detectMcpFormat, mcpFormatOptions, type McpConfigFormat, type McpFormatCapabilities,
+  detectMcpFormat, mcpEditFormatOptions, type McpConfigFormat, type McpFormatCapabilities,
 } from './mcp-state.js'
 import { css } from './styles.js'
 
@@ -43,9 +43,12 @@ export function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editSer
     : 'json'
   const [format, setFormat] = useState<McpConfigFormat>(initialFormat)
   /** 编辑模式且服务端未声明能力时只保留当前格式，避免切到宿主不接受的格式。 */
-  const formatOptions = mcpFormatOptions(
+  // 编辑全局 profile patch 时保留 JSON 入口：宿主回显是 YAML，但用户仍可通过
+  // /mcp-format 互转后以 JSON 编辑；仅预设/工作区的原生 .mcp.json 只保留 JSON。
+  const formatOptions = mcpEditFormatOptions(
+    editServer === undefined ? undefined : editSource,
+    initialFormat,
     editCapabilities,
-    editServer !== undefined ? [initialFormat] : ['json', 'yaml'],
   )
   const [text, setText] = useState(editText ?? '')
   const [reload, setReload] = useState(false)

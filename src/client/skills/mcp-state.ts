@@ -113,6 +113,21 @@ export function mcpFormatOptions(
   return formats !== undefined && formats.length > 0 ? [...new Set(formats)] : [...new Set(fallback)]
 }
 
+/**
+ * 编辑弹窗格式入口。全局 profile patch 的原始文本是 YAML，但 JSON 编辑入口
+ * 必须保留（宿主 /mcp-format 能双向互转）；preset/workspace 的 `.mcp.json`
+ * 只允许 JSON。
+ */
+export function mcpEditFormatOptions(
+  source: 'global' | 'preset' | 'workspace' | undefined,
+  current: McpConfigFormat,
+  capabilities?: McpFormatCapabilities,
+): McpConfigFormat[] {
+  if (source === undefined) return mcpFormatOptions(capabilities, ['json', 'yaml'])
+  if (source === 'global') return mcpFormatOptions(capabilities, [current, current === 'json' ? 'yaml' : 'json'])
+  return mcpFormatOptions(capabilities, ['json'])
+}
+
 /** 工作区工具禁用账本：优先按 server 分组的新接口，其次兼容扁平的旧接口。 */
 export interface WorkspaceToolLedgerLike {
   /** 新接口：cwd → serverName → 工具全名[]。 */

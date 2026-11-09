@@ -24,6 +24,7 @@ import {
 } from '../src/client/skills/types.ts'
 import {
   detectMcpFormat,
+  mcpEditFormatOptions,
   mcpEffectiveEnabled,
   mcpFormatOptions,
   mcpToggleTarget,
@@ -133,6 +134,9 @@ test('MCP 编辑格式由服务端 format/capabilities 驱动，文本兜底不�
 
   assert.deepEqual(mcpFormatOptions({ formats: ['yaml'] }, ['json', 'yaml']), ['yaml'])
   assert.deepEqual(mcpFormatOptions(undefined, ['json']), ['json'])
+  assert.deepEqual(mcpEditFormatOptions('global', 'yaml'), ['yaml', 'json'])
+  assert.deepEqual(mcpEditFormatOptions('preset', 'json'), ['json'])
+  assert.deepEqual(mcpEditFormatOptions(undefined, 'json'), ['json', 'yaml'])
 })
 
 test('工作区工具账本按 server 分组，旧扁平结构不解析 mcp__ 前缀', () => {

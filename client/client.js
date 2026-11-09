@@ -5311,6 +5311,11 @@ function mcpFormatOptions(capabilities, fallback) {
   const formats = capabilities?.formats;
   return formats !== void 0 && formats.length > 0 ? [...new Set(formats)] : [...new Set(fallback)];
 }
+function mcpEditFormatOptions(source, current2, capabilities) {
+  if (source === void 0) return mcpFormatOptions(capabilities, ["json", "yaml"]);
+  if (source === "global") return mcpFormatOptions(capabilities, [current2, current2 === "json" ? "yaml" : "json"]);
+  return mcpFormatOptions(capabilities, ["json"]);
+}
 function workspaceDisabledToolsFor(ledger, cwd, serverName, tools) {
   if (cwd === null || cwd === "") return [];
   const grouped = ledger.byServer?.[cwd]?.[serverName];
@@ -5329,9 +5334,10 @@ var import_jsx_runtime5 = require("react/jsx-runtime");
 function McpPasteAdd({ t, presetId, onAdded, onCancel, workspace, editServer, editText, onEdited, editSource, editPreset, editWorkspace, editFormat, editCapabilities }) {
   const initialFormat = editServer !== void 0 ? editFormat ?? detectMcpFormat(editText ?? "") : "json";
   const [format, setFormat] = (0, import_react10.useState)(initialFormat);
-  const formatOptions = mcpFormatOptions(
-    editCapabilities,
-    editServer !== void 0 ? [initialFormat] : ["json", "yaml"]
+  const formatOptions = mcpEditFormatOptions(
+    editServer === void 0 ? void 0 : editSource,
+    initialFormat,
+    editCapabilities
   );
   const [text, setText] = (0, import_react10.useState)(editText ?? "");
   const [reload, setReload] = (0, import_react10.useState)(false);
