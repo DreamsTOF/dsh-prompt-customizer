@@ -13,11 +13,11 @@
  *     agent 时回退名单缓存。
  *  4. **mcp-manager 运行时状态**：服务存在时用 `watch()` + `mcp-manager/status`
  *     维护快照；服务缺席时返回 `manualRefreshRequired: true`，UI 提示手动刷新。
- *  5. **插件自管全局行**：由 `mcp-global-store` 存在本插件 SQLite 里，启动后
+ *  5. **插件自管全局行**：由 `mcp-global-store` 存在 `$DSH_HOME/mcps` 里，启动后
  *     通过 root Loader 的内存树挂载；不进入宿主的 `cordis.yml` / `cordis.patch.yml`。
  *
  * 明确不做：
- *  - 不逐行解析宿主 YAML（全局 MCP 走插件 SQLite + root Loader，预设走 configEditor）；
+ *  - 不逐行解析宿主 YAML（全局 MCP 走 `.dsh/mcps` + root Loader，预设走 configEditor）；
  *  - 不探活第三方 URL、不自动改写用户配置（旧 watchdog 已删除）；
  *  - profile 未知（没有 profileContext.patchPath）一律 503，不回退 `web`。
  *
@@ -56,13 +56,12 @@ import {
 } from './mcp-workspace-scope.ts'
 import {
   findStoredGlobalMcpServer,
-  hasGlobalMcpStore,
+  globalMcpsRoot,
   readGlobalMcpStore,
   removeStoredGlobalMcpServer,
   replaceStoredGlobalMcpServerConfig,
   setStoredGlobalMcpServerDisabled,
   upsertStoredGlobalMcpServer,
-  writeGlobalMcpStore,
   type StoredGlobalMcpServer,
 } from './mcp-global-store.ts'
 import { optionalService } from './context-utils.ts'
@@ -114,7 +113,7 @@ function requireProfile(ctx: PluginContext): ProfileInfo {
   return profile
 }
 
-/** 插件账本按 profile 分键；缺名字时归入 default。 */
+/** 旧 SQLite 迁移键仍按 profile；新的 `.dsh/mcps` 全局共享。 */
 function profileStoreName(profile: ProfileInfo): string {
   return profile.name ?? 'default'
 }
@@ -444,11 +443,12 @@ function rowConfigView(row: EditableMcpRow, editable: boolean): Record<string, u
 /** 插件自管行的可安全外露字段（不返回 env / headers）。 */
 function storedRowConfigView(row: StoredGlobalMcpServer): Record<string, unknown> {
   const config = row.config
+  const editable = row.owned !== false
   return {
     entryId: row.id,
     disabled: row.disabled,
-    editable: true,
-    managed: true,
+    editable,
+    managed: editable,
     serverName: String(config.serverName ?? ''),
     ...typeof config.transport === 'string' ? { transport: config.transport } : {},
     ...typeof config.command === 'string' ? { command: config.command } : {},
@@ -588,6 +588,7 @@ async function collectMcpStatus(ctx: PluginContext): Promise<Record<string, unkn
     serverCount: servers.length,
     toolCount: servers.reduce((sum, server) => sum + (server.toolCount as number), 0),
     patchFile: profile.patchPath,
+    mcpsDir: globalMcpsRoot(),
     profile: profile.name ?? null,
     servers,
     presets,
@@ -665,7 +666,7 @@ async function togglePatchEntry(ctx: PluginContext, serverName: string, disabled
       await loader.update(stored.id, { disabled })
       setStoredGlobalMcpServerDisabled(profileStoreName(profile), serverName, disabled)
     } catch (error) {
-      // SQLite 写失败时恢复内存状态，避免“本次生效、下次又变回去”的静默漂移。
+      // 落盘失败时恢复内存状态，避免“本次生效、下次又变回去”的静默漂移。
       try { await loader.update(stored.id, { disabled: stored.disabled }) } catch { /* 原状态恢复失败时保留错误 */ }
       return { ok: false, error: `persist failed: ${error instanceof Error ? error.message : String(error)}` }
     }
@@ -750,7 +751,7 @@ function createGlobalServerEntry(ctx: PluginContext, row: StoredGlobalMcpServer,
   const creation = loader.create({
     id: row.id,
     name: MCP_CLIENT_NAME,
-    config: toEditorConfig(row.config) as Record<string, unknown>,
+    config: toEditorConfig(withEnvTemplates(row.config)) as Record<string, unknown>,
     ...(row.disabled ? { disabled: true } : {}),
   })
   const mounted = mountedIdsOf(ctx)
@@ -777,7 +778,6 @@ function createGlobalServerEntry(ctx: PluginContext, row: StoredGlobalMcpServer,
  */
 function adoptTransientGlobalServers(ctx: PluginContext, profile: ProfileInfo): void {
   const profileName = profileStoreName(profile)
-  if (hasGlobalMcpStore(profileName)) return
   const loader = loaderOf(ctx)
   if (loader?.store === undefined) return
   const rootIds = rootCordisEntryIds(profile)
@@ -789,18 +789,21 @@ function adoptTransientGlobalServers(ctx: PluginContext, profile: ProfileInfo): 
     && Object.keys(row.override).length === 0
     && (row.entry as { parent?: { tree?: { store?: Record<string, unknown> } } } | null)?.parent?.tree?.store?.[row.entryId] === row.entry)
   if (transient.length === 0) return
-  writeGlobalMcpStore(profileName, {
-    version: 1,
-    servers: transient.map((row) => ({
+  const existing = new Set(readGlobalMcpStore(profileName).servers.map((row) => row.config.serverName))
+  for (const row of transient) {
+    const serverName = row.serverName
+    if (serverName === '' || existing.has(serverName)) continue
+    upsertStoredGlobalMcpServer(profileName, {
       id: row.entryId,
       config: fromEditorConfig(row.config) as Record<string, unknown>,
       disabled: row.disabled,
-    })),
-  })
+    })
+    existing.add(serverName)
+  }
 }
 
 /**
- * 启动加载：把 SQLite 账本里的全局 MCP 行挂回 root Loader 的内存树。
+ * 启动加载：把 `.dsh/mcps` 里的全局 MCP 行挂回 root Loader 的内存树。
  * root tree 的 commit 是 no-op，因此不会写回 `cordis.yml`。
  */
 async function hydrateGlobalMcpServers(ctx: PluginContext): Promise<string[]> {
@@ -852,7 +855,7 @@ async function addGlobalRows(ctx: PluginContext, rows: readonly McpRowConfig[]):
     existingIds.add(id)
     const stored: StoredGlobalMcpServer = {
       id,
-      config: structuredClone(withEnvTemplates({ ...row.config, serverName })) as Record<string, unknown>,
+      config: structuredClone({ ...row.config, serverName }),
       disabled: false,
     }
     upsertStoredGlobalMcpServer(profileName, stored)
@@ -1044,13 +1047,13 @@ async function handleMcpEdit(ctx: PluginContext, req: IncomingMessage, res: Serv
       throw new Error(`serverName cannot be changed (${cfg.serverName} -> ${serverName})`)
     }
     cfg.serverName = serverName
-    const nextConfig = withEnvTemplates(cfg) as Record<string, unknown>
+    const nextConfig = { ...cfg, serverName }
     const previous = stored.config
     replaceStoredGlobalMcpServerConfig(profileName, serverName, structuredClone(nextConfig))
     try {
       const loader = loaderOf(ctx)
       if (typeof loader?.update !== 'function') throw new Error('loader unavailable')
-      await loader.update(stored.id, { config: toEditorConfig(nextConfig) as Record<string, unknown> })
+      await loader.update(stored.id, { config: toEditorConfig(withEnvTemplates(nextConfig)) as Record<string, unknown> })
     } catch (error) {
       replaceStoredGlobalMcpServerConfig(profileName, serverName, previous)
       throw error
@@ -1072,7 +1075,7 @@ export async function applyMcpStatus(ctx: Context): Promise<void> {
   const pluginCtx = ctx as PluginContext
   attachManagerWatch(pluginCtx)
 
-  // 启动成功后把 SQLite 账本里的全局 MCP 挂回 root Loader 内存树。
+  // 启动成功后把 `.dsh/mcps` 里的全局 MCP 挂回 root Loader 内存树。
   // 必须等 appReady：mcp-client 的首次连接计时（默认 30s）不能拖住宿主启动；
   // 没有 appReady 的裸组装退回下一个事件循环 tick。root tree 的 commit 是
   // no-op，不会写回 `cordis.yml`；插件卸载时按创建顺序反向清理。
@@ -1212,6 +1215,7 @@ export async function applyMcpStatus(ctx: Context): Promise<void> {
             writeJsonResponse(res, 200, {
               ok: true, added, skipped: outcome.rows.length - fresh.length, scope,
               warnings: outcome.warnings, patchFile: profile.patchPath, reload: 'live',
+              mcpsDir: globalMcpsRoot(),
               manualRefreshRequired: managerOf(pluginCtx) === undefined,
             })
             return

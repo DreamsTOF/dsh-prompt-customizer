@@ -2,7 +2,7 @@
 
 > 本文件保留原 README 的详细说明（会话阶段、界面、功能特性、工作原理、使用说明、配置位置、已知限制与开发）。产品概览见根目录 [README](../README.md)，版本升级记录见 [docs/upgrades/README.md](upgrades/README.md)。
 >
-> **状态（2.1.3）**：本文是历史文档，与当前实现有漂移 —— ① 统一为单文件 SQLite `~/.dsh/prompt-customizer/prompt-customizer.db`，`config.yaml` / `catalog.yaml` 不读不迁移；② 工作区级提示词 / 工具层已移除（2.0.0）；③ 跨预设累积池与手动重扫已删除（ADR-0001），下文「池子是见过才知道的并集」「catalog/rescan」等段落均已过时；④ **2.1.0 起清单与预览并入「同预设活动 agent」的真实装配**（ADR-0005），因此「预设预览按纯预设 scope 装配、不读取 agent 作用域条目」「预设预览右栏不会混入会话级内容」不再成立；⑤ 2.1.1 起同名遮蔽进只读遮蔽池；⑥ **2.1.2 起右栏可见工具目录改用 `ctx.tools.schemas(agent)`（与真实会话同源），不再只显示预设层工具**，只读池也如实列出插件纯新增的会话级工具；⑦ **2.1.3 起全局 MCP 行改存插件 SQLite，启动后挂回内存**，不再写 profile 根 `cordis.yml`。当前行为以 [ADR-0005](../adr/0005-universal-prompt-takeover.md) 与 [2.1.0](upgrades/2.1.0-universal-prompt-takeover.md) / [2.1.1](upgrades/2.1.1-tool-shadow-detection.md) / [2.1.2](upgrades/2.1.2-tool-catalog-scope.md) / [2.1.3](upgrades/2.1.3-global-mcp-persistence.md) 升级记录为准。
+> **状态（2.1.3）**：本文是历史文档，与当前实现有漂移 —— ① 统一为单文件 SQLite `~/.dsh/prompt-customizer/prompt-customizer.db`，`config.yaml` / `catalog.yaml` 不读不迁移；② 工作区级提示词 / 工具层已移除（2.0.0）；③ 跨预设累积池与手动重扫已删除（ADR-0001），下文「池子是见过才知道的并集」「catalog/rescan」等段落均已过时；④ **2.1.0 起清单与预览并入「同预设活动 agent」的真实装配**（ADR-0005），因此「预设预览按纯预设 scope 装配、不读取 agent 作用域条目」「预设预览右栏不会混入会话级内容」不再成立；⑤ 2.1.1 起同名遮蔽进只读遮蔽池；⑥ **2.1.2 起右栏可见工具目录改用 `ctx.tools.schemas(agent)`（与真实会话同源），不再只显示预设层工具**，只读池也如实列出插件纯新增的会话级工具；⑦ **2.1.3 起全局 MCP 行落盘到 `$DSH_HOME/mcps/<serverName>/mcp.json`，启动后挂回内存**，不再写 profile 根 `cordis.yml`。当前行为以 [ADR-0005](../adr/0005-universal-prompt-takeover.md) 与 [2.1.0](upgrades/2.1.0-universal-prompt-takeover.md) / [2.1.1](upgrades/2.1.1-tool-shadow-detection.md) / [2.1.2](upgrades/2.1.2-tool-catalog-scope.md) / [2.1.3](upgrades/2.1.3-global-mcp-persistence.md) 升级记录为准。
 
 ## 会话阶段怎么流转
 
@@ -232,8 +232,7 @@
 - `~/.dsh/prompt-customizer/config.yaml` —— 唯一权威配置。首次启动时若该文件不存在而旧版 `settings.yaml` 里有对应段落，会自动迁移一次（主文档原样保留，可回滚）。手工编辑即时生效，无需重启。
 - `~/.dsh/prompt-customizer/catalog.yaml` —— 跨预设的段 / 工具累积登记表，纯派生缓存，删掉会随浏览重建。
 - 技能侧：技能根目录下的 `.bundles.json`（技能包账本，记规范名与目录名两套写法）与技能开关账本（全局层 + 各预设层）。
-- MCP 侧：`$DSH_HOME` 下本插件 SQLite 里的 `mcp/global-servers/<profile>`（全局 Server 账本，启动后挂回内存）、`mcp/preset-masks`（分层遮蔽账本）与 `mcp/tool-disable`（工具级启停账本）；预设自带 Server 行写在该 agent 预设声明行的 `config.plugins` 里，由 DSH 的 `configEditor` 原子写回 profile 的 `cordis.patch.yml`。
-- mcps 目录侧（内核不读，本插件代读并挂载）：全局 `~/.agents/mcps/**/mcp.json`，工作区 `<工作区>/.dsh/mcps/**/mcp.json` 与 `<工作区>/.agents/mcps/**/mcp.json`。只读这些文件，不写；工作区层的 Server 只在该工作区的会话里可见。
+- MCP 侧：全局 Server 在 `$DSH_HOME/mcps/<serverName>/mcp.json`（标准 `.mcp.json`，启停意图在同目录 `.dsh-prompt-customizer.json`，启动后挂回内存）；预设自带 Server 行写在该 agent 预设声明行的 `config.plugins` 里，由 DSH 的 `configEditor` 原子写回 profile 的 `cordis.patch.yml`；工作区级 Server 写项目 `.mcp.json`。`mcp/preset-masks`（分层遮蔽账本）与 `mcp/tool-disable`（工具级启停账本）仍在插件 SQLite。
 
 ## 已知限制
 

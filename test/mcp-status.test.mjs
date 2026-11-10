@@ -12,8 +12,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { applyMcpStatus } from '../src/mcp-status.ts'
-import { globalMcpStoreKey, readGlobalMcpStore, writeGlobalMcpStore } from '../src/mcp-global-store.ts'
-import { closeAllDbs, delDoc, openDb, pluginDbFile } from '../vendor/prompt-customizer/db.js'
+import { globalMcpsRoot, readGlobalMcpStore, writeGlobalMcpStore } from '../src/mcp-global-store.ts'
+import { closeAllDbs } from '../vendor/prompt-customizer/db.js'
 
 const originalDshHome = process.env.DSH_HOME
 const testHome = mkdtempSync(join(tmpdir(), 'pc-mcp-status-home-'))
@@ -28,7 +28,7 @@ afterEach(() => {
   writeGlobalMcpStore('web', { version: 1, servers: [] })
 })
 function clearGlobalStoreDoc() {
-  try { delDoc(openDb(pluginDbFile()), globalMcpStoreKey('web')) } catch { /* 未建库 */ }
+  rmSync(globalMcpsRoot(), { recursive: true, force: true })
 }
 
 function request(route, method, url, body) {
@@ -172,7 +172,7 @@ test('mcp-status：mcpManager 存在时合并状态且不要求手动刷新', as
   assert.deepEqual(alpha.managerStatus, { state: 'ready' })
 })
 
-test('mcp-status：新增全局行写入插件 SQLite 并挂 root Loader，不碰 profile 根 Include', async () => {
+test('mcp-status：新增全局行写入 .dsh/mcps 并挂 root Loader，不碰 profile 根 Include', async () => {
   const ctx = fakeCtx()
   await applyMcpStatus(ctx)
   const route = ctx.routes.find((item) => item.path === '/api/triad/mcp-config')
@@ -192,7 +192,7 @@ test('mcp-status：新增全局行写入插件 SQLite 并挂 root Loader，不�
   assert.equal(stored.servers[0].config.serverName, 'gamma')
 })
 
-test('mcp-status：新增全局行保留 ${VAR} 的 !!js 模板语义', async () => {
+test('mcp-status：新增全局行把 ${VAR} 以原文本落盘，挂载时再转 !!js', async () => {
   const ctx = fakeCtx()
   await applyMcpStatus(ctx)
   const route = ctx.routes.find((item) => item.path === '/api/triad/mcp-config')
@@ -203,7 +203,8 @@ test('mcp-status：新增全局行保留 ${VAR} 的 !!js 模板语义', async ()
   })
   assert.equal(add.status, 200, JSON.stringify(add.body))
   const config = readGlobalMcpStore('web').servers[0].config
-  assert.deepEqual(config.env.TOKEN, { __js: '`${process.env.TOKEN}`' })
+  assert.equal(config.env.TOKEN, '${TOKEN}')
+  assert.deepEqual(ctx.calls.create[0].config.env.TOKEN, { __jsExpr: '`${process.env.TOKEN}`' })
 })
 
 test('mcp-status：profile 未知时不会读取或写入磁盘', async () => {
@@ -220,7 +221,7 @@ test('mcp-status：profile 未知时不会读取或写入磁盘', async () => {
   }
 })
 
-test('mcp-status：启动从 SQLite 账本加载全局行并体现在状态里', async () => {
+test('mcp-status：启动从 .dsh/mcps 加载全局行并体现在状态里', async () => {
   writeGlobalMcpStore('web', {
     version: 1,
     servers: [{
@@ -241,7 +242,7 @@ test('mcp-status：启动从 SQLite 账本加载全局行并体现在状态里',
   assert.equal(delta.config.disabled, false)
 })
 
-test('mcp-status：插件账本行 toggle/remove 同步 SQLite', async () => {
+test('mcp-status：插件账本行 toggle/remove 同步 .dsh/mcps 与启停元数据', async () => {
   writeGlobalMcpStore('web', {
     version: 1,
     servers: [{
@@ -264,7 +265,7 @@ test('mcp-status：插件账本行 toggle/remove 同步 SQLite', async () => {
   assert.equal(readGlobalMcpStore('web').servers.length, 0)
 })
 
-test('mcp-status：插件账本行编辑写 SQLite 并更新 root Loader config', async () => {
+test('mcp-status：插件账本行编辑写 .dsh/mcps 并更新 root Loader config', async () => {
   writeGlobalMcpStore('web', {
     version: 1,
     servers: [{
@@ -307,7 +308,7 @@ test('mcp-status：appReady 门控后加载，插件卸载清理 root Loader 条
   assert.ok(ctx.calls.remove.includes('mcp-delta'))
 })
 
-test('mcp-status：首次升级把旧 runtime 行收进 SQLite 账本', async () => {
+test('mcp-status：首次升级把旧 runtime 行收进 .dsh/mcps 账本', async () => {
   clearGlobalStoreDoc()
   const box = mkdtempSync(join(tmpdir(), 'pc-mcp-adopt-'))
   const profileDir = join(box, 'profile')

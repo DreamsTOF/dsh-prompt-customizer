@@ -21,7 +21,7 @@
 - **遮蔽池（Masked Pool）**：只读「完整目录 / 已遮蔽」池中的**工具**行：被别的插件 `restrict`（`masked-plugin`）、被本插件 MCP 遮蔽（`masked-own`）、被 agent 作用域的同名插件工具顶掉（`masked-shadow`，2.1.1）、以及插件在 agent 作用域**纯新增**、继承层无同名原定义的工具（`locked-agent`，2.1.2 按「会话级」如实列出，不伪称遮蔽）。段的屏蔽走 `sections*` 配置名单，不进遮蔽池。
 - **启用列表（Enabled List）**：当前对模型可见/可用的工具集合。
 - **工具身份（Tool Identity）**：一个工具的标识 = **名字 + 来源**（同名不同源是不同的工具条目）。
-- **全局 MCP 账本（Global MCP Ledger）**：本插件 SQLite 中按 profile 保存的全局 MCP Server 集合（`mcp/global-servers/<profile>`）；面板的全局新增/启停/删除/编辑都落在这里，启动后由插件挂回 root Loader 内存，不写入宿主 `cordis.yml`。
+- **全局 MCP 账本（Global MCP Ledger）**：`$DSH_HOME/mcps/<serverName>/mcp.json` 里保存的全局 MCP Server 集合（标准 `.mcp.json` 形态，启停意图在同目录 `.dsh-prompt-customizer.json`）；面板的全局新增/启停/删除/编辑都落在这里，启动后由插件挂回 root Loader 内存，不写入宿主 `cordis.yml`。
 
 ## 预设与层级
 
