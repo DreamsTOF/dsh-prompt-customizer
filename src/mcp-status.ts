@@ -13,9 +13,11 @@
  *     agent 时回退名单缓存。
  *  4. **mcp-manager 运行时状态**：服务存在时用 `watch()` + `mcp-manager/status`
  *     维护快照；服务缺席时返回 `manualRefreshRequired: true`，UI 提示手动刷新。
+ *  5. **插件自管全局行**：由 `mcp-global-store` 存在本插件 SQLite 里，启动后
+ *     通过 root Loader 的内存树挂载；不进入宿主的 `cordis.yml` / `cordis.patch.yml`。
  *
  * 明确不做：
- *  - 不逐行解析 YAML（增删改全部走 Loader / configEditor 的稳定 API）；
+ *  - 不逐行解析宿主 YAML（全局 MCP 走插件 SQLite + root Loader，预设走 configEditor）；
  *  - 不探活第三方 URL、不自动改写用户配置（旧 watchdog 已删除）；
  *  - profile 未知（没有 profileContext.patchPath）一律 503，不回退 `web`。
  *
@@ -27,13 +29,16 @@
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+// js-yaml 不自带类型声明（无 tsc 门禁）；与 mcp-paste 保持同一解析器。
+// @ts-expect-error -- untyped dependency
+import { load as loadYaml } from 'js-yaml'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { writeJsonResponse } from './mcp-recommended.ts'
 import { readMaskLedger } from './mcp-mask-ledger.ts'
 import { maskInstallReport } from './mcp-preset-mask.ts'
 import { collectPresetServers, presetRowOf, writePresetPlugins } from './mcp-presets.ts'
-import { parseMcpPaste, pasteFieldsOf, rowsToMcpServersYaml, type McpRowConfig } from './mcp-paste.ts'
+import { envTemplateOf, parseMcpPaste, pasteFieldsOf, rowsToMcpServersYaml, type McpRowConfig } from './mcp-paste.ts'
 import {
   knownToolsOf,
   ledgerServerNamesOf,
@@ -49,6 +54,17 @@ import {
   workspaceMcpMountStatus,
   workspaceToolDisabledLedger,
 } from './mcp-workspace-scope.ts'
+import {
+  findStoredGlobalMcpServer,
+  hasGlobalMcpStore,
+  readGlobalMcpStore,
+  removeStoredGlobalMcpServer,
+  replaceStoredGlobalMcpServerConfig,
+  setStoredGlobalMcpServerDisabled,
+  upsertStoredGlobalMcpServer,
+  writeGlobalMcpStore,
+  type StoredGlobalMcpServer,
+} from './mcp-global-store.ts'
 import { optionalService } from './context-utils.ts'
 import { rejectUntrusted, requireTrustedRequest } from './trust.ts'
 
@@ -72,11 +88,13 @@ class ProfileUnavailableError extends Error {
 interface ProfileInfo {
   patchPath: string
   name?: string
+  /** profile 目录（用于识别旧版 runtime 行所在的根 `cordis.yml`）。 */
+  dir?: string
 }
 
 /** 当前活动 profile；没有 patchPath 即视为未知。 */
 function profileInfo(ctx: PluginContext): ProfileInfo | undefined {
-  const profileContext = optionalService<{ patchPath?: unknown; name?: unknown }>(ctx, 'profileContext')
+  const profileContext = optionalService<{ patchPath?: unknown; name?: unknown; dir?: unknown }>(ctx, 'profileContext')
   const patchPath = typeof profileContext?.patchPath === 'string' && profileContext.patchPath.trim() !== ''
     ? profileContext.patchPath
     : undefined
@@ -84,6 +102,9 @@ function profileInfo(ctx: PluginContext): ProfileInfo | undefined {
   return {
     patchPath,
     ...typeof profileContext?.name === 'string' && profileContext.name !== '' ? { name: profileContext.name } : {},
+    dir: typeof profileContext?.dir === 'string' && profileContext.dir.trim() !== ''
+      ? profileContext.dir
+      : dirname(patchPath),
   }
 }
 
@@ -91,6 +112,11 @@ function requireProfile(ctx: PluginContext): ProfileInfo {
   const profile = profileInfo(ctx)
   if (profile === undefined) throw new ProfileUnavailableError()
   return profile
+}
+
+/** 插件账本按 profile 分键；缺名字时归入 default。 */
+function profileStoreName(profile: ProfileInfo): string {
+  return profile.name ?? 'default'
 }
 
 function plainObject(value: unknown): Record<string, unknown> {
@@ -122,6 +148,20 @@ function toEditorConfig(value: unknown): unknown {
     for (const [key, item] of Object.entries(record)) out[key] = toEditorConfig(item)
     return out
   }
+  return value
+}
+
+/** 字符串里的 `${VAR}` 占位 → `{ __js: template }`，与旧版写 patch / 预设的语义一致。 */
+function withEnvTemplates(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withEnvTemplates)
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    if (typeof record.__js === 'string' && Object.keys(record).length === 1) return value
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(record)) out[key] = withEnvTemplates(item)
+    return out
+  }
+  if (typeof value === 'string') return envTemplateOf(value) ?? value
   return value
 }
 
@@ -401,10 +441,27 @@ function rowConfigView(row: EditableMcpRow, editable: boolean): Record<string, u
   }
 }
 
+/** 插件自管行的可安全外露字段（不返回 env / headers）。 */
+function storedRowConfigView(row: StoredGlobalMcpServer): Record<string, unknown> {
+  const config = row.config
+  return {
+    entryId: row.id,
+    disabled: row.disabled,
+    editable: true,
+    managed: true,
+    serverName: String(config.serverName ?? ''),
+    ...typeof config.transport === 'string' ? { transport: config.transport } : {},
+    ...typeof config.command === 'string' ? { command: config.command } : {},
+    ...Array.isArray(config.args) ? { args: config.args.filter((arg): arg is string => typeof arg === 'string') } : {},
+    ...typeof config.url === 'string' ? { url: config.url } : {},
+  }
+}
+
 /** 只读：合并可编辑行、运行时注册工具与预设维度。 */
 async function collectMcpStatus(ctx: PluginContext): Promise<Record<string, unknown>> {
   const profile = requireProfile(ctx)
   const rows = editableMcpRows(ctx)
+  const storedServers = readGlobalMcpStore(profileStoreName(profile)).servers
   const [presets, presetServers] = await Promise.all([
     readPresetRoster(ctx),
     collectPresetServers(ctx),
@@ -413,6 +470,7 @@ async function collectMcpStatus(ctx: PluginContext): Promise<Record<string, unkn
   const presetServerNames = Object.values(presetServers).flat().map((row) => row.serverName)
   const candidates = [
     ...rows.map((row) => row.serverName),
+    ...storedServers.map((row) => String(row.config.serverName ?? '')),
     ...presetServerNames,
     ...ledgerServerNamesOf(),
   ]
@@ -448,6 +506,24 @@ async function collectMcpStatus(ctx: PluginContext): Promise<Record<string, unkn
       config: rowConfigView(row, true),
       scope: 'global',
       maskedBy: maskedBy(row.serverName),
+    })
+  }
+  // 插件自管的全局行：DSH profile 配置里没有它们，由 mcp-global-store 持久化。
+  for (const row of storedServers) {
+    const serverName = String(row.config.serverName ?? '')
+    if (serverName === '' || seen.has(serverName)) continue
+    seen.add(serverName)
+    const registered = groups.get(serverName) ?? []
+    const tools = mergeWithKnown(serverName, registered)
+    knownToRemember[serverName] = tools.map((tool) => tool.name)
+    servers.push({
+      serverName,
+      toolCount: registered.length,
+      tools,
+      config: storedRowConfigView(row),
+      scope: 'global',
+      managedBy: 'plugin',
+      maskedBy: maskedBy(serverName),
     })
   }
   // 注册了工具但没有可编辑行：只读展示（editable:false）。
@@ -536,55 +612,235 @@ function loaderOf(ctx: PluginContext): any {
   return optionalService(ctx, 'loader')
 }
 
-/** 切换一条全局行的 `disabled`（Loader 行选项，非 config）。 */
-async function togglePatchEntry(ctx: PluginContext, serverName: string, disabled: boolean): Promise<{ ok: boolean; error?: string; entryId?: string; disabled?: boolean; reload?: string; manualRefreshRequired?: boolean }> {
-  requireProfile(ctx)
-  const row = editableRowOf(ctx, serverName)
-  if (row === undefined) return { ok: false, error: `no editable mcp-client row for serverName "${serverName}"` }
-  const loader = loaderOf(ctx)
-  if (typeof loader?.update !== 'function') return { ok: false, error: 'loader unavailable' }
-  try {
-    await loader.update(row.entryId, { disabled })
-  } catch (error) {
-    return { ok: false, error: `write failed: ${error instanceof Error ? error.message : String(error)}` }
+/** 本插件创建过的 root Loader mcp-client 行 id；插件卸载时统一回收。 */
+const mountedGlobalServerIds = new WeakMap<object, Set<string>>()
+
+function mountedIdsOf(ctx: PluginContext): Set<string> {
+  let ids = mountedGlobalServerIds.get(ctx)
+  if (ids === undefined) {
+    ids = new Set<string>()
+    mountedGlobalServerIds.set(ctx, ids)
   }
-  return { ok: true, entryId: row.entryId, disabled, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
+  return ids
 }
 
-/** 删除一条全局 mcp-client 行（Loader 协调，configEditor 同款持久化）。 */
-async function removePatchEntry(ctx: PluginContext, serverName: string): Promise<{ ok: boolean; error?: string; entryId?: string; reload?: string; manualRefreshRequired?: boolean }> {
-  requireProfile(ctx)
-  const row = editableRowOf(ctx, serverName)
-  if (row === undefined) return { ok: false, error: `no editable mcp-client row for serverName "${serverName}"` }
-  const loader = loaderOf(ctx)
-  if (typeof loader?.remove !== 'function') return { ok: false, error: 'loader unavailable' }
+/** 读 profile 根 cordis.yml 顶层行 id；旧版 runtime 行只会出现在这里。 */
+function rootCordisEntryIds(profile: ProfileInfo): Set<string> {
+  const ids = new Set<string>()
   try {
-    loader.remove(row.entryId)
-  } catch (error) {
-    return { ok: false, error: `remove failed: ${error instanceof Error ? error.message : String(error)}` }
-  }
-  return { ok: true, entryId: row.entryId, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
-}
-
-/** profile 根 Include 的持久化树：从任一可编辑行的 parent 取。 */
-function profileTreeOf(ctx: PluginContext): any {
-  const editor = configEditorOf(ctx)
-  let entries: unknown[] = []
-  try {
-    entries = typeof editor?.entries === 'function' ? editor.entries() : []
+    const text = readFileSync(join(profile.dir ?? dirname(profile.patchPath), 'cordis.yml'), 'utf8')
+    const parsed = loadYaml(text) as unknown
+    for (const row of Array.isArray(parsed) ? parsed : []) {
+      if (row !== null && typeof row === 'object' && typeof (row as { id?: unknown }).id === 'string') {
+        ids.add((row as { id: string }).id)
+      }
+    }
   } catch {
-    entries = []
+    // 根文件缺失 / 坏 YAML：不启用旧行迁移，避免把别的来源误收进账本。
   }
-  const tree = (entries[0] as { parent?: { tree?: unknown } } | undefined)?.parent?.tree
-  return tree
+  return ids
 }
 
-/** 往 profile 根 Include 新增 mcp-client 行。 */
+/** 切换一条全局行的 `disabled`（插件账本行或宿主配置行）。 */
+async function togglePatchEntry(ctx: PluginContext, serverName: string, disabled: boolean): Promise<{ ok: boolean; error?: string; entryId?: string; disabled?: boolean; reload?: string; manualRefreshRequired?: boolean }> {
+  const profile = requireProfile(ctx)
+  const loader = loaderOf(ctx)
+  // 宿主配置行优先：status 也先列它；同名时绝不能去改隐藏的 ledger 行。
+  const row = editableRowOf(ctx, serverName)
+  if (row !== undefined) {
+    const entry = row.entry as { update?: (options: Record<string, unknown>) => Promise<void> }
+    try {
+      if (typeof entry?.update === 'function') await entry.update({ disabled })
+      else if (typeof loader?.update === 'function') await loader.update(row.entryId, { disabled })
+      else return { ok: false, error: 'loader unavailable' }
+    } catch (error) {
+      return { ok: false, error: `write failed: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    return { ok: true, entryId: row.entryId, disabled, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
+  }
+  const stored = findStoredGlobalMcpServer(profileStoreName(profile), serverName)
+  if (stored !== undefined) {
+    if (typeof loader?.update !== 'function') return { ok: false, error: 'loader unavailable' }
+    try {
+      await loader.update(stored.id, { disabled })
+      setStoredGlobalMcpServerDisabled(profileStoreName(profile), serverName, disabled)
+    } catch (error) {
+      // SQLite 写失败时恢复内存状态，避免“本次生效、下次又变回去”的静默漂移。
+      try { await loader.update(stored.id, { disabled: stored.disabled }) } catch { /* 原状态恢复失败时保留错误 */ }
+      return { ok: false, error: `persist failed: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    return { ok: true, entryId: stored.id, disabled, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
+  }
+  return { ok: false, error: `no mcp-client row for serverName "${serverName}"` }
+}
+
+/** 删除一条全局 mcp-client 行（插件账本行或宿主配置行）。 */
+async function removePatchEntry(ctx: PluginContext, serverName: string): Promise<{ ok: boolean; error?: string; entryId?: string; reload?: string; manualRefreshRequired?: boolean }> {
+  const profile = requireProfile(ctx)
+  const loader = loaderOf(ctx)
+  const row = editableRowOf(ctx, serverName)
+  if (row !== undefined) {
+    const entry = row.entry as { parent?: { tree?: { remove?: (id: string) => Promise<void> | void } } }
+    try {
+      if (typeof entry?.parent?.tree?.remove === 'function') await Promise.resolve(entry.parent.tree.remove(row.entryId))
+      else if (typeof loader?.remove === 'function') await Promise.resolve(loader.remove(row.entryId))
+      else return { ok: false, error: 'loader unavailable' }
+    } catch (error) {
+      return { ok: false, error: `remove failed: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    return { ok: true, entryId: row.entryId, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
+  }
+  const stored = findStoredGlobalMcpServer(profileStoreName(profile), serverName)
+  if (stored !== undefined) {
+    if (typeof loader?.remove !== 'function') return { ok: false, error: 'loader unavailable' }
+    try {
+      removeStoredGlobalMcpServer(profileStoreName(profile), serverName)
+    } catch (error) {
+      return { ok: false, error: `persist failed: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    try {
+      await Promise.resolve(loader.remove(stored.id))
+    } catch (error) {
+      try { upsertStoredGlobalMcpServer(profileStoreName(profile), stored) } catch { /* 恢复账本失败时保留原始错误 */ }
+      return { ok: false, error: `remove failed: ${error instanceof Error ? error.message : String(error)}` }
+    }
+    return { ok: true, entryId: stored.id, reload: 'live', manualRefreshRequired: managerOf(ctx) === undefined }
+  }
+  return { ok: false, error: `no mcp-client row for serverName "${serverName}"` }
+}
+
+/**
+ * 等 entry 的插件 apply 结果。mcp-client 的首次连接可能等满
+ * startupTimeoutMs，HTTP 请求不应被一台未启动/不可达的服务器拖住；但
+ * 重复 serverName / 配置错误这类 apply 立即失败必须能被观察到。
+ * 300ms 只覆盖同步/近同步的 apply 拒绝，超时按“已开始连接”处理。
+ */
+function awaitEntryActivation(entry: any, graceMs: number): Promise<void> {
+  const awaitFiber = Promise.resolve(entry?.fiber?.await?.())
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      resolve()
+    }, graceMs)
+    awaitFiber.then(() => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve()
+    }, (error: unknown) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      reject(error)
+    })
+  })
+}
+
+/**
+ * 把一条插件账本行挂进 root Loader 的内存树。
+ *
+ * `waitForReady=false` 用于面板新增：只等 short activation grace，不等待
+ * mcp-client 建立连接；连接与工具注册由 mcp-client 在后台完成。
+ */
+function createGlobalServerEntry(ctx: PluginContext, row: StoredGlobalMcpServer, waitForReady = true): Promise<void> {
+  const loader = loaderOf(ctx)
+  if (typeof loader?.create !== 'function') return Promise.reject(new Error('loader unavailable'))
+  const creation = loader.create({
+    id: row.id,
+    name: MCP_CLIENT_NAME,
+    config: toEditorConfig(row.config) as Record<string, unknown>,
+    ...(row.disabled ? { disabled: true } : {}),
+  })
+  const mounted = mountedIdsOf(ctx)
+  mounted.add(row.id)
+  return creation.then(async () => {
+    const entry = typeof loader.resolve === 'function' ? loader.resolve(row.id) : undefined
+    try {
+      await awaitEntryActivation(entry, waitForReady ? 30_000 : 300)
+    } catch (error) {
+      mounted.delete(row.id)
+      try { loader.remove?.(row.id) } catch { /* 已回滚 */ }
+      throw error
+    }
+  }).catch((error: unknown) => {
+    mounted.delete(row.id)
+    throw error
+  })
+}
+
+/**
+ * 首次升级迁移：旧版“全局添加”把行写进了 profile 根 Include 树，
+ * 这些行没有对应的宿主 patch 配置（configuration() 的 inherited/override 都为空）。
+ * 在插件热更新后的第一次运行里把它们收进账本，避免下一次重启直接消失。
+ */
+function adoptTransientGlobalServers(ctx: PluginContext, profile: ProfileInfo): void {
+  const profileName = profileStoreName(profile)
+  if (hasGlobalMcpStore(profileName)) return
+  const loader = loaderOf(ctx)
+  if (loader?.store === undefined) return
+  const rootIds = rootCordisEntryIds(profile)
+  if (rootIds.size === 0) return
+  const transient = editableMcpRows(ctx).filter((row) =>
+    rootIds.has(row.entryId)
+    &&
+    Object.keys(row.inherited).length === 0
+    && Object.keys(row.override).length === 0
+    && (row.entry as { parent?: { tree?: { store?: Record<string, unknown> } } } | null)?.parent?.tree?.store?.[row.entryId] === row.entry)
+  if (transient.length === 0) return
+  writeGlobalMcpStore(profileName, {
+    version: 1,
+    servers: transient.map((row) => ({
+      id: row.entryId,
+      config: fromEditorConfig(row.config) as Record<string, unknown>,
+      disabled: row.disabled,
+    })),
+  })
+}
+
+/**
+ * 启动加载：把 SQLite 账本里的全局 MCP 行挂回 root Loader 的内存树。
+ * root tree 的 commit 是 no-op，因此不会写回 `cordis.yml`。
+ */
+async function hydrateGlobalMcpServers(ctx: PluginContext): Promise<string[]> {
+  const profile = profileInfo(ctx)
+  if (profile === undefined) return []
+  const profileName = profileStoreName(profile)
+  try {
+    adoptTransientGlobalServers(ctx, profile)
+  } catch (error) {
+    ctx.logger?.warn?.(`[dsh-prompt-customizer] adopt legacy global MCP failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  const loader = loaderOf(ctx)
+  if (typeof loader?.create !== 'function' || loader.store === undefined) return []
+  const configServerNames = new Set(editableMcpRows(ctx).map((row) => row.serverName))
+  const created: string[] = []
+  for (const row of readGlobalMcpStore(profileName).servers) {
+    const serverName = String(row.config.serverName ?? '')
+    if (serverName === '' || configServerNames.has(serverName)) continue
+    if (Object.hasOwn(loader.store, row.id)) continue
+    try {
+      await createGlobalServerEntry(ctx, row, false)
+      created.push(row.id)
+    } catch (error) {
+      ctx.logger?.warn?.(`[dsh-prompt-customizer] load global MCP "${serverName}" failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return created
+}
+
+/** 往插件账本新增全局 MCP 行，并立即挂进内存。 */
 async function addGlobalRows(ctx: PluginContext, rows: readonly McpRowConfig[]): Promise<string[]> {
-  requireProfile(ctx)
-  const tree = profileTreeOf(ctx)
-  if (typeof tree?.create !== 'function') throw new Error('profile tree unavailable')
-  const existingIds = new Set(editableMcpRows(ctx).map((row) => row.entryId))
+  const profile = requireProfile(ctx)
+  const profileName = profileStoreName(profile)
+  const loader = loaderOf(ctx)
+  if (typeof loader?.create !== 'function') throw new Error('loader unavailable')
+  const existingIds = new Set([
+    ...editableMcpRows(ctx).map((row) => row.entryId),
+    ...readGlobalMcpStore(profileName).servers.map((row) => row.id),
+    ...(loader.store === undefined ? [] : Object.keys(loader.store)),
+  ])
   const added: string[] = []
   for (const row of rows) {
     const serverName = String(row.config.serverName ?? '')
@@ -594,7 +850,21 @@ async function addGlobalRows(ctx: PluginContext, rows: readonly McpRowConfig[]):
     let suffix = 2
     while (existingIds.has(id)) { id = `${baseId}-${suffix}`; suffix += 1 }
     existingIds.add(id)
-    await tree.create({ id, name: MCP_CLIENT_NAME, config: toEditorConfig(row.config) as Record<string, unknown> })
+    const stored: StoredGlobalMcpServer = {
+      id,
+      config: structuredClone(withEnvTemplates({ ...row.config, serverName })) as Record<string, unknown>,
+      disabled: false,
+    }
+    upsertStoredGlobalMcpServer(profileName, stored)
+    try {
+      await createGlobalServerEntry(ctx, stored, false)
+      if (findStoredGlobalMcpServer(profileName, serverName) === undefined) {
+        throw new Error(`global MCP ledger rejected server "${serverName}"`)
+      }
+    } catch (error) {
+      removeStoredGlobalMcpServer(profileName, serverName)
+      throw error
+    }
     added.push(serverName)
   }
   return added
@@ -688,15 +958,19 @@ async function handleMcpEdit(ctx: PluginContext, req: IncomingMessage, res: Serv
           : { ok: true, source, serverName, text, format: 'json' })
         return
       }
+      const profile = requireProfile(ctx)
       const row = editableRowOf(ctx, serverName)
-      if (row === undefined) {
+      const stored = row === undefined ? findStoredGlobalMcpServer(profileStoreName(profile), serverName) : undefined
+      if (stored === undefined && row === undefined) {
         writeJsonResponse(res, 404, { ok: false, error: `no mcp-client row for ${serverName}` })
         return
       }
       const text = rowsToMcpServersYaml([{
-        id: row.entryId,
+        id: stored?.id ?? row!.entryId,
         name: MCP_CLIENT_NAME,
-        config: fromEditorConfig(row.config) as Record<string, unknown>,
+        config: stored !== undefined
+          ? fromEditorConfig(stored.config) as Record<string, unknown>
+          : fromEditorConfig(row!.config) as Record<string, unknown>,
       }])
       writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, text, format: 'yaml' })
       return
@@ -744,19 +1018,44 @@ async function handleMcpEdit(ctx: PluginContext, req: IncomingMessage, res: Serv
       writeJsonResponse(res, 200, { ok: true, source: 'workspace', serverName, workspace: ws, reload: 'manual' })
       return
     }
-    // global：configEditor 整份替换该行 config。
-    requireProfile(ctx)
+    // global：宿主配置行优先；只有没有宿主行时才走插件账本 + root Loader。
+    const profile = requireProfile(ctx)
+    const profileName = profileStoreName(profile)
     const row = editableRowOf(ctx, serverName)
-    if (row === undefined) throw new Error(`no editable mcp-client row for ${serverName}`)
-    const editor = configEditorOf(ctx)
-    if (typeof editor?.edit !== 'function') throw new Error('configEditor unavailable')
+    if (row !== undefined) {
+      const editor = configEditorOf(ctx)
+      if (typeof editor?.edit !== 'function') throw new Error('configEditor unavailable')
+      const { format, text } = pasteFieldsOf(parsed)
+      const outcome = parseMcpPaste(format, text)
+      if (outcome.errors.length > 0) throw new Error(outcome.errors.join('; '))
+      const cfg = outcome.rows[0]?.config ?? {}
+      if (typeof cfg.serverName !== 'string' || cfg.serverName === '') cfg.serverName = serverName
+      await editor.edit(row.entry, () => toEditorConfig(cfg) as Record<string, unknown>)
+      writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, reload: 'live' })
+      return
+    }
+    const stored = findStoredGlobalMcpServer(profileName, serverName)
+    if (stored === undefined) throw new Error(`no editable mcp-client row for ${serverName}`)
     const { format, text } = pasteFieldsOf(parsed)
     const outcome = parseMcpPaste(format, text)
     if (outcome.errors.length > 0) throw new Error(outcome.errors.join('; '))
     const cfg = outcome.rows[0]?.config ?? {}
-    if (typeof cfg.serverName !== 'string' || cfg.serverName === '') cfg.serverName = serverName
-    await editor.edit(row.entry, () => toEditorConfig(cfg) as Record<string, unknown>)
-    writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, reload: 'live' })
+    if (typeof cfg.serverName === 'string' && cfg.serverName !== serverName) {
+      throw new Error(`serverName cannot be changed (${cfg.serverName} -> ${serverName})`)
+    }
+    cfg.serverName = serverName
+    const nextConfig = withEnvTemplates(cfg) as Record<string, unknown>
+    const previous = stored.config
+    replaceStoredGlobalMcpServerConfig(profileName, serverName, structuredClone(nextConfig))
+    try {
+      const loader = loaderOf(ctx)
+      if (typeof loader?.update !== 'function') throw new Error('loader unavailable')
+      await loader.update(stored.id, { config: toEditorConfig(nextConfig) as Record<string, unknown> })
+    } catch (error) {
+      replaceStoredGlobalMcpServerConfig(profileName, serverName, previous)
+      throw error
+    }
+    writeJsonResponse(res, 200, { ok: true, source: 'global', serverName, managedBy: 'plugin', reload: 'live' })
   } catch (error) {
     if (error instanceof ProfileUnavailableError) {
       writeJsonResponse(res, 503, { ok: false, error: 'profile-unavailable' })
@@ -769,9 +1068,53 @@ async function handleMcpEdit(ctx: PluginContext, req: IncomingMessage, res: Serv
 /* ── 路由 ──────────────────────────────────────────────────────────────── */
 
 /** 注册 GET /api/triad/mcp-status、POST /api/triad/mcp-config 与 mcp-edit。 */
-export function applyMcpStatus(ctx: Context): void {
+export async function applyMcpStatus(ctx: Context): Promise<void> {
   const pluginCtx = ctx as PluginContext
   attachManagerWatch(pluginCtx)
+
+  // 启动成功后把 SQLite 账本里的全局 MCP 挂回 root Loader 内存树。
+  // 必须等 appReady：mcp-client 的首次连接计时（默认 30s）不能拖住宿主启动；
+  // 没有 appReady 的裸组装退回下一个事件循环 tick。root tree 的 commit 是
+  // no-op，不会写回 `cordis.yml`；插件卸载时按创建顺序反向清理。
+  const hydration: { disposed: boolean; started: boolean } = { disposed: false, started: false }
+  const cleanup = async (): Promise<void> => {
+    const loader = loaderOf(pluginCtx)
+    const mounted = mountedIdsOf(pluginCtx)
+    for (const id of [...mounted].reverse()) {
+      try {
+        const entry = loader?.store?.[id]
+        if (entry === undefined) continue
+        await entry.fiber?.dispose?.()
+        loader.remove?.(id)
+      } catch {
+        // 卸载清理尽力而为；Loader 树随宿主销毁时本身也会回收。
+      }
+    }
+    mounted.clear()
+  }
+  const runHydration = (): void => {
+    if (hydration.disposed || hydration.started) return
+    hydration.started = true
+    void hydrateGlobalMcpServers(pluginCtx).then(() => {
+      if (hydration.disposed) void cleanup()
+    }).catch((error: unknown) => {
+      pluginCtx.logger?.warn?.(`[dsh-prompt-customizer] hydrate global MCP failed: ${error instanceof Error ? error.message : String(error)}`)
+    })
+  }
+  let cancelReady: (() => void) | undefined
+  try {
+    cancelReady = optionalService<{ onReady?: (listener: () => void) => () => void }>(pluginCtx, 'appReady')?.onReady?.(runHydration)
+  } catch {
+    cancelReady = undefined
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  if (cancelReady === undefined) timer = setTimeout(runHydration, 0)
+  ctx.effect(() => () => {
+    hydration.disposed = true
+    if (timer !== undefined) clearTimeout(timer)
+    try { cancelReady?.() } catch { /* 已触发 / 已卸载 */ }
+    return cleanup()
+  }, 'dsh-mcp-status: hydrate global mcp')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -853,8 +1196,10 @@ export function applyMcpStatus(ctx: Context): void {
               return
             }
             const profile = requireProfile(pluginCtx)
-            const existingRows = editableMcpRows(pluginCtx)
-            const existing = new Set(existingRows.map((row) => row.serverName))
+            const existing = new Set([
+              ...editableMcpRows(pluginCtx).map((row) => row.serverName),
+              ...readGlobalMcpStore(profileStoreName(profile)).servers.map((row) => String(row.config.serverName ?? '')),
+            ])
             const added: string[] = []
             const fresh = outcome.rows.filter((row) => {
               const serverName = String(row.config.serverName ?? '')

@@ -4,12 +4,19 @@
 
 ## 当前兼容版本
 
-- 插件 **2.1.2** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）；只扩展本插件自己的提示词枚举与工具探测，未改动宿主 API 依赖。
+- 插件 **2.1.3** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）；只扩展本插件自己的提示词枚举与工具探测，未改动宿主 API 依赖。
 - 历史起点：**2.0.0** 起对齐该宿主版本。
 - 0.2.2-rc.1 的完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
 - 更早的 0.2.1-rc.2 适配记录见 [rc2-migration.md](rc2-migration.md)。
 
 ## 版本历史
+
+## 2.1.3：全局 MCP 持久化修复
+
+- 根因：全局 MCP 的添加/启停/删除走 Loader 内存树，新增行会落进 profile 根 `cordis.yml`；DSH 每次启动都用 `runProfile()` 把该文件重写为空列表，因此重启必丢。预设级（`configEditor` 写 `cordis.patch.yml`）和工作区级（`.mcp.json`）不受影响，所以现象看起来像“有概率”。
+- 修复：全局 MCP 账本存入插件 SQLite（`mcp/global-servers/<profile>`），启动成功后（`appReady`）把启用行挂回 root Loader 内存树；添加/启停/删除/编辑同步写账本，不再写 `cordis.patch.yml` / `cordis.yml`。
+- 兼容：首次升级会把旧版遗留在 `cordis.yml` 的 runtime 行收进账本（只在账本尚未创建时执行一次），避免热更新后第一次重启丢服务。
+- 完整记录见 [2.1.3-global-mcp-persistence.md](2.1.3-global-mcp-persistence.md)。
 
 ## 2.1.2：工具目录与真实会话同源
 

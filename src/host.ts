@@ -242,7 +242,7 @@ export async function apply(ctx: Context, entry?: { dataDir?: unknown }): Promis
   // GET /api/triad/mcp-status：只读 ctx.tools 中 mcp__* 工具，供面板 MCP 页
   // 显示真实注册状态（替代 localStorage 假数据）。
   try {
-    applyMcpStatus(ctx)
+    await applyMcpStatus(ctx)
     ctx.logger?.info?.('[dsh-prompt-customizer] mcp status mounted')
   } catch (error) {
     ctx.logger?.warn?.(

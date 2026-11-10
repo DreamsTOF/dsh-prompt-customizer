@@ -73,7 +73,7 @@ test('工作区 MCP：首次新建 .mcp.json，后续合并且同名不覆盖', 
     await withEnv({ DSH_AGENTS_HOME: join(box, 'agents'), DSH_HOME: join(box, 'dsh') }, async () => {
       const { applyMcpStatus } = await import('../src/mcp-status.ts')
       const ctx = fakeCtx()
-      applyMcpStatus(ctx)
+      await applyMcpStatus(ctx)
       const route = ctx.routes.find((item) => item.path === '/api/triad/mcp-config')
       assert.ok(route !== undefined, 'MCP 配置路由已挂载')
       const target = join(workspace, '.mcp.json')
