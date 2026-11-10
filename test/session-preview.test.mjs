@@ -1,13 +1,14 @@
 /**
- * 「当前会话」只读视图 + 预设预览左栏的 agent 作用域补全。
+ * 「当前会话」只读视图 + 预设预览的 agent 作用域补全。
  *
  * 重点覆盖用户报告的两类缺口：
  *  - 工具：插件在 agent/created 时注册的工具（agent 作用域）不在预设注册表，
  *    以及插件用 tools.restrict 在 agent 作用域遮蔽的预设工具；
  *  - 提示词：agent 作用域注册/覆盖的段（如 hashline-edit 的 tool:undo_last_edit）。
  *
- * 预设预览右栏必须保持纯预设装配；只有左栏 base 列表和 /session 路由包含
- * agent 作用域条目。
+ * 2.1.0（ADR-0005）：有同预设活动 agent 时，预设预览的**清单与右栏正文**都并入
+ * 该 agent 的真实装配；工具目录仍按纯预设装配算。本文件与
+ * `test/universal-prompt-takeover.test.mjs` 一起覆盖两条真实装配入口。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -98,19 +99,21 @@ function harness(t, { live = true, toolMask } = {}) {
   return { request, ctx }
 }
 
-test('预设预览：右栏纯预设，不并入任何会话 agent 作用域条目', async (t) => {
+test('预设预览（工具侧）：右栏工具目录来自同预设活动 agent 的真实装配', async (t) => {
   const h = harness(t)
   const res = await h.request('preview?scope=standard&phase=active')
   assert.equal(res.statusCode, 200)
   assert.equal(res.body.source, 'preset')
-  assert.deepEqual(res.body.tools.map(tool => tool.name).sort(), ['edit', 'mcp__demo__query', 'read', 'write'])
-  // 预设预览仍是纯预设可见集：agent 新增 / 被别的插件遮蔽的项都不进右栏。
-  assert.ok(!res.body.tools.some(tool => tool.name === 'undo_last_edit'))
+  // 2.1.2：右栏 = agent scope 注册视图（含继承层 + agent 新增），与真实会话同源。
+  assert.deepEqual(res.body.tools.map(tool => tool.name).sort(),
+    ['edit', 'mcp__demo__query', 'read', 'undo_last_edit', 'write'])
+  assert.ok(res.body.tools.some(tool => tool.name === 'undo_last_edit'), 'agent 作用域新增工具必须出现在右栏')
   const byName = new Map(res.body.baseTools.map(tool => [tool.name, tool]))
+  // baseTools（纯预设基座）不含 agent 新增项，遮蔽池的完整目录另由 catalogTools 补扫。
   assert.equal(byName.get('undo_last_edit'), undefined)
   assert.notEqual(byName.get('write')?.maskedByPlugin, true)
   assert.notEqual(byName.get('edit')?.maskedByPlugin, true)
-  assert.equal(res.body.registryTotal, 4)
+  assert.equal(res.body.registryTotal, 5)
 })
 
 test('预设预览：本插件自己的 MCP 遮蔽会计入可见性与标记', async (t) => {

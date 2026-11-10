@@ -31,7 +31,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin. It adds an independent "Capabilities" panel to the sidebar that brings three otherwise configuration-heavy jobs into one visual surface:
 
-- **Prompt customization**: block, replace, inject and reorder system-prompt sections by name;
+- **Prompt customization**: block, replace, inject and reorder system-prompt sections by name + source — across every scope, including session-level sections that plugins register dynamically on the active agent's own scope (universal takeover, ADR-0005);
 - **Skill collection management**: import, group and toggle skills;
 - **MCP server integration**: add MCP servers and apply preset-level or tool-level masking.
 
@@ -39,10 +39,11 @@ All changes go through documented plugin extension points. No DSH source is modi
 
 ## Features
 
-- **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives; a new read-only "Current session" view shows the real prompt and tool catalog from the active session's own agent scope, including plugin-registered and plugin-masked entries.
+- **Prompt sections**: block / replace / inject / drag-reorder prompt sections, with a live preview of the final system prompt the model receives. The editable inventory and preview merge the selected preset with the same-preset active agent's real assembly, so plugin-injected session-level sections are enumerated and controllable. The host also exposes a read-only `/api/prompt-customizer/session` route reporting the latest active root session's own real assembly (there is no separate "Current session" panel tab).
 - **Phase and preset layering**: bootstrap, resident and compaction-controlled phases each have their own section lists, ordering space and tool catalog; the top preset selector scopes edits to one agent preset.
 - **Single-preset editing (2.0.0)**: prompt/tool customization is stored and applied only per **agent preset**. The workspace-level prompt/tool layer has been removed (source archived, data dormant, neither read nor backed up). Workspaces still apply to MCP / skills / cwd.
 - **Tool catalog**: hide or add back tools per phase, with a "model-visible / registry total" comparison that also handles PTC / Code Mode `run_code` wrapping.
+- **Tool prompt sections**: the Tools view links each `tool:*` prompt section to its tool group (for example `tool:jobs` covers `job_kill/job_list/job_output`), while the Prompt view can block / replace / reorder those sections independently. Tool descriptions stay read-only and JSON Schema is not part of prompt editing.
 - **Skill management**: skill bundles, ZIP / folder import, global and preset toggles, skill-root and membership health checks.
 - **MCP management**: paste JSON / YAML to connect, preset-owned server rows, global / preset masking, per-tool enable/disable, recommended templates.
 - **Prompt variables**: built-in date / host / environment facts plus `process.env` mapping with a secret blocklist.
@@ -75,7 +76,7 @@ Or install from a local checkout:
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-Current release **2.0.22** (single-preset editing; DSH runtime tool/prompt contracts, mask pool, workspace skill status, provider summary cache and write serialization; MCP global edit keeps JSON/YAML; live agent preset resolution via `composedPreset`; A/B preset, uninstall-restore and source-immutability regressions), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
+Current release **2.1.2** (single-preset editing; **universal system-prompt takeover** — the inventory and preview merge the selected preset with the same-preset active agent's real assembly so plugin-injected session-level sections can be enumerated and blocked; **tool catalog matches the live session** — the visible tool list now comes from `ctx.tools.schemas(agent)` instead of the preset-only assembly; **same-name shadow detection** — inherited tools displaced by a same-name plugin tool enter the read-only masked pool, and plugin-only session-level tools are listed honestly as such; DSH runtime tool/prompt contracts, mask pool, workspace skill status, provider summary cache and write serialization; MCP global edit keeps JSON/YAML; live agent preset resolution via `composedPreset`; A/B preset, uninstall-restore and source-immutability regressions), targeting **DSH 0.2.2-rc.1**. Version compatibility, per-release changes and migration notes live in [docs/upgrades/README.md](docs/upgrades/README.md).
 
 ## Quick start
 

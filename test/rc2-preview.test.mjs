@@ -4,10 +4,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { apply } from '../vendor/prompt-customizer/index.js'
+import { openDb, setDoc } from '../vendor/prompt-customizer/db.js'
 
-function harness(t, { live = false, fail = false, renderFail = false, literal = false, complete = false, missingVariable = false } = {}) {
+function harness(t, { live = false, fail = false, renderFail = false, literal = false, complete = false, missingVariable = false, config } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-rc2-'))
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }))
+  if (config !== undefined) setDoc(openDb(path.join(dataDir, 'prompt-customizer.db')), 'config', config)
   const routes = new Map()
   const key = {}
   const agent = { id: 'live-standard', ctx: {}, session: { header: { agentPreset: 'standard', cwd: '/workspace' } }, options: { provider: 'fixture', model: 'test' } }
@@ -66,18 +68,22 @@ test('rc.2 diagnostic acquires and releases the preset scope on each preview', a
   assert.equal(h.released(), 2)
 })
 
-test('preset preview ignores an existing conversation of the same mode', async t => {
+test('preset preview merges the same-mode conversation prompt and its live agent tool catalog', async t => {
   const h = harness(t, { live: true })
   const { body } = await h.request('preview?scope=standard&phase=active')
-  assert.equal(body.tools.length, 65)
-  // 纯预设装配：不并入当前会话的 registry / 段 / 工具。
-  assert.equal(body.registryTotal, 65)
+  // 2.1.2：真实会话装配的 scope 是 live Agent（宿主 assembleContextFor → scope: agent），
+  // 右栏工具目录必须用 agent scope 的注册视图，否则会少掉 agent 作用域注册的工具。
+  assert.equal(body.tools.length, 85)
+  assert.equal(body.registryTotal, 85)
   assert.equal(body.source, 'preset')
   assert.equal(body.sessionId, undefined)
-  assert.ok(!body.sections.some(section => section.name === 'live-only'))
+  // ADR-0005 D3：预览正文来自同预设活动 agent 的真实装配。
+  const live = body.sections.find(section => section.name === 'live-only')
+  assert.ok(live, '同预设活动 agent 的会话级段必须出现在预览 sections 里')
+  assert.equal(live.text, '/workspace')
   assert.ok(!body.baseTools.some(tool => tool.name === 'tool_65'))
   assert.equal(body.sessionOverlay, undefined)
-  assert.equal(h.evaluations(), 0)
+  assert.equal(h.evaluations(), 1, 'live 装配恰好求值一次动态 text provider，不重复调用')
 })
 
 test('当前会话只读视图使用 live agent 的真实作用域', async t => {
@@ -137,10 +143,20 @@ test('失败的预览与卸载：作用域获取失败、渲染失败仍释放�
   }
 })
 
-test('complete restoration does not discard the evaluated customizer sections', async t => {
+test('complete restoration is preserved when the preset has no section policy', async t => {
   const h = harness(t, { complete: true })
   const { body } = await h.request('preview?scope=standard')
+  assert.deepEqual(body.sections.map(section => section.name), ['persona'])
+})
+
+test('an actual section policy overrides complete restoration', async t => {
+  const h = harness(t, {
+    complete: true,
+    config: { forceSections: true, overrides: { standard: { sections: [{ name: 'live-only' }] } } },
+  })
+  const { body } = await h.request('preview?scope=standard')
   assert.ok(body.sections.some(section => section.name === 'preset-only'))
+  assert.ok(!body.sections.some(section => section.name === 'live-only'))
 })
 
 test('literal interpolation opt-out is preserved in preview', async t => {
@@ -167,5 +183,5 @@ test('legacy session parameter cannot change the selected mode preview', async t
   const res = await h.request('preview?scope=standard&session=unknown')
   assert.equal(res.status, 200)
   assert.equal(res.body.source, 'preset')
-  assert.equal(res.body.tools.length, 65)
+  assert.equal(res.body.tools.length, 85)
 })

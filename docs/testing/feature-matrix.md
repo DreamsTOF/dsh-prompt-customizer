@@ -1,5 +1,7 @@
 # 终测：功能点矩阵与自动化覆盖
 
+> **状态（2.1.0）**：本文件记录的是 1.x / 2.0.x 时期的终端级与行为级验证结果（2026-11-07），**不作为 2.1.0 的当前验证结论**。当前门禁是 `npm run check`（构建 + 全量单测 + 宿主 / 客户端 smoke）与 `test/universal-prompt-takeover.test.mjs`（ADR-0005 组合场景）。`scripts/verify-effect.mjs` 的旧 `replace` 字典、`level=workspace`、`scripts/e2e-terminal.mjs` 的工作区级断言已与 1.4.0 / 2.0.0 之后的代码不相容，属历史脚本，运行前须按当前 `/config/apply` 契约更新；`docs/guide.md` 同样保留作历史材料，现状以 `docs/adr/0005-universal-prompt-takeover.md` 与 `docs/upgrades/2.1.0-universal-prompt-takeover.md` 为准。
+
 > 自动化脚本：`scripts/e2e-terminal.mjs`（终端级，走真实 HTTP + dsh-auth 握手）。
 > 运行：先起一个实例 `dsh web --no-open --port <N>`，再
 > `node scripts/e2e-terminal.mjs --url "http://127.0.0.1:<N>/?token=<TOKEN>" [--destructive]`。
@@ -96,3 +98,45 @@
 | 以上各项还原 | 隐藏/替换撤销后，段与工具均回到最终装配/会话视图 | PASS |
 
 > 结论：在工作区隐藏/修改提示词、隐藏/启用工具，**确实改变了模型最终收到的系统提示词与工具声明**（隐藏即从最终装配移除；替换即进入最终文本；再次放回即恢复）。
+
+## 2.1.0 当前验证（ADR-0005，全域系统提示词接管）
+
+> 以下来自本机 `npm run check`（2026-11-09）：全量单测 **164/164 通过**、构建产物重建、宿主 / 客户端 smoke 全绿。真宿主 E2E 由使用者自行校验；上节 A–H 的 2026-11-07 结果均为历史存档。
+
+| 场景 | 覆盖 | 结果 |
+|---|---|---|
+| 会话级段进入 `/inventory` / `/preview`，同名不同源分列，`{kind:'agent'}` 身份稳定 | `test/universal-prompt-takeover.test.mjs` | PASS |
+| 屏蔽会话级段后 `/preview.text` 与 `/session.sections` 都不含它，撤销恢复 | 同上 | PASS |
+| 任意段名的 agent 段可枚举（非 `tool:*` 特判） | 同上 | PASS |
+| 切到别的预设不串台；无活动 agent 退回纯预设不抛错 | 同上 | PASS |
+| 工具目录不受 live 提示词视图影响（D6） | 同上 | PASS |
+| 段按宿主规范 order 排序（含 agent 链 order） | `test/ordering.test.mjs` | PASS |
+| 预览正文并入同预设活动 agent、工具目录仍纯预设 | `test/rc2-preview.test.mjs`、`test/source-model.test.mjs` | PASS |
+| 无明确编辑目标时退回纯预设、不读累积池 | `test/runtime-catalog.test.mjs` | PASS |
+| 反例 | 把 `liveBase.sections` 换回空数组、或让 `stableSourceOf` 返回带 session id 的原始 agent source，上述组合用例必须失败 | 已写入新测试文件头注释 |
+
+## 2.1.1 当前验证（同名遮蔽探测）
+
+> 来自本机 `npm run check`（2026-11-09）：全量单测 **170/170 通过**、构建产物重建、宿主 / 客户端 smoke 全绿。真宿主 E2E 由使用者自行校验。
+
+| 场景 | 覆盖 | 结果 |
+|---|---|---|
+| `definitions` 缺席 / agent `definitions` 缺该 name / `inPreset=false`（`schemas` 未挂原生）时同名遮蔽仍进池 | `test/tool-shadow-universal.test.mjs` ①②③ | PASS |
+| 0.2.1 `restrict` 场景（agent 视图仍含插件工具）仍进池 | 同上 ④ | PASS |
+| 任意工具名（`apply_patch` / `edit` / `plugin:custom`）都进池，非样例特判 | 同上 ⑤ | PASS |
+| 遮蔽行 source 标继承层、`shadowedBy` 指向 agent 工具、`keySuffix='shadowed'` | 同上 ①③ + `test/tool-shadow.test.mjs` | PASS |
+| 不误判 agent 新增 / 同一注册不拆行 / 跨预设不串台 / 无活动 agent 不抛错 / 工具目录状态不变 | 同上 ⑥ | PASS |
+| 反例 | 判定换回单点 `presetDefs.get(name) !== liveDefs.get(name)` 时 ①②③ 必须失败；为 `read` 写死特判时 ⑤ 必须失败 | 已写入新测试文件头注释并实测 |
+
+## 2.1.2 当前验证（工具目录与真实会话同源）
+
+> 来自本机 `npm run check`（2026-11-09）：全量单测 **175/175 通过**、构建产物重建、宿主 / 客户端 smoke 全绿。真宿主 E2E 由使用者自行校验。
+
+| 场景 | 覆盖 | 结果 |
+|---|---|---|
+| 右栏可见工具目录 = agent scope 注册视图（含 `apply_patch` / `undo_last_edit`），计数与右栏同源 | `test/tool-catalog-scope.test.mjs` ① | PASS |
+| 无 live agent 回落纯预设装配；右栏与 `/session` 同源 | 同上 ②③ | PASS |
+| PTC 塌缩防护（`assemble().tools` 只剩 `run_code` 时仍用 `schemas(agent)`） | 同上 ④ | PASS |
+| 纯新增 agent 工具不伪造 `masked-shadow`、`read` 仍是真同名遮蔽 | 同上 ⑤ | PASS |
+| 只读池纳入 `locked-agent`（会话级徽标）、`stateBadge` 四态 | `test/tool-mask-pool.test.mjs` | PASS |
+| 反例 | 主源换回 `toolSchemasOf(ctx, scopeKey, true)`（presetScopeKey）时 ①③④ 必须失败 | 实测 ①③④ 全红、②⑤ 仍绿 |

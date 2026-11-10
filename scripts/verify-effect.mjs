@@ -9,6 +9,12 @@
  *
  * 用法：node scripts/verify-effect.mjs --url "http://127.0.0.1:PORT/?token=TOKEN"
  * 写入前整库备份、结束后恢复。
+ *
+ * 状态（2.1.0）：本脚本的「替换段」仍用 1.4.0 已删除的 `replace` 字典，「工作区级
+ * 隐藏段 / 工具」仍用 2.0.0 已移除的 `level=workspace`，与当前 `/config/apply` 契约
+ * 不相容，不能直接当作 2.1.0 的验证结论。当前门禁是 `npm run check` 与
+ * `test/universal-prompt-takeover.test.mjs`（ADR-0005）。重跑前需把 `replace` 改为
+ * `replacements: [{name, phase, text}]`、去掉工作区级场景、隐藏名单改成 `{name, source}` 条目。
  */
 import fs from 'node:fs'
 import os from 'node:os'

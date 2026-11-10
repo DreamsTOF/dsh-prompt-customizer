@@ -366,6 +366,9 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   const renderRow = (key: PhaseKey, row: PartRow, index: number, total: number): ReactElement | null => {
     if (!rowVisible(row)) return null
     const identity = entryKey(row)
+    const toolPrompt = row.toolPrompt ?? (row.name.startsWith('tool:')
+      ? { tools: [row.name.slice('tool:'.length)], empty: row.text.length === 0 }
+      : undefined)
     const mark = dropMark !== null && dropMark.startsWith(`${identity}:`) ? dropMark.slice(identity.length + 1) : null
     return h('div', {
       key: identity,
@@ -418,6 +421,12 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
           // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
           // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
           agentScoped.has(identity) ? h('span', { style: s.badgeSystem, title: t('agentScopedHint') }, t('agentScoped')) : null,
+          toolPrompt === undefined
+            ? null
+            : h('span', {
+                style: s.badgeSystem,
+                title: t('toolPromptToolsHint', { tools: toolPrompt.tools.join(', ') }),
+              }, t('toolPromptBadge')),
           row.replaced ? h('span', { style: s.badgeReplaced }, t('replaced')) : null,
           row.blocked ? h('span', { style: s.badgeBlocked }, t('blockedOn')) : null,
         ]),
@@ -433,6 +442,10 @@ export function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
               ]),
             ])
           : h('div', { style: s.preview }, String(row.override || row.text || '').slice(0, 140) || (row.dynamic === true ? t('dynamic') : t('empty'))),
+        toolPrompt === undefined
+          ? null
+          : h('div', { style: { ...s.muted, fontSize: '11px' } },
+              `${t('toolPromptToolsLabel')}: ${toolPrompt.tools.join(' / ')}${toolPrompt.empty === true ? ` · ${t('empty')}` : ''}`),
       ]),
       h('div', { style: s.arrowCol }, [
         h('button', { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t('moveUp') }, '↑'),

@@ -115,7 +115,7 @@ function harness(t, { config } = {}) {
   return { request }
 }
 
-test('preview baseSections / baseTools 是纯预设装配，只带 global / preset 来源', async (t) => {
+test('preview baseSections 并入同预设活动 agent 的会话级段；baseTools 仍是纯预设', async (t) => {
   const h = harness(t)
   const res = await h.request('preview?scope=standard&phase=active')
   assert.equal(res.status, 200)
@@ -124,8 +124,11 @@ test('preview baseSections / baseTools 是纯预设装配，只带 global / pres
   const sectionSource = new Map(res.body.baseSections.map((section) => [section.name, section.source?.kind]))
   assert.equal(sectionSource.get('harness:identity'), 'global')
   assert.equal(sectionSource.get('deployment:persona'), 'preset')
-  assert.equal(sectionSource.get('tool:undo_last_edit'), undefined)
+  assert.equal(sectionSource.get('tool:undo_last_edit'), 'agent', '会话级段按 agent 来源进入清单（ADR-0005）')
   assert.deepEqual(res.body.baseSections.find((section) => section.name === 'deployment:persona').source, P)
+  const agentRow = res.body.baseSections.find((section) => section.name === 'tool:undo_last_edit')
+  assert.deepEqual(agentRow?.source, { kind: 'agent' }, '身份收敛成不带 session id 的 agent 来源')
+  assert.equal(agentRow?.scope, 'agent')
 
   const toolSource = new Map(res.body.baseTools.map((tool) => [tool.name, tool.source?.kind]))
   assert.equal(toolSource.get('read'), 'global')

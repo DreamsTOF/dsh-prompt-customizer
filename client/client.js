@@ -1736,6 +1736,7 @@ function phaseRows(cfg, view, key) {
     const override = injected.text.get(identity) ?? "";
     const replacement = replacements.find((item) => sameEntry(item, entry));
     const dynamic = typeof baseSection?.dynamic === "boolean" ? baseSection.dynamic : typeof postSection?.dynamic === "boolean" ? postSection.dynamic : void 0;
+    const toolPrompt = baseSection?.toolPrompt ?? postSection?.toolPrompt;
     return {
       name: entry.name,
       ...entry.source === void 0 ? {} : { source: entry.source },
@@ -1744,7 +1745,8 @@ function phaseRows(cfg, view, key) {
       custom: injected.custom.has(identity),
       override,
       blocked: deniedKeys.has(identity),
-      ...dynamic === void 0 ? {} : { dynamic }
+      ...dynamic === void 0 ? {} : { dynamic },
+      ...toolPrompt === void 0 ? {} : { toolPrompt }
     };
   });
   if (injected.order.size > 0) {
@@ -2467,6 +2469,7 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   const renderRow = (key, row, index, total) => {
     if (!rowVisible(row)) return null;
     const identity = entryKey(row);
+    const toolPrompt = row.toolPrompt ?? (row.name.startsWith("tool:") ? { tools: [row.name.slice("tool:".length)], empty: row.text.length === 0 } : void 0);
     const mark = dropMark !== null && dropMark.startsWith(`${identity}:`) ? dropMark.slice(identity.length + 1) : null;
     return (0, import_react4.createElement)("div", {
       key: identity,
@@ -2523,6 +2526,10 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           // 会话级：只在 agent 自己的作用域里注册（预设 scope 的注册表没有它，
           // 但真实会话装配一定有）—— 预览已把它并进列表，这里标出来免得误会。
           agentScoped.has(identity) ? (0, import_react4.createElement)("span", { style: s.badgeSystem, title: t("agentScopedHint") }, t("agentScoped")) : null,
+          toolPrompt === void 0 ? null : (0, import_react4.createElement)("span", {
+            style: s.badgeSystem,
+            title: t("toolPromptToolsHint", { tools: toolPrompt.tools.join(", ") })
+          }, t("toolPromptBadge")),
           row.replaced ? (0, import_react4.createElement)("span", { style: s.badgeReplaced }, t("replaced")) : null,
           row.blocked ? (0, import_react4.createElement)("span", { style: s.badgeBlocked }, t("blockedOn")) : null
         ]),
@@ -2533,7 +2540,12 @@ function SectionsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
             (0, import_react4.createElement)("button", { style: s.mini, onClick: () => setDraft("") }, t("clearInput")),
             !row.custom && row.replaced ? (0, import_react4.createElement)("button", { style: s.mini, onClick: () => restoreReplace(key, row) }, t("restore")) : null
           ])
-        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.dynamic === true ? t("dynamic") : t("empty")))
+        ]) : (0, import_react4.createElement)("div", { style: s.preview }, String(row.override || row.text || "").slice(0, 140) || (row.dynamic === true ? t("dynamic") : t("empty"))),
+        toolPrompt === void 0 ? null : (0, import_react4.createElement)(
+          "div",
+          { style: { ...s.muted, fontSize: "11px" } },
+          `${t("toolPromptToolsLabel")}: ${toolPrompt.tools.join(" / ")}${toolPrompt.empty === true ? ` \xB7 ${t("empty")}` : ""}`
+        )
       ]),
       (0, import_react4.createElement)("div", { style: s.arrowCol }, [
         (0, import_react4.createElement)("button", { style: s.arrow, disabled: index === 0, onClick: () => moveRow(key, index, -1), title: t("moveUp") }, "\u2191"),
@@ -2678,14 +2690,14 @@ var import_react5 = require("react");
 
 // src/client/prompt/tool-pool.ts
 function toolStateOf(tool) {
-  return tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
+  return tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByShadow === true ? "masked-shadow" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
 }
 function buildMaskedPool(tools) {
   const map = /* @__PURE__ */ new Map();
   for (const tool of tools) {
     if (tool.name === "") continue;
     const state = toolStateOf(tool);
-    if (state !== "masked-plugin" && state !== "masked-own") continue;
+    if (state !== "masked-plugin" && state !== "masked-own" && state !== "masked-shadow" && state !== "locked-agent") continue;
     const entry = normalizeEntry(tool);
     if (entry === void 0) continue;
     const identity = entryKey(entry);
@@ -2720,7 +2732,7 @@ function listWith(list, entry) {
   if (listHas(list, entry)) return list;
   return [...list, { name: entry.name, ...entry.source === void 0 ? {} : { source: entry.source } }];
 }
-function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
+function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }) {
   const [filter, setFilter] = (0, import_react5.useState)("all");
   const [notice, setNotice] = (0, import_react5.useState)(null);
   const [dragName, setDragName] = (0, import_react5.useState)(null);
@@ -2789,11 +2801,24 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     }
     writeLists(key, exclude, add);
   };
+  const promptSectionsOfName = (name) => {
+    for (const tool of inv?.tools ?? []) {
+      if (tool.name === name && Array.isArray(tool.promptSections)) return tool.promptSections;
+    }
+    for (const key of PHASE_KEYS) {
+      const view = phases?.[key];
+      for (const tool of [...view?.baseTools ?? [], ...view?.catalogTools ?? []]) {
+        if (tool.name === name && Array.isArray(tool.promptSections)) return tool.promptSections;
+      }
+    }
+    return [];
+  };
   const rowsOf = (key) => {
     const catalog = catalogOf(key).filter((tool) => isToggleable(tool) || isLockedExec(tool)).map((tool) => ({
       name: tool.name,
       ...tool.source === void 0 ? {} : { source: tool.source },
       description: tool.description ?? "",
+      promptSections: tool.promptSections ?? [],
       hidden: isLockedExec(tool) ? false : tool.hidden === true,
       added: false,
       state: stateOf(tool),
@@ -2804,6 +2829,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
       name: entry.name,
       ...entry.source === void 0 ? {} : { source: entry.source },
       description: "",
+      promptSections: promptSectionsOfName(entry.name),
       hidden: false,
       added: true,
       state: "controllable"
@@ -2897,6 +2923,44 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
     if (!rowVisible(row)) return null;
     const locked = row.state === "locked-executor";
     const identity = `${entryKey(row)}\0${row.keySuffix ?? ""}`;
+    const promptSectionEmpty = (section) => {
+      if (section.empty === true) return true;
+      for (const key of PHASE_KEYS) {
+        const base = phases?.[key]?.baseSections ?? [];
+        const match = base.find((candidate) => sameEntry(candidate, section));
+        if (match !== void 0 && String(match.text ?? "").length === 0) return true;
+      }
+      return false;
+    };
+    const promptSectionList = () => {
+      if (row.state === "locked-executor") return null;
+      if (row.promptSections.length === 0) {
+        return (0, import_react5.createElement)(
+          "div",
+          { style: { ...s.muted, fontSize: "11px" } },
+          `${t("toolPromptSections")}: ${t("toolPromptNone")}`
+        );
+      }
+      return (0, import_react5.createElement)("div", {
+        style: { ...s.muted, fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }
+      }, [
+        (0, import_react5.createElement)("span", {}, `${t("toolPromptSections")}:`),
+        ...row.promptSections.map((section) => {
+          const label = `${section.name}${promptSectionEmpty(section) ? ` ${t("empty")}` : ""}`;
+          const key = `${section.name}\0${sourceKey(section.source)}`;
+          return onOpenSection === void 0 ? (0, import_react5.createElement)("span", {
+            key,
+            style: s.badgeSystem,
+            title: t("toolPromptHint")
+          }, label) : (0, import_react5.createElement)("button", {
+            key,
+            style: s.mini,
+            title: t("toolPromptHint"),
+            onClick: () => onOpenSection({ name: section.name, ...section.source === void 0 ? {} : { source: section.source } })
+          }, label);
+        })
+      ]);
+    };
     return (0, import_react5.createElement)("div", {
       key: identity,
       style: {
@@ -2954,7 +3018,8 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
           row.state === "locked-executor" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : null,
           !locked && row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
         ]),
-        row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
+        row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, `${t("toolDescriptionLabel")}: ${row.description.slice(0, 120)}`) : null,
+        promptSectionList()
       ])
     ]);
   };
@@ -2992,10 +3057,14 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }) {
   };
   const stateBadge = (state) => {
     const own = state === "masked-own";
+    const shadow = state === "masked-shadow";
+    const agent = state === "locked-agent";
+    const hint = own ? t("toolMaskedByOwnPluginHint") : shadow ? t("toolMaskedByShadowHint") : agent ? t("toolAgentScopedHint") : t("toolMaskedByPluginHint");
+    const label = own ? t("toolMaskedByOwnPlugin") : shadow ? t("toolMaskedByShadow") : agent ? t("toolAgentScoped") : t("toolMaskedByPlugin");
     return (0, import_react5.createElement)("span", {
       style: s.badgeReplaced,
-      title: own ? t("toolMaskedByOwnPluginHint") : t("toolMaskedByPluginHint")
-    }, own ? t("toolMaskedByOwnPlugin") : t("toolMaskedByPlugin"));
+      title: hint
+    }, label);
   };
   return (0, import_react5.createElement)("div", { style: s.colLeft }, [
     (0, import_react5.createElement)("div", {
@@ -4169,7 +4238,17 @@ function Panel({ t, onClose, level = "preset", workspace }) {
         (0, import_react9.createElement)(SectionsPane, { key: "sections", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
         (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext })
       ] : mode === "tools" ? [
-        (0, import_react9.createElement)(ToolsPane, { key: "tools", cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
+        (0, import_react9.createElement)(ToolsPane, {
+          key: "tools",
+          cfg: view,
+          inv,
+          phases: ep,
+          phase,
+          syncAll,
+          t,
+          write: edit,
+          onOpenSection: () => switchMode("sections")
+        }),
         (0, import_react9.createElement)(PreviewPane, { key: "preview", t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext })
       ] : [
         (0, import_react9.createElement)(PresetsPane, {
@@ -4213,7 +4292,7 @@ function Panel({ t, onClose, level = "preset", workspace }) {
 var DICT = {
   zh: {
     nav: "\u63D0\u793A\u8BCD\u5B9A\u5236",
-    previewPreset: "\u6765\u6E90\uFF1A\u5F53\u524D\u6A21\u5F0F\u9884\u8BBE\u3002\u63D0\u793A\u8BCD\u3001\u5DE5\u5177\u53CA\u987A\u5E8F\u6309\u6B64\u9884\u8BBE\u72EC\u7ACB\u88C5\u914D\uFF0C\u4E0D\u5339\u914D\u6216\u66F4\u6539\u5DF2\u6709\u5BF9\u8BDD\u3002",
+    previewPreset: "\u6765\u6E90\uFF1A\u5F53\u524D\u6A21\u5F0F\u9884\u8BBE\u3002\u6709\u540C\u9884\u8BBE\u6D3B\u52A8\u4F1A\u8BDD\u65F6\uFF0C\u63D0\u793A\u8BCD\u6E05\u5355\u4E0E\u53F3\u680F\u663E\u793A\u8BE5\u4F1A\u8BDD\u7684\u771F\u5B9E\u88C5\u914D\uFF08\u542B\u63D2\u4EF6\u6CE8\u5165\u7684\u4F1A\u8BDD\u7EA7\u6BB5\uFF09\uFF1B\u5DE5\u5177\u76EE\u5F55\u4ECD\u6309\u6B64\u9884\u8BBE\u72EC\u7ACB\u88C5\u914D\u3002",
     runtimeContexts: "\u8FD0\u884C\u65F6\u4E0A\u4E0B\u6587\uFF08\u53EF\u663E\u9690\uFF1Bhost \u5E76\u5165\u7CFB\u7EDF\u63D0\u793A\u8BCD\u7684\u90E8\u5206\uFF09",
     loading: "\u52A0\u8F7D\u4E2D\u2026",
     tabsSections: "\u63D0\u793A\u8BCD",
@@ -4316,7 +4395,7 @@ var DICT = {
     saveFail: "\u4FDD\u5B58\u5931\u8D25",
     discardConfirm: "\u6709\u672A\u4FDD\u5B58\u7684\u66F4\u6539\uFF0C\u79BB\u5F00\u5C06\u4E22\u5F03\u3002\u786E\u5B9A\u79BB\u5F00\u5417\uFF1F",
     forceTitle: "\u5F3A\u5236\u8986\u76D6\uFF08forceSections\uFF09",
-    forceHint: "\u5F00\u542F\u540E\u6240\u6709\u9884\u8BBE\u7684\u63D0\u793A\u8BCD\u6BB5\u4E00\u5F8B\u4EE5\u672C\u63D2\u4EF6\u4E3A\u51C6\uFF08\u7ED5\u8FC7 complete \u6574\u6BB5\u63A5\u7BA1\u4E0E\u9884\u8BBE\u9636\u6BB5\u88C1\u6BB5\uFF09\uFF1B\u5173\u95ED\u540E\u9000\u56DE\u7011\u5E03\u6D41\u5185\u8FC7\u6EE4\uFF0C\u9884\u8BBE\u53EF\u80FD\u538B\u8FC7\u5B9A\u5236\u3002\u300C\u6062\u590D\u521D\u59CB\u72B6\u6001\u300D\u4F1A\u81EA\u52A8\u5173\u95ED\u5B83\u3002",
+    forceHint: "\u5F00\u542F\u540E\uFF0C\u4EC5\u5F53\u5F53\u524D\u9636\u6BB5\u5B58\u5728\u5B9E\u9645\u6BB5\u7B56\u7565\uFF08\u5C4F\u853D / \u66FF\u6362 / \u6CE8\u5165 / \u6392\u5E8F\uFF09\u65F6\uFF0C\u6700\u7EC8\u63D0\u793A\u8BCD\u6BB5\u4EE5\u672C\u63D2\u4EF6\u4E3A\u51C6\uFF08\u53EF\u7ED5\u8FC7 complete \u6574\u6BB5\u63A5\u7BA1\u4E0E\u9884\u8BBE\u9636\u6BB5\u88C1\u6BB5\uFF09\uFF1B\u6CA1\u6709\u6BB5\u5B9A\u5236\u65F6\u4FDD\u6301\u5BBF\u4E3B\u539F\u6837\u3002\u300C\u6062\u590D\u521D\u59CB\u72B6\u6001\u300D\u4F1A\u81EA\u52A8\u5173\u95ED\u5B83\u3002",
     forceOn: "\u5DF2\u5F00\u542F",
     forceOff: "\u5DF2\u5173\u95ED",
     envBlockTitle: "\u73AF\u5883\u53D8\u91CF\u9ED1\u540D\u5355\uFF08envBlocklist\uFF09",
@@ -4338,15 +4417,24 @@ var DICT = {
     previewToolsHint: "\u6A21\u578B\u5B9E\u9645\u53EF\u89C1\u7684\u5DE5\u5177\u76EE\u5F55\uFF08\u6309\u6240\u9009\u9636\u6BB5\u8FD0\u884C\u9884\u8BBE\u7684\u5168\u90E8\u88C5\u914D\u89C4\u5219\uFF0C\u542B\u539F\u751F\u9636\u6BB5\u88C1\u526A\uFF09\uFF1A",
     previewToolsCount: "\u6CE8\u518C\u8868",
     toolAgentScoped: "\u4F1A\u8BDD\u7EA7",
-    toolAgentScopedHint: "\u8BE5\u5DE5\u5177\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u6CE8\u518C\uFF08\u4E0D\u662F\u9884\u8BBE\u6CE8\u518C\u8868\u9879\uFF09\uFF1B\u672C\u63D2\u4EF6\u7684\u9636\u6BB5\u8FC7\u6EE4\u65E0\u6CD5\u62D2\u7EDD\u4F5C\u7528\u57DF\u5185\u540D\u5B57\uFF0C\u56E0\u6B64\u53EA\u80FD\u67E5\u770B\u3002",
+    toolAgentScopedHint: "\u8BE5\u5DE5\u5177\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u6CE8\u518C\uFF08\u4E0D\u662F\u9884\u8BBE\u6CE8\u518C\u8868\u9879\uFF09\uFF1Brestrict \u7BA1\u4E0D\u5230\u4F5C\u7528\u57DF\u5185\u540D\u5B57\uFF0C\u672C\u63D2\u4EF6\u9760\u88C5\u914D\u540E\u8FC7\u6EE4 tools \u5B9E\u73B0\u6309\u9636\u6BB5\u9690\u85CF\uFF0C\u53EF\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u52FE\u9009\u3002\u7EE7\u627F\u5C42\u6CA1\u6709\u540C\u540D\u539F\u5B9A\u4E49\u65F6\u5B83\u4E0D\u662F\u300C\u906E\u853D\u300D\uFF0C\u53EA\u8BFB\u6C60\u6309\u300C\u4F1A\u8BDD\u7EA7\u300D\u5982\u5B9E\u5217\u51FA\u3002",
+    toolDescriptionLabel: "\u5DE5\u5177\u63CF\u8FF0\uFF08\u53EA\u8BFB\uFF09",
+    toolPromptSections: "\u63D0\u793A\u8BCD\u6BB5",
+    toolPromptNone: "\u65E0\u63D0\u793A\u8BCD\u6BB5",
+    toolPromptHint: "\u5DE5\u5177\u7684\u7CFB\u7EDF\u63D0\u793A\u8BCD\u6BB5\uFF08\u7B2C\u4E00\u90E8\u5206\uFF09\uFF1B\u5DE5\u5177\u663E\u9690\u5728\u5DE5\u5177\u9875\u5355\u72EC\u63A7\u5236\uFF0Cdescription / JSON Schema \u4E0D\u5728\u8FD9\u91CC\u7F16\u8F91\u3002",
+    toolPromptBadge: "\u5DE5\u5177\u63D0\u793A\u8BCD",
+    toolPromptToolsLabel: "\u5173\u8054\u5DE5\u5177",
+    toolPromptToolsHint: "\u8FD9\u4E2A\u63D0\u793A\u8BCD\u6BB5\u670D\u52A1\u7684\u5DE5\u5177\uFF1A{tools}",
     toolExecutorScoped: "\u6267\u884C\u5668\u5305\u88C5",
     toolExecutorScopedHint: "\u8BE5\u5DE5\u5177\u662F\u6267\u884C\u5668\u63D0\u4F9B\u7ED9\u6A21\u578B\u7684\u5305\u88C5\u9879\uFF08\u5982 PTC \u7684 run_code\uFF09\uFF0C\u4E0D\u662F\u666E\u901A\u6CE8\u518C\u8868\u5DE5\u5177\uFF1B\u4E0D\u80FD\u6309\u9636\u6BB5\u52FE\u9009\u3002",
     toolMaskedByPlugin: "\u63D2\u4EF6\u906E\u853D",
     toolMaskedByPluginHint: "\u8BE5\u5DE5\u5177\u5728\u9884\u8BBE\u6CE8\u518C\u8868\u91CC\u6709\uFF0C\u4F46\u88AB\u5176\u5B83\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF restrict \u6389\u4E86\uFF1B\u672C\u63D2\u4EF6\u65E0\u6CD5\u53CD\u5411\u89E3\u9664\u3002",
+    toolMaskedByShadow: "\u540C\u540D\u906E\u853D",
+    toolMaskedByShadowHint: "\u8BE5\u5DE5\u5177\u662F\u7EE7\u627F\u5C42\uFF08global / preset\uFF09\u7684\u539F\u751F\u5DE5\u5177\uFF0C\u88AB\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF\u6CE8\u518C\u7684\u540C\u540D\u5DE5\u5177\u9876\u6389\uFF1B\u672C\u63D2\u4EF6\u65E0\u6CD5\u53CD\u5411\u89E3\u9664\uFF0C\u6A21\u578B\u53EA\u4F1A\u770B\u5230\u63D2\u4EF6\u90A3\u4E00\u4E2A\u3002",
     toolMaskedByOwnPlugin: "\u672C\u63D2\u4EF6\u906E\u853D",
     toolMaskedByOwnPluginHint: "\u8BE5\u5DE5\u5177\u88AB\u672C\u63D2\u4EF6\u7684 MCP \u5DE5\u5177\u7EA7\u7981\u7528 / \u9884\u8BBE\u906E\u853D / \u5DE5\u4F5C\u533A\u5173\u95ED\u9690\u85CF\uFF0C\u53EF\u5728 MCP Tab \u6062\u590D\u3002",
     completeCatalogTitle: "\u5B8C\u6574\u76EE\u5F55 / \u5DF2\u906E\u853D\uFF08\u53EA\u8BFB\uFF09",
-    completeCatalogHint: "\u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u65E0\u6CD5\u6309\u9636\u6BB5\u5F00\u5173\u7684\u5DE5\u5177\uFF1Aagent \u4F5C\u7528\u57DF\u6CE8\u518C\u3001\u6267\u884C\u5668\u5305\u88C5\u3001\u88AB\u522B\u7684\u63D2\u4EF6 restrict\u3001\u88AB\u672C\u63D2\u4EF6 MCP \u906E\u853D\u3002\u5B83\u4EEC\u4E0D\u4F1A\u51FA\u73B0\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u91CC\u3002",
+    completeCatalogHint: "\u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u65E0\u6CD5\u6309\u9636\u6BB5\u5F00\u5173\u7684\u5DE5\u5177\uFF1Aagent \u4F5C\u7528\u57DF\u6CE8\u518C\u3001\u6267\u884C\u5668\u5305\u88C5\u3001\u88AB\u522B\u7684\u63D2\u4EF6 restrict\u3001\u88AB\u540C\u540D\u63D2\u4EF6\u5DE5\u5177\u9876\u6389\u3001\u88AB\u672C\u63D2\u4EF6 MCP \u906E\u853D\u3002\u5B83\u4EEC\u4E0D\u4F1A\u51FA\u73B0\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u91CC\u3002",
     workspaceRequired: "\u5DE5\u4F5C\u533A\u7EA7\u4FDD\u5B58\u9700\u8981\u5F53\u524D\u5DE5\u4F5C\u533A\uFF08\u6D3B\u52A8\u4F1A\u8BDD\u7684 cwd\uFF09",
     workspaceNoSession: "\u5DE5\u4F5C\u533A\u7EA7\uFF1A\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF0C\u53D6\u4E0D\u5230\u5DE5\u4F5C\u533A\u8DEF\u5F84\uFF1B\u5F00\u4F1A\u8BDD\u540E\u518D\u7F16\u8F91\u5DE5\u4F5C\u533A\u7EA7\u3002",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
@@ -4357,7 +4445,7 @@ var DICT = {
     targetLabel: "\u7F16\u8F91\u76EE\u6807\uFF08Agent \u9884\u8BBE\uFF09",
     targetCustomized: "\u8BE5\u9884\u8BBE {n} \u9879\u5B9A\u5236",
     agentScoped: "\u4F1A\u8BDD\u7EA7",
-    agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7684\u9884\u89C8\u88C5\u914D\u770B\u4E0D\u5230\u5B83\uFF0C\u4F46\u6BCF\u4E2A\u771F\u5B9E\u4F1A\u8BDD\u7684\u63D0\u793A\u8BCD\u91CC\u90FD\u6709\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u63D0\u793A\u8BCD\u91CC\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F\u3002",
+    agentScopedHint: "\u8FD9\u4E00\u6BB5\u7531\u63D2\u4EF6\u5728\u5F53\u524D\u6D3B\u52A8 agent \u81EA\u5DF1\u7684\u4F5C\u7528\u57DF\u91CC\u6CE8\u518C\uFF08\u4E0D\u662F\u672C\u9884\u8BBE scope \u7684\u6CE8\u518C\u8868\u9879\uFF09\uFF1A\u9762\u677F\u7528\u540C\u9884\u8BBE\u6D3B\u52A8 agent \u7684\u771F\u5B9E\u88C5\u914D\u679A\u4E3E\u5230\u5B83\uFF0C\u5E76\u5728\u53F3\u680F\u9884\u89C8\u91CC\u663E\u793A\u5B83\u3002\u5B83\u9ED8\u8BA4\u5C31\u5728\u7CFB\u7EDF\u63D0\u793A\u8BCD\u91CC\uFF0C\u8EAB\u4EFD\u6309 agent \u6765\u6E90\u8DE8\u4F1A\u8BDD\u7A33\u5B9A\uFF0C\u6240\u4EE5\u53EF\u4EE5\u50CF\u666E\u901A\u6BB5\u4E00\u6837\u5C4F\u853D / \u66FF\u6362 / \u6392\u5E8F\u3002",
     libraryTitle: "\u914D\u7F6E\u5FEB\u7167\u5E93",
     applyToPreset: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u9884\u8BBE\u7EA7\u300C{name}\u300D",
     applyToWorkspace: "\u5E94\u7528\u5C06\u5199\u5165\uFF1A\u5DE5\u4F5C\u533A\u7EA7\u300C{name}\u300D",
@@ -4375,7 +4463,7 @@ var DICT = {
   },
   en: {
     nav: "Prompt Customizer",
-    previewPreset: "Source: selected mode preset. Sections, tools and ordering are assembled independently; existing conversations are neither matched nor changed.",
+    previewPreset: "Source: selected mode preset. With a same-preset active session, the prompt inventory and preview show that session's real assembly (including plugin-injected session-level sections); the tool catalog stays on the pure preset assembly.",
     runtimeContexts: "Runtime contexts (toggleable; the part the host folds into the system prompt)",
     loading: "Loading\u2026",
     tabsSections: "Sections",
@@ -4478,7 +4566,7 @@ var DICT = {
     saveFail: "Save failed",
     discardConfirm: "You have unsaved changes; leaving will discard them. Leave anyway?",
     forceTitle: "Force override (forceSections)",
-    forceHint: 'When on, every preset\u2019s prompt sections always follow this plugin (bypassing complete takeover and preset phase pruning); when off, filtering falls back to the waterfall, where presets may override your customization. "Restore initial state" turns this off automatically.',
+    forceHint: 'When on, final prompt sections follow this plugin only when the current phase has an actual section policy (block / replace / inject / order). With no section customization the host output is kept unchanged, including a complete persona. "Restore initial state" turns this off automatically.',
     forceOn: "On",
     forceOff: "Off",
     envBlockTitle: "Environment variable blocklist (envBlocklist)",
@@ -4500,15 +4588,24 @@ var DICT = {
     previewToolsHint: "Tool catalog as the model actually sees it (all assembly rules run for the selected phase, including native phase narrowing):",
     previewToolsCount: "of registry",
     toolAgentScoped: "session-level",
-    toolAgentScopedHint: "Registered by a plugin in the agent's own scope (not a preset registry entry); this plugin's phase filter cannot deny scope-local names, so this row is read-only.",
+    toolAgentScopedHint: `Registered by a plugin in the agent's own scope (not a preset registry entry). restrict cannot deny scope-local names; this plugin hides it per phase by filtering the assembled tools, so it stays toggleable in the enabled list. With no inherited same-name definition it is not "masked" \u2014 the read-only pool lists it as session-level rather than inventing a shadow.`,
+    toolDescriptionLabel: "Tool description (read-only)",
+    toolPromptSections: "Prompt sections",
+    toolPromptNone: "No prompt section",
+    toolPromptHint: "The tool's system-prompt section (part 1); tool visibility is controlled separately in the Tools tab. description / JSON Schema are not edited here.",
+    toolPromptBadge: "tool prompt",
+    toolPromptToolsLabel: "Associated tools",
+    toolPromptToolsHint: "Tools served by this prompt section: {tools}",
     toolExecutorScoped: "executor wrapper",
     toolExecutorScopedHint: "Provided by the tool executor as a model-facing wrapper (such as PTC run_code), not an ordinary registry tool; it cannot be toggled per phase.",
     toolMaskedByPlugin: "plugin-masked",
     toolMaskedByPluginHint: "Present in the preset registry but restricted away by another plugin in the agent scope; this plugin cannot lift that restriction.",
+    toolMaskedByShadow: "shadowed by same name",
+    toolMaskedByShadowHint: "An inherited (global/preset) tool displaced by a plugin tool with the same name registered in the agent scope. This plugin cannot lift it; the model sees only the plugin tool.",
     toolMaskedByOwnPlugin: "masked by this plugin",
     toolMaskedByOwnPluginHint: "Hidden by this plugin's MCP tool disable / preset mask / workspace close ledger; re-enable it in the MCP tab.",
     completeCatalogTitle: "Complete catalog / masked (read-only)",
-    completeCatalogHint: "Tools this plugin cannot toggle per phase: agent-scope registrations, executor wrappers, tools restricted by other plugins, and tools masked by this plugin's MCP ledgers. They never appear in the enabled list above.",
+    completeCatalogHint: "Tools this plugin cannot toggle per phase: agent-scope registrations, executor wrappers, tools restricted by other plugins, inherited tools displaced by a same-name plugin tool, and tools masked by this plugin's MCP ledgers. They never appear in the enabled list above.",
     workspaceRequired: "Saving workspace-level requires a current workspace (active session cwd).",
     workspaceNoSession: "Workspace level: no active session, so the workspace path is unknown; open a session first.",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
@@ -4519,7 +4616,7 @@ var DICT = {
     targetLabel: "Edit target (agent preset)",
     targetCustomized: "{n} overridden field(s)",
     agentScoped: "session-level",
-    agentScopedHint: "This section is registered by a plugin in the agent\u2019s own scope (it is not in this preset scope\u2019s registry): the panel\u2019s preview assembly cannot see it, but every real session\u2019s prompt has it. It is in the prompt by default, and it can be blocked / replaced / reordered like any other row.",
+    agentScopedHint: "This section is registered by a plugin in the active agent\u2019s own scope (not in this preset scope\u2019s registry): the panel enumerates it from the same-preset active agent\u2019s real assembly and shows it in the preview. It is in the system prompt by default, its identity stays stable across sessions as an agent source, and it can be blocked / replaced / reordered like any other row.",
     libraryTitle: "Config snapshots",
     applyToPreset: 'Apply writes to: preset "{name}"',
     applyToWorkspace: 'Apply writes to: workspace "{name}"',

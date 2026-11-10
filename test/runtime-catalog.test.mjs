@@ -1,15 +1,14 @@
 /**
- * 运行时段 / 工具进入「本系统全部提示词」池的两条路径：
+ * 回归：**无明确编辑目标**时的回退行为（ADR-0005 的条件边界）。
  *
- *  - **清单就列**（主路径）：有一批段只在 agent 自己的 scope 里注册（插件按
- *    agent 动态 section()，例如 subagent 工具的 `tool:subagent`、file-reference
- *    的 `context:file-reference`）。它们不进全局层、也不进任何预设 scope，预设
- *    的清单与预览都看不见；但它们不是某个模式独有的段 —— 所以清单在最开始
- *    （面板一打开、没跑过任何会话）就要按 agent 作用域 merge 出它们。
- *  - **运行时兜底**：没有活着的 agent 可查时（裸组装 / agent 还没建），真实
- *    装配那次也把看到的段并进登记表，等下一次请求就能列出来。
+ * 本文件的 mock 没有 `agentPresets` 服务，请求也不带 `?scope`，因此
+ * `buildPreview` 解析不出编辑预设 id、`livePromptAgent` 为 undefined，清单
+ * 必须退回纯预设装配：不并入 agent 作用域段、不读任何累积池、不凭空造段。
+ * 有明确编辑目标（客户端总会带 `?scope=<preset>`）且存在同预设活动 agent 时，
+ * 会话级段必须被枚举 —— 那一半由 `test/universal-prompt-takeover.test.mjs` 覆盖。
  *
- * 两条路径都只累积「名字 + 内容」；屏蔽 / 替换永远在响应时按生效配置现算。
+ * 历史说明：本文件早期描述的是 catalog 累积池时代的「清单就列 / 运行时兜底」
+ * 两条路径，池子与手动重扫已在 ADR-0001 删除，此处只保留其「不凭空造段」的断言。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -95,10 +94,10 @@ async function inventoryOf(routes) {
 // 表驱动合并：两条「清单里不该出现什么」的断言都以清单响应为对象，进同一张表
 // 逐项执行（每项各自建环境）；其余用例要串起多步装配 / 路由请求，保持独立。
 
-test('清单的首屏形状：模式清单不含对话专属段，只跑预览时也不凭空多段', async () => {
+test('无明确编辑目标时清单退回纯预设，只跑预览时也不凭空多段', async () => {
   const cases = [
     {
-      label: '模式清单只反映纯预设，不并入同预设活动 agent 的会话级段',
+      label: '无明确编辑目标时清单退回纯预设，不并入会话级段',
       run: async (h) => {
         const body = await inventoryOf(h.routes)
         const names = body.sections.map(sec => sec.name)
@@ -135,7 +134,7 @@ test('清单只反映当前装配：不再依赖运行时累积池', async () =>
   apply(ctx, { dataDir })
   // 一次真实会话装配（agent 作用域，带只在该作用域注册的段）。
   await ctx.systemPrompt.assemble({ scope: AGENT, promptCustomizerPhase: 'active' })
-  // 已取消累积池：清单只来自当前预设的真实装配，不因别的装配跑过就凭空出现。
+  // 已取消累积池：清单只来自当前（含同预设活动 agent 的）真实装配，不因别的装配跑过就凭空出现。
   const names = (await inventoryOf(routes)).sections.map((sec) => sec.name)
   assert.ok(!names.includes(RUNTIME_ONLY.name), `不应再靠运行时累积列出，实际：${names.join(', ')}`)
 })
@@ -194,13 +193,13 @@ test('工具屏蔽池保留同名 masked-plugin 行，不会被 base 行吞掉',
   assert.deepEqual(masked, ['masked-tool'])
 })
 
-test('两条路径并存时同名只出现一次（并集去重）', async () => {
+test('无明确编辑目标时同名只出现一次（按 name+source 去重）', async () => {
   const { ctx, routes, dataDir } = makeCtx()
   apply(ctx, { dataDir })
   await ctx.systemPrompt.assemble({ scope: AGENT, promptCustomizerPhase: 'active' })
   await ctx.systemPrompt.assemble({ scope: 'preset:standard', promptCustomizerBase: true, promptCustomizerPhase: 'active' })
 
   const names = (await inventoryOf(routes)).sections.map((sec) => sec.name)
-  assert.equal(names.includes(RUNTIME_ONLY.name), false, '纯预设清单不应出现会话专属段')
+  assert.equal(names.includes(RUNTIME_ONLY.name), false, '无明确编辑目标时清单不应出现会话专属段')
   assert.ok(names.includes('core') && names.includes('persona'))
 })

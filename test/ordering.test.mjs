@@ -1,6 +1,7 @@
 /**
  * 回归：面板两个列表必须「全面覆盖且有序」——
- *  - 提示词段按宿主注册的**规范数值 order** 排序（不是数组序 / 登记表追加序）；
+ *  - 提示词段按宿主注册的**规范数值 order** 排序（不是数组序 / 登记表追加序），
+ *    且包含同预设活动 agent 的会话级段（ADR-0005）；
  *  - 工具按宿主**最终目录顺序**（assembled.tools）排序，agent 作用域新增 / 被遮蔽
  *    项追加在后、按名字稳定排序；
  *  - 被别的插件 restrict 的工具带 maskedByPlugin 标记（客户端据此移出启用列表）。
@@ -85,19 +86,22 @@ function harness(t, { live = true, restrict = [] } = {}) {
   return { request }
 }
 
-test('提示词段按宿主规范 order 排序（纯预设，不并入会话 agent 作用域段）', async (t) => {
+test('提示词段按宿主规范 order 排序（并入同预设活动 agent 的会话级段）', async (t) => {
   const h = harness(t)
   const preview = await h.request('preview?scope=standard&phase=active')
   assert.deepEqual(
     preview.body.baseSections.map((section) => section.name),
-    ['persona', 'tool:read', 'tool:write', 'mcp:servers'],
-    'baseSections 必须按注册 order (0,1100,1200,3100) 排序，且不含会话专属段',
+    ['persona', 'tool:read', 'tool:undo_last_edit', 'tool:write', 'mcp:servers'],
+    'baseSections 必须按注册 order (0,1100,1150,1200,3100) 排序，会话级段按 agent 链的 order 落位',
   )
+  const agentRow = preview.body.baseSections.find((section) => section.name === 'tool:undo_last_edit')
+  assert.deepEqual(agentRow?.source, { kind: 'agent' }, '会话级段的身份必须收敛成不带 session id 的 agent 来源')
+  assert.equal(agentRow?.scope, 'agent', '会话级段带「会话级」徽标所需的 scope 标记')
   const inventory = await h.request('inventory')
   assert.deepEqual(
     inventory.body.sections.map((section) => section.name),
-    ['persona', 'tool:read', 'tool:write', 'mcp:servers'],
-    '清单 / 池子也必须同样有序',
+    ['persona', 'tool:read', 'tool:undo_last_edit', 'tool:write', 'mcp:servers'],
+    '清单也必须同样有序且含会话级段',
   )
 })
 

@@ -6,8 +6,10 @@
  *   新文件不存在而主文档里有旧 `prompt-customizer:` 段，自动迁移（主文档
  *   原样保留，可随时回滚旧版），此后本插件不再注册设置命名空间——主文档
  *   的设置页也不会再显示本段落。
- * - 挂钩 `system-prompt/assemble` 瀑布流，按名称屏蔽 / 替换 / 注入提示词段，
- *   并从模型目录中隐藏工具。只影响面向模型的目录；工具与路由照常工作。
+ * - 挂钩 `system-prompt/assemble` 瀑布流，按 {name, source} 身份屏蔽 / 替换 /
+ *   注入提示词段，并从模型目录中隐藏工具。段的可编辑清单同时来自「当前预设」
+ *   与「同预设活动 agent」的真实装配，因此插件在任意作用域（含 agent 作用域）
+ *   用 `systemPrompt.section()` / `context()` 注入的段都能被接管（ADR-0005）。
  * - 提供 `GET /api/prompt-customizer/inventory`（段/工具清单，`?scope=` 可切
  *   agent 预设；`scopeResolved` 标记 scope 是否成功挂载）、
  *   `GET /api/prompt-customizer/config` 与 `POST /config/set|/config/unset`
@@ -15,7 +17,8 @@
  *
  * 定制仅使用 `overrides[agentPreset]`，三个阶段各有独立规则。预览只读取
  * 选中模式的 rc.2 作用域租约，结束即释放；从不匹配或切换已有对话。
- * 系统段与 user-role contexts 分开返回，跨预设累计池不作为选中预设的输入。
+ * 系统段与 user-role contexts 分开返回；不再有跨预设累计池，清单只来自当前预设
+ * 与其同预设活动 agent 的真实装配，预设之间仍然天然隔离。
  * forceSections 在 assemble 返回边界恢复已经求值的段策略，避免 complete
  * 还原和动态 provider 重复执行；关闭时尊重宿主的 complete 接管行为。
  */
@@ -27,6 +30,7 @@ import { parse } from 'yaml'
 import { Config, NS, WorkspaceOverrides } from './schema.js'
 import {
   effectiveConfig,
+  hasSectionPolicy,
   pickToolsFilter,
   pickSectionsForStatus,
   pickContextsForStatus,
@@ -39,6 +43,7 @@ import { createPhaseProjection, presetOfSession, statusOf } from './promotion.js
 import { createConfigStore } from './store.js'
 import { openDb, allDocs, replaceAllDocs, setDoc } from './db.js'
 import { createPhaseToolVisibility } from './tool-visibility.js'
+import { promptSectionNamesForTool, toolsForPromptSection } from './tool-prompt-map.js'
 
 export const name = 'prompt-customizer'
 // settings 仍被注入：只读 documentPath 做一次性旧版迁移。cordis 对未在
@@ -129,7 +134,8 @@ function agentSourceOf(agent) {
   return id === undefined ? { kind: 'agent' } : { kind: 'agent', id }
 }
 
-/** 预设工具目录也要看到 agent 作用域工具；取最新根会话仅用于 catalog，不参与段装配。 */
+/** 预设工具目录也要看到 agent 作用域工具；取最新根会话仅用于 catalog 工具目录
+ *  与无会话兜底。段装配一律走 `liveAgentForPreset`（同预设活动 agent），避免跨预设串台。 */
 function latestRootAgent(ctx) {
   try {
     return listRootAgents(ctx)[0]
@@ -253,6 +259,51 @@ function sourceForTool(ctx, name, { role, presetId, agent, presetScopeKey }) {
   if (globalNames.has(name)) return { kind: 'global' }
   if (presetNames.has(name)) return presetSourceOf(presetId)
   return agentNames.has(name) ? agentSourceOf(agent) : undefined
+}
+
+/** 当前 scope 链上的 section 目录（名字、来源、静态空标记）；供工具提示词映射使用。 */
+function promptSectionCatalog(ctx, scopeKey, sourceOptions) {
+  const out = new Map()
+  try {
+    const layers = ctx?.systemPrompt?.layers
+    if (typeof layers?.merge !== 'function') return out
+    const sections = layers.merge(scopeKey, (layer) => layer.sections)
+    for (const [name, definition] of sections) {
+      const source = sourceForEntry(ctx, { name }, { table: 'sections', ...sourceOptions, scopeKey })
+      const text = definition?.text
+      out.set(name, {
+        name,
+        ...(source === undefined ? {} : { source }),
+        ...(typeof text === 'string' ? { empty: text.length === 0 } : {}),
+      })
+    }
+  } catch {
+    // layers 缺席（旧宿主 / 测试替身）：映射为空，UI 只显示已知工具名。
+  }
+  return out
+}
+
+/** 一个工具对应的提示词段；只返回当前 scope 链里实际存在的 section。 */
+function toolPromptSectionsOf(toolName, sectionCatalog) {
+  const out = []
+  for (const name of promptSectionNamesForTool(toolName)) {
+    const section = sectionCatalog.get(name)
+    if (section !== undefined) out.push({ ...section })
+  }
+  return out
+}
+
+/** 给段行附上它关联的工具组；非 tool:* 段原样返回。 */
+function decorateToolPromptSection(section) {
+  const tools = toolsForPromptSection(section?.name)
+  if (tools.length === 0) return section
+  return {
+    ...section,
+    toolPrompt: {
+      tools,
+      empty: typeof section.text === 'string' && section.text.length === 0,
+    },
+  }
 }
 
 /** 写盘边界：inject / replacements 的 phase 必须是 always 或 PHASES 里的阶段。 */
@@ -555,15 +606,19 @@ export function apply(ctx, entry = {}) {
     const wrapped = async (context = {}) => {
       // 变量先于装配同步：宿主在 pristine 内部解析 {{name}}，注册必须发生在前。
       const result = await pristine(context)
+      // 解析一次生效目标：工具过滤与段策略共用同一份配置 / 阶段，避免
+      // `promptCustomizerBase` 预览和真实装配走出不同的解析结果。
+      let targetInfo
+      try { targetInfo = resolveTarget(context) } catch { /* 解析失败不拦本次装配 */ }
       // 工具显隐：真实会话装配时按「当前阶段 exclude」过滤最终交给模型的 tools。
       // restrict 只能收窄继承的全局工具；作用域内注册的工具（插件提供的 read /
       // apply_patch 等）它管不到 —— 但模型看到的正是这份 `assembly.tools`，这里按
       // 名字删掉即可真正隐藏（含 agent 作用域工具）。诊断 / 预览的 base 调用不过滤，
       // 保证左栏能看到完整基座。
       let withTools = result
-      if (context?.promptCustomizerBase !== true && Array.isArray(result.tools)) {
+      if (targetInfo !== undefined && context?.promptCustomizerBase !== true && Array.isArray(result.tools)) {
         try {
-          const { cfg, status, presetId, presetScopeKey } = resolveTarget(context)
+          const { cfg, status, presetId, presetScopeKey } = targetInfo
           const exclude = pickToolsFilter(cfg.tools, status).exclude ?? []
           if (exclude.length > 0) {
             const sourceOptions = {
@@ -583,6 +638,9 @@ export function apply(ctx, entry = {}) {
         } catch { /* 解析失败不拦本次装配 */ }
       }
       if (read()?.forceSections === false) return withTools
+      // 没有实际段策略时不接管：保持宿主原样（尤其是 complete:true 的
+      // minimal persona），避免「安装插件」改变未定制预设的提示词。
+      if (targetInfo === undefined || !hasSectionPolicy(targetInfo.cfg, targetInfo.status)) return withTools
       try {
         const sections = withTools.promptCustomizerSections ?? withTools.sections
         const patched = { ...withTools, sections }
@@ -723,8 +781,9 @@ export function apply(ctx, entry = {}) {
     ctx.effect(() => disposePreview, 'prompt-customizer: preview route')
 
     // 当前会话只读视图：取最新活动根 agent，用它自己的 scope 跑真实装配与
-    // 工具可见集。这是「模型此刻真正看到什么」的唯一权威入口；预设编辑
-    // 预览仍保持纯预设装配，避免把编辑目标与运行中的会话混在一起。
+    // 工具可见集。它与 `buildPreview` 的「同预设活动 agent 视图」是两条并列的
+    // 真实装配入口：前者回答「模型此刻真正看到什么」，后者是编辑目标预设的
+    // 清单 / 预览数据源（ADR-0005）。
     const disposeSession = register({
       kind: 'exact',
       path: '/api/prompt-customizer/session',
@@ -1170,7 +1229,8 @@ function overlayPatch(raw, target, patch) {
   return base
 }
 
-/** Read the selected mode's current revision; never substitute a live conversation. */
+/** Read the selected mode's current revision; never substitute a live conversation.
+ *  buildPreview additionally takes the same-preset active agent's real view (ADR-0005). */
 async function acquireTarget(ctx, id) {
   const presets = ctx.get('agentPresets')
   const requestedId = id ?? (typeof presets?.resolve === 'function' ? (await presets.resolve()).id : undefined)
@@ -1386,7 +1446,9 @@ function toolDefsOf(ctx, scopeKey, mergeGlobal = false) {
  *  - `scope: 'agent'`：只在 agent 自己的作用域注册（插件动态添加，本插件
  *    的 restrict 无法拒绝作用域内名字）；
  *  - `maskedByPlugin`：预设注册表里有、但 agent 实际视图没有（被别的插件
- *    restrict 掉）；`maskedByOwnPlugin` 是本插件自己的 MCP 遮蔽账本。
+ *    restrict 掉）；`maskedByOwnPlugin` 是本插件自己的 MCP 遮蔽账本；
+ *    `masked-shadow`：被 agent 作用域的同名插件工具顶掉（同名遮蔽），来源标
+ *    继承层而不是 agent（2.1.1）。
  *
  * `hidden` 只表示本插件当前阶段的 exclude（可编辑项）；别的插件的 restrict
  * 不允许本插件反向解除，UI 据此置灰。
@@ -1397,7 +1459,14 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
   const extraTools = Array.isArray(options.extraTools) ? options.extraTools : []
   const presetDefs = toolDefsOf(ctx, presetScopeKey, true)
   const liveDefs = liveAgent === undefined ? null : toolDefsOf(ctx, liveAgent)
+  const globalDefs = toolDefsOf(ctx, undefined)
   const hasLive = liveAgent !== undefined
+  const sectionCatalog = promptSectionCatalog(ctx, hasLive ? liveAgent : presetScopeKey, {
+    role: hasLive ? 'agent' : 'preset',
+    presetId: options.presetId,
+    agent: liveAgent,
+    presetScopeKey,
+  })
   const presetByName = new Map()
   for (const tool of presetTools) {
     if (tool?.name !== undefined) presetByName.set(String(tool.name), tool)
@@ -1442,7 +1511,7 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     return ''
   }
   const rows = []
-  const emit = (name, state, description, keySuffix, sourceOverride) => {
+  const emit = (name, state, description, keySuffix, sourceOverride, shadowedBy) => {
     const source = sourceOverride ?? (state === 'locked-executor'
       ? { kind: 'executor' }
       : state === 'locked-agent'
@@ -1465,6 +1534,12 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
       ...(state === 'locked-executor' ? { scope: 'executor' } : {}),
       ...(state === 'masked-plugin' ? { maskedByPlugin: true } : {}),
       ...(state === 'masked-own' ? { maskedByOwnPlugin: true } : {}),
+      ...(state === 'masked-shadow' ? { maskedByShadow: true } : {}),
+      ...(shadowedBy === undefined ? {} : { shadowedBy }),
+      ...(() => {
+        const promptSections = toolPromptSectionsOf(name, sectionCatalog)
+        return promptSections.length === 0 ? {} : { promptSections }
+      })(),
       ...(keySuffix === undefined ? {} : { keySuffix }),
     })
   }
@@ -1476,18 +1551,33 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     const inLive = liveTool !== undefined
     const inExtra = extraTool !== undefined
     if (maskedByOwn.has(name)) { emit(name, 'masked-own', descOf(presetTool, liveTool, extraTool)); continue }
-    // 同名不同注册 = 被 agent 作用域工具顶掉（遮蔽）。没有 definitions 时无法判定，
-    // 退化为「同名即同一工具」。
-    const shadowed = hasLive && inPreset && inLive && presetDefs !== null && liveDefs !== null
-      && presetDefs.get(name) !== liveDefs.get(name)
+    // 同名遮蔽（2.1.1 多证据判定）：不再只靠 `definitions` 对象引用相等。
+    // 只要继承层（global ∪ preset）查得到同名定义 / schema，且 agent 视图里的
+    // 同名工具与它「不是同一注册」，就把被顶掉的那份放进遮蔽池。证据三条取一：
+    //   ① definitions 引用不同（精确）；② 宿主缺席 definitions 时 description 不同；
+    //   ③ 只有继承层定义、agent 层另有注册（profile 没把原生挂进 presetTools）。
+    // 查不到继承层同名定义（纯 agent 新增，如 undo_last_edit）绝不误判成遮蔽。
+    const inheritedSchema = presetByName.get(name)
+    const inheritedDef = presetDefs?.get(name) ?? globalDefs?.get(name)
+    const agentDef = liveDefs?.get(name)
+    const inheritedPresent = inheritedSchema !== undefined || inheritedDef !== undefined || inPreset
+    const inheritedDescription = inheritedSchema?.description ?? inheritedDef?.description
+    const definitionDiffers = inheritedDef !== undefined && agentDef !== undefined && inheritedDef !== agentDef
+    const descriptionDiffers = inheritedDescription !== undefined && liveTool?.description !== undefined
+      && String(inheritedDescription) !== String(liveTool.description)
+    const shadowed = hasLive && inLive && inheritedPresent && (definitionDiffers || descriptionDiffers)
     const restricted = hasLive && inPreset && !inLive
     const agentOnly = hasLive && inLive && !inPreset
     const executor = !inPreset && !inLive && inExtra
     if (shadowed) {
       // agent 提供的同名工具（模型实际可见、本插件无法开关）→ 启用锁定；
-      // 被顶掉的预设 / 原生同名工具 → 遮蔽池。同名两行。
-      emit(name, 'locked-agent', descOf(liveTool, presetTool), 'live')
-      emit(name, 'masked-plugin', descOf(presetTool), 'preset')
+      // 被顶掉的继承层同名工具 → 遮蔽池，来源标继承层（不是 agent）。
+      const inheritedSource = sourceForTool(ctx, name, {
+        role: 'preset', presetId: options.presetId, agent: undefined, presetScopeKey,
+      })
+      emit(name, 'locked-agent', descOf(liveTool, inheritedSchema, inheritedDef), 'live')
+      emit(name, 'masked-shadow', descOf(inheritedSchema, inheritedDef, presetTool), 'shadowed',
+        inheritedSource, { name, source: agentSourceOf(liveAgent) })
       continue
     }
     if (agentOnly) { emit(name, 'locked-agent', descOf(liveTool)); continue }
@@ -1505,7 +1595,7 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     const name = tool?.name === undefined ? undefined : String(tool.name)
     if (name !== undefined && !finalRank.has(name)) finalRank.set(name, rank++)
   }
-  const rankOf = (row) => (row.state === 'masked-plugin' || row.state === 'masked-own')
+  const rankOf = (row) => (row.state === 'masked-plugin' || row.state === 'masked-own' || row.state === 'masked-shadow')
     ? Number.MAX_SAFE_INTEGER
     : (finalRank.has(row.name) ? finalRank.get(row.name) : Number.MAX_SAFE_INTEGER - 1)
   rows.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name) || String(a.state).localeCompare(String(b.state)))
@@ -1513,9 +1603,46 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
 }
 
 /**
- * 预设预览的左栏「基座」：纯预设 base 段 + 同预设活动 agent 的 agent 作用域段。
- * 右栏最终装配仍用纯预设装配；这里只补编辑列表的可见性，并给新增段打
- * `scope: 'agent'`（UI 的「会话级」徽标）。
+ * 清单身份必须跨会话稳定：运行时 `sourceForEntry` 给 agent 来源带上 session id，
+ * 但配置按预设存、草稿与屏蔽名单必须在新会话里继续命中。`model.js:entryMatches`
+ * 已对 agent 按 kind 匹配，这里把清单 / 预览里的 agent 来源统一收敛成
+ * `{ kind: 'agent' }`，让 UI 写入的名单、`entryKey` 与运行时候选三者身份一致。
+ */
+function stableSourceOf(item) {
+  const source = item?.source
+  if (source === undefined || source === null) return undefined
+  return source.kind === 'agent' ? { kind: 'agent' } : source
+}
+
+/**
+ * 合并「预设装配」与「同预设活动 agent 装配」的预过滤段 / 上下文。
+ * 按 name+source 去重（ADR-0002 同名不同源分列），agent 视图优先；没有任何
+ * 硬编码段名，任何作用域新注册的段都会自动进入清单（ADR-0005）。
+ */
+function mergePromptEntries(presetEntries, liveEntries) {
+  const out = []
+  const seen = new Set()
+  const ordered = [
+    ...(Array.isArray(liveEntries) ? liveEntries : []),
+    ...(Array.isArray(presetEntries) ? presetEntries : []),
+  ]
+  for (const item of ordered) {
+    if (item === null || typeof item !== 'object') continue
+    const name = String(item.name ?? '')
+    if (name === '') continue
+    const source = stableSourceOf(item)
+    const key = entryKey({ name, ...(source === undefined ? {} : { source }) })
+    if (key === '' || seen.has(key)) continue
+    seen.add(key)
+    out.push(source === item.source ? item : { ...item, source })
+  }
+  return out
+}
+
+/**
+ * 预设预览的左栏「基座」：预设 base 段 + 同预设活动 agent 的 agent 作用域段。
+ * 调用方把两份视图先经 `mergePromptEntries` 合并；本函数负责按 name+source
+ * 装饰 blocked / replaced 并给 agent 来源打 `scope: 'agent'`（UI「会话级」徽标）。
  */
 function mergeAgentScopedSections(presetSections, liveSections, denied, replacements, orderOf) {
   const base = Array.isArray(presetSections) ? presetSections : []
@@ -1569,7 +1696,8 @@ function entryIdentity(value, source) {
 async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
   // 生效配置：目标预设 override + 工作区 override（预览已合并好则为 preview.config）。
   const cfg = preview?.config ?? effectiveConfig(raw.overrides?.[presetId])
-  // 清单无会话概念：恒展示静态（晋级后）视图。
+  // 清单并入同预设活动 agent 的会话级段（ADR-0005），但阶段恒展示静态
+  // （晋级后）视图：三阶段名单由 /preview 的名义阶段各自给出，与此处无关。
   const status = statusOfPhase('active')
   const denied = pickSectionsForStatus(cfg, status)
   const replacements = filterReplacementsByPhase(cfg.replacements, status)
@@ -1583,6 +1711,7 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
     text: section.text,
     ...(section.source === undefined ? {} : { source: section.source }),
     ...(section.scope === 'agent' ? { scope: 'agent' } : {}),
+    ...(section.toolPrompt === undefined ? {} : { toolPrompt: section.toolPrompt }),
   }))
   // 工具来自预览的完整目录（预设注册表 ∪ 当前会话 agent 视图）：既包含被
   // 其它插件 restrict 掉、仍应可解释的条目，也包含只在 agent 作用域注册的
@@ -1598,10 +1727,13 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
       ...(tool.keySuffix === undefined ? {} : { keySuffix: tool.keySuffix }),
       ...(tool.maskedByPlugin === true ? { maskedByPlugin: true } : {}),
       ...(tool.maskedByOwnPlugin === true ? { maskedByOwnPlugin: true } : {}),
+      ...(tool.maskedByShadow === true ? { maskedByShadow: true } : {}),
+      ...(tool.shadowedBy === undefined ? {} : { shadowedBy: tool.shadowedBy }),
+      ...(tool.promptSections === undefined ? {} : { promptSections: tool.promptSections }),
     }))
 
-  // 清单只来自「当前预设的真实装配」：有就有、没有就没有。不再读任何累积池，
-  // 也不需要手动重扫；预设之间天然隔离。
+  // 清单只来自「当前预设 + 同预设活动 agent 的真实装配」：有就有、没有就没有。
+  // 不再读任何累积池，也不需要手动重扫；预设之间天然隔离（ADR-0005）。
   const sections = seenSections
     .map((item) => ({
       ...item,
@@ -1637,17 +1769,46 @@ async function previewTarget(ctx, req, body = null) {
   return { ...target, phase, invalidPhase }
 }
 
+/**
+ * 「接管一切系统提示词」的发现入口（ADR-0005）。插件在 `agent/created` 里用
+ * `ctx.systemPrompt.section()` / `context()` 注册到 agent 作用域的段不会出现在预设
+ * scope 的装配里 —— 宿主 `layers` 是单向作用域链，没有「列出所有作用域」的 API，
+ * 只有用该 agent 自己的 scope 跑一次真实装配才能枚举到。一次 base 装配同时给出
+ * 预过滤清单（`promptCustomizerBaseView`）与过滤后的正文（`sections`）。
+ *
+ * 工具目录刻意不走这里：2.0.x 的工具目录 / restrict / 遮蔽池按预设 scope 独立算，
+ * 混入 agent scope 会推翻那一组回归约束；提示词与工具两条数据源保持分离。
+ * 无活动会话时宿主没有可枚举的 agent 作用域，只能退回纯预设装配 —— 这是唯一的
+ * 条件边界，也是插件必须自己把段注册在预设 / 全局层才能「无会话也可控」的原因。
+ */
+async function collectLivePromptView(ctx, liveHint) {
+  try {
+    return await ctx.systemPrompt.assemble(liveHint)
+  } catch (error) {
+    warnOnce(`prompt-customizer: 会话级提示词装配失败，本次退回纯预设装配：${String((error && error.message) || error)}`)
+    return undefined
+  }
+}
+
 /** Assemble one leased mode revision; unresolved session variables stay in the template. */
 async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patchTarget, toolMask) {
   const scopeKey = target?.scopeKey
   const hintId = target?.hintId
   const configTargetId = hintId
+  // 编辑目标必须明确：客户端 /inventory 与 /preview 都带 ?scope；无显式 scope 的
+  // 诊断请求用最新根会话所属预设兜底，绝不猜「全部预设」，避免跨预设串台（D5）。
+  // 两份装配必须共用同一个 preset id，否则清单的 blocked 标记与预览的过滤结果会打架。
+  const catalogAgent = configTargetId === undefined
+    ? latestRootAgent(ctx)
+    : liveAgentForPreset(ctx, configTargetId)
+  const editPresetId = configTargetId ?? (catalogAgent === undefined ? undefined : presetIdOfAgent(ctx, catalogAgent))
+  const livePromptAgent = editPresetId === undefined ? undefined : liveAgentForPreset(ctx, editPresetId)
   // promptCustomizerPreset / promptCustomizerPhase 都是本插件的自定义装配
   // 字段：让我们的过滤器在这次装配里按该 agent 预设的 override 与指定阶段
   // 视图生效（AssembleContext 允许插件自定义字段）。
   const hint = {
     scope: scopeKey,
-    promptCustomizerPreset: configTargetId,
+    promptCustomizerPreset: editPresetId,
     promptCustomizerPresetScope: scopeKey,
     promptCustomizerPhase: phase,
     // 请求预过滤视图（base）：本插件的过滤器把进入过滤前的段 / 工具原文
@@ -1662,15 +1823,28 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   }
   // Mode preview has no conversation state; session variables remain template references.
   const assembled = await ctx.systemPrompt.assemble(hint)
+  // 全域接管（ADR-0005）：同预设活动 agent 的系统提示词真实视图。只取「同预设」
+  // 的 agent，绝不拿最新会话顶替，否则编辑 A 预设会混入 B 预设会话的会话级段。
+  // hint 全量复用（含草稿 patch 与名义阶段），只覆盖 scope / agent，保证两份装配
+  // 走同一份生效配置、同一阶段、同一草稿，预览与清单才不会互相打架。
+  const livePromptView = livePromptAgent === undefined
+    ? undefined
+    : await collectLivePromptView(ctx, { ...hint, scope: livePromptAgent, agent: livePromptAgent })
+  const previewSource = livePromptView ?? assembled
+  const liveBase = (livePromptView && typeof livePromptView === 'object' && livePromptView.promptCustomizerBaseView) || {}
   const diagnostics = []
-  const sections = Array.isArray(assembled.sections)
-    ? assembled.sections.map(section => ({
-      name: section.name,
-      text: renderSection(section, assembled.variables ?? {}, diagnostics),
-      ...(section.source === undefined ? {} : { source: section.source }),
-    }))
+  const sections = Array.isArray(previewSource.sections)
+    ? previewSource.sections.map(section => {
+      const source = stableSourceOf(section)
+      return {
+        name: section.name,
+        text: renderSection(section, previewSource.variables ?? {}, diagnostics),
+        ...(source === undefined ? {} : { source }),
+      }
+    })
     : []
-  // 预过滤视图（base）：段来自装配 base 视图；工具目录 0.2.2 起改从注册表读。
+  // 预过滤视图（base）：段来自预设 + 同预设活动 agent 两份装配 base 视图的并集；
+  // 工具目录 0.2.2 起改从注册表读，仍按预设装配单独算，不与段合并。
   const baseView = (assembled && typeof assembled === 'object' && assembled.promptCustomizerBaseView) || {}
   const phaseStatus = statusOfPhase(phase === undefined ? 'active' : phase) ?? statusOfPhase('active')
   // 草稿预览必须和 /config/apply 共用同一套 overlayPatch 语义；否则工具目录
@@ -1678,23 +1852,39 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const previewRaw = patch !== undefined
     ? overlayPatch({ ...(rawConfig ?? {}) }, patchTarget ?? configTargetId, patch)
     : rawConfig
-  const previewCfg = effectiveConfig(previewRaw?.overrides?.[configTargetId])
+  const previewCfg = effectiveConfig(previewRaw?.overrides?.[editPresetId])
   const previewToolFilter = pickToolsFilter(previewCfg.tools, phaseStatus)
   const previewDenied = pickSectionsForStatus(previewCfg, phaseStatus)
   const previewContextsDenied = pickContextsForStatus(previewCfg, phaseStatus)
   const previewReplacements = filterReplacementsByPhase(previewCfg.replacements, phaseStatus)
-  // 预设预览是纯预设装配：不读取任何具体会话的 agent 作用域条目。
-  // 段的规范顺序只取宿主注册的预设作用域链；用户拖动 / 注入仍走草稿序。
-  const sectionOrder = sectionOrderMap(ctx, [scopeKey])
-  const baseSections = mergeAgentScopedSections(baseView.sections ?? [], [], previewDenied, previewReplacements, sectionOrder)
+  // 段的规范顺序取「预设作用域链 ∪ 同预设活动 agent 作用域链」：agent 作用域段
+  // 的 order 只存在于 agent 链，不补这一条会被一律排到清单尾部。
+  const sectionOrder = sectionOrderMap(ctx, livePromptAgent === undefined
+    ? [scopeKey]
+    : [scopeKey, livePromptAgent])
+  const baseSections = mergeAgentScopedSections(
+    mergePromptEntries(baseView.sections ?? [], liveBase.sections ?? []),
+    [], previewDenied, previewReplacements, sectionOrder)
+    .map(decorateToolPromptSection)
   const finalTools = Array.isArray(assembled.tools) ? assembled.tools : []
-  // 预设预览不做 live 段混合；工具目录例外：agent 作用域注册的工具（如
-  // apply_patch / 客户端工具）也必须出现在“完整目录/遮蔽池”，否则会被误认为消失。
-  // 只取当前编辑预设对应的活动会话，不能用“最新会话”顶替：否则编辑 A 预设时
-  // 会把 B 预设会话的 agent 工具混进 A 的完整目录。
-  const catalogAgent = configTargetId === undefined
-    ? latestRootAgent(ctx)
-    : liveAgentForPreset(ctx, configTargetId)
+  // 真实会话的装配 scope 是 live Agent 自身（宿主 assembleContextFor → scope: agent，
+  // agent-loop 用 resolve 的 toolSet 装配，assembly.tools → GenerateOptions.tools），
+  // 不是 presetScopeKey：assemble({scope: presetScopeKey}).tools 只有预设层可见集，
+  // 会少掉 agent 作用域注册 / 同名 shadow 的工具（2.1.2 修复 38 vs 50）。
+  // 插件拿不到 modelSelection/signal，无法调 ctx.tools.resolve() 复刻步骤准入。
+  // 主源用 ctx.tools.schemas(agent)（agent scope 注册视图全集，global+preset+agent own，
+  // shadow/restrictions 已生效）：不经 executor，PTC 模式下也不会像
+  // assemble().tools 那样被塌缩成只剩 run_code，且与 /session 的 visibleTools 同源。
+  // 只有在 schemas 不可用时才回落 PromptAssembly.tools / 预设装配。
+  // finalTools 仍保留预设装配，供 buildToolUnion 的 extraTools / 排序用，避免改动遮蔽池结构。
+  const visibleFinalTools = livePromptAgent === undefined
+    ? finalTools
+    : (() => {
+        const schemas = toolSchemasOf(ctx, livePromptAgent, true)
+        if (schemas.length > 0) return schemas
+        const live = Array.isArray(previewSource.tools) ? previewSource.tools : []
+        return live.length > 0 ? live : finalTools
+      })()
   const union = await buildToolUnion(ctx, scopeKey, undefined, previewCfg, phaseStatus, {
     toolMask,
     presetId: configTargetId,
@@ -1713,9 +1903,16 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const baseToolNames = new Set(baseTools.map((tool) => tool.name))
   const catalogTools = [...baseTools, ...catalogRows.filter((tool) => !baseToolNames.has(tool.name)
     // 同名但 agent 实际可见的遮蔽行必须保留（keySuffix=live）；同名
-    // masked-plugin / masked-own 行必须保留给只读「已遮蔽」池，不能因
+    // masked-plugin / masked-own / masked-shadow 行必须保留给只读「已遮蔽」池，不能因
     // base 同名就丢掉，否则工具屏蔽池会整块消失。
-    || tool.state === 'locked-agent' || tool.state === 'masked-plugin' || tool.state === 'masked-own')]
+    || tool.state === 'locked-agent' || tool.state === 'masked-plugin'
+    || tool.state === 'masked-own' || tool.state === 'masked-shadow')]
+  const promptSectionsByName = new Map()
+  for (const tool of [...baseTools, ...catalogTools]) {
+    if (tool.promptSections !== undefined && !promptSectionsByName.has(tool.name)) {
+      promptSectionsByName.set(tool.name, tool.promptSections)
+    }
+  }
   const toolSourceByName = new Map(baseTools.map((row) => [row.name, row.source]))
   const toolCandidate = (tool) => {
     const name = typeof tool?.name === 'string' ? tool.name : String(tool?.name)
@@ -1724,14 +1921,18 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   }
   const toolExcluded = (tool) => matchesAny(previewToolFilter.exclude, toolCandidate(tool))
   // 预览带 scope，是「浏览其它预设」时唯一真正跑过该预设装配的入口 —— 把它
-  // 见到的段与工具并进池子（base 视图不含 order，新条目由登记表按追加序补）。
-  const registryTools = union.registryTools
-  const registryTotal = union.registryTools.length
+  // 见到的工具由 catalogTools 补扫进完整目录；段清单已由两份真实装配的并集给出，
+  // 按宿主规范 order 排（ADR-0001 已删登记表，ADR-0005 不再按追加序补）。
+  // 计数与「注册表」清单也必须来自 agent scope，否则右栏会显示「50 / 39 注册表」。
+  const registryTools = visibleFinalTools.length > 0
+    ? visibleFinalTools.map((tool) => String(tool.name ?? ''))
+    : union.registryTools
+  const registryTotal = registryTools.length
   // 兜底探测（机制无关）：本插件产出的段有多少没进最终装配。下游丢弃段的规则
   // 不止 persona complete 一种（实测 liangshen 引导期由预设自身规则 20 → 1 段，
   // 注册表里没有 complete 段），所以按名字比对结果而不是只看注册表标记。
   // emitted 缺席 = 我们的过滤器没跑（异常回退未加工装配），此时无从比较。
-  const emitted = Array.isArray(assembled.promptCustomizerEmitted) ? assembled.promptCustomizerEmitted : null
+  const emitted = Array.isArray(previewSource.promptCustomizerEmitted) ? previewSource.promptCustomizerEmitted : null
   const survivedNames = new Set(sections.map((section) => String(section.name)))
   const droppedNames = emitted === null ? [] : emitted.filter((name) => !survivedNames.has(String(name)))
   const lostSections = droppedNames.length > 0
@@ -1740,33 +1941,34 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   return {
     ok: true,
     config: previewCfg,
-    contexts: filterEmptyOptionalContexts(assembled.contexts ?? [], ctx, scopeKey)
+    contexts: filterEmptyOptionalContexts(previewSource.contexts ?? [], ctx, livePromptAgent ?? scopeKey)
       .filter((item) => !matchesAny(previewContextsDenied, item))
-      .map(context => ({
-        name: context.name,
-        text: renderSection(context, assembled.variables ?? {}, diagnostics),
-        ...(context.source === undefined ? {} : { source: context.source }),
-      })),
+      .map(context => {
+        const source = stableSourceOf(context)
+        return {
+          name: context.name,
+          text: renderSection(context, previewSource.variables ?? {}, diagnostics),
+          ...(source === undefined ? {} : { source }),
+        }
+      }),
     registryTotal,
     /** 该 scope 注册表的工具名清单：供界面区分「在本预设里、只是被该阶段裁掉」
      *  与「根本不属于本预设（无法加回）」。 */
     registryTools,
     /** 非空 = 该 scope 有 complete 段整段接管最终提示词（值为那段的名字）。 */
-    takenOverBy: assembled && typeof assembled === 'object'
-      ? (typeof assembled.promptCustomizerTakenOver === 'string' ? assembled.promptCustomizerTakenOver : undefined)
+    takenOverBy: previewSource && typeof previewSource === 'object'
+      ? (typeof previewSource.promptCustomizerTakenOver === 'string' ? previewSource.promptCustomizerTakenOver : undefined)
       : undefined,
     /** 非空 = 本插件产出的段有若干被下游装配规则丢弃（计数，不含段名列表）。 */
     lostSections,
     sections,
     text: sections.map(section => section.text).filter(Boolean).join('\n\n'),
     diagnostics,
-    // 该阶段最终可见的工具目录（纯预设预览）：注册表去掉本插件阶段 exclude、
-    // 本插件 MCP 遮蔽与 agent 作用域新增项 —— 右栏仍是「编辑目标预设」的
-    // 纯装配；真实会话的完整视图在 /session 路由。
-    // `assembled.tools` 是宿主最终交给模型的声明（含 PTC 的 run_code 包装）。
-    // 有它就用它；测试 / 旧宿主没有该字段时回落到注册表过滤结果。
-    tools: (finalTools.length > 0
-      ? finalTools
+    // 该阶段最终可见的工具目录：与真实会话同源（agent scope 注册视图，2.1.2），
+    // 去掉本插件阶段 exclude 与 MCP 遮蔽；提示词正文亦来自同一份真实装配（ADR-0005 D3）。
+    // 无活动 agent 时回落到预设装配 / 注册表过滤结果。
+    tools: (visibleFinalTools.length > 0
+      ? visibleFinalTools
           .filter(tool => !toolExcluded(tool)
             && !baseTools.some(row => row.name === tool.name && row.maskedByOwnPlugin === true))
           .map(tool => ({
@@ -1775,6 +1977,9 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
             ...toolSourceByName.get(typeof tool.name === 'string' ? tool.name : String(tool.name)) === undefined
               ? {}
               : { source: toolSourceByName.get(typeof tool.name === 'string' ? tool.name : String(tool.name)) },
+            ...(promptSectionsByName.has(typeof tool.name === 'string' ? tool.name : String(tool.name))
+              ? { promptSections: promptSectionsByName.get(typeof tool.name === 'string' ? tool.name : String(tool.name)) }
+              : {}),
           }))
       : baseTools
           .filter(tool => tool.scope !== 'agent'
@@ -1784,6 +1989,7 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
             name: typeof tool.name === 'string' ? tool.name : String(tool.name),
             description: typeof tool.description === 'string' ? tool.description : '',
             ...tool.source === undefined ? {} : { source: tool.source },
+            ...(tool.promptSections === undefined ? {} : { promptSections: tool.promptSections }),
           }))),
     // 预过滤视图：段（含该阶段独立屏蔽标记 blocked / 替换标记）与工具
     // （含该阶段隐藏标记 hidden）—— 供提示词 / 工具 Tab 渲染「每阶段
@@ -1791,7 +1997,9 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
     baseSections,
     baseTools,
     catalogTools,
-    baseContexts: filterEmptyOptionalContexts(baseView.contexts, ctx, scopeKey),
+    baseContexts: filterEmptyOptionalContexts(
+      mergePromptEntries(baseView.contexts, liveBase.contexts),
+      ctx, livePromptAgent ?? scopeKey),
     /** 段名 → 宿主规范 order（清单按它排序，保证跨预设池也不再乱序）。 */
     sectionOrder: Object.fromEntries(sectionOrder),
   }
@@ -1815,11 +2023,14 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
   const assembled = await ctx.systemPrompt.assemble({ scope: agent, agent, ...hintExtra })
   const diagnostics = []
   const sections = Array.isArray(assembled.sections)
-    ? assembled.sections.map(section => ({
-      name: section.name,
-      text: renderSection(section, assembled.variables ?? {}, diagnostics),
-      ...(section.source === undefined ? {} : { source: section.source }),
-    }))
+    ? assembled.sections.map(section => {
+      const source = stableSourceOf(section)
+      return {
+        name: section.name,
+        text: renderSection(section, assembled.variables ?? {}, diagnostics),
+        ...(source === undefined ? {} : { source }),
+      }
+    })
     : []
   const baseView = (baseAssembled && typeof baseAssembled === 'object' && baseAssembled.promptCustomizerBaseView) || {}
   const phase = phaseNameOf(status)
@@ -1829,7 +2040,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
   const presetNames = sectionNamesOf(ctx, presetScopeKey)
   const baseSections = (Array.isArray(baseView.sections) ? baseView.sections : []).map((section) => {
     const name = String(section.name)
-    const source = section.source ?? sourceForEntry(ctx, section, {
+    const rawSource = section.source ?? sourceForEntry(ctx, section, {
       table: 'sections',
       role: 'agent',
       presetId,
@@ -1837,6 +2048,8 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       scopeKey: agent,
       presetScopeKey,
     })
+    const source = stableSourceOf({ source: rawSource })
+    const toolPromptTools = toolsForPromptSection(name)
     return {
       name,
       text: section.text,
@@ -1844,6 +2057,12 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       blocked: matchesAny(denied, source === undefined ? { name } : { name, source }),
       replaced: section.replaced === true || matchesAny(replacements, source === undefined ? { name } : { name, source }),
       ...(source?.kind === 'agent' || !presetNames.has(name) ? { scope: 'agent' } : {}),
+      ...(toolPromptTools.length === 0 ? {} : {
+        toolPrompt: {
+          tools: toolPromptTools,
+          empty: typeof section.text === 'string' && section.text.length === 0,
+        },
+      }),
     }
   })
   const finalTools = Array.isArray(assembled.tools) ? assembled.tools : []
@@ -1853,6 +2072,7 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
     cwd: agent.session?.header?.cwd,
     extraTools: finalTools,
   })
+  const promptSectionsByName = new Map(union.rows.map((tool) => [tool.name, tool.promptSections]))
   // 0.2.2 的 PromptPresentation 没有 tools：真实可见集来自 ctx.tools.schemas(scope)，
   // 没有 tools 服务（测试 / 旧宿主）时才回落到装配结果 / base 视图。
   const visibleTools = toolSchemasOf(ctx, agent)
@@ -1873,6 +2093,9 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
         })
         return source === undefined ? {} : { source }
       })(),
+      ...(promptSectionsByName.get(typeof tool.name === 'string' ? tool.name : String(tool.name)) === undefined
+        ? {}
+        : { promptSections: promptSectionsByName.get(typeof tool.name === 'string' ? tool.name : String(tool.name)) }),
     }))
   const emitted = Array.isArray(assembled.promptCustomizerEmitted) ? assembled.promptCustomizerEmitted : null
   const survivedNames = new Set(sections.map((section) => String(section.name)))
@@ -1889,11 +2112,14 @@ async function buildSessionPreview(ctx, rawConfig, presetScopeKey, live, status,
       phase,
       createdAt: typeof agent.session?.header?.createdAt === 'number' ? agent.session.header.createdAt : undefined,
     },
-    contexts: filterEmptyOptionalContexts(assembled.contexts ?? [], ctx, agent).map(context => ({
-      name: context.name,
-      text: renderSection(context, assembled.variables ?? {}, diagnostics),
-      ...(context.source === undefined ? {} : { source: context.source }),
-    })),
+    contexts: filterEmptyOptionalContexts(assembled.contexts ?? [], ctx, agent).map(context => {
+      const source = stableSourceOf(context)
+      return {
+        name: context.name,
+        text: renderSection(context, assembled.variables ?? {}, diagnostics),
+        ...(source === undefined ? {} : { source }),
+      }
+    }),
     sections,
     text: sections.map(section => section.text).filter(Boolean).join('\n\n'),
     diagnostics,

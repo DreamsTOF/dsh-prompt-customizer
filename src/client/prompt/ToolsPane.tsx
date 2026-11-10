@@ -28,6 +28,7 @@ import {
   type Inventory,
   type PhaseKey,
   type PhaseViews,
+  type ToolPromptSection,
   type ToolState,
 } from './types.ts'
 import type { Translate } from './locales.ts'
@@ -45,6 +46,7 @@ type Notice = { kind: 'ok' | 'warn'; text: string }
 /** 工具行：条目身份 + 展示 / 状态字段。 */
 type ToolRow = EntryRef & {
   description: string
+  promptSections: ToolPromptSection[]
   hidden: boolean
   added: boolean
   state?: ToolState
@@ -55,6 +57,7 @@ type ToolRow = EntryRef & {
 /** 清单与预览两个来源的工具条目（description 可能缺席）。 */
 type ToolLike = EntryRef & {
   description?: string
+  promptSections?: ToolPromptSection[]
   hidden?: boolean
   state?: ToolState
   scope?: 'agent' | 'executor'
@@ -87,7 +90,7 @@ function listWith(list: EntryRef[], entry: EntryRef): EntryRef[] {
   return [...list, { name: entry.name, ...(entry.source === undefined ? {} : { source: entry.source }) }]
 }
 
-export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
+export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }: {
   cfg: Config
   inv: Inventory | null
   phases: PhaseViews | null
@@ -97,6 +100,8 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
   syncAll?: boolean
   t: Translate
   write: (field: 'replacements' | 'inject' | 'tools', value: unknown) => void
+  /** 从工具行跳到提示词页的对应 tool:* 段（可选；不传时只显示提示词段标签）。 */
+  onOpenSection?: (entry: EntryRef) => void
 }): ReactElement {
   const [filter, setFilter] = useState<TriState>('all')
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -191,6 +196,20 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     writeLists(key, exclude, add)
   }
 
+  /** 某个工具已由服务端 inventory / 三阶段视图带出的提示词段元数据。 */
+  const promptSectionsOfName = (name: string): ToolPromptSection[] => {
+    for (const tool of inv?.tools ?? []) {
+      if (tool.name === name && Array.isArray(tool.promptSections)) return tool.promptSections
+    }
+    for (const key of PHASE_KEYS) {
+      const view = phases?.[key]
+      for (const tool of [...(view?.baseTools ?? []), ...(view?.catalogTools ?? [])]) {
+        if (tool.name === name && Array.isArray(tool.promptSections)) return tool.promptSections
+      }
+    }
+    return []
+  }
+
   // 阶段分组里的行 = 该阶段进入过滤的目录 ∪ 已加回（但尚未出现在装配里）的工具。
   const rowsOf = (key: PhaseKey): ToolRow[] => {
     const catalog = catalogOf(key)
@@ -199,6 +218,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
         name: tool.name,
         ...(tool.source === undefined ? {} : { source: tool.source }),
         description: tool.description ?? '',
+        promptSections: tool.promptSections ?? [],
         hidden: isLockedExec(tool) ? false : tool.hidden === true,
         added: false,
         state: stateOf(tool),
@@ -211,6 +231,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
         name: entry.name,
         ...(entry.source === undefined ? {} : { source: entry.source }),
         description: '',
+        promptSections: promptSectionsOfName(entry.name),
         hidden: false,
         added: true,
         state: 'controllable' as ToolState,
@@ -326,6 +347,43 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     if (!rowVisible(row)) return null
     const locked = row.state === 'locked-executor'
     const identity = `${entryKey(row)}\u0000${row.keySuffix ?? ''}`
+    const promptSectionEmpty = (section: ToolPromptSection): boolean => {
+      if (section.empty === true) return true
+      for (const key of PHASE_KEYS) {
+        const base = phases?.[key]?.baseSections ?? []
+        const match = base.find((candidate) => sameEntry(candidate, section))
+        if (match !== undefined && String(match.text ?? '').length === 0) return true
+      }
+      return false
+    }
+    const promptSectionList = (): ReactElement | null => {
+      if (row.state === 'locked-executor') return null
+      if (row.promptSections.length === 0) {
+        return h('div', { style: { ...s.muted, fontSize: '11px' } },
+          `${t('toolPromptSections')}: ${t('toolPromptNone')}`)
+      }
+      return h('div', {
+        style: { ...s.muted, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' },
+      }, [
+        h('span', {}, `${t('toolPromptSections')}:`),
+        ...row.promptSections.map((section) => {
+          const label = `${section.name}${promptSectionEmpty(section) ? ` ${t('empty')}` : ''}`
+          const key = `${section.name}\u0000${sourceKey(section.source)}`
+          return onOpenSection === undefined
+            ? h('span', {
+                key,
+                style: s.badgeSystem,
+                title: t('toolPromptHint'),
+              }, label)
+            : h('button', {
+                key,
+                style: s.mini,
+                title: t('toolPromptHint'),
+                onClick: () => onOpenSection({ name: section.name, ...(section.source === undefined ? {} : { source: section.source }) }),
+              }, label)
+        }),
+      ])
+    }
     return h('div', {
       key: identity,
       style: {
@@ -379,7 +437,8 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
           row.state === 'locked-executor' ? h('span', { style: s.badgeSystem, title: t('toolExecutorScopedHint') }, t('toolExecutorScoped')) : null,
           !locked && row.hidden ? h('span', { style: s.badgeBlocked }, t('hiddenOn')) : null,
         ]),
-        row.description !== '' ? h('div', { style: s.preview }, row.description.slice(0, 120)) : null,
+        row.description !== '' ? h('div', { style: s.preview }, `${t('toolDescriptionLabel')}: ${row.description.slice(0, 120)}`) : null,
+        promptSectionList(),
       ]),
     ])
   }
@@ -426,12 +485,20 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write }: {
     return source.id === undefined ? label : `${label} · ${source.id}`
   }
   const stateBadge = (state: ToolState): ReactElement => {
-    // 只读完整目录只聚合「被遮蔽」两态：分别是其它插件 restrict / 本插件 MCP 遮蔽。
+    // 只读完整目录聚合：其它插件 restrict / 同名遮蔽 / 本插件 MCP 遮蔽 / agent 作用域注册。
     const own = state === 'masked-own'
+    const shadow = state === 'masked-shadow'
+    const agent = state === 'locked-agent'
+    const hint = own ? t('toolMaskedByOwnPluginHint')
+      : shadow ? t('toolMaskedByShadowHint')
+        : agent ? t('toolAgentScopedHint') : t('toolMaskedByPluginHint')
+    const label = own ? t('toolMaskedByOwnPlugin')
+      : shadow ? t('toolMaskedByShadow')
+        : agent ? t('toolAgentScoped') : t('toolMaskedByPlugin')
     return h('span', {
       style: s.badgeReplaced,
-      title: own ? t('toolMaskedByOwnPluginHint') : t('toolMaskedByPluginHint'),
-    }, own ? t('toolMaskedByOwnPlugin') : t('toolMaskedByPlugin'))
+      title: hint,
+    }, label)
   }
 
   return h('div', { style: s.colLeft }, [

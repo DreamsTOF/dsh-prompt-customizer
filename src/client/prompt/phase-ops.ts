@@ -18,6 +18,7 @@ import {
   type Preview,
   type ReplacementEntry,
   type SectionField,
+  type ToolPromptInfo,
 } from './types.ts'
 
 /** 屏幕上一条可交互的段行。`dynamic` 只在服务端给出标记时才是布尔值 ——
@@ -31,6 +32,8 @@ export interface PhaseRow extends EntryRef {
   /** 该阶段自己的屏蔽名单是否屏蔽了此段：勾选框 = 未屏蔽（注入模型）。 */
   blocked: boolean
   dynamic?: boolean
+  /** tool:* 段关联的工具组（服务端 inventory 提供；旧宿主缺省）。 */
+  toolPrompt?: ToolPromptInfo
 }
 
 function descriptorOf(key: PhaseKey) {
@@ -157,6 +160,7 @@ interface BaseLike extends EntryRef {
   blocked?: boolean
   replaced?: boolean
   dynamic?: boolean
+  toolPrompt?: ToolPromptInfo
 }
 
 /**
@@ -212,6 +216,7 @@ export function phaseRows(cfg: Config | null | undefined, view: Preview | null |
     const dynamic = typeof baseSection?.dynamic === 'boolean'
       ? baseSection.dynamic
       : typeof postSection?.dynamic === 'boolean' ? postSection.dynamic : undefined
+    const toolPrompt = baseSection?.toolPrompt ?? postSection?.toolPrompt
     return {
       name: entry.name,
       ...(entry.source === undefined ? {} : { source: entry.source }),
@@ -221,6 +226,7 @@ export function phaseRows(cfg: Config | null | undefined, view: Preview | null |
       override,
       blocked: deniedKeys.has(identity),
       ...(dynamic === undefined ? {} : { dynamic }),
+      ...(toolPrompt === undefined ? {} : { toolPrompt }),
     } satisfies PhaseRow
   })
   if (injected.order.size > 0) {

@@ -195,7 +195,21 @@ export interface PresetData extends OverrideData {
 // ── 清单 / 预览 ─────────────────────────────────────────────────────────────
 
 /** 工具展示状态。 */
-export type ToolState = 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own'
+export type ToolState = 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own' | 'masked-shadow'
+
+/** 工具提示词段（tool:* systemPrompt.section）的展示元数据。 */
+export interface ToolPromptSection extends EntryRef {
+  /** 静态 provider 文本为空；动态 provider 或缺省时由前端按实际段文本判断。 */
+  empty?: boolean
+  /** 动态 provider；文本只能在装配时得到。 */
+  dynamic?: boolean
+}
+
+/** 段行上的工具组关系：一个 tool:* 段可能服务多个工具。 */
+export interface ToolPromptInfo {
+  tools: string[]
+  empty?: boolean
+}
 
 /** 宿主路由返回的清单载荷：当前生效的提示词段与工具目录。 */
 export interface Inventory {
@@ -206,6 +220,7 @@ export interface Inventory {
     replaced: boolean
     scope?: 'agent'
     dynamic?: boolean
+    toolPrompt?: ToolPromptInfo
   }>
   tools: Array<EntryRef & {
     description?: string
@@ -214,6 +229,10 @@ export interface Inventory {
     scope?: 'agent' | 'executor'
     maskedByPlugin?: boolean
     maskedByOwnPlugin?: boolean
+    maskedByShadow?: boolean
+    /** 同名遮蔽：顶掉该行的 agent 作用域工具身份（只读展示）。 */
+    shadowedBy?: { name: string; source?: EntrySource }
+    promptSections?: ToolPromptSection[]
     /** 同名多行（如 live / preset 两态）的展示区分后缀。 */
     keySuffix?: string
   }>
@@ -240,6 +259,7 @@ export interface BaseSection extends EntryRef {
   replaced: boolean
   scope?: 'agent'
   dynamic?: boolean
+  toolPrompt?: ToolPromptInfo
 }
 
 /** 预过滤工具视图。 */
@@ -250,6 +270,10 @@ export interface BaseTool extends EntryRef {
   scope?: 'agent' | 'executor'
   maskedByPlugin?: boolean
   maskedByOwnPlugin?: boolean
+  maskedByShadow?: boolean
+  /** 同名遮蔽：顶掉该行的 agent 作用域工具身份（只读展示）。 */
+  shadowedBy?: { name: string; source?: EntrySource }
+  promptSections?: ToolPromptSection[]
   keySuffix?: string
 }
 
@@ -262,7 +286,7 @@ export interface BaseContext extends EntryRef {
 }
 
 /** 工具预览条目：对象形态或纯字符串工具名（统一归一化为对象）。 */
-export type PreviewTool = EntryRef & { description?: string; keySuffix?: string }
+export type PreviewTool = EntryRef & { description?: string; keySuffix?: string; promptSections?: ToolPromptSection[] }
 
 /** 宿主路由返回的最终装配预览载荷。 */
 export interface Preview {
@@ -271,7 +295,7 @@ export interface Preview {
   source?: 'preset' | 'session'
   /** 当前会话视图的会话元数据；预设预览为空。 */
   session?: { id: string; presetId?: string; phase?: string; createdAt?: number } | null
-  /** 非空 = 预设预览的左栏已并入该活动会话的 agent 作用域条目（右栏仍是纯预设装配）。 */
+  /** 未解析的提示词变量诊断（会话变量在诊断装配里保持模板引用）。 */
   diagnostics?: Array<{ name: string; variable: string; kind: 'session-variable' }>
   contexts?: Array<{ name: string; text: string }>
   scope?: unknown
@@ -280,7 +304,9 @@ export interface Preview {
   lostSections?: { emitted: number; survived: number; dropped: number }
   registryTotal?: number
   registryTools?: Array<EntryRef | string>
+  /** 2.1.0 起：有同预设活动 agent 时来自「该预设 + 同预设活动 agent」的真实装配（ADR-0005）。 */
   sections: Array<EntryRef & { text: string }>
+  /** 与 sections 同源的最终系统提示词正文（只含段，不含工具声明）。 */
   text: string
   tools: Array<PreviewTool | string>
   baseSections?: BaseSection[]

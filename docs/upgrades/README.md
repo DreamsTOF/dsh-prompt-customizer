@@ -4,11 +4,31 @@
 
 ## 当前兼容版本
 
-- 插件 **2.0.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）。
+- 插件 **2.1.2** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）；只扩展本插件自己的提示词枚举与工具探测，未改动宿主 API 依赖。
+- 历史起点：**2.0.0** 起对齐该宿主版本。
 - 0.2.2-rc.1 的完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
 - 更早的 0.2.1-rc.2 适配记录见 [rc2-migration.md](rc2-migration.md)。
 
 ## 版本历史
+
+## 2.1.2：工具目录与真实会话同源
+
+- 右栏「模型实际可见的工具目录」改用 `ctx.tools.schemas(agent)`（agent scope 注册视图），与 `/session` 同源；修掉只显示预设层工具（38 vs 50）与 `38 / 39 注册表` 错配。
+- 只读「完整目录 / 已遮蔽」池如实列出插件在 agent 作用域**纯新增**的工具（会话级），不伪造「同名遮蔽」；同时修正「会话级工具只能查看」的误导文案（可按阶段隐藏）。
+- 工具提示词段（`tool:*`）按工具组映射（`jobs` / `pty` / `goal` / `schedule` / `subagent`）：工具页显示提示词段入口与只读 description，提示词页显示关联工具与空段；`forceSections` 仅在有实际段策略时覆盖，无定制时保留宿主 `complete` 原样。
+- 完整记录见 [2.1.2-tool-catalog-scope.md](2.1.2-tool-catalog-scope.md)。
+
+## 2.1.1：同名遮蔽探测
+
+- 工具遮蔽池不再只靠 `definitions` 对象引用相等来识别同名遮蔽；`definitions` 缺席 / 缺项、profile 未把原生工具挂进 `presetTools` 时都能识别，被顶掉的继承层工具进入只读遮蔽池（`masked-shadow`）。
+- 遮蔽行来源标继承层（global / preset）而不是 agent，并携带 `shadowedBy`；工具目录数据源、阶段过滤与 2.1.0 的提示词接管链路全部不变。
+- 完整记录见 [2.1.1-tool-shadow-detection.md](2.1.1-tool-shadow-detection.md)。
+
+## 2.1.0：全域系统提示词接管
+
+- 清单与预览并入「同预设活动 agent」的真实装配，插件在 agent 作用域动态注册的段可被枚举、屏蔽 / 替换 / 注入 / 排序；同名不同源分列，agent 来源按 `{kind:'agent'}` 跨会话稳定匹配。
+- 工具目录仍按纯预设装配计算（两条数据源分离），2.0.x 的工具目录 / restrict / 遮蔽池行为不变。
+- 决策与边界见 [ADR-0005](../adr/0005-universal-prompt-takeover.md)，完整记录见 [2.1.0-universal-prompt-takeover.md](2.1.0-universal-prompt-takeover.md)。
 
 ## 2.0.22：原文不可变回归
 

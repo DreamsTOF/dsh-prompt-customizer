@@ -10,6 +10,11 @@
  *  - 默认只跑只读检查；`--destructive` 会跑写入场景，且**测试前整库备份、结束时恢复**，
  *    保护真实数据。任何异常都会在 finally 里尝试恢复。
  *  - 退出码：全部通过 0，否则 1。结果同时写到 scripts/e2e-report.json。
+ *
+ * 状态（2.1.0）：`--destructive` 里的「config/apply 工作区级写入 / 还原」场景仍用
+ * 2.0.0 已移除的 `level=workspace` 与 `workspaceOverrides`，与当前契约不相容；只读
+ * 检查仍可用。`scripts/e2e-report.json` 与 `docs/testing/feature-matrix.md` 都是历史
+ * 运行结果，不是当前验证结论（当前门禁见 `npm run check`）。
  */
 import fs from 'node:fs'
 import os from 'node:os'

@@ -789,7 +789,17 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
           ]
         : mode === 'tools'
           ? [
-              h(ToolsPane, { key: 'tools', cfg: view, inv, phases: ep, phase, syncAll, t, write: edit }),
+              h(ToolsPane, {
+                key: 'tools',
+                cfg: view,
+                inv,
+                phases: ep,
+                phase,
+                syncAll,
+                t,
+                write: edit,
+                onOpenSection: () => switchMode('sections'),
+              }),
               h(PreviewPane, { key: 'preview', t, phases: ep, phase, sub: previewSub, onToggleContext: toggleContext }),
             ]
           : [

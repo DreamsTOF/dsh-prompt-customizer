@@ -7,6 +7,10 @@
  * 按真实形状（含 dsh_browser_* 这类已卸载的历史工具）构造。
  *
  * Usage: node scripts/simulate-rescan.mjs
+ *
+ * 状态（2.1.0）：本脚本基于 ADR-0001 已删除的「目录累积池 + /catalog/rescan」，
+ * 现在跑不通，保留作历史材料。全域接管的当前验证见
+ * test/universal-prompt-takeover.test.mjs 与 `npm run check`。
  */
 
 import fs from 'node:fs'

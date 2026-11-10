@@ -127,6 +127,20 @@ export function pickContextsForStatus(config, status) {
   return field === undefined || !Array.isArray(config?.[field]) ? [] : config[field]
 }
 
+/**
+ * 当前阶段是否有任何会影响 sections 的实际段策略。
+ *
+ * `forceSections` 只能在这类策略存在时才覆盖宿主结果：没有段定制时保持
+ * 宿主原样（包括 `complete: true` 的 minimal persona）；只有屏蔽 / 替换 /
+ * 注入 / 排序（inject 空文本也承载顺序）存在时才接管最终 sections。
+ */
+export function hasSectionPolicy(config, status) {
+  if (pickSectionsForStatus(config, status).length > 0) return true
+  if (filterReplacementsByPhase(config?.replacements, status).length > 0) return true
+  if (filterInjectByPhase(config?.inject, status).length > 0) return true
+  return false
+}
+
 /** 段级策略：屏蔽 → 阶段替换 → 注入 → 排序。 */
 export function applySectionPolicy(baseSections, cfg, status) {
   const denied = pickSectionsForStatus(cfg, status)
