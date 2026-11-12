@@ -15,7 +15,6 @@ import { createElement as h, useEffect, useRef, useState, type DragEvent as Reac
 import {
   PHASE_KEYS,
   PHASE_LABEL_KEY,
-  SOURCE_KIND_ORDER,
   SOURCE_LABEL_KEY,
   entryKey,
   normalizeEntry,
@@ -30,6 +29,7 @@ import {
   type PhaseViews,
   type ToolPromptSection,
   type ToolState,
+  type ToolLayer,
 } from './types.ts'
 import type { Translate } from './locales.ts'
 import { toolFieldOf } from './phase-ops.ts'
@@ -38,7 +38,7 @@ import { acceptsDrop, beginDrag, finishDrag, payloadOf, setPhaseDropHandler, typ
 import { useDragAutoScroll } from './drag-scroll.ts'
 import { s } from './styles.ts'
 import type { TriState } from './SectionsPane.tsx'
-import { buildMaskedPool, toolStateOf } from './tool-pool.ts'
+import { buildMaskedPoolGrouped, toolStateOf, type MaskedPoolRow } from './tool-pool.ts'
 
 /** 一次加回操作的反馈（ok = 已写入，warn = 什么都没改并说明原因）。 */
 type Notice = { kind: 'ok' | 'warn'; text: string }
@@ -52,6 +52,8 @@ type ToolRow = EntryRef & {
   state?: ToolState
   scope?: 'agent' | 'executor'
   keySuffix?: string
+  /** 注册层（行标题右侧的层徽标）。 */
+  layer?: ToolLayer
 }
 
 /** 清单与预览两个来源的工具条目（description 可能缺席）。 */
@@ -64,6 +66,12 @@ type ToolLike = EntryRef & {
   maskedByPlugin?: boolean
   maskedByOwnPlugin?: boolean
   keySuffix?: string
+  maskedByShadow?: boolean
+  maskedByPtc?: boolean
+  /** 注册层（行标题右侧的层徽标）。 */
+  layer?: ToolLayer
+  /** PTC 折叠标记（该工具落在程序绑定内）。 */
+  ptcCollapsed?: true
 }
 
 function entryOf(tool: EntryRef | string): EntryRef | undefined {
@@ -224,6 +232,7 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
         state: stateOf(tool),
         ...(tool.scope === 'agent' || tool.scope === 'executor' ? { scope: tool.scope } : {}),
         ...(tool.keySuffix === undefined ? {} : { keySuffix: tool.keySuffix }),
+        ...(tool.layer === undefined ? {} : { layer: tool.layer }),
       }))
     const added = addOf(key)
       .filter((entry) => !catalog.some((row) => sameEntry(row, entry)))
@@ -338,6 +347,8 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
 
   // 当前阶段的行 + 三态过滤（已启用 = 对模型可见）。
   const rows = rowsOf(phase)
+  // 顶部横幅的链接真值：来自当前阶段的 preview（phases[phase]）。
+  const truth = phases?.[phase]?.truth
   const onCount = rows.filter((row) => !row.hidden).length
   const offCount = rows.length - onCount
   const rowVisible = (row: ToolRow): boolean =>
@@ -435,7 +446,13 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
           row.added ? h('span', { style: s.badgeCustom }, t('toolAddedTag')) : null,
           row.state === 'locked-agent' ? h('span', { style: s.badgeSystem, title: t('toolAgentScopedHint') }, t('toolAgentScoped')) : null,
           row.state === 'locked-executor' ? h('span', { style: s.badgeSystem, title: t('toolExecutorScopedHint') }, t('toolExecutorScoped')) : null,
-          !locked && row.hidden ? h('span', { style: s.badgeBlocked }, t('hiddenOn')) : null,
+          !locked && row.hidden
+            ? h('span', {
+                style: s.badgeBlocked,
+                ...(row.state === 'controllable' ? { title: t('toolOwnHiddenHint') } : {}),
+              }, row.state === 'controllable' ? t('toolOwnHidden') : t('hiddenOn'))
+            : null,
+          layerBadge(row.layer),
         ]),
         row.description !== '' ? h('div', { style: s.preview }, `${t('toolDescriptionLabel')}: ${row.description.slice(0, 120)}`) : null,
         promptSectionList(),
@@ -453,31 +470,13 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
       keySuffix: tool.keySuffix,
     }))
 
-  // 只读「完整目录 / 已遮蔽」：被别的插件遮蔽 / 被本插件 MCP 遮蔽的工具。
+  // 只读池：可反选组（本插件遮蔽）与不可反选组（外部决定：外部不可见 / 同名被覆盖 / PTC 折叠）。
   // 来源 = 跨预设池 ∪ 当前阶段完整基座；同一 name+source 的多状态聚合一行。
-  type Agg = { entry: EntryRef; description: string; states: Set<ToolState> }
-  const readOnly: Agg[] = buildMaskedPool([
+  const poolGroups = buildMaskedPoolGrouped([
     ...(inv?.tools ?? []),
     ...PHASE_KEYS.flatMap((key) => catalogOf(key)),
   ])
-  // 按来源分组（global / preset / workspace / agent / executor / 未知）。
-  const readOnlyGroups = (() => {
-    const groups = new Map<string, { source?: EntrySource; rows: Agg[] }>()
-    for (const row of readOnly) {
-      const key = sourceKey(row.entry.source)
-      const group = groups.get(key)
-      if (group === undefined) groups.set(key, { ...(row.entry.source === undefined ? {} : { source: row.entry.source }), rows: [row] })
-      else group.rows.push(row)
-    }
-    return [...groups.values()].sort((left, right) => {
-      const leftKind = left.source?.kind
-      const rightKind = right.source?.kind
-      const leftRank = leftKind === undefined ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(leftKind)
-      const rightRank = rightKind === undefined ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(rightKind)
-      if (leftRank !== rightRank) return leftRank - rightRank
-      return String(left.source?.id ?? '').localeCompare(String(right.source?.id ?? ''))
-    })
-  })()
+  const poolTotal = poolGroups.reversible.length + poolGroups.irreversible.length
 
   const sourceLabel = (source?: EntrySource): string => {
     if (source === undefined) return t('sourceUnknown')
@@ -485,21 +484,58 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
     return source.id === undefined ? label : `${label} · ${source.id}`
   }
   const stateBadge = (state: ToolState): ReactElement => {
-    // 只读完整目录聚合：其它插件 restrict / 同名遮蔽 / 本插件 MCP 遮蔽 / agent 作用域注册。
+    // 只读池：可反选组 = 本插件遮蔽；不可反选组 = 外部决定（外部不可见 / 同名被覆盖 / PTC 折叠）。
     const own = state === 'masked-own'
     const shadow = state === 'masked-shadow'
+    const ptc = state === 'masked-ptc'
     const agent = state === 'locked-agent'
     const hint = own ? t('toolMaskedByOwnPluginHint')
       : shadow ? t('toolMaskedByShadowHint')
-        : agent ? t('toolAgentScopedHint') : t('toolMaskedByPluginHint')
+        : ptc ? t('toolMaskedByPtcHint')
+          : agent ? t('toolAgentScopedHint') : t('toolMaskedByExternalHint')
     const label = own ? t('toolMaskedByOwnPlugin')
       : shadow ? t('toolMaskedByShadow')
-        : agent ? t('toolAgentScoped') : t('toolMaskedByPlugin')
+        : ptc ? t('toolMaskedByPtc')
+          : agent ? t('toolAgentScoped') : t('toolMaskedByExternal')
     return h('span', {
       style: s.badgeReplaced,
       title: hint,
     }, label)
   }
+
+  // 层徽标：行标题右侧显示该工具的注册层（执行器层沿用「执行器」来源文案）。
+  const LAYER_LABEL_KEY: Record<ToolLayer, string> = {
+    global: 'layerGlobal',
+    preset: 'layerPreset',
+    agent: 'layerAgent',
+    executor: 'sourceExecutor',
+  }
+  const layerBadge = (layer?: ToolLayer): ReactElement | null => layer === undefined
+    ? null
+    : h('span', { style: { ...s.badgeSystem, marginLeft: 'auto' } }, t(LAYER_LABEL_KEY[layer]))
+
+  /** 只读池行：无勾选框、不可拖拽（外部决定的状态）。 */
+  const renderPoolRow = (row: MaskedPoolRow): ReactElement => h('div', {
+    key: entryKey(row.entry),
+    style: { ...s.row, opacity: 0.8 },
+  }, [
+    h('div', { style: s.rowBody }, [
+      h('div', { style: s.rowTitle }, [
+        h('span', { style: s.code }, row.entry.name),
+        row.entry.source === undefined ? null : h('span', { style: s.badgeSystem }, sourceLabel(row.entry.source)),
+        ...[...row.states].map((state) => stateBadge(state)),
+        layerBadge(row.layer),
+      ]),
+      row.description !== '' ? h('div', { style: s.preview }, row.description.slice(0, 120)) : null,
+    ]),
+  ])
+
+  /** 只读池的一个分组（空组不渲染）。 */
+  const poolGroup = (title: string, groupRows: MaskedPoolRow[]): ReactElement | null =>
+    groupRows.length === 0 ? null : h('details', { style: s.injectBox }, [
+      h('summary', { style: { ...s.muted, cursor: 'pointer' } }, `${title} (${groupRows.length})`),
+      groupRows.map(renderPoolRow),
+    ])
 
   return h('div', { style: s.colLeft }, [
     h('div', {
@@ -514,6 +550,8 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
       },
       onDrop: dropOnPane,
     }, [
+      truth?.linked === false ? h('div', { style: s.noticeWarn }, t('noSessionBanner')) : null,
+      truth?.ptcCollapsed === true ? h('div', { style: s.noticeWarn }, t('ptcCollapsedBanner')) : null,
       h('div', { style: s.muted }, t('toolsFourHint')),
       notice ? h('div', { style: notice.kind === 'ok' ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
@@ -555,25 +593,21 @@ export function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSe
           ]),
         ])),
       ]),
-      // 只读「完整目录」：不可控工具按来源分组，同一 name+source 的多状态聚合一行。
-      readOnly.length === 0 ? null : h('details', { style: s.injectBox }, [
-        h('summary', { style: { ...s.muted, cursor: 'pointer' } }, `${t('completeCatalogTitle')} (${readOnly.length})`),
+      // 只读池：两个 <details> 分组（可反选 / 不可反选），行只读、无勾选框。
+      poolTotal === 0 ? null : h('div', {
+        style: { ...s.injectBox, ...(dropMark === 'pool' ? s.dropZoneActive : {}) },
+        onDragOver: (event: ReactDragEvent) => {
+          if (!acceptsDrop(event, 'tool')) return
+          event.preventDefault()
+          event.stopPropagation()
+          setDropMark('pool')
+        },
+        onDrop: dropOnPool,
+      }, [
+        h('div', { style: { ...s.muted, fontWeight: 600 } }, `${t('completeCatalogTitle')} (${poolTotal})`),
         h('div', { style: s.muted }, t('completeCatalogHint')),
-        readOnlyGroups.map((group) => h('div', { key: sourceKey(group.source) || 'unknown' }, [
-          h('div', { style: { ...s.muted, marginTop: 6, fontWeight: 600 } }, sourceLabel(group.source)),
-          group.rows.map((row) => h('div', {
-            key: entryKey(row.entry),
-            style: { ...s.row, opacity: 0.8 },
-          }, [
-            h('div', { style: s.rowBody }, [
-              h('div', { style: s.rowTitle }, [
-                h('span', { style: s.code }, row.entry.name),
-                ...[...row.states].map((state) => stateBadge(state)),
-              ]),
-              row.description !== '' ? h('div', { style: s.preview }, row.description.slice(0, 120)) : null,
-            ]),
-          ])),
-        ])),
+        poolGroup(t('poolReversible'), poolGroups.reversible),
+        poolGroup(t('poolIrreversible'), poolGroups.irreversible),
       ]),
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。

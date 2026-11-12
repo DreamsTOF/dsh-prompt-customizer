@@ -1570,7 +1570,6 @@ var SOURCE_LABEL_KEY = {
   executor: "sourceExecutor",
   workspace: "sourceWorkspace"
 };
-var SOURCE_KIND_ORDER = ["global", "preset", "workspace", "agent", "executor"];
 function normalizeSource(source) {
   if (source === null || source === void 0) return void 0;
   if (typeof source === "string") return void 0;
@@ -2690,26 +2689,40 @@ var import_react5 = require("react");
 
 // src/client/prompt/tool-pool.ts
 function toolStateOf(tool) {
-  return tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByShadow === true ? "masked-shadow" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
+  return tool.state ?? (tool.scope === "agent" ? "locked-agent" : tool.scope === "executor" ? "locked-executor" : tool.maskedByOwnPlugin === true ? "masked-own" : tool.maskedByShadow === true ? "masked-shadow" : tool.maskedByPtc === true ? "masked-ptc" : tool.maskedByPlugin === true ? "masked-plugin" : "controllable");
 }
 function buildMaskedPool(tools) {
   const map = /* @__PURE__ */ new Map();
   for (const tool of tools) {
     if (tool.name === "") continue;
     const state = toolStateOf(tool);
-    if (state !== "masked-plugin" && state !== "masked-own" && state !== "masked-shadow" && state !== "locked-agent") continue;
+    if (state !== "masked-own" && state !== "masked-plugin" && state !== "masked-shadow" && state !== "masked-ptc") continue;
     const entry = normalizeEntry(tool);
     if (entry === void 0) continue;
     const identity = entryKey(entry);
     const existing = map.get(identity);
     if (existing === void 0) {
-      map.set(identity, { entry, description: tool.description ?? "", states: /* @__PURE__ */ new Set([state]) });
+      map.set(identity, {
+        entry,
+        description: tool.description ?? "",
+        states: /* @__PURE__ */ new Set([state]),
+        reversible: state === "masked-own",
+        ...tool.layer === void 0 ? {} : { layer: tool.layer }
+      });
     } else {
       existing.states.add(state);
+      if (state === "masked-own") existing.reversible = true;
+      if (existing.layer === void 0 && tool.layer !== void 0) existing.layer = tool.layer;
       if (existing.description === "" && (tool.description ?? "") !== "") existing.description = tool.description ?? "";
     }
   }
   return [...map.values()].sort((left, right) => left.entry.name.localeCompare(right.entry.name));
+}
+function buildMaskedPoolGrouped(tools) {
+  const reversible = [];
+  const irreversible = [];
+  for (const row of buildMaskedPool(tools)) (row.reversible ? reversible : irreversible).push(row);
+  return { reversible, irreversible };
 }
 
 // src/client/prompt/ToolsPane.tsx
@@ -2823,7 +2836,8 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
       added: false,
       state: stateOf(tool),
       ...tool.scope === "agent" || tool.scope === "executor" ? { scope: tool.scope } : {},
-      ...tool.keySuffix === void 0 ? {} : { keySuffix: tool.keySuffix }
+      ...tool.keySuffix === void 0 ? {} : { keySuffix: tool.keySuffix },
+      ...tool.layer === void 0 ? {} : { layer: tool.layer }
     }));
     const added = addOf(key).filter((entry) => !catalog.some((row) => sameEntry(row, entry))).map((entry) => ({
       name: entry.name,
@@ -2916,6 +2930,7 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
   });
   const stageLabel = (key) => t(PHASE_LABEL_KEY[key]);
   const rows = rowsOf(phase);
+  const truth = phases?.[phase]?.truth;
   const onCount = rows.filter((row) => !row.hidden).length;
   const offCount = rows.length - onCount;
   const rowVisible = (row) => filter === "all" || (filter === "on" ? !row.hidden : row.hidden);
@@ -3016,7 +3031,11 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
           row.added ? (0, import_react5.createElement)("span", { style: s.badgeCustom }, t("toolAddedTag")) : null,
           row.state === "locked-agent" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolAgentScopedHint") }, t("toolAgentScoped")) : null,
           row.state === "locked-executor" ? (0, import_react5.createElement)("span", { style: s.badgeSystem, title: t("toolExecutorScopedHint") }, t("toolExecutorScoped")) : null,
-          !locked && row.hidden ? (0, import_react5.createElement)("span", { style: s.badgeBlocked }, t("hiddenOn")) : null
+          !locked && row.hidden ? (0, import_react5.createElement)("span", {
+            style: s.badgeBlocked,
+            ...row.state === "controllable" ? { title: t("toolOwnHiddenHint") } : {}
+          }, row.state === "controllable" ? t("toolOwnHidden") : t("hiddenOn")) : null,
+          layerBadge(row.layer)
         ]),
         row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, `${t("toolDescriptionLabel")}: ${row.description.slice(0, 120)}`) : null,
         promptSectionList()
@@ -3029,27 +3048,11 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
     description: tool.description ?? "",
     keySuffix: tool.keySuffix
   }));
-  const readOnly = buildMaskedPool([
+  const poolGroups = buildMaskedPoolGrouped([
     ...inv?.tools ?? [],
     ...PHASE_KEYS.flatMap((key) => catalogOf(key))
   ]);
-  const readOnlyGroups = (() => {
-    const groups = /* @__PURE__ */ new Map();
-    for (const row of readOnly) {
-      const key = sourceKey(row.entry.source);
-      const group = groups.get(key);
-      if (group === void 0) groups.set(key, { ...row.entry.source === void 0 ? {} : { source: row.entry.source }, rows: [row] });
-      else group.rows.push(row);
-    }
-    return [...groups.values()].sort((left, right) => {
-      const leftKind = left.source?.kind;
-      const rightKind = right.source?.kind;
-      const leftRank = leftKind === void 0 ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(leftKind);
-      const rightRank = rightKind === void 0 ? SOURCE_KIND_ORDER.length : SOURCE_KIND_ORDER.indexOf(rightKind);
-      if (leftRank !== rightRank) return leftRank - rightRank;
-      return String(left.source?.id ?? "").localeCompare(String(right.source?.id ?? ""));
-    });
-  })();
+  const poolTotal = poolGroups.reversible.length + poolGroups.irreversible.length;
   const sourceLabel = (source) => {
     if (source === void 0) return t("sourceUnknown");
     const label = t(SOURCE_LABEL_KEY[source.kind] ?? "sourceUnknown");
@@ -3058,14 +3061,40 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
   const stateBadge = (state) => {
     const own = state === "masked-own";
     const shadow = state === "masked-shadow";
+    const ptc = state === "masked-ptc";
     const agent = state === "locked-agent";
-    const hint = own ? t("toolMaskedByOwnPluginHint") : shadow ? t("toolMaskedByShadowHint") : agent ? t("toolAgentScopedHint") : t("toolMaskedByPluginHint");
-    const label = own ? t("toolMaskedByOwnPlugin") : shadow ? t("toolMaskedByShadow") : agent ? t("toolAgentScoped") : t("toolMaskedByPlugin");
+    const hint = own ? t("toolMaskedByOwnPluginHint") : shadow ? t("toolMaskedByShadowHint") : ptc ? t("toolMaskedByPtcHint") : agent ? t("toolAgentScopedHint") : t("toolMaskedByExternalHint");
+    const label = own ? t("toolMaskedByOwnPlugin") : shadow ? t("toolMaskedByShadow") : ptc ? t("toolMaskedByPtc") : agent ? t("toolAgentScoped") : t("toolMaskedByExternal");
     return (0, import_react5.createElement)("span", {
       style: s.badgeReplaced,
       title: hint
     }, label);
   };
+  const LAYER_LABEL_KEY = {
+    global: "layerGlobal",
+    preset: "layerPreset",
+    agent: "layerAgent",
+    executor: "sourceExecutor"
+  };
+  const layerBadge = (layer) => layer === void 0 ? null : (0, import_react5.createElement)("span", { style: { ...s.badgeSystem, marginLeft: "auto" } }, t(LAYER_LABEL_KEY[layer]));
+  const renderPoolRow = (row) => (0, import_react5.createElement)("div", {
+    key: entryKey(row.entry),
+    style: { ...s.row, opacity: 0.8 }
+  }, [
+    (0, import_react5.createElement)("div", { style: s.rowBody }, [
+      (0, import_react5.createElement)("div", { style: s.rowTitle }, [
+        (0, import_react5.createElement)("span", { style: s.code }, row.entry.name),
+        row.entry.source === void 0 ? null : (0, import_react5.createElement)("span", { style: s.badgeSystem }, sourceLabel(row.entry.source)),
+        ...[...row.states].map((state) => stateBadge(state)),
+        layerBadge(row.layer)
+      ]),
+      row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
+    ])
+  ]);
+  const poolGroup = (title, groupRows) => groupRows.length === 0 ? null : (0, import_react5.createElement)("details", { style: s.injectBox }, [
+    (0, import_react5.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${title} (${groupRows.length})`),
+    groupRows.map(renderPoolRow)
+  ]);
   return (0, import_react5.createElement)("div", { style: s.colLeft }, [
     (0, import_react5.createElement)("div", {
       ref: scrollRef,
@@ -3079,6 +3108,8 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
       },
       onDrop: dropOnPane
     }, [
+      truth?.linked === false ? (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("noSessionBanner")) : null,
+      truth?.ptcCollapsed === true ? (0, import_react5.createElement)("div", { style: s.noticeWarn }, t("ptcCollapsedBanner")) : null,
       (0, import_react5.createElement)("div", { style: s.muted }, t("toolsFourHint")),
       notice ? (0, import_react5.createElement)("div", { style: notice.kind === "ok" ? s.noticeOk : s.noticeWarn }, notice.text) : null,
       rows.map(renderRow),
@@ -3123,25 +3154,21 @@ function ToolsPane({ cfg, inv, phases, phase, syncAll, t, write, onOpenSection }
           ])
         ]))
       ]),
-      // 只读「完整目录」：不可控工具按来源分组，同一 name+source 的多状态聚合一行。
-      readOnly.length === 0 ? null : (0, import_react5.createElement)("details", { style: s.injectBox }, [
-        (0, import_react5.createElement)("summary", { style: { ...s.muted, cursor: "pointer" } }, `${t("completeCatalogTitle")} (${readOnly.length})`),
+      // 只读池：两个 <details> 分组（可反选 / 不可反选），行只读、无勾选框。
+      poolTotal === 0 ? null : (0, import_react5.createElement)("div", {
+        style: { ...s.injectBox, ...dropMark === "pool" ? s.dropZoneActive : {} },
+        onDragOver: (event) => {
+          if (!acceptsDrop(event, "tool")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setDropMark("pool");
+        },
+        onDrop: dropOnPool
+      }, [
+        (0, import_react5.createElement)("div", { style: { ...s.muted, fontWeight: 600 } }, `${t("completeCatalogTitle")} (${poolTotal})`),
         (0, import_react5.createElement)("div", { style: s.muted }, t("completeCatalogHint")),
-        readOnlyGroups.map((group) => (0, import_react5.createElement)("div", { key: sourceKey(group.source) || "unknown" }, [
-          (0, import_react5.createElement)("div", { style: { ...s.muted, marginTop: 6, fontWeight: 600 } }, sourceLabel(group.source)),
-          group.rows.map((row) => (0, import_react5.createElement)("div", {
-            key: entryKey(row.entry),
-            style: { ...s.row, opacity: 0.8 }
-          }, [
-            (0, import_react5.createElement)("div", { style: s.rowBody }, [
-              (0, import_react5.createElement)("div", { style: s.rowTitle }, [
-                (0, import_react5.createElement)("span", { style: s.code }, row.entry.name),
-                ...[...row.states].map((state) => stateBadge(state))
-              ]),
-              row.description !== "" ? (0, import_react5.createElement)("div", { style: s.preview }, row.description.slice(0, 120)) : null
-            ])
-          ]))
-        ]))
+        poolGroup(t("poolReversible"), poolGroups.reversible),
+        poolGroup(t("poolIrreversible"), poolGroups.irreversible)
       ])
     ]),
     // 左栏底部固定条：三态过滤（全部 / 已启用 = 可见 / 已停用 = 隐藏）。
@@ -3634,6 +3661,7 @@ var CONFIG_UNSET_URL = "/api/prompt-customizer/config/unset";
 var CONFIG_APPLY_URL = "/api/prompt-customizer/config/apply";
 var CONFIG_RESET_URL = "/api/prompt-customizer/config/reset";
 var PREVIEW_URL = "/api/prompt-customizer/preview";
+var REVISION_URL = "/api/prompt-customizer/revision";
 var DRAFT_FIELDS = [
   ...PHASES.flatMap((phase) => [phase.sectionField, phase.contextField]),
   "replacements",
@@ -3740,6 +3768,32 @@ function Panel({ t, onClose, level = "preset", workspace }) {
   (0, import_react9.useEffect)(() => {
     void refresh();
   }, [target, version, level, workspace, currentWorkspace]);
+  const revisionRef = (0, import_react9.useRef)(null);
+  (0, import_react9.useEffect)(() => {
+    let stopped = false;
+    let timer = null;
+    const tick = () => {
+      if (stopped) return;
+      if (typeof document !== "undefined" && document.hidden) {
+        timer = setTimeout(tick, 1500);
+        return;
+      }
+      fetch(REVISION_URL, { cache: "no-store" }).then((response) => response.json()).then((body) => {
+        if (stopped || body?.ok !== true || typeof body.revision !== "number") return;
+        const previous = revisionRef.current;
+        revisionRef.current = body.revision;
+        if (previous !== null && previous !== body.revision) void refresh();
+      }).catch(() => {
+      }).finally(() => {
+        if (!stopped) timer = setTimeout(tick, 1500);
+      });
+    };
+    timer = setTimeout(tick, 1500);
+    return () => {
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [level, target, workspace, currentWorkspace]);
   const syncDraftPreview = () => {
     if (draft === null || !draft.dirty) return;
     if (level !== "preset") return;
@@ -4429,12 +4483,26 @@ var DICT = {
     toolExecutorScopedHint: "\u8BE5\u5DE5\u5177\u662F\u6267\u884C\u5668\u63D0\u4F9B\u7ED9\u6A21\u578B\u7684\u5305\u88C5\u9879\uFF08\u5982 PTC \u7684 run_code\uFF09\uFF0C\u4E0D\u662F\u666E\u901A\u6CE8\u518C\u8868\u5DE5\u5177\uFF1B\u4E0D\u80FD\u6309\u9636\u6BB5\u52FE\u9009\u3002",
     toolMaskedByPlugin: "\u63D2\u4EF6\u906E\u853D",
     toolMaskedByPluginHint: "\u8BE5\u5DE5\u5177\u5728\u9884\u8BBE\u6CE8\u518C\u8868\u91CC\u6709\uFF0C\u4F46\u88AB\u5176\u5B83\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF restrict \u6389\u4E86\uFF1B\u672C\u63D2\u4EF6\u65E0\u6CD5\u53CD\u5411\u89E3\u9664\u3002",
-    toolMaskedByShadow: "\u540C\u540D\u906E\u853D",
+    toolMaskedByShadow: "\u540C\u540D\u88AB\u8986\u76D6",
     toolMaskedByShadowHint: "\u8BE5\u5DE5\u5177\u662F\u7EE7\u627F\u5C42\uFF08global / preset\uFF09\u7684\u539F\u751F\u5DE5\u5177\uFF0C\u88AB\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF\u6CE8\u518C\u7684\u540C\u540D\u5DE5\u5177\u9876\u6389\uFF1B\u672C\u63D2\u4EF6\u65E0\u6CD5\u53CD\u5411\u89E3\u9664\uFF0C\u6A21\u578B\u53EA\u4F1A\u770B\u5230\u63D2\u4EF6\u90A3\u4E00\u4E2A\u3002",
     toolMaskedByOwnPlugin: "\u672C\u63D2\u4EF6\u906E\u853D",
     toolMaskedByOwnPluginHint: "\u8BE5\u5DE5\u5177\u88AB\u672C\u63D2\u4EF6\u7684 MCP \u5DE5\u5177\u7EA7\u7981\u7528 / \u9884\u8BBE\u906E\u853D / \u5DE5\u4F5C\u533A\u5173\u95ED\u9690\u85CF\uFF0C\u53EF\u5728 MCP Tab \u6062\u590D\u3002",
+    // 2.2.0：主列表「本插件遮蔽」徽标、只读池双组（可反选 / 不可反选）、层徽标与顶部横幅。
+    toolOwnHidden: "\u672C\u63D2\u4EF6\u906E\u853D",
+    toolOwnHiddenHint: "\u8BE5\u884C\u88AB\u672C\u9636\u6BB5\u7684\u5DE5\u5177\u540D\u5355\u9690\u85CF\uFF08\u672C\u63D2\u4EF6\u53EF\u53CD\u9009\uFF1A\u52FE\u9009\u5373\u53EF\u6062\u590D\u53EF\u89C1\uFF09\u3002",
+    toolMaskedByExternal: "\u5916\u90E8\u4E0D\u53EF\u89C1",
+    toolMaskedByExternalHint: "\u8BE5\u5DE5\u5177\u5728\u9884\u8BBE\u6CE8\u518C\u8868\u91CC\u6709\uFF0C\u4F46\u88AB\u5176\u5B83\u63D2\u4EF6\u5728 agent \u4F5C\u7528\u57DF restrict \u6389\u4E86\uFF1A\u5916\u90E8\u51B3\u5B9A\uFF0C\u672C\u63D2\u4EF6\u4E0D\u53EF\u53CD\u9009\u3002",
+    toolMaskedByPtc: "PTC \u6298\u53E0",
+    toolMaskedByPtcHint: "PTC \u6298\u53E0\u751F\u6548\u65F6\u6A21\u578B\u53EA\u6536\u5230 run_code\uFF0C\u8BE5\u5DE5\u5177\u5728\u7A0B\u5E8F\u7ED1\u5B9A\u5185\u53EF\u7528\uFF1A\u5916\u90E8\u51B3\u5B9A\uFF0C\u672C\u63D2\u4EF6\u4E0D\u53EF\u53CD\u9009\u3002",
+    poolReversible: "\u53EF\u53CD\u9009\uFF08\u672C\u63D2\u4EF6\u906E\u853D\uFF09",
+    poolIrreversible: "\u4E0D\u53EF\u53CD\u9009\uFF08\u5916\u90E8\u51B3\u5B9A\uFF09",
+    layerGlobal: "\u5168\u5C40",
+    layerPreset: "\u9884\u8BBE",
+    layerAgent: "\u4F1A\u8BDD",
+    noSessionBanner: "\u672A\u94FE\u63A5\u4F1A\u8BDD\uFF1A\u5F53\u524D\u6CA1\u6709\u540C\u9884\u8BBE\u7684\u6D3B\u52A8\u4F1A\u8BDD\uFF0C\u5916\u90E8\u53EF\u89C1\u6027\u672A\u77E5\u3002",
+    ptcCollapsedBanner: "PTC \u6298\u53E0\u751F\u6548\uFF1A\u6A21\u578B\u53EA\u6536\u5230 run_code\uFF0C\u5176\u4F59\u5DE5\u5177\u5728\u7A0B\u5E8F\u7ED1\u5B9A\u5185\u53EF\u7528\u3002",
     completeCatalogTitle: "\u5B8C\u6574\u76EE\u5F55 / \u5DF2\u906E\u853D\uFF08\u53EA\u8BFB\uFF09",
-    completeCatalogHint: "\u8FD9\u91CC\u5217\u51FA\u672C\u63D2\u4EF6\u65E0\u6CD5\u6309\u9636\u6BB5\u5F00\u5173\u7684\u5DE5\u5177\uFF1Aagent \u4F5C\u7528\u57DF\u6CE8\u518C\u3001\u6267\u884C\u5668\u5305\u88C5\u3001\u88AB\u522B\u7684\u63D2\u4EF6 restrict\u3001\u88AB\u540C\u540D\u63D2\u4EF6\u5DE5\u5177\u9876\u6389\u3001\u88AB\u672C\u63D2\u4EF6 MCP \u906E\u853D\u3002\u5B83\u4EEC\u4E0D\u4F1A\u51FA\u73B0\u5728\u4E0A\u9762\u7684\u542F\u7528\u5217\u8868\u91CC\u3002",
+    completeCatalogHint: "\u53EA\u8BFB\u6C60\uFF1A\u53EF\u53CD\u9009\u7EC4\u5217\u672C\u63D2\u4EF6\u906E\u853D\u7684\u5DE5\u5177\uFF08\u53EF\u5728 MCP Tab \u6062\u590D\uFF09\uFF1B\u4E0D\u53EF\u53CD\u9009\u7EC4\u5217\u5916\u90E8\u51B3\u5B9A\u7684\u5DE5\u5177\uFF08\u5916\u90E8\u4E0D\u53EF\u89C1 / \u540C\u540D\u88AB\u8986\u76D6 / PTC \u6298\u53E0\uFF09\u3002\u4E24\u7EC4\u90FD\u4E0D\u53C2\u4E0E\u4E0A\u9762\u7684\u9636\u6BB5\u52FE\u9009\u3002",
     workspaceRequired: "\u5DE5\u4F5C\u533A\u7EA7\u4FDD\u5B58\u9700\u8981\u5F53\u524D\u5DE5\u4F5C\u533A\uFF08\u6D3B\u52A8\u4F1A\u8BDD\u7684 cwd\uFF09",
     workspaceNoSession: "\u5DE5\u4F5C\u533A\u7EA7\uFF1A\u5F53\u524D\u6CA1\u6709\u6D3B\u52A8\u4F1A\u8BDD\uFF0C\u53D6\u4E0D\u5230\u5DE5\u4F5C\u533A\u8DEF\u5F84\uFF1B\u5F00\u4F1A\u8BDD\u540E\u518D\u7F16\u8F91\u5DE5\u4F5C\u533A\u7EA7\u3002",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。
@@ -4604,8 +4672,22 @@ var DICT = {
     toolMaskedByShadowHint: "An inherited (global/preset) tool displaced by a plugin tool with the same name registered in the agent scope. This plugin cannot lift it; the model sees only the plugin tool.",
     toolMaskedByOwnPlugin: "masked by this plugin",
     toolMaskedByOwnPluginHint: "Hidden by this plugin's MCP tool disable / preset mask / workspace close ledger; re-enable it in the MCP tab.",
+    // 2.2.0: main-list "masked here" badge, the two read-only pool groups, layer badges and top banners.
+    toolOwnHidden: "masked by this plugin",
+    toolOwnHiddenHint: "Hidden by this phase's tool list (this plugin can toggle it back: tick it to restore visibility).",
+    toolMaskedByExternal: "invisible externally",
+    toolMaskedByExternalHint: "Present in the preset registry but restricted away by another plugin in the agent scope: decided externally, this plugin cannot toggle it back.",
+    toolMaskedByPtc: "PTC collapsed",
+    toolMaskedByPtcHint: "With PTC collapse in effect the model only receives run_code; this tool stays available inside the program binding: decided externally, this plugin cannot toggle it back.",
+    poolReversible: "Reversible (masked by this plugin)",
+    poolIrreversible: "Irreversible (decided externally)",
+    layerGlobal: "Global",
+    layerPreset: "Preset",
+    layerAgent: "Session",
+    noSessionBanner: "No linked session: there is no active session on this preset, so external visibility is unknown.",
+    ptcCollapsedBanner: "PTC collapse is in effect: the model only receives run_code; the other tools are available inside the program binding.",
     completeCatalogTitle: "Complete catalog / masked (read-only)",
-    completeCatalogHint: "Tools this plugin cannot toggle per phase: agent-scope registrations, executor wrappers, tools restricted by other plugins, inherited tools displaced by a same-name plugin tool, and tools masked by this plugin's MCP ledgers. They never appear in the enabled list above.",
+    completeCatalogHint: "Read-only pool: the reversible group lists tools masked by this plugin (restorable in the MCP tab); the irreversible group lists externally decided tools (invisible externally / shadowed by same name / PTC collapsed). Neither group takes part in the phase checkboxes above.",
     workspaceRequired: "Saving workspace-level requires a current workspace (active session cwd).",
     workspaceNoSession: "Workspace level: no active session, so the workspace path is unknown; open a session first.",
     // 独立面板（侧边栏入口 + 抽屉分栏）新增。

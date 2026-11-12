@@ -52,6 +52,7 @@ const CONFIG_UNSET_URL = '/api/prompt-customizer/config/unset'
 const CONFIG_APPLY_URL = '/api/prompt-customizer/config/apply'
 const CONFIG_RESET_URL = '/api/prompt-customizer/config/reset'
 const PREVIEW_URL = '/api/prompt-customizer/preview'
+const REVISION_URL = '/api/prompt-customizer/revision'
 
 /** 编辑草稿里可能出现的字段（与服务端 /config/apply 的 APPLY_FIELDS 一致，由 PHASES 派生）。 */
 const DRAFT_FIELDS: string[] = [
@@ -209,6 +210,32 @@ export function Panel({ t, onClose, level = 'preset', workspace }: { t: Translat
   // 挂载时与切换编辑目标后：清单与三阶段预览切到对应 scope。
   // version 入依赖：保存/写配置成功后 +1，驱动重新拉取（否则一直显示保存前的装配）。
   useEffect(() => { void refresh() }, [target, version, level, workspace, currentWorkspace])
+
+  // 运行时版本号轮询（ADR-0006）：其它插件 reconcile / agent 创建销毁 / 段注册
+  // 变化都会让 host 的 revision 递增；面板打开期间每 1.5s 对比一次，变化即重取，
+  // 页面隐藏时停发请求。轮询失败静默降级为手动刷新，不打扰编辑。
+  const revisionRef = useRef<number | null>(null)
+  useEffect(() => {
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const tick = (): void => {
+      if (stopped) return
+      if (typeof document !== 'undefined' && document.hidden) { timer = setTimeout(tick, 1500); return }
+      fetch(REVISION_URL, { cache: 'no-store' })
+        .then((response) => response.json())
+        .then((body: { ok?: boolean; revision?: number }) => {
+          if (stopped || body?.ok !== true || typeof body.revision !== 'number') return
+          const previous = revisionRef.current
+          revisionRef.current = body.revision
+          // 首次只记基线：挂载后的第一次拉取已经由上面的 refresh 负责。
+          if (previous !== null && previous !== body.revision) void refresh()
+        })
+        .catch(() => { /* 轮询失败：保持手动刷新 */ })
+        .finally(() => { if (!stopped) timer = setTimeout(tick, 1500) })
+    }
+    timer = setTimeout(tick, 1500)
+    return () => { stopped = true; if (timer !== null) clearTimeout(timer) }
+  }, [level, target, workspace, currentWorkspace])
 
   // 草稿实时预览：把未保存的编辑草稿补丁 POST 给 /preview（服务端只在内存里
   // 叠加，磁盘不动），只刷新当前阶段视图 —— 预览随改随动；保存后的 GET 全量

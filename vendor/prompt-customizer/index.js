@@ -392,6 +392,19 @@ export function apply(ctx, entry = {}) {
     warn: (message) => { try { ctx.logger?.warn?.(message) } catch { /* logger 缺席 */ } },
   })
   const read = () => store.readResolved()
+  // 运行时版本号（ADR-0006）：配置写入 / 工具注册 / 段注册 / agent 生命周期
+  // 变化时 +1；面板打开期间轮询 /revision，变化即重取清单与三阶段预览，避免
+  // 设置改完（或其它插件 reconcile 后）面板还显示旧图。
+  let revision = 0
+  const bumpRevision = () => { revision += 1 }
+  for (const method of ['writeSection', 'setField']) {
+    const original = store[method].bind(store)
+    store[method] = (...args) => { const result = original(...args); bumpRevision(); return result }
+  }
+  ctx.on('tools/change', bumpRevision)
+  ctx.on('system-prompt/change', bumpRevision)
+  ctx.on('agent/created', bumpRevision)
+  ctx.on('agent/disposed', bumpRevision)
   // @archive 工作区级 override：源码保留供以后恢复参考；当前不读取、不写入、
   // 不参与装配、不进备份。workspaceOverrides 数据字段休眠。
   const wsStore = createConfigStore({
@@ -823,6 +836,16 @@ export function apply(ctx, entry = {}) {
       },
     })
     ctx.effect(() => disposeSession, 'prompt-customizer: current session route')
+
+    // 运行时版本号（ADR-0006）：面板打开期间轮询它，变化即重取清单与预览。
+    const disposeRevision = register({
+      kind: 'exact',
+      path: '/api/prompt-customizer/revision',
+      handler: async (_req, res) => {
+        writeJson(res, 200, { ok: true, revision })
+      },
+    })
+    ctx.effect(() => disposeRevision, 'prompt-customizer: revision route')
 
 
     // agent 预设枚举路由：直接读 roster 的 list()（未 memo 化，运行中新增
@@ -1511,7 +1534,7 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     return ''
   }
   const rows = []
-  const emit = (name, state, description, keySuffix, sourceOverride, shadowedBy) => {
+  const emit = (name, state, description, keySuffix, sourceOverride, shadowedBy, extra) => {
     const source = sourceOverride ?? (state === 'locked-executor'
       ? { kind: 'executor' }
       : state === 'locked-agent'
@@ -1522,7 +1545,7 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
           agent: liveAgent,
           presetScopeKey,
         }))
-    rows.push({
+    const row = {
       name,
       description,
       ...source === undefined ? {} : { source },
@@ -1541,8 +1564,47 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
         return promptSections.length === 0 ? {} : { promptSections }
       })(),
       ...(keySuffix === undefined ? {} : { keySuffix }),
-    })
+    }
+    // 行级附加字段（层身份 / 本插件遮蔽 / PTC 折叠）统一在这里合入，
+    // 调用点不必为每种状态重复展开（ADR-0006）。
+    if (extra !== undefined) Object.assign(row, extra)
+    rows.push(row)
   }
+  // 当前阶段本插件 exclude 的名字集：名字级匹配（运行时 restrict 与
+  // tools/pre-execute 也都按名字拒绝），source 会随会话变化不能作基准。
+  const ownHiddenNames = new Set(phaseExclude
+    .map((entry) => (entry !== null && typeof entry === 'object' ? entry.name : entry))
+    .filter((name) => typeof name === 'string' && name !== ''))
+  /**
+   * 同一名字在 global / preset / agent 三层的注册身份（按定义引用去重，内层在前）。
+   * 宿主 `tools.view()` 是私有的，公开 API 只有各 scope 的 `definitions()`；
+   * 逐层取引用再比对即可推出「谁生效、哪些被同名覆盖」，不靠名字猜。
+   */
+  const layerIdentitiesOf = (name) => {
+    const layers = [
+      ['global', globalDefs === null ? undefined : globalDefs.get(name)],
+      ['preset', presetDefs === null ? undefined : presetDefs.get(name)],
+      ['agent', liveDefs === null ? undefined : liveDefs.get(name)],
+    ]
+    const list = []
+    for (const [layer, def] of layers) {
+      if (def === undefined) continue
+      // 宿主可能对每次 definitions() 返回副本：引用不同但名字 + 描述都相同时
+      // 视为同一注册；只有描述确实不同才算「被同名覆盖」的不同注册。
+      if (list.some((item) => item.def === def
+        || (typeof item.def?.description === 'string' && item.def.description !== ''
+          && item.def.name === def?.name && item.def.description === def?.description))) continue
+      list.push({ layer, def })
+    }
+    return list
+  }
+  /** 某层身份对应的来源（global / preset 走预设视图解析，agent 走会话来源）。 */
+  const sourceOfToolLayer = (name, layer) => sourceForTool(ctx, name, {
+    role: layer === 'agent' ? 'agent' : 'preset',
+    presetId: options.presetId,
+    agent: layer === 'agent' ? liveAgent : undefined,
+    presetScopeKey,
+  })
   for (const name of names) {
     const presetTool = presetByName.get(name)
     const liveTool = liveByName.get(name)
@@ -1551,38 +1613,69 @@ async function buildToolUnion(ctx, presetScopeKey, liveAgent, cfg, phaseStatus, 
     const inLive = liveTool !== undefined
     const inExtra = extraTool !== undefined
     if (maskedByOwn.has(name)) { emit(name, 'masked-own', descOf(presetTool, liveTool, extraTool)); continue }
-    // 同名遮蔽（2.1.1 多证据判定）：不再只靠 `definitions` 对象引用相等。
-    // 只要继承层（global ∪ preset）查得到同名定义 / schema，且 agent 视图里的
-    // 同名工具与它「不是同一注册」，就把被顶掉的那份放进遮蔽池。证据三条取一：
-    //   ① definitions 引用不同（精确）；② 宿主缺席 definitions 时 description 不同；
-    //   ③ 只有继承层定义、agent 层另有注册（profile 没把原生挂进 presetTools）。
-    // 查不到继承层同名定义（纯 agent 新增，如 undo_last_edit）绝不误判成遮蔽。
-    const inheritedSchema = presetByName.get(name)
-    const inheritedDef = presetDefs?.get(name) ?? globalDefs?.get(name)
-    const agentDef = liveDefs?.get(name)
-    const inheritedPresent = inheritedSchema !== undefined || inheritedDef !== undefined || inPreset
-    const inheritedDescription = inheritedSchema?.description ?? inheritedDef?.description
-    const definitionDiffers = inheritedDef !== undefined && agentDef !== undefined && inheritedDef !== agentDef
-    const descriptionDiffers = inheritedDescription !== undefined && liveTool?.description !== undefined
-      && String(inheritedDescription) !== String(liveTool.description)
-    const shadowed = hasLive && inLive && inheritedPresent && (definitionDiffers || descriptionDiffers)
-    const restricted = hasLive && inPreset && !inLive
-    const agentOnly = hasLive && inLive && !inPreset
-    const executor = !inPreset && !inLive && inExtra
-    if (shadowed) {
-      // agent 提供的同名工具（模型实际可见、本插件无法开关）→ 启用锁定；
-      // 被顶掉的继承层同名工具 → 遮蔽池，来源标继承层（不是 agent）。
-      const inheritedSource = sourceForTool(ctx, name, {
-        role: 'preset', presetId: options.presetId, agent: undefined, presetScopeKey,
-      })
-      emit(name, 'locked-agent', descOf(liveTool, inheritedSchema, inheritedDef), 'live')
-      emit(name, 'masked-shadow', descOf(inheritedSchema, inheritedDef, presetTool), 'shadowed',
-        inheritedSource, { name, source: agentSourceOf(liveAgent) })
+    // ── 生效判定（ADR-0006）：本插件遮蔽 → 同名多来源 → 外部不可见 ─────────
+    // 1) 本插件阶段遮蔽：命中者留在主列表原位、未勾选（2.0.15 的「可反选」回归约束）。
+    if (ownHiddenNames.has(name)) {
+      if (!inLive) {
+        emit(name, 'controllable', descOf(presetTool, liveTool, extraTool), undefined, undefined, undefined,
+          { hidden: true, ownHidden: true })
+        continue
+      }
+      if (!inPreset) {
+        emit(name, 'locked-agent', descOf(liveTool, presetTool), undefined, undefined, undefined,
+          { hidden: true, ownHidden: true })
+        continue
+      }
+    }
+    // 2) 同名多来源：最内层生效进主列表，其余每一层身份都进只读池（同名被覆盖）。
+    const identities = layerIdentitiesOf(name)
+    if (identities.length > 1) {
+      const winner = identities[identities.length - 1]
+      const winnerSource = sourceOfToolLayer(name, winner.layer)
+      if (inLive) {
+        emit(name, 'locked-agent', descOf(liveTool, presetTool), 'live', winnerSource, undefined, { layer: winner.layer })
+      } else if (hasLive) {
+        // 有活动会话但该名字不在它的视图里：被外部收窄 → 只读池（外部不可见）。
+        emit(name, 'masked-plugin', descOf(presetTool, liveTool), undefined, winnerSource, undefined, { layer: winner.layer })
+      } else {
+        // 无活动会话：只能确定「预设视图里谁生效、谁被同名覆盖」，不能断定
+        // 外部收窄，所以生效项保持可控、落选项进只读池（不谎称不可见）。
+        emit(name, 'controllable', descOf(presetTool, liveTool), undefined, winnerSource, undefined, { layer: winner.layer })
+      }
+      for (const loser of identities.slice(0, -1)) {
+        emit(name, 'masked-shadow', descOf(loser.def, presetTool), 'shadowed',
+          sourceOfToolLayer(name, loser.layer), { name, source: winnerSource }, { layer: loser.layer })
+      }
       continue
     }
-    if (agentOnly) { emit(name, 'locked-agent', descOf(liveTool)); continue }
-    if (executor) { emit(name, 'locked-executor', descOf(extraTool, liveTool)); continue }
-    if (restricted) { emit(name, 'masked-plugin', descOf(presetTool)); continue }
+    // 3) 单一身份但不在 agent 视图：被别的插件在自己的作用域收窄（外部不可见，只读）。
+    if (hasLive && !inLive && inPreset) {
+      emit(name, 'masked-plugin', descOf(presetTool, liveTool), undefined, undefined, undefined, { layer: 'preset' })
+      continue
+    }
+    // 4) 旧宿主没有 tools.definitions：保留 2.1.1 的多证据同名判定，行为不变。
+    // 4) schemas 描述差异兜底：宿主 definitions 仍指向旧定义（stale）或确实没有
+    //    definitions 时，描述不同即「不同注册」，把继承层那一份放进池（2.1.1 的
+    //    多证据判定，命中任一即可，不依赖引用相等）。
+    {
+      const inheritedSchema = presetByName.get(name)
+      const inheritedDef = presetDefs?.get(name) ?? globalDefs?.get(name)
+      const inheritedDescription = inheritedSchema?.description ?? inheritedDef?.description
+      const descriptionDiffers = inheritedDescription !== undefined && liveTool?.description !== undefined
+        && String(inheritedDescription) !== String(liveTool.description)
+      if (inLive && inPreset && descriptionDiffers) {
+        const inheritedSource = sourceForTool(ctx, name, {
+          role: 'preset', presetId: options.presetId, agent: undefined, presetScopeKey,
+        })
+        emit(name, 'locked-agent', descOf(liveTool, inheritedSchema, inheritedDef), 'live')
+        emit(name, 'masked-shadow', descOf(inheritedSchema, inheritedDef, presetTool), 'shadowed',
+          inheritedSource, { name, source: agentSourceOf(liveAgent) })
+        continue
+      }
+    }
+    // 5) 其余：agent 作用域注册 / 执行器包装 / 预设可见。
+    if (inLive && !inPreset) { emit(name, 'locked-agent', descOf(liveTool)); continue }
+    if (!inPreset && !inLive && inExtra) { emit(name, 'locked-executor', descOf(extraTool, liveTool)); continue }
     if (inPreset) { emit(name, 'controllable', descOf(presetTool, liveTool)); continue }
     emit(name, 'locked-executor', descOf(extraTool, liveTool))
   }
@@ -1885,28 +1978,39 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
         const live = Array.isArray(previewSource.tools) ? previewSource.tools : []
         return live.length > 0 ? live : finalTools
       })()
-  const union = await buildToolUnion(ctx, scopeKey, undefined, previewCfg, phaseStatus, {
+  // 真值来源（ADR-0006）：把「同预设活动 agent」的视图当作主数据源 —— 主列表 =
+  // 该阶段真实可见集 ∪ 本插件遮蔽集；预设注册表退为「能加回什么」的参考。
+  // 无活动会话时 catalogAgent 缺席，自然退回预设视图，由 truth.linked 标注降级。
+  const union = await buildToolUnion(ctx, scopeKey, catalogAgent, previewCfg, phaseStatus, {
     toolMask,
     presetId: configTargetId,
+    ...(typeof catalogAgent?.session?.header?.cwd === 'string' && catalogAgent.session.header.cwd !== ''
+      ? { cwd: catalogAgent.session.header.cwd } : {}),
     extraTools: finalTools,
   })
-  const baseTools = union.rows
-  const catalogRows = catalogAgent === undefined
-    ? []
-    : (await buildToolUnion(ctx, scopeKey, catalogAgent, previewCfg, phaseStatus, {
-        toolMask,
-        presetId: configTargetId,
-        extraTools: finalTools,
-      })).rows
-  // 只补 agent 独有的工具；同名预设工具必须保留 base 行的 hidden/controllable
-  // 状态，否则本插件 restrict 后的隐藏工具会被误标成 masked-plugin，用户无法反选。
-  const baseToolNames = new Set(baseTools.map((tool) => tool.name))
-  const catalogTools = [...baseTools, ...catalogRows.filter((tool) => !baseToolNames.has(tool.name)
-    // 同名但 agent 实际可见的遮蔽行必须保留（keySuffix=live）；同名
-    // masked-plugin / masked-own / masked-shadow 行必须保留给只读「已遮蔽」池，不能因
-    // base 同名就丢掉，否则工具屏蔽池会整块消失。
-    || tool.state === 'locked-agent' || tool.state === 'masked-plugin'
-    || tool.state === 'masked-own' || tool.state === 'masked-shadow')]
+  // PTC 折叠（ADR-0006 例外）：PTC 模式下模型只收到 run_code，但被折叠的工具仍会
+  // 注入各自的提示词段 —— 折叠只作用于工具域的工具声明，不作用于提示词域。
+  const ptcSectionVisible = sections.some(section => section.name === 'tools:ptc-only' && String(section.text ?? '').trim() !== '')
+  const ptcCollapsed = ptcSectionVisible || (finalTools.length === 1 && String(finalTools[0]?.name) === 'run_code')
+  const keepUnderPtc = (row) => row.name === 'run_code' || row.state === 'masked-own'
+    || row.state === 'masked-plugin' || row.state === 'masked-shadow' || row.ownHidden === true
+  let baseTools = union.rows
+  if (ptcCollapsed) {
+    const kept = baseTools.filter(keepUnderPtc)
+    const folded = baseTools.filter((row) => !keepUnderPtc(row)).map((row) => ({
+      ...row,
+      state: 'masked-ptc',
+      maskedByPtc: true,
+      hidden: false,
+      ptcCollapsed: true,
+    }))
+    if (!kept.some((row) => row.name === 'run_code')) {
+      kept.unshift({ name: 'run_code', description: '', state: 'locked-executor', scope: 'executor', hidden: false, layer: 'executor' })
+    }
+    baseTools = [...kept, ...folded]
+  }
+  // 主列表与只读池共用这一份行集（catalogTools 保留字段名以兼容旧客户端）。
+  const catalogTools = baseTools
   const promptSectionsByName = new Map()
   for (const tool of [...baseTools, ...catalogTools]) {
     if (tool.promptSections !== undefined && !promptSectionsByName.has(tool.name)) {
@@ -1961,6 +2065,60 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
       : undefined,
     /** 非空 = 本插件产出的段有若干被下游装配规则丢弃（计数，不含段名列表）。 */
     lostSections,
+    /** 真值来源与折叠状态（ADR-0006）：面板据此降级 / 显示横幅。 */
+    truth: {
+      linked: catalogAgent !== undefined,
+      source: catalogAgent === undefined ? 'preset' : 'agent',
+      ...(catalogAgent === undefined ? {} : { agentId: sessionIdOf(catalogAgent) }),
+      ptcCollapsed,
+    },
+    /** 同名被覆盖的段（global / preset / agent 三层引用身份去重）：只读池数据源。 */
+    sectionPool: (() => {
+      const layerOf = (scope) => {
+        try {
+          const merged = ctx.systemPrompt?.layers?.merge?.(scope, (layer) => layer.sections)
+          return merged instanceof Map ? merged : new Map()
+        } catch { return new Map() }
+      }
+      const sourceOfSection = (section, layer) => stableSourceOf({
+        source: sourceForEntry(ctx, section, {
+          table: 'sections',
+          role: layer === 'agent' ? 'agent' : 'preset',
+          presetId: configTargetId,
+          agent: layer === 'agent' ? livePromptAgent : undefined,
+          scopeKey,
+          presetScopeKey: scopeKey,
+        }),
+      })
+      const globalSections = layerOf(undefined)
+      const presetSections = scopeKey === undefined ? new Map() : layerOf(scopeKey)
+      const liveSections = livePromptAgent === undefined ? undefined : layerOf(livePromptAgent)
+      const names = new Set([...presetSections.keys(), ...(liveSections?.keys() ?? [])].map(String))
+      const out = []
+      for (const name of names) {
+        const identities = []
+        for (const [layer, map] of [['global', globalSections], ['preset', presetSections], ['agent', liveSections]]) {
+          if (map === undefined) continue
+          const section = map.get(name)
+          if (section === undefined) continue
+          if (identities.some((item) => item.section === section)) continue
+          identities.push({ layer, section })
+        }
+        if (identities.length < 2) continue
+        const winner = identities[identities.length - 1]
+        const winnerSource = sourceOfSection(winner.section, winner.layer)
+        for (const loser of identities.slice(0, -1)) {
+          const loserSource = sourceOfSection(loser.section, loser.layer)
+          out.push({
+            name,
+            layer: loser.layer,
+            ...(loserSource === undefined ? {} : { source: loserSource }),
+            shadowedBy: { name, ...(winnerSource === undefined ? {} : { source: winnerSource }) },
+          })
+        }
+      }
+      return out
+    })(),
     sections,
     text: sections.map(section => section.text).filter(Boolean).join('\n\n'),
     diagnostics,

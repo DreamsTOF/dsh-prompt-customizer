@@ -195,7 +195,10 @@ export interface PresetData extends OverrideData {
 // ── 清单 / 预览 ─────────────────────────────────────────────────────────────
 
 /** 工具展示状态。 */
-export type ToolState = 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own' | 'masked-shadow'
+export type ToolState = 'controllable' | 'locked-agent' | 'locked-executor' | 'masked-plugin' | 'masked-own' | 'masked-shadow' | 'masked-ptc'
+
+/** 工具注册层（与服务端工具行的 layer 字段同构；只读展示用）。 */
+export type ToolLayer = 'global' | 'preset' | 'agent' | 'executor'
 
 /** 工具提示词段（tool:* systemPrompt.section）的展示元数据。 */
 export interface ToolPromptSection extends EntryRef {
@@ -227,6 +230,10 @@ export interface Inventory {
     hidden: boolean
     state?: ToolState
     scope?: 'agent' | 'executor'
+    /** 注册层：主列表 / 只读池行右侧的层徽标。 */
+    layer?: ToolLayer
+    /** PTC 折叠标记：该工具因 PTC 折叠落在程序绑定内（外部决定，不可反选）。 */
+    ptcCollapsed?: true
     maskedByPlugin?: boolean
     maskedByOwnPlugin?: boolean
     maskedByShadow?: boolean
@@ -268,6 +275,10 @@ export interface BaseTool extends EntryRef {
   hidden: boolean
   state?: ToolState
   scope?: 'agent' | 'executor'
+  /** 注册层：主列表 / 只读池行右侧的层徽标。 */
+  layer?: ToolLayer
+  /** PTC 折叠标记：该工具因 PTC 折叠落在程序绑定内（外部决定，不可反选）。 */
+  ptcCollapsed?: true
   maskedByPlugin?: boolean
   maskedByOwnPlugin?: boolean
   maskedByShadow?: boolean
@@ -317,6 +328,10 @@ export interface Preview {
   /** 生效配置（清单路由用）。 */
   config?: OverrideData
   sectionOrder?: Record<string, number>
+  /** 链接真值：当前阶段是否挂在同预设活动会话上（左栏顶部横幅用）。 */
+  truth?: { linked: boolean; source: 'agent' | 'preset'; agentId?: string; ptcCollapsed: boolean }
+  /** 该阶段的段池（跨来源；含被同名覆盖的条目）。 */
+  sectionPool?: Array<{ name: string; source?: EntrySource; layer: 'global' | 'preset' | 'agent'; shadowedBy?: { name: string; source?: EntrySource } }>
 }
 
 /** Panel 并行拉取的三阶段装配。 */

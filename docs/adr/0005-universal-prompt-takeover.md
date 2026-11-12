@@ -58,6 +58,7 @@ mergeAgentScopedSections(baseView.sections ?? [], [], previewDenied, previewRepl
 - **D6 工具数据源分离**：`finalTools` / `buildToolUnion` / `catalogTools` 仍按纯预设装配计算；提示词与工具两条链路互不干扰，避免推翻 2.0.x 的工具目录回归约束。
 
 > **2.1.2 修订**：D6 的「右栏工具目录按纯预设装配」已被证明是错的——宿主真实会话装配的 `scope` 是 live Agent 自身（[2.1.2 升级记录](../upgrades/2.1.2-tool-catalog-scope.md)），预设装配只显示预设层工具（实测 38 vs 真实 50）。右栏 `tools` / `registryTools` / `registryTotal` 已改为 `ctx.tools.schemas(agent)` 与 `/session` 同源；`buildToolUnion` / `tools.restrict` / 阶段过滤 / 遮蔽池结构仍不变，D6 的「不动工具目录回归约束」这部分继续成立。
+> **2.2.0 修订（[ADR-0006](0006-effective-view-source.md)）**：「工具目录 / 遮蔽池按纯预设 scope 独立算」这条取舍已被推翻 —— 工具域同样改由宿主 agent 作用域同源视图判定，主列表与只读池按真值分级（可编辑 / 可反选组 / 不可反选组）。本 ADR 的 D1–D5、D7、D8 全部保留，只有 D6 的数据源口径被 ADR-0006 取代。
 - **D7 失败回退**：agent 装配抛错时 `warnOnce` 并退回纯预设装配，绝不因可选视图让 `/inventory` / `/preview` 500。
 - **D8 `/session` 定位**：`/session`（`buildSessionPreview`）与 `buildPreview` 的 live 视图是**两条并列的真实装配入口**——前者回答「模型此刻真正看到什么」（只读），后者是编辑目标预设的清单 / 预览数据源。两者都把 agent 来源稳定化为 `{kind:'agent'}`。
 

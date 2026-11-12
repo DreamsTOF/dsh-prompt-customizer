@@ -4,12 +4,21 @@
 
 ## 当前兼容版本
 
-- 插件 **2.1.3** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）；只扩展本插件自己的提示词枚举与工具探测，未改动宿主 API 依赖。
+- 插件 **2.2.0** 对齐 **DSH 0.2.2-rc.1**（`peerDependencies` / `engines.dsh` 为 `^0.2.2-rc.1`）；只扩展本插件自己的提示词枚举与工具探测，未改动宿主 API 依赖。
 - 历史起点：**2.0.0** 起对齐该宿主版本。
 - 0.2.2-rc.1 的完整适配记录见 [dsh-0.2.2-rc1.md](dsh-0.2.2-rc1.md)。
 - 更早的 0.2.1-rc.2 适配记录见 [rc2-migration.md](rc2-migration.md)。
 
 ## 版本历史
+
+## 2.2.0：面板 = 请求真值（生效视图同源）
+
+- 左栏主列表与只读池改用宿主 agent 作用域同源视图判定（三层身份采样：global / preset / agent，按定义引用比对），修掉「面板能勾选、真实请求里却不可见」的错位（实例：dsh-ops 开「隐藏宿主 PowerShell」后 `pwsh` 仍显示可勾选）。
+- 主列表固定为 `controllable` / `locked-agent` / `locked-executor`；本插件遮蔽项留在原位可反选；只读池拆成可反选组（`masked-own`）与不可反选组（`masked-plugin` / `masked-shadow` / `masked-ptc`）。
+- `/preview` 新增 `truth`（`linked` / `source` / `agentId` / `ptcCollapsed`）与 `sectionPool`（段的三层来源池）；工具行新增 `layer` / `ptcCollapsed`，`state` 新增 `masked-ptc`。
+- PTC 折叠只作用于工具域的工具声明，不作用于提示词域；无活动会话时给「未链接会话，外部可见性未知」横幅并退回预设视图。
+- 2.0.15 的「base 行 + masked 行」双行设计作废；术语拆分：遮蔽 = 本插件可反选，不可见 = 外部决定、只读。
+- 决策与边界见 [ADR-0006](../adr/0006-effective-view-source.md)，完整记录见 [2.2.0-effective-view.md](2.2.0-effective-view.md)。
 
 ## 2.1.3：全局 MCP 持久化修复
 
@@ -18,7 +27,6 @@
 - 预设级继续写 profile `cordis.patch.yml`（`configEditor`），工作区级继续写项目 `.mcp.json`；三层都是磁盘持久化。旧 `mcps/**/mcp.json` 文件仍可读，非 canonical 文件在面板只读。
 - 兼容：首次升级会把旧版遗留在 `cordis.yml` 的 runtime 行和 2.1.3 中间版本的 SQLite 全局账本一次性迁到 `.dsh/mcps`，避免重启丢失。
 - 完整记录见 [2.1.3-global-mcp-persistence.md](2.1.3-global-mcp-persistence.md)。
-
 ## 2.1.2：工具目录与真实会话同源
 
 - 右栏「模型实际可见的工具目录」改用 `ctx.tools.schemas(agent)`（agent scope 注册视图），与 `/session` 同源；修掉只显示预设层工具（38 vs 50）与 `38 / 39 注册表` 错配。

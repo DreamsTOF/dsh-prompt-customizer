@@ -140,3 +140,18 @@
 | 纯新增 agent 工具不伪造 `masked-shadow`、`read` 仍是真同名遮蔽 | 同上 ⑤ | PASS |
 | 只读池纳入 `locked-agent`（会话级徽标）、`stateBadge` 四态 | `test/tool-mask-pool.test.mjs` | PASS |
 | 反例 | 主源换回 `toolSchemasOf(ctx, scopeKey, true)`（presetScopeKey）时 ①③④ 必须失败 | 实测 ①③④ 全红、②⑤ 仍绿 |
+
+## 2.2.0 当前验证（面板 = 请求真值）
+
+> 本节是 2.2.0「生效视图同源」（ADR-0006）的验证清单。门禁 `npm run check`，真浏览器 `scripts/verify-panel-browser.mjs`。结果按实测原始输出填写：单测与主机 HTTP 实测已跑；**面板 DOM 渲染与前端轮询未跑**（本机无 Chrome），故标「未跑」或「部分」。
+
+| 场景 | 覆盖 | 结果 |
+|---|---|---|
+| 主列表生效判定（外部 `restrict` 隐藏的工具不进可编辑主列表） | `test/effective-view.test.mjs` ① | PASS — `npm run check` → 189/189，exit 0 |
+| 本插件遮蔽留原位（`controllable && hidden` + `ownHidden`，可反选） | `test/effective-view.test.mjs` ④；web 主机实测 `pwsh` 行 | PASS — 单测绿；实测行字段 `{"state":"controllable","hidden":true,"ownHidden":true}` |
+| 双组只读池（可反选 `masked-own` / 不可反选 `masked-plugin` · `masked-shadow` · `masked-ptc`） | `test/tool-mask-pool.test.mjs` | PASS — 单测绿（分组与只读性）；面板渲染未跑（本机无 Chrome） |
+| 同名多来源枚举（`layer` = global / preset / agent，`shadowedBy` 指向生效来源） | `test/effective-view.test.mjs` ⑤ ⑧；web 主机实测 `read` 行 | PASS — 实测两条：`controllable`(layer preset) + `masked-shadow`(layer global)，无假 `masked-plugin` |
+| PTC 折叠（`truth.ptcCollapsed`、工具行 `masked-ptc`、提示词段仍可枚举） | `test/effective-view.test.mjs` ⑥ | PASS — 单测绿 |
+| 未链接会话降级（`truth.linked === false`，不判外部不可见、不抛错） | `test/effective-view.test.mjs` ③；web 主机实测 | PASS — 实测 `truth={"linked":false,"source":"preset","ptcCollapsed":false}`；横幅渲染未跑 |
+| revision 自动刷新（版本变化后自动重取真值） | `test/effective-view.test.mjs` ⑦；`Panel.tsx` 轮询 | 部分 — 路由与单调性单测绿、主机实测 `revision` 可用；前端轮询未实测（本机无 Chrome） |
+| 反例 | 关掉外部隐藏后 `pwsh` 必须回到 `controllable`（②）；无会话时同名覆盖不得标 `masked-plugin`（⑧） | PASS — 两条反例单测均绿 |

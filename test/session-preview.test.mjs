@@ -109,10 +109,11 @@ test('预设预览（工具侧）：右栏工具目录来自同预设活动 agen
     ['edit', 'mcp__demo__query', 'read', 'undo_last_edit', 'write'])
   assert.ok(res.body.tools.some(tool => tool.name === 'undo_last_edit'), 'agent 作用域新增工具必须出现在右栏')
   const byName = new Map(res.body.baseTools.map(tool => [tool.name, tool]))
-  // baseTools（纯预设基座）不含 agent 新增项，遮蔽池的完整目录另由 catalogTools 补扫。
-  assert.equal(byName.get('undo_last_edit'), undefined)
-  assert.notEqual(byName.get('write')?.maskedByPlugin, true)
-  assert.notEqual(byName.get('edit')?.maskedByPlugin, true)
+  // baseTools 已改为 agent 真值（ADR-0006）：agent 新增工具进主列表，被 restrict
+  // 掉的预设工具进只读池（外部不可见）。
+  assert.equal(byName.get('undo_last_edit')?.state, 'locked-agent')
+  assert.equal(byName.get('write')?.maskedByPlugin, true)
+  assert.equal(byName.get('edit')?.maskedByPlugin, true)
   assert.equal(res.body.registryTotal, 5)
 })
 

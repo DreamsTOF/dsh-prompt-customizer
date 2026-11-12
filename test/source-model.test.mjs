@@ -133,7 +133,7 @@ test('preview baseSections 并入同预设活动 agent 的会话级段；baseToo
   const toolSource = new Map(res.body.baseTools.map((tool) => [tool.name, tool.source?.kind]))
   assert.equal(toolSource.get('read'), 'global')
   assert.equal(toolSource.get('write'), 'preset')
-  assert.equal(toolSource.get('undo_last_edit'), undefined)
+  assert.equal(toolSource.get('undo_last_edit'), 'agent')
 })
 
 test('/session 最终 sections 走非 base 装配，base 只作为左栏 catalog；屏蔽按 source 命中', async (t) => {

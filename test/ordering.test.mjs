@@ -105,21 +105,21 @@ test('提示词段按宿主规范 order 排序（并入同预设活动 agent 的
   )
 })
 
-test('工具按宿主最终目录顺序排序，纯预设不含会话 agent 新增项', async (t) => {
+test('工具按宿主最终目录顺序排序，主列表跟随 agent 真值（ADR-0006）', async (t) => {
   const h = harness(t)
   const preview = await h.request('preview?scope=standard&phase=active')
   assert.deepEqual(
     preview.body.baseTools.map((tool) => tool.name),
-    ['mid', 'zeta', 'alpha'],
-    'baseTools 跟随 assembled.tools 顺序；agent_only 不属于纯预设预览',
+    ['mid', 'zeta', 'alpha', 'agent_only'],
+    'baseTools 跟随 assembled.tools 顺序；agent 作用域新增工具也进主列表（ADR-0006）',
   )
 })
 
-test('纯预设预览不读取 live 视图的 restrict 标记', async (t) => {
+test('预设预览读取 live 视图的 restrict 标记，外部不可见工具进只读池（ADR-0006）', async (t) => {
   const h = harness(t, { restrict: ['alpha'] })
   const preview = await h.request('preview?scope=standard&phase=active')
   const alpha = preview.body.baseTools.find((tool) => tool.name === 'alpha')
-  assert.notEqual(alpha?.maskedByPlugin, true, '预设预览不把 live 视图的 restrict 当作预设状态')
+  assert.equal(alpha?.maskedByPlugin, true, 'live 视图里被 restrict 的工具 = 外部不可见，进只读池')
   // 未被遮蔽的工具不带该标记。
   assert.notEqual(preview.body.baseTools.find((tool) => tool.name === 'mid')?.maskedByPlugin, true)
 })
