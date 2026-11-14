@@ -90,6 +90,20 @@ function matchesAny(entries, candidate) {
 }
 
 /**
+ * 段级屏蔽联动同名同源的运行时上下文：段与上下文是同一逻辑贡献的两面，
+ * 屏蔽段时其值面不应单独留在请求里。来源不同（同名不同源）不联动。
+ */
+function withLinkedContextDenials(explicitDenied, deniedSections, contexts) {
+  const list = Array.isArray(explicitDenied) ? [...explicitDenied] : []
+  if (!Array.isArray(deniedSections) || !Array.isArray(contexts)) return list
+  for (const entry of deniedSections) {
+    if (!contexts.some((context) => entryMatches(entry, context))) continue
+    if (!matchesAny(list, entry)) list.push(entry)
+  }
+  return list
+}
+
+/**
  * 通用过滤空的非 required 运行时上下文。宿主 PromptContext 公开了 `required`
  * 标记：required（如 working-directory:current）即使当前文本为空也保留；
  * 其它可选上下文为空时不进入 UI（不按名字特判任何插件）。
@@ -518,7 +532,7 @@ export function apply(ctx, entry = {}) {
     try {
       const { raw, cfg, status, presetId, presetScopeKey } = resolveTarget(context)
       const denied = pickSectionsForStatus(cfg, status)
-      const deniedContexts = pickContextsForStatus(cfg, status)
+      const explicitDeniedContexts = pickContextsForStatus(cfg, status)
       const replacements = filterReplacementsByPhase(cfg.replacements, status)
       const te = pickToolsFilter(cfg.tools, status)
       const sourceOptions = {
@@ -545,6 +559,8 @@ export function apply(ctx, entry = {}) {
         const source = contextSourceOf(item)
         return source === undefined ? { ...item } : { ...item, source }
       })
+      // 同名同源的段被屏蔽时，对应的运行时上下文值也一并屏蔽（同名联动）。
+      const deniedContexts = withLinkedContextDenials(explicitDeniedContexts, denied, annotatedContexts)
       const baseView = context?.promptCustomizerBase === true
       // 0.2.2 起 `PromptPresentation` 只含 sections / contexts / variables，
       // 工具声明由工具提供者拥有；装配瀑布流不再读写 `assembled.tools`。
@@ -1838,7 +1854,11 @@ async function buildInventory(ctx, raw, scopeKey, presetId, _catalog, preview) {
   const tools = seenTools
     .map((item) => ({ ...item, hidden: matchesAny(te.exclude, item) }))
 
-  const ctxDenied = pickContextsForStatus(cfg, status)
+  const ctxDenied = withLinkedContextDenials(
+    pickContextsForStatus(cfg, status),
+    denied,
+    Array.isArray(preview.baseContexts) ? preview.baseContexts : [],
+  )
   const contexts = (Array.isArray(preview.baseContexts) ? preview.baseContexts : []).map((c) => ({
     name: String(c?.name ?? ''),
     text: String(c?.text ?? ''),
@@ -1950,6 +1970,19 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   const previewDenied = pickSectionsForStatus(previewCfg, phaseStatus)
   const previewContextsDenied = pickContextsForStatus(previewCfg, phaseStatus)
   const previewReplacements = filterReplacementsByPhase(previewCfg.replacements, phaseStatus)
+  // 预览源可能是 base 装配（无 live agent 时）；base 结果的 contexts 不带
+  // source，这里按同一份 scope 信息补标，才能用 {name, source} 身份过滤 /
+  // 联动同名段屏蔽（与运行时装配共用同一规则）。
+  const previewContextSources = new Map()
+  for (const item of mergePromptEntries(baseView.contexts, liveBase.contexts)) {
+    const name = String(item?.name ?? '')
+    if (name !== '' && !previewContextSources.has(name)) previewContextSources.set(name, item.source)
+  }
+  const previewContextEntries = (Array.isArray(previewSource.contexts) ? previewSource.contexts : []).map((item) => {
+    const source = stableSourceOf({ source: item.source ?? previewContextSources.get(String(item.name ?? '')) })
+    return source === undefined ? { ...item } : { ...item, source }
+  })
+  const previewContextsDeniedEffective = withLinkedContextDenials(previewContextsDenied, previewDenied, previewContextEntries)
   // 段的规范顺序取「预设作用域链 ∪ 同预设活动 agent 作用域链」：agent 作用域段
   // 的 order 只存在于 agent 链，不补这一条会被一律排到清单尾部。
   const sectionOrder = sectionOrderMap(ctx, livePromptAgent === undefined
@@ -2045,8 +2078,8 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   return {
     ok: true,
     config: previewCfg,
-    contexts: filterEmptyOptionalContexts(previewSource.contexts ?? [], ctx, livePromptAgent ?? scopeKey)
-      .filter((item) => !matchesAny(previewContextsDenied, item))
+    contexts: filterEmptyOptionalContexts(previewContextEntries, ctx, livePromptAgent ?? scopeKey)
+      .filter((item) => !matchesAny(previewContextsDeniedEffective, item))
       .map(context => {
         const source = stableSourceOf(context)
         return {
