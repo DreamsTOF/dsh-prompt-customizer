@@ -1,0 +1,8 @@
+{
+  "name": "dsh-probe-stimulus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "DSH tool/prompt registration surfaces demo + prompt-injection stimulus (dev-only, not published)."
+}
