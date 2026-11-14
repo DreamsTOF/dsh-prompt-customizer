@@ -156,7 +156,7 @@ export const DICT = {
     layerPreset: '预设',
     layerAgent: '会话',
     noSessionBanner: '未链接会话：当前没有同预设的活动会话，外部可见性未知。',
-    ptcCollapsedBanner: 'PTC 折叠生效：模型只收到 run_code，其余工具在程序绑定内可用。',
+    ptcCollapsedBanner: 'PTC 模式：模型只收到 run_code，其余工具在程序绑定内可用；本插件仍可勾选控制（全局/继承层工具真从 SDK 移除，agent/预设自带工具仅运行时拦截）。',
     completeCatalogTitle: '完整目录 / 已遮蔽（只读）',
     completeCatalogHint: '只读池：可反选组列本插件遮蔽的工具（可在 MCP Tab 恢复）；不可反选组列外部决定的工具（外部不可见 / 同名被覆盖 / PTC 折叠）。两组都不参与上面的阶段勾选。',
     workspaceRequired: '工作区级保存需要当前工作区（活动会话的 cwd）',

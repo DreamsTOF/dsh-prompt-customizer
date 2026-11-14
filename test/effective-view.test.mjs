@@ -147,11 +147,14 @@ test('⑤ 同名多来源：生效行进主列表，落选的层身份进只读�
   assert.equal(shadow.description, 'host powershell')
 })
 
-test('⑥ PTC 折叠只作用于工具域：工具只剩 run_code，提示词段照旧', async (t) => {
+test('⑥ PTC 折叠只作用于工具域：run_code 锁定，其余工具仍可控勾选，提示词段照旧', async (t) => {
   const body = await previewOf(harness(t, { ptc: true }))
   assert.equal(body.truth?.ptcCollapsed, true)
-  assert.equal(rowOf(body, 'run_code')?.state, 'locked-executor', 'PTC 传输是主列表唯一条目')
-  assert.equal(rowOf(body, 'bash', 'masked-ptc')?.ptcCollapsed, true, '折叠工具进不可反选池')
+  assert.equal(rowOf(body, 'run_code')?.state, 'locked-executor', 'PTC 传输锁定常驻')
+  // 关键回归：被折叠进 SDK 的工具不再降级为不可反选的 masked-ptc，而是保持可控。
+  assert.equal(rowOf(body, 'bash')?.state, 'controllable', 'PTC 下的工具仍可控（restrict 会真实收敛 SDK）')
+  assert.equal(rowOf(body, 'bash')?.ptcBinding, true, '标记为 PTC SDK 绑定供 UI 说明')
+  assert.equal(rowOf(body, 'bash', 'masked-ptc'), undefined, '不再落入不可反选池')
   assert.ok(body.sections.some((section) => section.name === 'tools:ptc-only'), '提示词段不因工具折叠而消失')
 })
 

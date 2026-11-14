@@ -1992,22 +1992,22 @@ async function buildPreview(ctx, rawConfig, target, phase, _catalog, patch, patc
   // 注入各自的提示词段 —— 折叠只作用于工具域的工具声明，不作用于提示词域。
   const ptcSectionVisible = sections.some(section => section.name === 'tools:ptc-only' && String(section.text ?? '').trim() !== '')
   const ptcCollapsed = ptcSectionVisible || (finalTools.length === 1 && String(finalTools[0]?.name) === 'run_code')
-  const keepUnderPtc = (row) => row.name === 'run_code' || row.state === 'masked-own'
-    || row.state === 'masked-plugin' || row.state === 'masked-shadow' || row.ownHidden === true
   let baseTools = union.rows
   if (ptcCollapsed) {
-    const kept = baseTools.filter(keepUnderPtc)
-    const folded = baseTools.filter((row) => !keepUnderPtc(row)).map((row) => ({
-      ...row,
-      state: 'masked-ptc',
-      maskedByPtc: true,
-      hidden: false,
-      ptcCollapsed: true,
-    }))
-    if (!kept.some((row) => row.name === 'run_code')) {
-      kept.unshift({ name: 'run_code', description: '', state: 'locked-executor', scope: 'executor', hidden: false, layer: 'executor' })
+    // PTC 折叠只作用于「工具声明」域：模型只收到 run_code，其余工具通过 run_code 的
+    // TypeScript SDK 绑定调用。但 SDK 绑定取自 tools.schemas(agent)，本插件的阶段过滤
+    // 走 agent 作用域 tools.restrict({deny})，会真实收敛 schemas —— 因此这些工具在 PTC
+    // 下依然可控：全局/继承层真从 SDK 移除；agent/预设自带工具只能运行时拦截。这里不再
+    // 把它们降级为不可反选的 masked-ptc，而是保留原状态可勾选，仅打 ptcBinding 标记。
+    baseTools = baseTools.map((row) => (row.name === 'run_code'
+      ? { ...row, ptcCollapsed: true }
+      : row.state === 'masked-own' || row.state === 'masked-plugin' || row.state === 'masked-shadow'
+        ? row
+        : { ...row, ptcBinding: true, ptcCollapsed: true }))
+    // run_code 是唯一传输通道（宿主 tools.restrict 显式禁止命名它），锁定常驻、不可隐藏。
+    if (!baseTools.some((row) => row.name === 'run_code')) {
+      baseTools = [{ name: 'run_code', description: '', state: 'locked-executor', scope: 'executor', hidden: false, layer: 'executor', ptcCollapsed: true }, ...baseTools]
     }
-    baseTools = [...kept, ...folded]
   }
   // 主列表与只读池共用这一份行集（catalogTools 保留字段名以兼容旧客户端）。
   const catalogTools = baseTools
