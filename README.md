@@ -88,7 +88,7 @@ dsh plugin --profile desktop add dsh-prompt-customizer
 dsh plugin --profile web add /path/to/dsh-prompt-customizer
 ```
 
-**2.2.1（当前版本）**：兼容并已实测 **DSH 0.2.2-rc.3**；**2.1.3**（**全局 MCP 磁盘持久化修复**：全局添加 / 启停 / 删除 / 编辑落盘到 `$DSH_HOME/mcps/<serverName>/mcp.json`，启动后自动挂回内存，不再写入会被 DSH 启动清空的 profile 根 `cordis.yml`，也不再存插件 SQLite 虚拟账本；预设级仍写 profile patch，工作区级仍写项目 `.mcp.json`；单预设编辑；**全域系统提示词接管**：清单与预览并入同预设活动 agent 的真实装配，插件动态注入的会话级段可枚举、可屏蔽；**工具目录与真实会话同源**：右栏可见工具目录改用 `ctx.tools.schemas(agent)`，不再只显示预设层；**同名遮蔽探测**：被插件同名工具顶掉的原生工具无条件进入只读遮蔽池，插件纯新增的会话级工具也如实列出；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；MCP 全局编辑支持 JSON/YAML；活跃 Agent 预设按 `composedPreset` 精确归位；A/B 预设提示词与工具隔离、卸载恢复及原文不可变回归）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
+**2.2.2（当前版本）**：PTC 折叠工具改为可勾选控制（run_code 锁定常驻；全局/继承层工具真从 PTC SDK 移除，agent/预设自带工具仅运行时拦截）；兼容并已实测 **DSH 0.2.2-rc.3**；**2.1.3**（**全局 MCP 磁盘持久化修复**：全局添加 / 启停 / 删除 / 编辑落盘到 `$DSH_HOME/mcps/<serverName>/mcp.json`，启动后自动挂回内存，不再写入会被 DSH 启动清空的 profile 根 `cordis.yml`，也不再存插件 SQLite 虚拟账本；预设级仍写 profile patch，工作区级仍写项目 `.mcp.json`；单预设编辑；**全域系统提示词接管**：清单与预览并入同预设活动 agent 的真实装配，插件动态注入的会话级段可枚举、可屏蔽；**工具目录与真实会话同源**：右栏可见工具目录改用 `ctx.tools.schemas(agent)`，不再只显示预设层；**同名遮蔽探测**：被插件同名工具顶掉的原生工具无条件进入只读遮蔽池，插件纯新增的会话级工具也如实列出；工具屏蔽池、工作区技能状态、汇总缓存和写队列回归已补齐；MCP 全局编辑支持 JSON/YAML；活跃 Agent 预设按 `composedPreset` 精确归位；A/B 预设提示词与工具隔离、卸载恢复及原文不可变回归）。版本对应关系、逐版变更和适配记录见 [docs/upgrades/README.md](docs/upgrades/README.md)。
 
 ## 快速上手
 
